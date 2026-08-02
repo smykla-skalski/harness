@@ -40,7 +40,7 @@ async fn offer_response_cannot_cross_a_host_trust_rotation() {
         assert!(error.to_string().contains("remote operation host"));
     })
     .await;
-    assert_eq!(server.requests.await.expect("offer request count"), 1);
+    assert_eq!(server.requests.count().await, 1);
     let assignment = state
         .fixture
         .db
@@ -94,7 +94,7 @@ async fn status_evidence_cannot_cross_a_host_trust_rotation() {
         );
     })
     .await;
-    assert_eq!(server.requests.await.expect("status request count"), 1);
+    assert_eq!(server.requests.count().await, 1);
     let assignment = state
         .prepared
         .db
@@ -149,7 +149,7 @@ async fn claim_response_cannot_cross_a_host_trust_rotation() {
         assert!(error.to_string().contains("remote operation host"));
     })
     .await;
-    assert_eq!(server.requests.await.expect("claim request count"), 1);
+    assert_eq!(server.requests.count().await, 1);
     let assignment = load_assignment(
         &state.prepared.db,
         &state.prepared.offer.binding.assignment_id,
@@ -197,7 +197,7 @@ async fn renewal_response_cannot_cross_a_host_trust_rotation() {
         assert!(error.to_string().contains("remote operation host"));
     })
     .await;
-    assert_eq!(server.requests.await.expect("renewal request count"), 1);
+    assert_eq!(server.requests.count().await, 1);
     let assignment = load_assignment(
         &state.prepared.db,
         &state.prepared.offer.binding.assignment_id,
@@ -249,7 +249,7 @@ async fn cancel_response_cannot_cross_a_host_trust_rotation() {
         );
     })
     .await;
-    assert_eq!(server.requests.await.expect("cancel request count"), 1);
+    assert_eq!(server.requests.count().await, 1);
     let assignment = load_assignment(
         &state.prepared.db,
         &state.prepared.offer.binding.assignment_id,
@@ -301,7 +301,7 @@ async fn settlement_response_cannot_cross_a_host_trust_rotation() {
         );
     })
     .await;
-    assert_eq!(server.requests.await.expect("settlement request count"), 1);
+    assert_eq!(server.requests.count().await, 1);
     let assignment = load_assignment(
         &state.prepared.db,
         &state.prepared.offer.binding.assignment_id,

@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use std::time::Duration as StdDuration;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use chrono::{DateTime, Duration, SecondsFormat, Utc};
 use rcgen::{BasicConstraints, CertificateParams, IsCa, Issuer, KeyPair};
@@ -347,11 +347,37 @@ fn pinned_client(
         .expect("authority pinned client")
 }
 
+/// Counts the requests a test server answered.
+///
+/// Read the count only once the call under test has returned. The server counts a
+/// request before it answers, and the client cannot return before it reads that
+/// answer, so any request it was going to send has already landed here. That
+/// ordering is what lets these assertions carry no wall-clock grace period: a
+/// deadline generous enough to survive a loaded host is indistinguishable from a
+/// hang, and one short enough to keep the suite fast turns into a flake.
+pub(super) struct RequestCounter {
+    served: Arc<AtomicUsize>,
+    server: tokio::task::JoinHandle<()>,
+}
+
+impl RequestCounter {
+    pub(super) async fn count(self) -> usize {
+        let served = self.served.load(Ordering::SeqCst);
+        self.server.abort();
+        if let Err(joined) = self.server.await
+            && let Ok(panic) = joined.try_into_panic()
+        {
+            std::panic::resume_unwind(panic);
+        }
+        served
+    }
+}
+
 pub(super) struct BarrierServer {
     pub(super) endpoint: String,
     pub(super) seen: oneshot::Receiver<()>,
     pub(super) release: oneshot::Sender<()>,
-    pub(super) requests: tokio::task::JoinHandle<usize>,
+    pub(super) requests: RequestCounter,
 }
 
 pub(super) async fn spawn_barrier_server(tls: &TestTlsMaterial, body: String) -> BarrierServer {
@@ -360,49 +386,60 @@ pub(super) async fn spawn_barrier_server(tls: &TestTlsMaterial, body: String) ->
     let acceptor = TlsAcceptor::from(Arc::clone(&tls.server));
     let (seen_tx, seen) = oneshot::channel();
     let (release, release_rx) = oneshot::channel();
-    let requests = tokio::spawn(async move {
+    let served = Arc::new(AtomicUsize::new(0));
+    let counted = Arc::clone(&served);
+    let server = tokio::spawn(async move {
         let (stream, _) = listener.accept().await.expect("accept TCP");
         let mut stream = acceptor.accept(stream).await.expect("accept TLS");
         read_request(&mut stream).await;
+        counted.fetch_add(1, Ordering::SeqCst);
         let _ = seen_tx.send(());
         let _ = release_rx.await;
         write_response(&mut stream, 200, &body).await;
-        let Ok(Ok((stream, _))) =
-            tokio::time::timeout(StdDuration::from_millis(250), listener.accept()).await
-        else {
-            return 1;
-        };
-        let mut stream = acceptor.accept(stream).await.expect("accept replay TLS");
-        read_request(&mut stream).await;
-        write_response(&mut stream, 500, "{}").await;
-        2
+        serve_counted_failures(listener, acceptor, &counted).await;
     });
     BarrierServer {
         endpoint: format!("https://localhost:{}/", address.port()),
         seen,
         release,
-        requests,
+        requests: RequestCounter { served, server },
     }
 }
 
-pub(super) async fn spawn_probe_server(
-    tls: &TestTlsMaterial,
-) -> (String, tokio::task::JoinHandle<usize>) {
+pub(super) async fn spawn_probe_server(tls: &TestTlsMaterial) -> (String, RequestCounter) {
     let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind TLS");
     let address = listener.local_addr().expect("TLS address");
     let acceptor = TlsAcceptor::from(Arc::clone(&tls.server));
-    let task = tokio::spawn(async move {
-        let Ok(Ok((stream, _))) =
-            tokio::time::timeout(StdDuration::from_millis(250), listener.accept()).await
-        else {
-            return 0;
+    let served = Arc::new(AtomicUsize::new(0));
+    let counted = Arc::clone(&served);
+    let server =
+        tokio::spawn(async move { serve_counted_failures(listener, acceptor, &counted).await });
+    (
+        format!("https://localhost:{}/", address.port()),
+        RequestCounter { served, server },
+    )
+}
+
+/// Answers every request that arrives, so a regression that repeats a call is
+/// counted rather than left hanging on a socket nobody accepts. A connection that
+/// dies before it becomes a request never reached the endpoint under test, so it
+/// ends the loop instead of counting.
+async fn serve_counted_failures(
+    listener: TcpListener,
+    acceptor: TlsAcceptor,
+    served: &AtomicUsize,
+) {
+    loop {
+        let Ok((stream, _)) = listener.accept().await else {
+            return;
         };
-        let mut stream = acceptor.accept(stream).await.expect("accept TLS");
+        let Ok(mut stream) = acceptor.accept(stream).await else {
+            return;
+        };
         read_request(&mut stream).await;
+        served.fetch_add(1, Ordering::SeqCst);
         write_response(&mut stream, 500, "{}").await;
-        1
-    });
-    (format!("https://localhost:{}/", address.port()), task)
+    }
 }
 
 async fn read_request(stream: &mut tokio_rustls::server::TlsStream<tokio::net::TcpStream>) {

@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use chrono::{Duration, SecondsFormat, Utc};
 use rcgen::{BasicConstraints, CertificateParams, IsCa, Issuer, KeyPair};
@@ -122,7 +122,7 @@ async fn claim_and_lost_renewal_response_converge_through_durable_controller_cas
             if record.state == TaskBoardRemoteAssignmentState::Claimed
                 && record.lease_id.as_deref() == Some("lease-l2")
     ));
-    let requests = requests.await.expect("scripted TLS server");
+    let requests = requests.take().await;
     assert_eq!(requests.len(), 3);
     assert_eq!(request_body(&requests[1]), request_body(&requests[2]));
     assert_eq!(
@@ -417,27 +417,45 @@ pub(super) fn pinned_client(endpoint: &str, tls: &TestTlsMaterial) -> RemoteExec
         .expect("pinned client")
 }
 
+/// Collects the requests a scripted server received.
+///
+/// Read them only once the call under test has returned, for the reason
+/// [`super::controller_authority_test_support::RequestCounter`] spells out: the
+/// server records a request before it answers, so nothing the client sent is
+/// still in flight and no wall-clock grace period has to stand in for that.
+pub(super) struct ScriptedRequests {
+    received: Arc<Mutex<Vec<Vec<u8>>>>,
+    server: tokio::task::JoinHandle<()>,
+}
+
+impl ScriptedRequests {
+    pub(super) async fn take(self) -> Vec<Vec<u8>> {
+        let received = std::mem::take(&mut *self.received.lock().expect("scripted requests"));
+        self.server.abort();
+        if let Err(joined) = self.server.await
+            && let Ok(panic) = joined.try_into_panic()
+        {
+            std::panic::resume_unwind(panic);
+        }
+        received
+    }
+}
+
 pub(super) async fn spawn_scripted_https_server(
     tls: &TestTlsMaterial,
     script: Vec<ScriptedResponse>,
-) -> (String, tokio::task::JoinHandle<Vec<Vec<u8>>>) {
+) -> (String, ScriptedRequests) {
     let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind TLS");
     let address = listener.local_addr().expect("TLS address");
     let acceptor = TlsAcceptor::from(Arc::clone(&tls.server));
-    let task = tokio::spawn(async move {
-        let mut requests = Vec::with_capacity(script.len());
+    let received = Arc::new(Mutex::new(Vec::with_capacity(script.len())));
+    let collected = Arc::clone(&received);
+    let server = tokio::spawn(async move {
         for response in script {
-            // Bound each accept: a client that never connects (e.g. settle
-            // failing before any HTTP request) must surface as a fast assertion
-            // on the collected request count, never a whole-suite hang.
-            let Ok(accepted) =
-                tokio::time::timeout(std::time::Duration::from_secs(10), listener.accept()).await
-            else {
-                break;
-            };
-            let (stream, _) = accepted.expect("accept TCP");
+            let (stream, _) = listener.accept().await.expect("accept TCP");
             let mut stream = acceptor.accept(stream).await.expect("accept TLS");
-            requests.push(read_request(&mut stream).await);
+            let request = read_request(&mut stream).await;
+            collected.lock().expect("scripted requests").push(request);
             if let ScriptedResponse::Json(body) = response {
                 stream
                     .write_all(http_response(&body).as_bytes())
@@ -446,9 +464,11 @@ pub(super) async fn spawn_scripted_https_server(
             }
             stream.shutdown().await.expect("shutdown HTTP");
         }
-        requests
     });
-    (format!("https://localhost:{}/", address.port()), task)
+    (
+        format!("https://localhost:{}/", address.port()),
+        ScriptedRequests { received, server },
+    )
 }
 
 async fn read_request(

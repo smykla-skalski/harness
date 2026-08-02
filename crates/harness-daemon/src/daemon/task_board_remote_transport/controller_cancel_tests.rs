@@ -47,7 +47,7 @@ async fn lost_cancel_response_retries_exactly_and_restarts_from_durable_response
         TaskBoardRemoteMutationOutcome::Updated(ref record)
             if record.state == TaskBoardRemoteAssignmentState::Cancelled
     ));
-    let requests = requests.await.expect("scripted TLS server");
+    let requests = requests.take().await;
     assert_eq!(requests.len(), 2);
     assert_eq!(request_body(&requests[0]), request_body(&requests[1]));
 
@@ -109,7 +109,7 @@ async fn claim_only_cancel_restarts_with_the_exact_empty_response_evidence() {
     .await
     .expect("claim-only cancel succeeds");
     assert_eq!(cancelled.0, response);
-    let requests = requests.await.expect("scripted TLS server");
+    let requests = requests.take().await;
     assert_eq!(requests.len(), 1);
 
     let restarted =
@@ -161,10 +161,7 @@ async fn two_lost_cancel_responses_reconcile_from_status_after_restart() {
         },
     ))
     .await;
-    assert_eq!(
-        cancel_requests.await.expect("cancel request count").len(),
-        2
-    );
+    assert_eq!(cancel_requests.take().await.len(), 2);
     let pending = state
         .prepared
         .db
@@ -207,10 +204,7 @@ async fn two_lost_cancel_responses_reconcile_from_status_after_restart() {
         TaskBoardRemoteMutationOutcome::Updated(ref record)
             if record.state == TaskBoardRemoteAssignmentState::Cancelled
     ));
-    assert_eq!(
-        status_requests.await.expect("status request count").len(),
-        1
-    );
+    assert_eq!(status_requests.take().await.len(), 1);
     let replayed = Box::pin(restarted.cancel(&state.prepared.db, &cancel))
         .await
         .expect("replay status-reconciled cancellation without I/O");

@@ -68,8 +68,8 @@ async fn claim_authority_wins_before_cancel_and_cancel_performs_zero_io() {
         },
     ))
     .await;
-    assert_eq!(requests.await.expect("claim barrier"), 1);
-    assert_eq!(cancel_requests.await.expect("cancel probe"), 0);
+    assert_eq!(requests.count().await, 1);
+    assert_eq!(cancel_requests.count().await, 0);
 }
 
 #[tokio::test]
@@ -128,8 +128,8 @@ async fn cancel_authority_wins_before_claim_and_claim_performs_zero_io() {
         },
     ))
     .await;
-    assert_eq!(requests.await.expect("cancel barrier"), 1);
-    assert_eq!(claim_requests.await.expect("claim probe"), 0);
+    assert_eq!(requests.count().await, 1);
+    assert_eq!(claim_requests.count().await, 0);
 }
 
 #[tokio::test]
@@ -188,8 +188,8 @@ async fn renewal_authority_wins_before_cancel_and_cancel_performs_zero_io() {
         },
     ))
     .await;
-    assert_eq!(requests.await.expect("renewal barrier"), 1);
-    assert_eq!(cancel_requests.await.expect("cancel probe"), 0);
+    assert_eq!(requests.count().await, 1);
+    assert_eq!(cancel_requests.count().await, 0);
 }
 
 #[tokio::test]
@@ -254,6 +254,6 @@ async fn cancel_authority_wins_before_renewal_and_renewal_performs_zero_io() {
         },
     ))
     .await;
-    assert_eq!(requests.await.expect("cancel barrier"), 1);
-    assert_eq!(renew_requests.await.expect("renewal probe"), 0);
+    assert_eq!(requests.count().await, 1);
+    assert_eq!(renew_requests.count().await, 0);
 }

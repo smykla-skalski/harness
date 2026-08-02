@@ -49,7 +49,7 @@ async fn offer_authority_fences_stop_until_response_settlement() {
         assert_eq!(outcome.0, response);
     })
     .await;
-    assert_eq!(requests.await.expect("barrier server"), 1);
+    assert_eq!(requests.count().await, 1);
     try_stop(&state, "stopped after offer settlement")
         .await
         .expect("offer settlement clears operation authority");
@@ -96,7 +96,7 @@ async fn claim_authority_fences_stop_and_settles_attempt_running() {
         assert_eq!(outcome.0, response);
     })
     .await;
-    assert_eq!(requests.await.expect("barrier server"), 1);
+    assert_eq!(requests.count().await, 1);
     let execution = state
         .fixture
         .db
@@ -167,7 +167,7 @@ async fn expired_accepted_offer_is_retained_but_claim_has_zero_network_io() {
     ))
     .await;
     assert_concurrent_database_error(claim_error);
-    assert_eq!(requests.await.expect("replay server"), 1);
+    assert_eq!(requests.count().await, 1);
     let durable = state
         .fixture
         .db

@@ -68,7 +68,7 @@ async fn advertisement_receipt_time_is_captured_after_the_network_response() {
             .expect("record delayed advertisement")
     })
     .await;
-    assert_eq!(requests.await.expect("advertisement server"), 1);
+    assert_eq!(requests.count().await, 1);
     assert_eq!(selection.received_at, canonical_time(received));
     assert_eq!(selection.advertisement.heartbeat_at, canonical_time(sent));
     assert!(selection.advertisement.heartbeat_is_fresh_at(received));
@@ -194,7 +194,7 @@ async fn execute_trust_rotation_barrier(
             .to_string()
             .contains("client trust configuration is stale")
     );
-    assert_eq!(old_server.requests.await.expect("old server requests"), 1);
+    assert_eq!(old_server.requests.count().await, 1);
 
     let fresh_db = db.clone();
     let fresh = tokio::spawn(async move { fresh_controller.refresh_observation(&fresh_db).await });
@@ -212,7 +212,7 @@ async fn execute_trust_rotation_barrier(
         .expect("fresh trust records observation");
     assert_eq!(selection.configuration_revision, new_revision);
     assert_eq!(selection.config, new_config);
-    assert_eq!(new_server.requests.await.expect("new server requests"), 1);
+    assert_eq!(new_server.requests.count().await, 1);
 }
 
 #[tokio::test]
@@ -238,7 +238,7 @@ async fn disabled_host_rejects_advertisement_before_io() {
             .to_string()
             .contains("remote execution host is disabled")
     );
-    assert_eq!(requests.await.expect("disabled probe requests"), 0);
+    assert_eq!(requests.count().await, 0);
 }
 
 fn advertisement(sent_at: chrono::DateTime<Utc>) -> RemoteHostAdvertisement {

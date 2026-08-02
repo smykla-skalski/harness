@@ -24,7 +24,7 @@ async fn stop_after_central_offer_prevents_offer_network_io() {
     .await;
 
     assert_concurrent_database_error(error);
-    assert_eq!(requests.await.expect("probe server"), 0);
+    assert_eq!(requests.count().await, 0);
 }
 
 #[tokio::test]
@@ -49,7 +49,7 @@ async fn stop_after_acceptance_prevents_claim_network_io() {
     .await;
 
     assert_concurrent_database_error(error);
-    assert_eq!(requests.await.expect("probe server"), 0);
+    assert_eq!(requests.count().await, 0);
 }
 
 pub(super) fn assert_concurrent_database_error(error: RemoteExecutionControllerError) {

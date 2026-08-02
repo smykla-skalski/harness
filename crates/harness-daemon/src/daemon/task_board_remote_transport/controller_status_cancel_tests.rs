@@ -64,8 +64,8 @@ async fn status_authority_wins_before_cancel_and_cancel_performs_zero_io() {
         },
     ))
     .await;
-    assert_eq!(status_server.requests.await.expect("status barrier"), 1);
-    assert_eq!(cancel_requests.await.expect("cancel probe"), 0);
+    assert_eq!(status_server.requests.count().await, 1);
+    assert_eq!(cancel_requests.count().await, 0);
 }
 
 #[tokio::test]
@@ -118,8 +118,8 @@ async fn journaled_cancel_lets_a_reconciling_status_reach_the_executor() {
             .expect("cancel settles atomically");
     })
     .await;
-    assert_eq!(status_requests.await.expect("status probe"), 1);
-    assert_eq!(cancel_server.requests.await.expect("cancel barrier"), 1);
+    assert_eq!(status_requests.count().await, 1);
+    assert_eq!(cancel_server.requests.count().await, 1);
     assert_cancelled_without_authority(&state).await;
 }
 
@@ -163,8 +163,8 @@ async fn completed_status_before_cancel_denies_cancel_with_zero_io() {
         },
     ))
     .await;
-    assert_eq!(status_server.requests.await.expect("status barrier"), 1);
-    assert_eq!(cancel_requests.await.expect("cancel probe"), 0);
+    assert_eq!(status_server.requests.count().await, 1);
+    assert_eq!(cancel_requests.count().await, 0);
     let assignment = state
         .prepared
         .db

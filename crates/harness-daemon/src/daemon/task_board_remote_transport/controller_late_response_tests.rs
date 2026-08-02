@@ -73,7 +73,7 @@ async fn claim_response_received_after_l1_expiry_never_exposes_running_state() {
         },
     ))
     .await;
-    assert_eq!(requests.await.expect("late claim server"), 1);
+    assert_eq!(requests.count().await, 1);
     assert_human_required_unknown(&state).await;
 }
 
@@ -137,7 +137,7 @@ async fn renewal_response_received_after_l1_expiry_retains_l2_but_stops_continua
     ))
     .await;
     assert_concurrent_database_error(replay_error);
-    assert_eq!(requests.await.expect("late renewal server"), 1);
+    assert_eq!(requests.count().await, 1);
     assert_human_required_unknown(&state).await;
 }
 

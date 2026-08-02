@@ -77,7 +77,7 @@ async fn controller_upload_replays_immutable_receipt_without_a_second_request() 
         serde_json::to_vec(&replay).expect("replay response JSON")
     );
     assert_eq!(first, response);
-    assert_eq!(requests.await.expect("source upload server"), 1);
+    assert_eq!(requests.count().await, 1);
 }
 
 #[tokio::test]
@@ -135,7 +135,7 @@ async fn controller_upload_replay_rejects_wrong_principal_and_digest_without_net
             .await
             .is_err()
     );
-    assert_eq!(requests.await.expect("source conflict probe"), 0);
+    assert_eq!(requests.count().await, 0);
 }
 
 fn bundle_offer(

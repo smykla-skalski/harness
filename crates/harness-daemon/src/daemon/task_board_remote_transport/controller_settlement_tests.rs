@@ -37,7 +37,7 @@ async fn lost_settlement_response_restarts_with_one_exact_authority_and_receipt(
         },
     ))
     .await;
-    let failed_requests = failed_requests.await.expect("failed settlement server");
+    let failed_requests = failed_requests.take().await;
     assert_eq!(failed_requests.len(), 2);
     assert_eq!(
         request_body(&failed_requests[0]),
@@ -65,7 +65,7 @@ async fn lost_settlement_response_restarts_with_one_exact_authority_and_receipt(
     .await
     .expect("executor receipt replay is adopted after restart");
     assert_eq!(adopted, response);
-    let replay_requests = replay_requests.await.expect("replay server");
+    let replay_requests = replay_requests.take().await;
     assert_eq!(replay_requests.len(), 1);
     assert_eq!(request_body(&replay_requests[0]), sealed_body.as_slice());
     assert_adopted_receipt(&state, &request, &response).await;
@@ -88,7 +88,7 @@ async fn lost_settlement_response_restarts_with_one_exact_authority_and_receipt(
     .await
     .expect("controller receipt replays without network");
     assert_eq!(replayed, response);
-    assert!(probe_requests.await.expect("settlement probe").is_empty());
+    assert!(probe_requests.take().await.is_empty());
 }
 
 #[tokio::test]

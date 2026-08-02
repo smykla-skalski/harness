@@ -94,7 +94,7 @@ async fn accepted_offer_receipt_replays_original_l1_after_claim_renewal_and_term
             if record.state == TaskBoardRemoteAssignmentState::Cancelled
                 && record.lease_id.as_deref() == Some("lease-l2")
     ));
-    assert_eq!(requests.await.expect("offer replay probe"), 0);
+    assert_eq!(requests.count().await, 0);
 }
 
 async fn persist_renewal(
@@ -174,7 +174,7 @@ async fn rejected_capacity_receipt_replays_after_fallback_and_rejects_conflicts(
         },
     ))
     .await;
-    assert_eq!(requests.await.expect("rejected replay probe"), 0);
+    assert_eq!(requests.count().await, 0);
 }
 
 fn renewal_request(

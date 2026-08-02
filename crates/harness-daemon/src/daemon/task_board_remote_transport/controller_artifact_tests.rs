@@ -49,7 +49,7 @@ async fn durable_artifact_replay_skips_a_second_http_fetch() {
     })
     .await;
     assert_eq!(first.content, ARTIFACT_CONTENT);
-    assert_eq!(server.requests.await.expect("artifact request count"), 1);
+    assert_eq!(server.requests.count().await, 1);
 
     let (endpoint, requests) = spawn_probe_server(&tls).await;
     let replay = pinned_controller(&endpoint, &tls)
@@ -57,7 +57,7 @@ async fn durable_artifact_replay_skips_a_second_http_fetch() {
         .await
         .expect("durable artifact replay");
     assert_eq!(replay, first);
-    assert_eq!(requests.await.expect("replay request count"), 0);
+    assert_eq!(requests.count().await, 0);
     assert_fetch_settled(&fixture.state.prepared.db, &fixture.request).await;
 }
 
@@ -77,7 +77,7 @@ async fn failed_http_fetch_retains_trust_authority_without_artifact() {
         },
     ))
     .await;
-    assert_eq!(requests.await.expect("failed fetch request count"), 1);
+    assert_eq!(requests.count().await, 1);
     assert_fetch_pending(&fixture.state.prepared.db, &fixture.request).await;
 }
 
@@ -116,7 +116,7 @@ async fn artifact_response_cannot_cross_a_host_trust_rotation() {
         );
     })
     .await;
-    assert_eq!(server.requests.await.expect("stale fetch request count"), 1);
+    assert_eq!(server.requests.count().await, 1);
     assert_fetch_pending(&fixture.state.prepared.db, &fixture.request).await;
 }
 
