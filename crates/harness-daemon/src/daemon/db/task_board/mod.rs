@@ -164,6 +164,7 @@ mod workflow_execution_attempts;
 mod workflow_execution_audited_cancel;
 mod workflow_execution_candidates;
 mod workflow_execution_fencing;
+mod workflow_execution_queries;
 mod workflow_execution_revisions;
 mod workflow_execution_rows;
 mod workflow_executions;

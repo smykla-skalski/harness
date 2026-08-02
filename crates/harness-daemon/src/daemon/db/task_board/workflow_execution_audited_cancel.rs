@@ -8,6 +8,7 @@ use super::remote_assignment_fencing::{RemoteAssignmentFencing, RemoteTargetStop
 use super::workflow_execution_attempts::{
     attempt_cas_matches, validate_atomic_execution_attempt_update,
 };
+use super::workflow_execution_queries::WorkflowExecutionQueries;
 use super::workflow_executions::{cas_mismatch, load_execution_in_tx, update_execution_in_tx};
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::daemon::protocol::HarnessMonitorAuditEvent;
@@ -31,40 +32,61 @@ impl AsyncDaemonDb {
         updated_attempt: &TaskBoardExecutionAttemptRecord,
         audit: &HarnessMonitorAuditEvent,
     ) -> Result<AuditedRemoteCancelCasOutcome, CliError> {
-        let mut transaction = self
-            .begin_immediate_transaction("audited task board remote cancellation")
-            .await?;
-        // Every staleness verdict still commits rather than drops. Nothing has
-        // been written on those paths -- the screen only reads, and the apply
-        // refuses ahead of its first write -- so an empty commit leaves the same
-        // state as the rollback it replaces. The apply's own writes reach this
-        // commit too, which is why settling at one exit keeps the verdict and
-        // the transaction from drifting apart.
-        let outcome = match screen_audited_remote_cancel_in_tx(
-            &mut transaction,
+        <Self as WorkflowExecutionQueries>::compare_and_set_task_board_remote_cancel_with_audit(
+            self,
             expected_execution,
             target,
+            updated_execution,
             expected_attempt,
+            updated_attempt,
+            audit,
+        )
+        .await
+    }
+}
+
+pub(super) async fn compare_and_set_task_board_remote_cancel_with_audit(
+    db: &AsyncDaemonDb,
+    expected_execution: &TaskBoardWorkflowExecutionCas,
+    target: &TaskBoardAutomationCancelTarget,
+    updated_execution: &TaskBoardWorkflowExecutionRecord,
+    expected_attempt: &TaskBoardExecutionAttemptCas,
+    updated_attempt: &TaskBoardExecutionAttemptRecord,
+    audit: &HarnessMonitorAuditEvent,
+) -> Result<AuditedRemoteCancelCasOutcome, CliError> {
+    let mut transaction = db
+        .begin_immediate_transaction("audited task board remote cancellation")
+        .await?;
+    // Every staleness verdict still commits rather than drops. Nothing has
+    // been written on those paths -- the screen only reads, and the apply
+    // refuses ahead of its first write -- so an empty commit leaves the same
+    // state as the rollback it replaces. The apply's own writes reach this
+    // commit too, which is why settling at one exit keeps the verdict and
+    // the transaction from drifting apart.
+    let outcome = match screen_audited_remote_cancel_in_tx(
+        &mut transaction,
+        expected_execution,
+        target,
+        expected_attempt,
+    )
+    .await?
+    {
+        None => stale(),
+        Some(screened) => apply_audited_remote_cancel_in_tx(
+            &mut transaction,
+            expected_execution,
+            (updated_execution, updated_attempt),
+            &screened,
+            audit,
         )
         .await?
-        {
-            None => stale(),
-            Some(screened) => apply_audited_remote_cancel_in_tx(
-                &mut transaction,
-                expected_execution,
-                (updated_execution, updated_attempt),
-                &screened,
-                audit,
-            )
-            .await?
-            .unwrap_or_else(stale),
-        };
-        transaction
-            .commit()
-            .await
-            .map_err(|error| commit_error(&error))?;
-        Ok(outcome)
-    }
+        .unwrap_or_else(stale),
+    };
+    transaction
+        .commit()
+        .await
+        .map_err(|error| commit_error(&error))?;
+    Ok(outcome)
 }
 
 /// The execution and attempt an audited cancellation proved it still owns.

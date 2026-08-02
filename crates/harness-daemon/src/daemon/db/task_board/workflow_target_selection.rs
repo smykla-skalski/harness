@@ -6,6 +6,7 @@ use super::remote_assignment_fencing::RemoteAssignmentFencing;
 use super::workflow_execution_attempts::{
     attempt_cas_matches, update_attempt_in_tx, validate_attempt_phase,
 };
+use super::workflow_execution_queries::WorkflowExecutionQueries;
 use super::workflow_executions::{cas_mismatch, load_execution_in_tx, update_execution_in_tx};
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::{
@@ -25,33 +26,49 @@ impl AsyncDaemonDb {
         expected_attempt: &TaskBoardExecutionAttemptCas,
         selected_at: &str,
     ) -> Result<bool, CliError> {
-        let mut transaction = self
-            .begin_immediate_transaction("task board local execution target selection")
-            .await?;
-        let (parent, attempt_index) = match screen_local_execution_target_in_tx(
-            &mut transaction,
+        <Self as WorkflowExecutionQueries>::select_task_board_local_execution_target(
+            self,
             expected_execution,
             expected_attempt,
-        )
-        .await?
-        {
-            LocalTargetScreen::Stopped => return commit_noop(transaction).await,
-            LocalTargetScreen::Ready(parent, attempt_index) => (parent, attempt_index),
-        };
-        write_local_execution_target_in_tx(
-            &mut transaction,
-            expected_execution,
-            expected_attempt,
-            &parent,
-            attempt_index,
             selected_at,
         )
-        .await?;
-        transaction.commit().await.map_err(|error| {
-            db_error(format!("commit task board local target selection: {error}"))
-        })?;
-        Ok(true)
+        .await
     }
+}
+
+pub(super) async fn select_task_board_local_execution_target(
+    db: &AsyncDaemonDb,
+    expected_execution: &TaskBoardWorkflowExecutionCas,
+    expected_attempt: &TaskBoardExecutionAttemptCas,
+    selected_at: &str,
+) -> Result<bool, CliError> {
+    let mut transaction = db
+        .begin_immediate_transaction("task board local execution target selection")
+        .await?;
+    let (parent, attempt_index) = match screen_local_execution_target_in_tx(
+        &mut transaction,
+        expected_execution,
+        expected_attempt,
+    )
+    .await?
+    {
+        LocalTargetScreen::Stopped => return commit_noop(transaction).await,
+        LocalTargetScreen::Ready(parent, attempt_index) => (parent, attempt_index),
+    };
+    write_local_execution_target_in_tx(
+        &mut transaction,
+        expected_execution,
+        expected_attempt,
+        &parent,
+        attempt_index,
+        selected_at,
+    )
+    .await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit task board local target selection: {error}")))?;
+    Ok(true)
 }
 
 /// Either the parent, the exact attempt, or the attempt's eligibility is

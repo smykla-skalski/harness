@@ -20,6 +20,7 @@ use super::remote_assignment_fencing::RemoteAssignmentFencing;
 use super::workflow_execution_attempts::{
     attempt_cas_matches, attempt_identity_matches, update_attempt_in_tx, validate_attempt_phase,
 };
+use super::workflow_execution_queries::WorkflowExecutionQueries;
 use super::workflow_execution_revisions::live_execution_revision_mismatch_in_tx;
 use super::workflow_executions::{cas_mismatch, load_execution_in_tx, update_execution_in_tx};
 use super::workflow_first_start_admission::{
@@ -39,26 +40,43 @@ impl AsyncDaemonDb {
         claimed_attempt: &TaskBoardExecutionAttemptRecord,
         now: &str,
     ) -> Result<Option<TaskBoardExecutionAttemptRecord>, CliError> {
-        let claim = SideEffectClaimRequest {
-            execution: expected_execution,
-            attempt: expected_attempt,
+        <Self as WorkflowExecutionQueries>::claim_task_board_workflow_side_effect(
+            self,
+            expected_execution,
+            expected_attempt,
             claimed_attempt,
             now,
-        };
-        let mut transaction = self
-            .begin_immediate_transaction("task board workflow side-effect claim")
-            .await?;
-        let parent_state = match screen_side_effect_claim_in_tx(&mut transaction, &claim).await? {
-            SideEffectClaim::Ready(parent_state) => *parent_state,
-            SideEffectClaim::Settled(context) => {
-                commit_side_effect_claim(transaction, context).await?;
-                return Ok(None);
-            }
-        };
-        apply_side_effect_claim_in_tx(&mut transaction, &claim, &parent_state).await?;
-        commit_side_effect_claim(transaction, "task board workflow side-effect claim").await?;
-        Ok(Some(claimed_attempt.clone()))
+        )
+        .await
     }
+}
+
+pub(super) async fn claim_task_board_workflow_side_effect(
+    db: &AsyncDaemonDb,
+    expected_execution: &TaskBoardWorkflowExecutionCas,
+    expected_attempt: &TaskBoardExecutionAttemptCas,
+    claimed_attempt: &TaskBoardExecutionAttemptRecord,
+    now: &str,
+) -> Result<Option<TaskBoardExecutionAttemptRecord>, CliError> {
+    let claim = SideEffectClaimRequest {
+        execution: expected_execution,
+        attempt: expected_attempt,
+        claimed_attempt,
+        now,
+    };
+    let mut transaction = db
+        .begin_immediate_transaction("task board workflow side-effect claim")
+        .await?;
+    let parent_state = match screen_side_effect_claim_in_tx(&mut transaction, &claim).await? {
+        SideEffectClaim::Ready(parent_state) => *parent_state,
+        SideEffectClaim::Settled(context) => {
+            commit_side_effect_claim(transaction, context).await?;
+            return Ok(None);
+        }
+    };
+    apply_side_effect_claim_in_tx(&mut transaction, &claim, &parent_state).await?;
+    commit_side_effect_claim(transaction, "task board workflow side-effect claim").await?;
+    Ok(Some(claimed_attempt.clone()))
 }
 
 /// The records a side-effect claim compares and stores. Every step reads from
