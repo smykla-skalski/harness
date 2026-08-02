@@ -160,6 +160,7 @@ gallery_path="$output_directory/index.html"
     '    button:hover { color: #fff; background: #2b2b2b; }' \
     '    button[aria-pressed="true"] { color: #fff; background: #3b6fc4; }' \
     '    main { display: grid; gap: 20px; }' \
+    '    main[data-columns="four"] { grid-template-columns: repeat(4, minmax(0, 1fr)); }' \
     '    main[data-columns="two"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }' \
     '    main[data-columns="one"] { grid-template-columns: minmax(0, 1fr); }' \
     '    figure { margin: 0; padding: 16px; overflow: auto; background: #202020; border: 1px solid #353535; border-radius: 12px; }' \
@@ -168,7 +169,8 @@ gallery_path="$output_directory/index.html"
     '    .dimensions { color: #888; font-weight: 400; white-space: nowrap; }' \
     '    img { display: block; max-width: 100%; height: auto; margin-inline: auto; border-radius: 8px; background: #1d1d1d; }' \
     '    a { color: inherit; }' \
-    '    @media (max-width: 1120px) { main[data-columns="two"] { grid-template-columns: minmax(0, 1fr); } }' \
+    '    @media (max-width: 2200px) { main[data-columns="four"] { grid-template-columns: repeat(2, minmax(0, 1fr)); } }' \
+    '    @media (max-width: 1120px) { main[data-columns="four"], main[data-columns="two"] { grid-template-columns: minmax(0, 1fr); } }' \
     '    @media (max-width: 700px) { body { padding: 20px; } header { align-items: stretch; flex-direction: column; } .layout-controls { align-self: start; } }' \
     '  </style>' \
     '</head>' \
@@ -179,6 +181,7 @@ gallery_path="$output_directory/index.html"
     "      <p>$rendered_count snapshots · Click any preview to open the original PNG</p>" \
     '    </div>' \
     '    <div class="layout-controls" role="group" aria-label="Preview columns">' \
+    '      <button type="button" data-column-choice="four" aria-pressed="false">Four columns</button>' \
     '      <button type="button" data-column-choice="two" aria-pressed="true">Two columns</button>' \
     '      <button type="button" data-column-choice="one" aria-pressed="false">One column</button>' \
     '    </div>' \
