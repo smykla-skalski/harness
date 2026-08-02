@@ -27,5 +27,6 @@ pub use process::AgentTuiProcess;
 pub(crate) use process::{
     AgentTuiAttachState, AgentTuiInputWorker, AgentTuiSnapshotContext, snapshot_from_process,
 };
+pub(crate) use readiness::signal_readiness_ready;
 pub use screen::TerminalScreenParser;
 pub(crate) use spawn::{deliver_deferred_prompts, spawn_agent_tui_process};

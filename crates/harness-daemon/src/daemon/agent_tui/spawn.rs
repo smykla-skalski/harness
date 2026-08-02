@@ -80,18 +80,24 @@ pub(crate) fn ensure_runtime_bootstrap(runtime: &str, project_dir: &Path) -> Res
     clippy::cognitive_complexity,
     reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
 )]
-pub(crate) fn wait_for_readiness(process: &AgentTuiProcess, runtime: &str, tui_id: &str) {
-    if !process.wait_ready(READINESS_TIMEOUT) {
-        tracing::warn!(
-            runtime = %runtime,
-            tui_id = %tui_id,
-            "terminal agent readiness timeout, sending join message anyway"
-        );
+pub(crate) fn wait_for_readiness(process: &AgentTuiProcess, runtime: &str, tui_id: &str) -> bool {
+    if process.wait_ready(READINESS_TIMEOUT) {
+        return true;
     }
+    tracing::warn!(
+        runtime = %runtime,
+        tui_id = %tui_id,
+        "terminal agent readiness timeout, sending join message anyway"
+    );
+    false
 }
 
-/// Wait for readiness, then send the auto-join prompt and optional user prompt.
-/// Used by both the direct and bridge deferred-join background threads.
+/// Wait for readiness, then send the auto-join prompt and the user's first
+/// prompt. Used by both the direct and bridge deferred-join background threads.
+///
+/// Returns the first problem worth putting on the snapshot. A readiness timeout
+/// still sends the prompts, but they land blind and the agent may miss them, so
+/// the caller has to record it rather than leave a healthy-looking `Running`.
 #[expect(
     clippy::cognitive_complexity,
     reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
@@ -100,19 +106,33 @@ pub(crate) fn deliver_deferred_prompts(
     process: &AgentTuiProcess,
     runtime: &str,
     tui_id: &str,
-    auto_join: &str,
+    pty_auto_join: Option<&str>,
     user_prompt: Option<&str>,
-) {
-    wait_for_readiness(process, runtime, tui_id);
-    if let Err(error) = send_initial_prompt(process, auto_join) {
+) -> Option<String> {
+    if pty_auto_join.is_none() && user_prompt.is_none() {
+        return None;
+    }
+    let mut problem = (!wait_for_readiness(process, runtime, tui_id)).then(|| {
+        format!(
+            "terminal agent never signaled readiness within {}s, so its session join may have been missed",
+            READINESS_TIMEOUT.as_secs()
+        )
+    });
+    if let Some(auto_join) = pty_auto_join
+        && let Err(error) = send_initial_prompt(process, auto_join)
+    {
         tracing::warn!(%error, tui_id = %tui_id, "deferred join: failed to send auto-join");
-        return;
+        return Some(format!("failed to send the session join: {error}"));
     }
     if let Some(prompt) = user_prompt
         && let Err(error) = send_initial_prompt(process, prompt)
     {
-        tracing::warn!(%error, "failed to send user prompt after auto-join");
+        tracing::warn!(%error, tui_id = %tui_id, "failed to send user prompt after auto-join");
+        if problem.is_none() {
+            problem = Some(format!("failed to send the initial prompt: {error}"));
+        }
     }
+    problem
 }
 
 pub(crate) fn send_initial_prompt(process: &AgentTuiProcess, prompt: &str) -> Result<(), CliError> {

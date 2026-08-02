@@ -167,7 +167,13 @@ pub struct AgentTuiStartSpec {
     pub project_dir: PathBuf,
     pub transcript_path: PathBuf,
     pub size: AgentTuiSize,
+    /// Session auto-join, delivered through argv or the PTY depending on the
+    /// runtime's [`InitialPromptDelivery`](crate::agents::runtime::InitialPromptDelivery).
     pub prompt: Option<String>,
+    /// First prompt the caller asked for, sent after the auto-join lands. An
+    /// older bridge simply drops it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub user_prompt: Option<String>,
     /// Reasoning / thinking effort level forwarded to the runtime. Runtimes
     /// that accept it via CLI flag have already had it folded into `profile.argv`
     /// at request resolution; this field is consumed at spawn time for

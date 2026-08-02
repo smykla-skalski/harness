@@ -268,6 +268,11 @@ impl BridgeServer {
                 let snapshot = self.get_agent_tui(&request.tui_id)?;
                 Ok(BridgeResponse::ok_payload(&snapshot)?.into())
             }
+            "ready" => {
+                let request: BridgeGetRequest = parse_bridge_payload(payload)?;
+                let snapshot = self.signal_agent_tui_ready(&request.tui_id)?;
+                Ok(BridgeResponse::ok_payload(&snapshot)?.into())
+            }
             "input" => {
                 let request: BridgeInputRequest = parse_bridge_payload(payload)?;
                 request
