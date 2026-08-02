@@ -13,6 +13,7 @@ use x509_parser::parse_x509_certificate;
 
 use super::{RemoteTlsConfigHandle, RemoteTlsListener};
 use crate::daemon::remote_acme::RemoteCertificateBundle;
+use crate::daemon::test_liveness::LIVENESS;
 
 #[tokio::test]
 async fn remote_tls_listener_uses_reloaded_certificate_on_new_handshakes() {
@@ -131,7 +132,7 @@ async fn remote_tls_listener_accepts_valid_client_while_another_handshake_stalls
         .expect("open stalled TLS connection");
     let alpn_protocols = [b"h2".as_slice()];
 
-    let ((server_stream, _), client_stream) = timeout(Duration::from_secs(1), async {
+    let ((server_stream, _), client_stream) = timeout(LIVENESS, async {
         tokio::join!(
             listener.accept(),
             connect_client(address, &alpn_protocols, "daemon.example.com")
@@ -162,7 +163,7 @@ async fn remote_tls_listener_times_out_stalled_handshakes_at_capacity() {
         .expect("open stalled TLS connection");
     let alpn_protocols = [b"h2".as_slice()];
 
-    let ((server_stream, _), client_stream) = timeout(Duration::from_secs(1), async {
+    let ((server_stream, _), client_stream) = timeout(LIVENESS, async {
         tokio::join!(
             listener.accept(),
             connect_client(address, &alpn_protocols, "daemon.example.com")

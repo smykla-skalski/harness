@@ -20,6 +20,7 @@ use crate::daemon::remote_acme::{
 use crate::daemon::remote_acme_cleanup::RemoteAcmeCleanupTracker;
 use crate::daemon::remote_identity::RemoteAuditOutcome;
 use crate::daemon::remote_tls::RemoteTlsConfigHandle;
+use crate::daemon::test_liveness::LIVENESS;
 
 #[test]
 fn remote_certificate_renewal_becomes_due_exactly_thirty_days_before_expiry() {
@@ -214,7 +215,7 @@ async fn remote_acme_renewal_loop_checks_immediately_and_stops_on_shutdown() {
         || at("2026-07-10T00:00:00Z"),
     );
 
-    timeout(Duration::from_secs(5), async {
+    timeout(LIVENESS, async {
         while issuer.renewal_count() != 1 {
             sleep(Duration::from_millis(10)).await;
         }
@@ -223,7 +224,7 @@ async fn remote_acme_renewal_loop_checks_immediately_and_stops_on_shutdown() {
     .expect("immediate renewal check timeout");
 
     shutdown_tx.send(true).expect("signal shutdown");
-    timeout(Duration::from_secs(1), task)
+    timeout(LIVENESS, task)
         .await
         .expect("renewal loop shutdown timeout")
         .expect("renewal loop join");
@@ -245,7 +246,7 @@ async fn remote_acme_renewal_loop_stops_while_check_is_in_flight() {
         || at("2026-07-10T00:00:00Z"),
     );
 
-    timeout(Duration::from_secs(5), async {
+    timeout(LIVENESS, async {
         while !issuer.started() {
             sleep(Duration::from_millis(10)).await;
         }
@@ -254,7 +255,7 @@ async fn remote_acme_renewal_loop_stops_while_check_is_in_flight() {
     .expect("renewal check start timeout");
     shutdown_tx.send(true).expect("signal shutdown");
 
-    timeout(Duration::from_secs(1), task)
+    timeout(LIVENESS, task)
         .await
         .expect("renewal loop did not stop while its check was in flight")
         .expect("renewal loop join");

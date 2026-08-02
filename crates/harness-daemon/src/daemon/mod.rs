@@ -150,6 +150,8 @@ pub(crate) mod task_board_read_only_runtime;
 pub(crate) mod task_board_remote_result_import;
 #[cfg(feature = "daemon-runtime")]
 pub(crate) mod task_board_remote_transport;
+#[cfg(test)]
+pub(crate) mod test_liveness;
 // Session-timeline construction lives in `harness_timeline`; re-exported
 // under the old name so the daemon's own `db`, `service`, and `http` call
 // sites keep resolving `crate::daemon::timeline::*` without touching every
