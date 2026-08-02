@@ -4,7 +4,7 @@ This file governs the Harness Monitor macOS app. The repo-root `AGENTS.md` still
 
 ## How to use this file
 
-1. Apply the repo-root contract first, including the selected `pr` or `replay` delivery mode, worktree rules, `mise`, and signed path-limited commits.
+1. Apply the repo-root contract first, including the selected `pr`, `pr with review`, or `replay` delivery mode, worktree rules, `mise`, and signed path-limited commits.
 2. Use this file for mandatory Monitor rules: Tuist generation, lanes, validation, SwiftUI/UX, and daemon ownership.
 3. Load `../../docs/agent-guides/monitor-reference.md` only for detailed lane, daemon, performance, or SwiftUI rationale. Load `../../docs/agent-guides/monitor-previews.md` for preview authoring and shell-rendered snapshots. Load `../../docs/agent-guides/monitor-mobile-reference.md` only for iOS, watch, CloudKit, or mobile mirror work.
 
@@ -39,7 +39,7 @@ Full git worktrees are mandatory for parallel Monitor work. Any agent or user th
 
 Keep one assigned custom worktree and one build/test/runtime lane for the whole session. Reusing them keeps DerivedData, daemon state, and ports warm instead of forcing cold rebuilds.
 
-The root-selected delivery mode controls integration: `replay` uses local `main`, while `pr` uses `upstream/main` and the review lifecycle. Keep the Monitor worktree and lane available through the mode's terminal state and until session end or explicit cleanup.
+The root-selected delivery mode controls integration: `replay` uses local `main`, while `pr` and `pr with review` use `upstream/main`, and only `pr with review` runs a reviewer loop before the PR goes ready. Keep the Monitor worktree and lane available through the mode's terminal state and until session end or explicit cleanup.
 
 Inside a worktree:
 
