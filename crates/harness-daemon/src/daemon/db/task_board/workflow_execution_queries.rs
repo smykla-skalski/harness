@@ -245,14 +245,16 @@ impl WorkflowExecutionQueries for AsyncDaemonDb {
         updated_attempt: &TaskBoardExecutionAttemptRecord,
         audit: &HarnessMonitorAuditEvent,
     ) -> Result<AuditedRemoteCancelCasOutcome, CliError> {
-        workflow_execution_audited_cancel::compare_and_set_task_board_remote_cancel_with_audit(
-            self,
-            expected_execution,
-            target,
-            updated_execution,
-            expected_attempt,
-            updated_attempt,
-            audit,
+        Box::pin(
+            workflow_execution_audited_cancel::compare_and_set_task_board_remote_cancel_with_audit(
+                self,
+                expected_execution,
+                target,
+                updated_execution,
+                expected_attempt,
+                updated_attempt,
+                audit,
+            ),
         )
         .await
     }

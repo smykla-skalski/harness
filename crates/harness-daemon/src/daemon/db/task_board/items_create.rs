@@ -29,7 +29,10 @@ impl AsyncDaemonDb {
         &self,
         item: TaskBoardItem,
     ) -> Result<TaskBoardMutation, CliError> {
-        <Self as ItemCoreQueries>::create_task_board_item(self, item).await
+        Box::pin(<Self as ItemCoreQueries>::create_task_board_item(
+            self, item,
+        ))
+        .await
     }
 
     /// Like [`create_task_board_item`], but also evaluates `BuiltInV1` in the
@@ -38,7 +41,7 @@ impl AsyncDaemonDb {
         &self,
         item: TaskBoardItem,
     ) -> Result<TaskBoardMutation, CliError> {
-        <Self as ItemCoreQueries>::create_task_board_item_with_triage(self, item).await
+        Box::pin(<Self as ItemCoreQueries>::create_task_board_item_with_triage(self, item)).await
     }
 
     /// Like [`create_task_board_item_with_triage`], but for a create whose
@@ -49,7 +52,8 @@ impl AsyncDaemonDb {
         &self,
         item: TaskBoardItem,
     ) -> Result<TaskBoardMutation, CliError> {
-        <Self as ItemCoreQueries>::create_task_board_item_at_requested_status(self, item).await
+        Box::pin(<Self as ItemCoreQueries>::create_task_board_item_at_requested_status(self, item))
+            .await
     }
 
     /// Like [`create_task_board_item`], but also evaluates `BuiltInV1` in the
@@ -58,7 +62,8 @@ impl AsyncDaemonDb {
         &self,
         item: TaskBoardItem,
     ) -> Result<TaskBoardMutation, CliError> {
-        <Self as ItemCoreQueries>::create_task_board_item_with_provider_triage(self, item).await
+        Box::pin(<Self as ItemCoreQueries>::create_task_board_item_with_provider_triage(self, item))
+            .await
     }
 }
 
