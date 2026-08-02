@@ -14,6 +14,7 @@ final class HarnessClientTests: XCTestCase {
 
     XCTAssertEqual(env["XDG_DATA_HOME"], dataHome.path)
     XCTAssertEqual(env["HARNESS_DAEMON_DATA_HOME"], dataHome.path)
+    XCTAssertEqual(env["HARNESS_DAEMON_OWNERSHIP"], "external")
     XCTAssertEqual(env["XDG_DATA_HOME"], env["HARNESS_DAEMON_DATA_HOME"])
   }
 

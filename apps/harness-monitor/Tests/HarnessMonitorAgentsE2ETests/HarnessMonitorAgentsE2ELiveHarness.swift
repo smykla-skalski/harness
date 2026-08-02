@@ -94,6 +94,19 @@ final class HarnessMonitorAgentsE2ELiveHarness {
     return lines.joined(separator: "\n")
   }
 
+  func approvalFileURL() throws -> URL {
+    let manifestURL = stateRootURL.appendingPathComponent("prepare-manifest.json")
+    let data = try Data(contentsOf: manifestURL)
+    guard
+      let object = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+      let workspace = object["codexWorkspace"] as? String,
+      !workspace.isEmpty
+    else {
+      throw Self.failure("Agents e2e manifest has no Codex workspace")
+    }
+    return URL(fileURLWithPath: workspace).appendingPathComponent("approved.txt")
+  }
+
   private static func requiredEnvironmentValue(
     _ key: String,
     from environment: [String: String]
