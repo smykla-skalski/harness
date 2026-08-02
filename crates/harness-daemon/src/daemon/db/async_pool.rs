@@ -5,8 +5,8 @@ use sqlx::pool::PoolOptions;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous};
 use sqlx::{Sqlite, SqlitePool, query_as, query_scalar};
 
-use super::summary_rows::AsyncSessionSummaryRow;
 use super::async_resolved_session::AsyncResolvedSessionRow;
+use super::summary_rows::AsyncSessionSummaryRow;
 use super::task_board_sync_coordinator::{
     TaskBoardSyncCoordinator, TaskBoardSyncPermit, TaskBoardSyncStatus,
 };

@@ -185,9 +185,7 @@ fn dependency_pin_rejects_an_item_without_a_recorded_head() {
         .expect_err("dependency pinning must fail closed without the recorded head");
 
     assert!(
-        error
-            .to_string()
-            .contains("no recorded pull request head"),
+        error.to_string().contains("no recorded pull request head"),
         "unexpected error: {error}"
     );
 }

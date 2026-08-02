@@ -59,7 +59,10 @@ fn parse_resolved_session(
         worktree_name: row.worktree_name,
     };
     let canonicalized = canonicalize_persisted_session_state(&mut state, &utc_now());
-    Ok((daemon_index::ResolvedSession { project, state }, canonicalized))
+    Ok((
+        daemon_index::ResolvedSession { project, state },
+        canonicalized,
+    ))
 }
 
 #[cfg(test)]

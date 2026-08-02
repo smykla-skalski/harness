@@ -69,12 +69,8 @@ fn delete_session_removes_archived_session_and_returns_204() {
                     let db_path = sandbox.path().join("daemon.sqlite");
                     let state = test_http_state_with_empty_async_db(&db_path).await;
                     let session_id = "e3c5e42d-cf97-5104-b49e-d6e456d53f4c";
-                    let body = start_async_http_session(
-                        state.clone(),
-                        &project_dir,
-                        session_id,
-                    )
-                    .await;
+                    let body =
+                        start_async_http_session(state.clone(), &project_dir, session_id).await;
                     let worktree_path: std::path::PathBuf = body["state"]["worktree_path"]
                         .as_str()
                         .expect("worktree_path in response")

@@ -103,9 +103,7 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
     let daemon_epoch = manifest.started_at.clone();
     let async_db_slot_for_audit = async_db.clone();
 
-    if let Err(error) =
-        initialize_startup_state(&db, &async_db, sender.clone(), &config).await
-    {
+    if let Err(error) = initialize_startup_state(&db, &async_db, sender.clone(), &config).await {
         let _ = state::clear_manifest_for_pid(process_id());
         return Err(error);
     }
@@ -236,10 +234,7 @@ pub(crate) async fn initialize_startup_state(
             reattribute_task_board_items(async_db).await;
             policy_bootstrap::bootstrap_policy_storage(async_db).await?;
             let task_board_instance_id = async_db.task_board_instance_id().await?;
-            load_provider_credentials(
-                &task_board_instance_id,
-                config.provider_credential_startup,
-            );
+            load_provider_credentials(&task_board_instance_id, config.provider_credential_startup);
         }
         spawn_startup_background_tasks(
             Arc::clone(&db),
