@@ -169,6 +169,42 @@ final class HarnessMonitorAppConfigurationTests: XCTestCase {
   }
 
   @MainActor
+  func testResolvePerfScenarioUsesDeterministicDashboardRoute() throws {
+    let suiteName = "io.harnessmonitor.app-tests.perf-dashboard-route.\(UUID().uuidString)"
+    let isolated = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+    defer { isolated.removePersistentDomain(forName: suiteName) }
+
+    isolated.set(
+      DashboardWindowRoute.reviews.rawValue,
+      forKey: DashboardRouteRestorationDefaults.storageKey
+    )
+    let testEnv = HarnessMonitorEnvironment(
+      values: [
+        HarnessMonitorPerfScenario.environmentKey: HarnessMonitorPerfScenario.repositoriesSettings
+          .rawValue
+      ],
+      homeDirectory: FileManager.default.homeDirectoryForCurrentUser
+    )
+
+    _ = HarnessMonitorAppConfiguration.resolve(
+      defaults: isolated,
+      baseEnvironment: testEnv
+    )
+
+    XCTAssertEqual(
+      isolated.string(forKey: DashboardRouteRestorationDefaults.storageKey),
+      DashboardWindowRoute.agents.rawValue
+    )
+  }
+
+  func testTaskBoardPerfScenarioKeepsTaskBoardDashboardRoute() {
+    XCTAssertEqual(
+      HarnessMonitorAppConfiguration.perfInitialDashboardRoute(for: .dashboardLiveScroll),
+      .taskBoard
+    )
+  }
+
+  @MainActor
   func testResolveAppliesPersistedDaemonOwnershipPreferenceBeforeStoreCreation() throws {
     let suiteName = "io.harnessmonitor.app-tests.daemon-ownership.\(UUID().uuidString)"
     let isolated = try XCTUnwrap(UserDefaults(suiteName: suiteName))
