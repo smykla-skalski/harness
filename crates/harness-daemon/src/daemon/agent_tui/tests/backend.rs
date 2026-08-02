@@ -303,13 +303,19 @@ fn portable_pty_backend_preserves_raw_ansi_and_parses_screen_text() {
         .expect("status");
     assert!(status.success());
 
-    let transcript = process.transcript().expect("transcript");
-    assert!(
-        transcript
+    // The child exiting says nothing about its output having been read: the PTY
+    // reader drains and parses on its own thread, so both the transcript and the
+    // screen can still be empty at this point.
+    wait_until(WAIT_TIMEOUT, || {
+        process
+            .transcript()
+            .expect("transcript")
             .windows(b"\x1b[31m".len())
             .any(|chunk| chunk == b"\x1b[31m")
-    );
-    assert!(process.screen().expect("screen").text.contains("red"));
+    });
+    wait_until(WAIT_TIMEOUT, || {
+        process.screen().expect("screen").text.contains("red")
+    });
 }
 
 #[test]
@@ -356,13 +362,13 @@ fn portable_pty_backend_resolves_vibe_from_local_bin_when_missing_from_path() {
                 .expect("wait")
                 .expect("status");
             assert!(status.success());
-            assert!(
+            wait_until(WAIT_TIMEOUT, || {
                 process
                     .screen()
                     .expect("screen")
                     .text
                     .contains("vibe-local-bin")
-            );
+            });
         },
     );
 }
@@ -393,13 +399,13 @@ fn portable_pty_backend_resolves_vibe_from_uv_tool_dir_without_local_bin_symlink
                 .expect("wait")
                 .expect("status");
             assert!(status.success());
-            assert!(
+            wait_until(WAIT_TIMEOUT, || {
                 process
                     .screen()
                     .expect("screen")
                     .text
                     .contains("vibe-uv-tool")
-            );
+            });
         },
     );
 }

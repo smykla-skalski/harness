@@ -8,7 +8,12 @@ use crate::daemon::agent_tui::{
 };
 use crate::daemon::protocol::StreamEvent;
 
-pub(super) const WAIT_TIMEOUT: Duration = super::super::DEFAULT_WAIT_TIMEOUT;
+/// This replaced a local `DEFAULT_WAIT_TIMEOUT` that had already been raised from
+/// 5s to 20s chasing PTY starvation on a loaded host, and still timed out at 20s.
+/// Raising it again was never going to be the fix - the tests that flaked were
+/// asserting on output the PTY reader had not parsed yet, which no duration
+/// repairs. Every use here fails the test when it expires, so it is a backstop.
+pub(super) const WAIT_TIMEOUT: Duration = crate::daemon::test_liveness::LIVENESS;
 
 pub(super) fn sample_snapshot(
     tui_id: &str,
