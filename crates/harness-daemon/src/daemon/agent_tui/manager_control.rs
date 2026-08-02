@@ -272,8 +272,13 @@ impl AgentTuiManagerHandle {
         reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
     )]
     pub fn signal_ready(&self, tui_id: &str) -> Result<AgentTuiSnapshot, CliError> {
-        let process = self.active_process(tui_id)?;
-        signal_readiness_ready(&process.readiness_signal());
+        // A sandboxed daemon never owns the PTY, so the callback has to be
+        // relayed to the bridge process that does.
+        if self.state.sandboxed {
+            BridgeClient::for_capability(BridgeCapability::AgentTui)?.agent_tui_ready(tui_id)?;
+        } else {
+            signal_readiness_ready(&self.active_process(tui_id)?.readiness_signal());
+        }
         tracing::info!(tui_id = %tui_id, "terminal agent readiness signaled via callback");
         self.get(tui_id)
     }

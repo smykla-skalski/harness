@@ -480,7 +480,7 @@ impl AgentTuiProcess {
         guard.ready
     }
 
-    #[cfg(feature = "daemon-runtime")]
+    #[cfg(any(feature = "bridge-runtime", feature = "daemon-runtime"))]
     pub(crate) fn readiness_signal(&self) -> ReadinessSignal {
         Arc::clone(&self.readiness)
     }

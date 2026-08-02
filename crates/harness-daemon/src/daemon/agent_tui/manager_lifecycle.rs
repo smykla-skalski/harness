@@ -13,10 +13,7 @@ use super::model::{
     AgentTuiSnapshot, AgentTuiStartRequest, AgentTuiStartRequestExt, AgentTuiStatus,
 };
 use super::process::{AgentTuiProcess, AgentTuiSnapshotContext, snapshot_from_process};
-use super::spawn::{
-    build_auto_join_prompt, deliver_deferred_prompts, send_initial_prompt, spawn_agent_tui_process,
-    wait_for_readiness,
-};
+use super::spawn::{build_auto_join_prompt, deliver_deferred_prompts, spawn_agent_tui_process};
 use super::support::{
     ResolvedTuiProject, lock_db, record_started_prompt, resolve_tui_project,
     resolve_tui_project_async, transcript_path,
@@ -141,26 +138,21 @@ impl AgentTuiManagerHandle {
                     tracing::warn!(tui_id = %tui_id, "deferred join: TUI no longer active");
                     return;
                 };
-                // Only wait for readiness when there is something to deliver via PTY.
-                // Runtimes whose join is wired via CLI flag/positional (e.g. gemini's
-                // `--prompt-interactive`) and have no user prompt would otherwise burn
-                // 10s on `READINESS_TIMEOUT` for nothing - their HOOK_POINTS may not
-                // include SessionStart, so the readiness callback never fires and the
-                // wait always times out.
-                if let Some(join_prompt) = &pty_auto_join {
-                    deliver_deferred_prompts(
-                        &process,
-                        &runtime,
-                        &tui_id,
-                        join_prompt,
-                        user_prompt.as_deref(),
-                    );
-                } else if let Some(prompt) = &user_prompt {
-                    wait_for_readiness(&process, &runtime, &tui_id);
-                    if let Err(error) = send_initial_prompt(&process, prompt) {
-                        tracing::warn!(%error, "failed to send user prompt");
-                    }
-                }
+                // `deliver_deferred_prompts` returns before waiting when there is
+                // nothing to deliver via PTY. Runtimes whose join is wired via CLI
+                // flag/positional (e.g. gemini's `--prompt-interactive`) and have no
+                // user prompt would otherwise burn 10s on `READINESS_TIMEOUT` for
+                // nothing - their HOOK_POINTS may not include SessionStart, so the
+                // readiness callback never fires and the wait always times out.
+                let problem = deliver_deferred_prompts(
+                    &process,
+                    &runtime,
+                    &tui_id,
+                    pty_auto_join.as_deref(),
+                    user_prompt.as_deref(),
+                );
+                let mut snapshot = snapshot;
+                snapshot.error = problem;
                 let _ = manager.save_and_broadcast("agent_tui_ready", &snapshot);
             },
         );
@@ -208,6 +200,11 @@ impl AgentTuiManagerHandle {
             transcript_path,
             size,
             prompt: Some(auto_join),
+            user_prompt: request
+                .prompt
+                .as_deref()
+                .filter(|value| !value.is_empty())
+                .map(ToString::to_string),
             effort: request.effort.clone(),
         })?;
         self.register_started_snapshot(&snapshot, ActiveAgentTui::new(None))?;
