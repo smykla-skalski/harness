@@ -2,12 +2,36 @@ use chrono::DateTime;
 use sqlx::{Sqlite, Transaction, query, query_as};
 
 use super::ORCHESTRATOR_CHANGE_SCOPE;
+use super::item_core_queries::ItemCoreQueries;
 use super::items::bump_change_in_tx;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::{
     TaskBoardAiReviewReportRecord, TaskBoardAiReviewReportStatus, TaskBoardReportOnlyReviewFinding,
     validate_task_board_ai_review_report,
 };
+
+impl AsyncDaemonDb {
+    pub(crate) async fn append_task_board_ai_review_report(
+        &self,
+        report: &TaskBoardAiReviewReportRecord,
+    ) -> Result<bool, CliError> {
+        <Self as ItemCoreQueries>::append_task_board_ai_review_report(self, report).await
+    }
+
+    pub(crate) async fn task_board_ai_review_reports(
+        &self,
+        item_id: &str,
+    ) -> Result<Vec<TaskBoardAiReviewReportRecord>, CliError> {
+        <Self as ItemCoreQueries>::task_board_ai_review_reports(self, item_id).await
+    }
+
+    pub(crate) async fn task_board_latest_ai_review_report(
+        &self,
+        item_id: &str,
+    ) -> Result<Option<TaskBoardAiReviewReportRecord>, CliError> {
+        <Self as ItemCoreQueries>::task_board_latest_ai_review_report(self, item_id).await
+    }
+}
 
 #[derive(Debug, sqlx::FromRow)]
 struct AiReviewReportRow {
@@ -31,95 +55,93 @@ struct AiReviewReportRow {
     finished_at: String,
 }
 
-impl AsyncDaemonDb {
-    pub(crate) async fn append_task_board_ai_review_report(
-        &self,
-        report: &TaskBoardAiReviewReportRecord,
-    ) -> Result<bool, CliError> {
-        validate_task_board_ai_review_report(report)
-            .map_err(|error| db_error(format!("validate AI review report: {error}")))?;
-        let mut transaction = self
-            .begin_immediate_transaction("append AI review report")
-            .await?;
-        if let Some(existing) = load_by_id(&mut transaction, &report.report_id).await? {
-            transaction.rollback().await.map_err(|error| {
-                db_error(format!(
-                    "rollback unchanged AI review report append: {error}"
-                ))
-            })?;
-            if existing == *report {
-                return Ok(false);
-            }
-            return Err(db_error(format!(
-                "AI review report '{}' already exists with different content",
-                report.report_id
-            )));
-        }
-        insert_report(&mut transaction, report).await?;
-        insert_report_order(&mut transaction, &report.report_id).await?;
-        bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit AI review report append: {error}")))?;
-        Ok(true)
-    }
-
-    pub(crate) async fn task_board_ai_review_reports(
-        &self,
-        item_id: &str,
-    ) -> Result<Vec<TaskBoardAiReviewReportRecord>, CliError> {
-        let rows = query_as::<_, AiReviewReportRow>(
-            "SELECT report.report_id, report.item_id, report.correlation_id, report.repository,
-                    report.pull_request_number, report.head_revision, report.runtime,
-                    report.requested_runtime, report.actual_runtime, report.requested_model,
-                    report.effective_model, report.status, report.summary, report.findings_json,
-                    report.partial_output, report.terminal_reason, report.started_at,
-                    report.finished_at
-             FROM task_board_ai_review_reports AS report
-             JOIN task_board_ai_review_report_order AS report_order
-               ON report_order.report_id = report.report_id
-             WHERE report.item_id = ?1
-             ORDER BY report_order.sequence DESC",
-        )
-        .bind(item_id)
-        .fetch_all(self.pool())
-        .await
-        .map_err(|error| db_error(format!("list AI review reports for '{item_id}': {error}")))?;
-        rows.into_iter()
-            .map(AiReviewReportRow::into_record)
-            .collect()
-    }
-
-    pub(crate) async fn task_board_latest_ai_review_report(
-        &self,
-        item_id: &str,
-    ) -> Result<Option<TaskBoardAiReviewReportRecord>, CliError> {
-        query_as::<_, AiReviewReportRow>(
-            "SELECT report.report_id, report.item_id, report.correlation_id, report.repository,
-                    report.pull_request_number, report.head_revision, report.runtime,
-                    report.requested_runtime, report.actual_runtime, report.requested_model,
-                    report.effective_model, report.status, report.summary, report.findings_json,
-                    report.partial_output, report.terminal_reason, report.started_at,
-                    report.finished_at
-             FROM task_board_ai_review_reports AS report
-             JOIN task_board_ai_review_report_order AS report_order
-               ON report_order.report_id = report.report_id
-             WHERE report.item_id = ?1
-             ORDER BY report_order.sequence DESC
-             LIMIT 1",
-        )
-        .bind(item_id)
-        .fetch_optional(self.pool())
-        .await
-        .map_err(|error| {
+pub(crate) async fn append_task_board_ai_review_report(
+    db: &AsyncDaemonDb,
+    report: &TaskBoardAiReviewReportRecord,
+) -> Result<bool, CliError> {
+    validate_task_board_ai_review_report(report)
+        .map_err(|error| db_error(format!("validate AI review report: {error}")))?;
+    let mut transaction = db
+        .begin_immediate_transaction("append AI review report")
+        .await?;
+    if let Some(existing) = load_by_id(&mut transaction, &report.report_id).await? {
+        transaction.rollback().await.map_err(|error| {
             db_error(format!(
-                "load latest AI review report for '{item_id}': {error}"
+                "rollback unchanged AI review report append: {error}"
             ))
-        })?
-        .map(AiReviewReportRow::into_record)
-        .transpose()
+        })?;
+        if existing == *report {
+            return Ok(false);
+        }
+        return Err(db_error(format!(
+            "AI review report '{}' already exists with different content",
+            report.report_id
+        )));
     }
+    insert_report(&mut transaction, report).await?;
+    insert_report_order(&mut transaction, &report.report_id).await?;
+    bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit AI review report append: {error}")))?;
+    Ok(true)
+}
+
+pub(crate) async fn task_board_ai_review_reports(
+    db: &AsyncDaemonDb,
+    item_id: &str,
+) -> Result<Vec<TaskBoardAiReviewReportRecord>, CliError> {
+    let rows = query_as::<_, AiReviewReportRow>(
+        "SELECT report.report_id, report.item_id, report.correlation_id, report.repository,
+                report.pull_request_number, report.head_revision, report.runtime,
+                report.requested_runtime, report.actual_runtime, report.requested_model,
+                report.effective_model, report.status, report.summary, report.findings_json,
+                report.partial_output, report.terminal_reason, report.started_at,
+                report.finished_at
+         FROM task_board_ai_review_reports AS report
+         JOIN task_board_ai_review_report_order AS report_order
+           ON report_order.report_id = report.report_id
+         WHERE report.item_id = ?1
+         ORDER BY report_order.sequence DESC",
+    )
+    .bind(item_id)
+    .fetch_all(db.pool())
+    .await
+    .map_err(|error| db_error(format!("list AI review reports for '{item_id}': {error}")))?;
+    rows.into_iter()
+        .map(AiReviewReportRow::into_record)
+        .collect()
+}
+
+pub(crate) async fn task_board_latest_ai_review_report(
+    db: &AsyncDaemonDb,
+    item_id: &str,
+) -> Result<Option<TaskBoardAiReviewReportRecord>, CliError> {
+    query_as::<_, AiReviewReportRow>(
+        "SELECT report.report_id, report.item_id, report.correlation_id, report.repository,
+                report.pull_request_number, report.head_revision, report.runtime,
+                report.requested_runtime, report.actual_runtime, report.requested_model,
+                report.effective_model, report.status, report.summary, report.findings_json,
+                report.partial_output, report.terminal_reason, report.started_at,
+                report.finished_at
+         FROM task_board_ai_review_reports AS report
+         JOIN task_board_ai_review_report_order AS report_order
+           ON report_order.report_id = report.report_id
+         WHERE report.item_id = ?1
+         ORDER BY report_order.sequence DESC
+         LIMIT 1",
+    )
+    .bind(item_id)
+    .fetch_optional(db.pool())
+    .await
+    .map_err(|error| {
+        db_error(format!(
+            "load latest AI review report for '{item_id}': {error}"
+        ))
+    })?
+    .map(AiReviewReportRow::into_record)
+    .transpose()
 }
 
 async fn load_by_id(

@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use sqlx::{Sqlite, Transaction, query_as, query_scalar};
 
 use super::ITEMS_CHANGE_SCOPE;
+use super::item_core_queries::ItemCoreQueries;
 use super::items::TaskBoardItemSnapshot;
 use super::lane_order::TaskBoardItemsSnapshot;
 use super::mapper::item_from_rows;
@@ -16,34 +17,7 @@ impl AsyncDaemonDb {
         &self,
         status: Option<TaskBoardStatus>,
     ) -> Result<TaskBoardItemsSnapshot, CliError> {
-        let mut transaction = self
-            .pool()
-            .begin()
-            .await
-            .map_err(|error| db_error(format!("begin task board item snapshot: {error}")))?;
-        let items_change_seq = query_scalar::<_, i64>(
-            "SELECT COALESCE(change_seq, 0) FROM change_tracking WHERE scope = ?1",
-        )
-        .bind(ITEMS_CHANGE_SCOPE)
-        .fetch_optional(transaction.as_mut())
-        .await
-        .map_err(|error| db_error(format!("read task-board item sequence: {error}")))?
-        .unwrap_or(0);
-        let mut items = load_item_snapshots_in_tx(&mut transaction).await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit task board item snapshot: {error}")))?;
-        let status = status.map(TaskBoardStatus::canonical_persisted_status);
-        items.retain(|snapshot| {
-            !snapshot.item.is_deleted()
-                && status.is_none_or(|expected| snapshot.item.status == expected)
-        });
-        sort_item_snapshots(&mut items);
-        Ok(TaskBoardItemsSnapshot {
-            items,
-            items_change_seq,
-        })
+        <Self as ItemCoreQueries>::task_board_items_snapshot(self, status).await
     }
 
     /// Test a picked item against its list sequence and row revision.
@@ -53,67 +27,130 @@ impl AsyncDaemonDb {
         item_revision: i64,
         items_change_seq: i64,
     ) -> Result<bool, CliError> {
-        let mut transaction =
-            self.pool().begin().await.map_err(|error| {
-                db_error(format!("begin task board pick revalidation: {error}"))
-            })?;
-        let current_sequence = query_scalar::<_, i64>(
-            "SELECT COALESCE(change_seq, 0) FROM change_tracking WHERE scope = ?1",
+        <Self as ItemCoreQueries>::task_board_item_snapshot_is_current(
+            self,
+            item_id,
+            item_revision,
+            items_change_seq,
         )
-        .bind(ITEMS_CHANGE_SCOPE)
-        .fetch_optional(transaction.as_mut())
         .await
-        .map_err(|error| db_error(format!("read task-board pick sequence: {error}")))?
-        .unwrap_or(0);
-        let current_revision = query_scalar::<_, i64>(
-            "SELECT revision FROM task_board_items WHERE item_id = ?1 AND deleted_at IS NULL",
-        )
-        .bind(item_id)
-        .fetch_optional(transaction.as_mut())
-        .await
-        .map_err(|error| {
-            db_error(format!(
-                "read task-board pick revision '{item_id}': {error}"
-            ))
-        })?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit task board pick revalidation: {error}")))?;
-        Ok(current_sequence == items_change_seq && current_revision == Some(item_revision))
     }
 
     /// List Task Board items including tombstones.
     pub(crate) async fn list_task_board_items_including_deleted(
         &self,
     ) -> Result<Vec<TaskBoardItem>, CliError> {
-        Ok(self
-            .list_task_board_item_snapshots_including_deleted()
-            .await?
-            .into_iter()
-            .map(|snapshot| snapshot.item)
-            .collect())
+        <Self as ItemCoreQueries>::list_task_board_items_including_deleted(self).await
     }
 
     /// Like [`list_task_board_items_including_deleted`], but keeps each
-    /// item's row revision, for a batch caller that needs to CAS an exact
-    /// matched revision without a second point read.
+    /// item's row revision. See
+    /// [`ItemCoreQueries::list_task_board_item_snapshots_including_deleted`]
+    /// for the full contract.
     pub(crate) async fn list_task_board_item_snapshots_including_deleted(
         &self,
     ) -> Result<Vec<TaskBoardItemSnapshot>, CliError> {
-        let mut transaction = self
-            .pool()
-            .begin()
-            .await
-            .map_err(|error| db_error(format!("begin task board item list: {error}")))?;
-        let mut snapshots = load_item_snapshots_in_tx(&mut transaction).await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit task board item list: {error}")))?;
-        sort_item_snapshots(&mut snapshots);
-        Ok(snapshots)
+        <Self as ItemCoreQueries>::list_task_board_item_snapshots_including_deleted(self).await
     }
+}
+
+pub(crate) async fn task_board_items_snapshot(
+    db: &AsyncDaemonDb,
+    status: Option<TaskBoardStatus>,
+) -> Result<TaskBoardItemsSnapshot, CliError> {
+    let mut transaction = db
+        .pool()
+        .begin()
+        .await
+        .map_err(|error| db_error(format!("begin task board item snapshot: {error}")))?;
+    let items_change_seq = query_scalar::<_, i64>(
+        "SELECT COALESCE(change_seq, 0) FROM change_tracking WHERE scope = ?1",
+    )
+    .bind(ITEMS_CHANGE_SCOPE)
+    .fetch_optional(transaction.as_mut())
+    .await
+    .map_err(|error| db_error(format!("read task-board item sequence: {error}")))?
+    .unwrap_or(0);
+    let mut items = load_item_snapshots_in_tx(&mut transaction).await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit task board item snapshot: {error}")))?;
+    let status = status.map(TaskBoardStatus::canonical_persisted_status);
+    items.retain(|snapshot| {
+        !snapshot.item.is_deleted() && status.is_none_or(|expected| snapshot.item.status == expected)
+    });
+    sort_item_snapshots(&mut items);
+    Ok(TaskBoardItemsSnapshot {
+        items,
+        items_change_seq,
+    })
+}
+
+pub(crate) async fn task_board_item_snapshot_is_current(
+    db: &AsyncDaemonDb,
+    item_id: &str,
+    item_revision: i64,
+    items_change_seq: i64,
+) -> Result<bool, CliError> {
+    let mut transaction = db
+        .pool()
+        .begin()
+        .await
+        .map_err(|error| db_error(format!("begin task board pick revalidation: {error}")))?;
+    let current_sequence = query_scalar::<_, i64>(
+        "SELECT COALESCE(change_seq, 0) FROM change_tracking WHERE scope = ?1",
+    )
+    .bind(ITEMS_CHANGE_SCOPE)
+    .fetch_optional(transaction.as_mut())
+    .await
+    .map_err(|error| db_error(format!("read task-board pick sequence: {error}")))?
+    .unwrap_or(0);
+    let current_revision = query_scalar::<_, i64>(
+        "SELECT revision FROM task_board_items WHERE item_id = ?1 AND deleted_at IS NULL",
+    )
+    .bind(item_id)
+    .fetch_optional(transaction.as_mut())
+    .await
+    .map_err(|error| {
+        db_error(format!(
+            "read task-board pick revision '{item_id}': {error}"
+        ))
+    })?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit task board pick revalidation: {error}")))?;
+    Ok(current_sequence == items_change_seq && current_revision == Some(item_revision))
+}
+
+pub(crate) async fn list_task_board_items_including_deleted(
+    db: &AsyncDaemonDb,
+) -> Result<Vec<TaskBoardItem>, CliError> {
+    Ok(
+        list_task_board_item_snapshots_including_deleted(db)
+            .await?
+            .into_iter()
+            .map(|snapshot| snapshot.item)
+            .collect(),
+    )
+}
+
+pub(crate) async fn list_task_board_item_snapshots_including_deleted(
+    db: &AsyncDaemonDb,
+) -> Result<Vec<TaskBoardItemSnapshot>, CliError> {
+    let mut transaction = db
+        .pool()
+        .begin()
+        .await
+        .map_err(|error| db_error(format!("begin task board item list: {error}")))?;
+    let mut snapshots = load_item_snapshots_in_tx(&mut transaction).await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit task board item list: {error}")))?;
+    sort_item_snapshots(&mut snapshots);
+    Ok(snapshots)
 }
 
 async fn load_item_snapshots_in_tx(

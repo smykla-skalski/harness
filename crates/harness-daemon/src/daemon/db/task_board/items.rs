@@ -19,10 +19,12 @@
 use sqlx::{Sqlite, Transaction, query, query_as, query_scalar};
 
 use super::ITEMS_CHANGE_SCOPE;
+use super::item_core_queries::ItemCoreQueries;
 use super::item_tx_ext::TaskBoardItemTxExt;
 use super::lane_order::{LaneTransitionWrite, record_lane_transition_audit_in_tx};
 use super::mapper::item_from_rows;
 use super::rows::{ExternalRefRow, ItemRow};
+use super::items_reads;
 use super::triage_interface::Triage;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
 use crate::infra::io;
@@ -60,10 +62,10 @@ mod write;
 pub(super) use write::{insert_item_in_tx, replace_item_in_tx};
 
 #[path = "items_create.rs"]
-mod create;
+pub(crate) mod create;
 
 #[path = "items_update.rs"]
-mod update;
+pub(crate) mod update;
 
 const SELECT_ITEM: &str = "SELECT * FROM task_board_items WHERE item_id = ?1";
 const SELECT_REFS: &str = "SELECT item_id, position, provider, external_id, url, sync_state_json
@@ -110,9 +112,7 @@ impl AsyncDaemonDb {
     /// # Errors
     /// Returns [`CliError`] when the item does not exist or the load fails.
     pub async fn task_board_item(&self, item_id: &str) -> Result<TaskBoardItem, CliError> {
-        self.task_board_item_snapshot(item_id)
-            .await
-            .map(|snapshot| snapshot.item)
+        <Self as ItemCoreQueries>::task_board_item(self, item_id).await
     }
 
     /// Load one Task Board item with the row revision used by automation CAS.
@@ -123,48 +123,17 @@ impl AsyncDaemonDb {
         &self,
         item_id: &str,
     ) -> Result<TaskBoardItemSnapshot, CliError> {
-        io::validate_safe_segment(item_id)?;
-        let mut transaction = self
-            .pool()
-            .begin()
-            .await
-            .map_err(|error| db_error(format!("begin task board item load: {error}")))?;
-        let (item, item_revision) = transaction
-            .load_item_in_tx(item_id)
-            .await?
-            .ok_or_else(|| db_error(format!("task-board item '{item_id}' not found")))?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit task board item load: {error}")))?;
-        Ok(TaskBoardItemSnapshot {
-            item,
-            item_revision,
-        })
+        <Self as ItemCoreQueries>::task_board_item_snapshot(self, item_id).await
     }
 
     /// Like [`task_board_item`], but returns `Ok(None)` for a genuinely
-    /// missing item instead of an error, so a caller that needs to
-    /// distinguish "not found" from a real database failure -- a
-    /// provider-exclusion restore deciding whether there is anything to
-    /// restore, for example -- does not have to fail closed on every error
-    /// alike.
+    /// missing item instead of an error. See
+    /// [`ItemCoreQueries::find_task_board_item`] for the full contract.
     pub(crate) async fn find_task_board_item(
         &self,
         item_id: &str,
     ) -> Result<Option<TaskBoardItem>, CliError> {
-        io::validate_safe_segment(item_id)?;
-        let mut transaction = self
-            .pool()
-            .begin()
-            .await
-            .map_err(|error| db_error(format!("begin task board item load: {error}")))?;
-        let found = transaction.load_item_in_tx(item_id).await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit task board item load: {error}")))?;
-        Ok(found.map(|(item, _revision)| item))
+        <Self as ItemCoreQueries>::find_task_board_item(self, item_id).await
     }
 
     /// List active Task Board items in the legacy stable ordering.
@@ -172,12 +141,7 @@ impl AsyncDaemonDb {
         &self,
         status: Option<TaskBoardStatus>,
     ) -> Result<Vec<TaskBoardItem>, CliError> {
-        let mut items = self.list_task_board_items_including_deleted().await?;
-        let status = status.map(TaskBoardStatus::canonical_persisted_status);
-        items.retain(|item| {
-            !item.is_deleted() && status.is_none_or(|expected| item.status == expected)
-        });
-        Ok(items)
+        <Self as ItemCoreQueries>::list_task_board_items(self, status).await
     }
 
     /// Tombstone one Task Board item.
@@ -185,14 +149,82 @@ impl AsyncDaemonDb {
         &self,
         item_id: &str,
     ) -> Result<TaskBoardMutation, CliError> {
-        self.update_task_board_item(item_id, |item| {
-            item.deleted_at = Some(utc_now());
-            item.tombstone_cause = Some(TaskBoardTombstoneCause::Manual);
-            Ok(true)
-        })
-        .await?
-        .ok_or_else(|| db_error("task board delete unexpectedly produced no mutation"))
+        <Self as ItemCoreQueries>::delete_task_board_item(self, item_id).await
     }
+}
+
+pub(crate) async fn task_board_item(
+    db: &AsyncDaemonDb,
+    item_id: &str,
+) -> Result<TaskBoardItem, CliError> {
+    task_board_item_snapshot(db, item_id)
+        .await
+        .map(|snapshot| snapshot.item)
+}
+
+pub(crate) async fn task_board_item_snapshot(
+    db: &AsyncDaemonDb,
+    item_id: &str,
+) -> Result<TaskBoardItemSnapshot, CliError> {
+    io::validate_safe_segment(item_id)?;
+    let mut transaction = db
+        .pool()
+        .begin()
+        .await
+        .map_err(|error| db_error(format!("begin task board item load: {error}")))?;
+    let (item, item_revision) = transaction
+        .load_item_in_tx(item_id)
+        .await?
+        .ok_or_else(|| db_error(format!("task-board item '{item_id}' not found")))?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit task board item load: {error}")))?;
+    Ok(TaskBoardItemSnapshot {
+        item,
+        item_revision,
+    })
+}
+
+pub(crate) async fn find_task_board_item(
+    db: &AsyncDaemonDb,
+    item_id: &str,
+) -> Result<Option<TaskBoardItem>, CliError> {
+    io::validate_safe_segment(item_id)?;
+    let mut transaction = db
+        .pool()
+        .begin()
+        .await
+        .map_err(|error| db_error(format!("begin task board item load: {error}")))?;
+    let found = transaction.load_item_in_tx(item_id).await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit task board item load: {error}")))?;
+    Ok(found.map(|(item, _revision)| item))
+}
+
+pub(crate) async fn list_task_board_items(
+    db: &AsyncDaemonDb,
+    status: Option<TaskBoardStatus>,
+) -> Result<Vec<TaskBoardItem>, CliError> {
+    let mut items = items_reads::list_task_board_items_including_deleted(db).await?;
+    let status = status.map(TaskBoardStatus::canonical_persisted_status);
+    items.retain(|item| !item.is_deleted() && status.is_none_or(|expected| item.status == expected));
+    Ok(items)
+}
+
+pub(crate) async fn delete_task_board_item(
+    db: &AsyncDaemonDb,
+    item_id: &str,
+) -> Result<TaskBoardMutation, CliError> {
+    update::update_task_board_item(db, item_id, |item| {
+        item.deleted_at = Some(utc_now());
+        item.tombstone_cause = Some(TaskBoardTombstoneCause::Manual);
+        Ok(true)
+    })
+    .await?
+    .ok_or_else(|| db_error("task board delete unexpectedly produced no mutation"))
 }
 
 /// Records exactly one audit event for a write, distinguishing: a fresh

@@ -8,6 +8,7 @@ use super::super::dispatch_admission_tx_ext::TaskBoardDispatchAdmissionTxExt;
 use super::super::item_tx_ext::TaskBoardItemTxExt;
 use super::super::lane_order::{LaneTransitionKind, replace_with_lane_transition_in_tx};
 use super::super::projects::resolve_item_project_in_tx;
+use super::super::item_core_queries::ItemCoreQueries;
 use super::super::triage_interface::Triage;
 use super::lifecycle::ensure_estimates_are_editable_in_tx;
 use super::{
@@ -38,18 +39,13 @@ impl AsyncDaemonDb {
     where
         F: FnOnce(&mut TaskBoardItem) -> Result<bool, CliError>,
     {
-        self.update_task_board_item_impl(
-            item_id,
-            mutate,
-            TaskBoardTriageIngress::None,
-            DispatchReservationPolicy::Allow,
-        )
-        .await
+        <Self as ItemCoreQueries>::update_task_board_item(self, item_id, mutate).await
     }
 
     /// Evaluation follows session state, but it must not advance an item while
-    /// dispatch admission still owns the item's exact revision. The worker
-    /// claim clears that reservation before later evaluations may resume.
+    /// dispatch admission still owns the item's exact revision. See
+    /// [`ItemCoreQueries::update_task_board_item_for_evaluation`] for the
+    /// full contract.
     pub(crate) async fn update_task_board_item_for_evaluation<F>(
         &self,
         item_id: &str,
@@ -58,19 +54,13 @@ impl AsyncDaemonDb {
     where
         F: FnOnce(&mut TaskBoardItem) -> Result<bool, CliError>,
     {
-        self.update_task_board_item_impl(
-            item_id,
-            mutate,
-            TaskBoardTriageIngress::None,
-            DispatchReservationPolicy::Skip,
-        )
-        .await
+        <Self as ItemCoreQueries>::update_task_board_item_for_evaluation(self, item_id, mutate).await
     }
 
     /// Like [`update_task_board_item`], but also evaluates `BuiltInV1` in the
-    /// same transaction, for the public update API: a same-call status or
-    /// placement change is a direct human effect and suppresses `BuiltInV1`
-    /// placement (decision history still refreshes).
+    /// same transaction, for the public update API. See
+    /// [`ItemCoreQueries::update_task_board_item_with_triage`] for the full
+    /// contract.
     pub(crate) async fn update_task_board_item_with_triage<F>(
         &self,
         item_id: &str,
@@ -79,20 +69,13 @@ impl AsyncDaemonDb {
     where
         F: FnOnce(&mut TaskBoardItem) -> Result<bool, CliError>,
     {
-        self.update_task_board_item_impl(
-            item_id,
-            mutate,
-            TaskBoardTriageIngress::HumanUpdate,
-            DispatchReservationPolicy::Allow,
-        )
-        .await
+        <Self as ItemCoreQueries>::update_task_board_item_with_triage(self, item_id, mutate).await
     }
 
     /// Like [`update_task_board_item_with_triage`], but for provider
-    /// create/reconcile/restore: a same-call status or placement change
-    /// reflects provider evidence, not a human override, so it never
-    /// suppresses `BuiltInV1` placement on its own. Only a pre-existing
-    /// manual lane anchor still suppresses.
+    /// create/reconcile/restore. See
+    /// [`ItemCoreQueries::update_task_board_item_with_provider_triage`] for
+    /// the full contract.
     pub(crate) async fn update_task_board_item_with_provider_triage<F>(
         &self,
         item_id: &str,
@@ -101,124 +84,187 @@ impl AsyncDaemonDb {
     where
         F: FnOnce(&mut TaskBoardItem) -> Result<bool, CliError>,
     {
-        self.update_task_board_item_impl(
-            item_id,
-            mutate,
-            TaskBoardTriageIngress::ProviderReconcile,
-            DispatchReservationPolicy::Allow,
-        )
-        .await
+        <Self as ItemCoreQueries>::update_task_board_item_with_provider_triage(self, item_id, mutate)
+            .await
     }
+}
 
-    #[expect(
-        clippy::cognitive_complexity,
-        reason = "sequential mutation and guard chain with atomic triage and lane persistence"
-    )]
-    async fn update_task_board_item_impl<F>(
-        &self,
-        item_id: &str,
-        mutate: F,
-        ingress: TaskBoardTriageIngress,
-        reservation_policy: DispatchReservationPolicy,
-    ) -> Result<Option<TaskBoardMutation>, CliError>
-    where
-        F: FnOnce(&mut TaskBoardItem) -> Result<bool, CliError>,
-    {
-        io::validate_safe_segment(item_id)?;
-        let mut transaction = self
-            .begin_immediate_transaction("task board item update")
-            .await?;
-        let (mut item, revision, existing_override) = transaction
-            .load_item_with_triage_override_in_tx(item_id)
+pub(crate) async fn update_task_board_item<F>(
+    db: &AsyncDaemonDb,
+    item_id: &str,
+    mutate: F,
+) -> Result<Option<TaskBoardMutation>, CliError>
+where
+    F: FnOnce(&mut TaskBoardItem) -> Result<bool, CliError>,
+{
+    update_task_board_item_impl(
+        db,
+        item_id,
+        mutate,
+        TaskBoardTriageIngress::None,
+        DispatchReservationPolicy::Allow,
+    )
+    .await
+}
+
+pub(crate) async fn update_task_board_item_for_evaluation<F>(
+    db: &AsyncDaemonDb,
+    item_id: &str,
+    mutate: F,
+) -> Result<Option<TaskBoardMutation>, CliError>
+where
+    F: FnOnce(&mut TaskBoardItem) -> Result<bool, CliError>,
+{
+    update_task_board_item_impl(
+        db,
+        item_id,
+        mutate,
+        TaskBoardTriageIngress::None,
+        DispatchReservationPolicy::Skip,
+    )
+    .await
+}
+
+pub(crate) async fn update_task_board_item_with_triage<F>(
+    db: &AsyncDaemonDb,
+    item_id: &str,
+    mutate: F,
+) -> Result<Option<TaskBoardMutation>, CliError>
+where
+    F: FnOnce(&mut TaskBoardItem) -> Result<bool, CliError>,
+{
+    update_task_board_item_impl(
+        db,
+        item_id,
+        mutate,
+        TaskBoardTriageIngress::HumanUpdate,
+        DispatchReservationPolicy::Allow,
+    )
+    .await
+}
+
+pub(crate) async fn update_task_board_item_with_provider_triage<F>(
+    db: &AsyncDaemonDb,
+    item_id: &str,
+    mutate: F,
+) -> Result<Option<TaskBoardMutation>, CliError>
+where
+    F: FnOnce(&mut TaskBoardItem) -> Result<bool, CliError>,
+{
+    update_task_board_item_impl(
+        db,
+        item_id,
+        mutate,
+        TaskBoardTriageIngress::ProviderReconcile,
+        DispatchReservationPolicy::Allow,
+    )
+    .await
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "sequential mutation and guard chain with atomic triage and lane persistence"
+)]
+async fn update_task_board_item_impl<F>(
+    db: &AsyncDaemonDb,
+    item_id: &str,
+    mutate: F,
+    ingress: TaskBoardTriageIngress,
+    reservation_policy: DispatchReservationPolicy,
+) -> Result<Option<TaskBoardMutation>, CliError>
+where
+    F: FnOnce(&mut TaskBoardItem) -> Result<bool, CliError>,
+{
+    io::validate_safe_segment(item_id)?;
+    let mut transaction = db
+        .begin_immediate_transaction("task board item update")
+        .await?;
+    let (mut item, revision, existing_override) = transaction
+        .load_item_with_triage_override_in_tx(item_id)
+        .await?
+        .ok_or_else(|| db_error(format!("task-board item '{item_id}' not found")))?;
+    if reservation_policy == DispatchReservationPolicy::Skip
+        && transaction
+            .has_active_dispatch_reservation_in_tx(item_id)
             .await?
-            .ok_or_else(|| db_error(format!("task-board item '{item_id}' not found")))?;
-        if reservation_policy == DispatchReservationPolicy::Skip
-            && transaction
-                .has_active_dispatch_reservation_in_tx(item_id)
-                .await?
-        {
-            transaction.commit().await.map_err(|error| {
-                db_error(format!("commit reserved task board item no-op: {error}"))
-            })?;
-            return Ok(None);
-        }
-        let before = item.clone();
-        let prior_estimates = (item.estimated_tokens, item.estimated_cost_microusd);
-        if !mutate(&mut item)? {
-            transaction
-                .commit()
-                .await
-                .map_err(|error| db_error(format!("commit task board item no-op: {error}")))?;
-            return Ok(None);
-        }
-        if item.id != item_id {
-            return Err(db_error(format!(
-                "task-board mutation cannot change item id '{item_id}' to '{}'",
-                item.id
-            )));
-        }
-        if prior_estimates != (item.estimated_tokens, item.estimated_cost_microusd) {
-            ensure_estimates_are_editable_in_tx(&mut transaction, item_id).await?;
-        }
-        item.status = item.status.canonical_persisted_status();
-        resolve_parent_update_in_tx(&mut transaction, &mut item, &before, ingress).await?;
-        resolve_item_project_in_tx(&mut transaction, &mut item).await?;
-        validate_item(&item)?;
-        if item == before {
-            transaction
-                .commit()
-                .await
-                .map_err(|error| db_error(format!("commit task board item no-op: {error}")))?;
-            return Ok(None);
-        }
-        item.updated_at = utc_now();
-        transaction
-            .apply_task_board_item_status_transition_in_tx(&item)
-            .await?;
-        if item.deleted_at.is_some() {
-            transaction.clear_children_parent_in_tx(item_id).await?;
-        }
-        let (outcome, transition_kind) = apply_update_triage_in_tx(
-            &mut transaction,
-            &before,
-            &mut item,
-            ingress,
-            existing_override.as_ref(),
-        )
-        .await?;
-        let before_triage = before.clone();
-        let write = replace_with_lane_transition_in_tx(
-            &mut transaction,
-            before,
-            revision,
-            item,
-            transition_kind,
-        )
-        .await?;
-        let change_revision = bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
-        let mutation_kind =
-            (ingress != TaskBoardTriageIngress::None).then_some(TaskBoardMutationKind::Update);
-        record_triage_or_lane_audit_in_tx(
-            &mut transaction,
-            &before_triage,
-            outcome.as_ref(),
-            mutation_kind,
-            &write,
-            change_revision,
-            existing_override.is_some(),
-            &self.triage_escalation_config(),
-        )
-        .await?;
+    {
         transaction
             .commit()
             .await
-            .map_err(|error| db_error(format!("commit task board item update: {error}")))?;
-        Ok(Some(TaskBoardMutation {
-            item: write.item,
-            item_revision: write.item_revision,
-            change_revision,
-        }))
+            .map_err(|error| db_error(format!("commit reserved task board item no-op: {error}")))?;
+        return Ok(None);
     }
+    let before = item.clone();
+    let prior_estimates = (item.estimated_tokens, item.estimated_cost_microusd);
+    if !mutate(&mut item)? {
+        transaction
+            .commit()
+            .await
+            .map_err(|error| db_error(format!("commit task board item no-op: {error}")))?;
+        return Ok(None);
+    }
+    if item.id != item_id {
+        return Err(db_error(format!(
+            "task-board mutation cannot change item id '{item_id}' to '{}'",
+            item.id
+        )));
+    }
+    if prior_estimates != (item.estimated_tokens, item.estimated_cost_microusd) {
+        ensure_estimates_are_editable_in_tx(&mut transaction, item_id).await?;
+    }
+    item.status = item.status.canonical_persisted_status();
+    resolve_parent_update_in_tx(&mut transaction, &mut item, &before, ingress).await?;
+    resolve_item_project_in_tx(&mut transaction, &mut item).await?;
+    validate_item(&item)?;
+    if item == before {
+        transaction
+            .commit()
+            .await
+            .map_err(|error| db_error(format!("commit task board item no-op: {error}")))?;
+        return Ok(None);
+    }
+    item.updated_at = utc_now();
+    transaction
+        .apply_task_board_item_status_transition_in_tx(&item)
+        .await?;
+    if item.deleted_at.is_some() {
+        transaction.clear_children_parent_in_tx(item_id).await?;
+    }
+    let (outcome, transition_kind) = apply_update_triage_in_tx(
+        &mut transaction,
+        &before,
+        &mut item,
+        ingress,
+        existing_override.as_ref(),
+    )
+    .await?;
+    let before_triage = before.clone();
+    let write =
+        replace_with_lane_transition_in_tx(&mut transaction, before, revision, item, transition_kind)
+            .await?;
+    let change_revision = bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
+    let mutation_kind =
+        (ingress != TaskBoardTriageIngress::None).then_some(TaskBoardMutationKind::Update);
+    record_triage_or_lane_audit_in_tx(
+        &mut transaction,
+        &before_triage,
+        outcome.as_ref(),
+        mutation_kind,
+        &write,
+        change_revision,
+        existing_override.is_some(),
+        &db.triage_escalation_config(),
+    )
+    .await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit task board item update: {error}")))?;
+    Ok(Some(TaskBoardMutation {
+        item: write.item,
+        item_revision: write.item_revision,
+        change_revision,
+    }))
 }
 
 async fn apply_update_triage_in_tx(

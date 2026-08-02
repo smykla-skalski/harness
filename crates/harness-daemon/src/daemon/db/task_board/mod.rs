@@ -18,6 +18,7 @@ mod held_dispatch;
 mod import_lifecycle;
 mod import_lifecycle_queries;
 mod imports;
+mod item_core_queries;
 mod item_tx_ext;
 mod items;
 mod items_reads;
