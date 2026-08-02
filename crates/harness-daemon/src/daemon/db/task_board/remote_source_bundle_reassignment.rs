@@ -1,10 +1,11 @@
-use chrono::Duration;
 use sqlx::{Sqlite, Transaction};
 
 #[path = "remote_source_bundle_reassignment_replay.rs"]
 mod replay;
 #[path = "remote_source_bundle_reassignment_storage.rs"]
 mod storage;
+#[path = "remote_source_bundle_reassignment_validation.rs"]
+mod validation;
 
 use super::ORCHESTRATOR_CHANGE_SCOPE;
 use super::items::bump_change_in_tx;
@@ -12,8 +13,8 @@ use super::remote_assignment_active_fence::record_controller_reassignment_handof
 use super::remote_assignment_archival_fence::require_no_archival_collision_in_tx;
 use super::remote_assignment_authority_settlement::clear_offer_io_authority_in_tx;
 use super::remote_assignment_model::{
-    TaskBoardRemoteAssignmentRecord, TaskBoardRemoteOfferOutcome, canonical_time, concurrent,
-    insert_assignment_in_tx, load_assignment_in_tx, nonblank,
+    TaskBoardRemoteAssignmentRecord, TaskBoardRemoteOfferOutcome, concurrent,
+    insert_assignment_in_tx, load_assignment_in_tx,
 };
 use super::remote_lifecycle_trust::{
     TaskBoardRemoteLifecycleTrustSnapshot, capture_lifecycle_trust_for_offer_in_tx,
@@ -24,6 +25,7 @@ use super::remote_operation_trust::{
 use super::remote_outbound_sources::{
     exact_outbound_source_content_in_tx, persist_outbound_source_in_tx,
 };
+use super::remote_source_bundle_queries::RemoteSourceBundleQueries;
 use super::remote_source_bundle_reassignment_evidence::{
     SourceReassignmentEvidence, require_reassignment_evidence_in_tx,
 };
@@ -34,14 +36,16 @@ use crate::task_board::remote_wire::wire::{
     RemoteOfferRequest, RemoteSourceBundleAbandonRequest, RemoteSourceBundleAbandonResponse,
 };
 use crate::task_board::{
-    TASK_BOARD_EXECUTION_TARGET_ACTION_RESOURCE, TASK_BOARD_EXECUTION_TARGET_ATTEMPT_RESOURCE,
-    TASK_BOARD_EXECUTION_TARGET_RESOURCE, TASK_BOARD_REMOTE_OFFER_IO_AUTHORITY_RESOURCE,
-    TaskBoardAttemptState, TaskBoardExecutionAttemptCas, TaskBoardExecutionState,
-    TaskBoardRemoteAssignmentState, TaskBoardWorkflowExecutionCas,
+    TASK_BOARD_REMOTE_OFFER_IO_AUTHORITY_RESOURCE, TaskBoardAttemptState,
+    TaskBoardExecutionAttemptCas, TaskBoardExecutionState, TaskBoardWorkflowExecutionCas,
     TaskBoardWorkflowExecutionRecord, validate_task_board_remote_target_reassignment,
 };
 use replay::replayed_replacement_in_tx;
 use storage::{require_no_replacement_collision_in_tx, supersede_predecessor_in_tx};
+use validation::{
+    replacement_parent, require_preclaim_predecessor, validate_reassignment_input,
+    validate_replacement,
+};
 
 pub(crate) struct TaskBoardRemoteSourceOfferReassignment<'a> {
     pub(crate) expected_execution: &'a TaskBoardWorkflowExecutionCas,
@@ -60,13 +64,12 @@ impl AsyncDaemonDb {
         abandonment_request: &RemoteSourceBundleAbandonRequest,
         abandonment_response: &RemoteSourceBundleAbandonResponse,
     ) -> Result<TaskBoardRemoteOfferOutcome, CliError> {
-        Box::pin(self.reassign_task_board_remote_source_bundle_offer(
+        <Self as RemoteSourceBundleQueries>::reassign_abandoned_task_board_remote_source_bundle_offer(
+            self,
             reassignment,
-            SourceReassignmentEvidence::Abandonment {
-                request: abandonment_request,
-                response: abandonment_response,
-            },
-        ))
+            abandonment_request,
+            abandonment_response,
+        )
         .await
     }
 
@@ -75,45 +78,76 @@ impl AsyncDaemonDb {
         reassignment: &TaskBoardRemoteSourceOfferReassignment<'_>,
         evidence: SourceReassignmentEvidence<'_>,
     ) -> Result<TaskBoardRemoteOfferOutcome, CliError> {
-        validate_reassignment_input(
-            evidence,
-            reassignment.replacement,
-            reassignment.authenticated_principal,
-            reassignment.trust,
-            reassignment.offered_at,
-            reassignment.lease_expires_at,
-        )?;
-        let mut transaction = self
-            .begin_immediate_transaction("task board remote source offer reassignment")
-            .await?;
-        require_reassignment_preconditions_in_tx(&mut transaction, reassignment).await?;
-        if let Some(replayed) = Box::pin(replayed_replacement_in_tx(
-            &mut transaction,
-            evidence,
-            reassignment.replacement,
-            reassignment.authenticated_principal,
-            reassignment.trust,
-        ))
-        .await?
-        {
-            transaction.commit().await.map_err(|error| {
-                db_error(format!(
-                    "commit replayed source offer reassignment: {error}"
-                ))
-            })?;
-            return Ok(TaskBoardRemoteOfferOutcome::Replayed(replayed));
-        }
-        let created = Box::pin(create_reassigned_successor_in_tx(
-            &mut transaction,
+        <Self as RemoteSourceBundleQueries>::reassign_task_board_remote_source_bundle_offer(
+            self,
             reassignment,
             evidence,
-        ))
-        .await?;
-        transaction.commit().await.map_err(|error| {
-            db_error(format!("commit remote source offer reassignment: {error}"))
-        })?;
-        Ok(TaskBoardRemoteOfferOutcome::Created(created))
+        )
+        .await
     }
+}
+
+pub(super) async fn reassign_abandoned_task_board_remote_source_bundle_offer(
+    db: &AsyncDaemonDb,
+    reassignment: &TaskBoardRemoteSourceOfferReassignment<'_>,
+    abandonment_request: &RemoteSourceBundleAbandonRequest,
+    abandonment_response: &RemoteSourceBundleAbandonResponse,
+) -> Result<TaskBoardRemoteOfferOutcome, CliError> {
+    Box::pin(reassign_task_board_remote_source_bundle_offer(
+        db,
+        reassignment,
+        SourceReassignmentEvidence::Abandonment {
+            request: abandonment_request,
+            response: abandonment_response,
+        },
+    ))
+    .await
+}
+
+pub(super) async fn reassign_task_board_remote_source_bundle_offer(
+    db: &AsyncDaemonDb,
+    reassignment: &TaskBoardRemoteSourceOfferReassignment<'_>,
+    evidence: SourceReassignmentEvidence<'_>,
+) -> Result<TaskBoardRemoteOfferOutcome, CliError> {
+    validate_reassignment_input(
+        evidence,
+        reassignment.replacement,
+        reassignment.authenticated_principal,
+        reassignment.trust,
+        reassignment.offered_at,
+        reassignment.lease_expires_at,
+    )?;
+    let mut transaction = db
+        .begin_immediate_transaction("task board remote source offer reassignment")
+        .await?;
+    require_reassignment_preconditions_in_tx(&mut transaction, reassignment).await?;
+    if let Some(replayed) = Box::pin(replayed_replacement_in_tx(
+        &mut transaction,
+        evidence,
+        reassignment.replacement,
+        reassignment.authenticated_principal,
+        reassignment.trust,
+    ))
+    .await?
+    {
+        transaction.commit().await.map_err(|error| {
+            db_error(format!(
+                "commit replayed source offer reassignment: {error}"
+            ))
+        })?;
+        return Ok(TaskBoardRemoteOfferOutcome::Replayed(replayed));
+    }
+    let created = Box::pin(create_reassigned_successor_in_tx(
+        &mut transaction,
+        reassignment,
+        evidence,
+    ))
+    .await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit remote source offer reassignment: {error}")))?;
+    Ok(TaskBoardRemoteOfferOutcome::Created(created))
 }
 
 async fn require_reassignment_preconditions_in_tx(
@@ -353,148 +387,3 @@ async fn settle_predecessor_offer_authority_in_tx(
         })
 }
 
-fn require_preclaim_predecessor(
-    record: &TaskBoardRemoteAssignmentRecord,
-    offer: &RemoteOfferRequest,
-    principal: &str,
-) -> Result<(), CliError> {
-    let exact = record.state == TaskBoardRemoteAssignmentState::Offered
-        && record.offer.as_ref() == Some(offer)
-        && record.authenticated_principal.as_deref() == Some(principal)
-        && record.claim_receipt.is_none()
-        && record.lease_id.is_none()
-        && record.claimed_at.is_none()
-        && record.started_at.is_none()
-        && record.workspace_ref.is_none()
-        && record.start_receipt.is_none()
-        && record.executor_start_authority_sha256.is_none()
-        && record.executor_lifecycle_owner.is_none()
-        && record.executor_stop_pending.is_none()
-        && record.status_response.is_none()
-        && record.result_sha256.is_none()
-        && record.cleanup_completed_at.is_none();
-    if exact {
-        Ok(())
-    } else {
-        Err(concurrent(
-            "source reassignment predecessor has accepted or running evidence",
-        ))
-    }
-}
-
-fn validate_replacement(
-    parent: &TaskBoardWorkflowExecutionRecord,
-    predecessor: &TaskBoardRemoteAssignmentRecord,
-    expected_execution: &TaskBoardWorkflowExecutionCas,
-    replacement: &RemoteOfferRequest,
-    trust: &TaskBoardRemoteOperationTrustFence,
-) -> Result<(), CliError> {
-    let old = predecessor.require_offer()?;
-    let mut expected_binding = old.binding.clone();
-    expected_binding
-        .assignment_id
-        .clone_from(&replacement.binding.assignment_id);
-    expected_binding
-        .host_instance_id
-        .clone_from(&trust.observed_host_instance_id);
-    expected_binding.fencing_epoch = old
-        .binding
-        .fencing_epoch
-        .checked_add(1)
-        .ok_or_else(|| db_error("remote source reassignment epoch overflow"))?;
-    expected_binding
-        .execution_record_sha256
-        .clone_from(&expected_execution.record_sha256);
-    let exact = replacement.binding == expected_binding
-        && replacement.binding.assignment_id != old.binding.assignment_id
-        && replacement.lease_seconds == old.lease_seconds
-        && replacement.deadline_at == old.deadline_at
-        && replacement.launch == old.launch
-        && replacement.source == old.source
-        && replacement.artifacts == old.artifacts
-        && predecessor.host_id == trust.host.config.host_id
-        && parent.ownership.fencing_epoch == predecessor.fencing_epoch
-        && active_target_matches(parent, predecessor);
-    if exact {
-        Ok(())
-    } else {
-        Err(concurrent(
-            "replacement offer changed the frozen source, launch, attempt, or host contract",
-        ))
-    }
-}
-
-fn active_target_matches(
-    parent: &TaskBoardWorkflowExecutionRecord,
-    predecessor: &TaskBoardRemoteAssignmentRecord,
-) -> bool {
-    let attempt = predecessor.attempt.map(|value| value.to_string());
-    parent.ownership.host_id.as_deref() == Some(predecessor.host_id.as_str())
-        && parent
-            .ownership
-            .resources
-            .get(TASK_BOARD_EXECUTION_TARGET_RESOURCE)
-            .is_some_and(|target| target == &format!("remote:{}", predecessor.assignment_id))
-        && parent
-            .ownership
-            .resources
-            .get(TASK_BOARD_EXECUTION_TARGET_ACTION_RESOURCE)
-            == predecessor.action_key.as_ref()
-        && parent
-            .ownership
-            .resources
-            .get(TASK_BOARD_EXECUTION_TARGET_ATTEMPT_RESOURCE)
-            .map(String::as_str)
-            == attempt.as_deref()
-}
-
-fn replacement_parent(
-    parent: &TaskBoardWorkflowExecutionRecord,
-    replacement: &RemoteOfferRequest,
-    offered_at: &str,
-) -> Result<TaskBoardWorkflowExecutionRecord, CliError> {
-    if canonical_time(offered_at, "source reassignment offer time")?
-        < canonical_time(&parent.updated_at, "source reassignment parent time")?
-    {
-        return Err(concurrent("source reassignment time precedes parent state"));
-    }
-    let mut updated = parent.clone();
-    updated.ownership.fencing_epoch = replacement.binding.fencing_epoch;
-    updated.ownership.resources.insert(
-        TASK_BOARD_EXECUTION_TARGET_RESOURCE.into(),
-        format!("remote:{}", replacement.binding.assignment_id),
-    );
-    updated.updated_at = offered_at.into();
-    Ok(updated)
-}
-
-fn validate_reassignment_input(
-    evidence: SourceReassignmentEvidence<'_>,
-    replacement: &RemoteOfferRequest,
-    principal: &str,
-    trust: &TaskBoardRemoteOperationTrustFence,
-    offered_at: &str,
-    lease_expires_at: &str,
-) -> Result<(), CliError> {
-    evidence.validate()?;
-    replacement
-        .validate()
-        .map_err(|error| db_error(format!("validate replacement source offer: {error}")))?;
-    nonblank(principal, "replacement source offer principal")?;
-    let offered = canonical_time(offered_at, "replacement source offer time")?;
-    let lease = canonical_time(lease_expires_at, "replacement source lease expiry")?;
-    let deadline = canonical_time(&replacement.deadline_at, "replacement source deadline")?;
-    let expected_lease = offered + Duration::seconds(i64::from(replacement.lease_seconds));
-    let exact = lease == expected_lease
-        && lease <= deadline
-        && principal == replacement.binding.host_id
-        && replacement.binding.host_id == trust.host.config.host_id
-        && replacement.binding.host_instance_id == trust.observed_host_instance_id;
-    if exact {
-        Ok(())
-    } else {
-        Err(concurrent(
-            "replacement source offer time, lease, principal, or trust mismatched",
-        ))
-    }
-}

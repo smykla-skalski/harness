@@ -11,15 +11,18 @@ use super::remote_assignment_model::{
     nonblank, to_i64,
 };
 use super::remote_offer_receipts::load_offer_receipt_collisions_in_tx;
+use super::remote_source_bundle_queries::RemoteSourceBundleQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::remote_wire::wire::{
-    RemoteArtifactEntry, RemoteOfferRequest, RemoteSourceBundleUploadRequest,
-    RemoteSourceBundleUploadResponse,
+    RemoteOfferRequest, RemoteSourceBundleUploadRequest, RemoteSourceBundleUploadResponse,
 };
 
 #[path = "remote_source_bundles/coordinates.rs"]
 mod coordinates;
+#[path = "remote_source_bundles/row.rs"]
+mod row;
 pub(super) use coordinates::source_bundle_coordinates;
+use row::RemoteSourceBundleRow;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TaskBoardRemoteSourceBundle {
@@ -60,72 +63,96 @@ impl AsyncDaemonDb {
         host_instance_id: &str,
         stored_at: &str,
     ) -> Result<TaskBoardRemoteSourceBundle, CliError> {
-        validate_upload(
-            request,
-            authenticated_principal,
-            host_instance_id,
-            stored_at,
-        )?;
-        let mut transaction = self
-            .begin_immediate_transaction("task board remote source bundle upload")
-            .await?;
-        if let Some(existing) =
-            exact_source_bundle_replay_in_tx(&mut transaction, request, authenticated_principal)
-                .await?
-        {
-            transaction.commit().await.map_err(|error| {
-                db_error(format!("commit replayed remote source bundle: {error}"))
-            })?;
-            return Ok(existing);
-        }
-        require_fresh_upload_identity_in_tx(&mut transaction, request, host_instance_id).await?;
-        let stored = seal_and_store_source_bundle_in_tx(
-            &mut transaction,
+        <Self as RemoteSourceBundleQueries>::store_task_board_remote_source_bundle(
+            self,
             request,
             authenticated_principal,
             host_instance_id,
             stored_at,
         )
-        .await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit remote source bundle: {error}")))?;
-        Ok(stored)
+        .await
     }
 
     pub(crate) async fn task_board_remote_source_bundle(
         &self,
         assignment: &TaskBoardRemoteAssignmentRecord,
     ) -> Result<Option<TaskBoardRemoteSourceBundle>, CliError> {
-        let mut transaction = self
-            .pool()
-            .begin()
-            .await
-            .map_err(|error| db_error(format!("begin remote source bundle load: {error}")))?;
-        let stored = load_source_bundle_in_tx(
-            &mut transaction,
-            &assignment.assignment_id,
-            assignment.fencing_epoch,
-        )
+        <Self as RemoteSourceBundleQueries>::task_board_remote_source_bundle(self, assignment).await
+    }
+}
+
+pub(super) async fn store_task_board_remote_source_bundle(
+    db: &AsyncDaemonDb,
+    request: &RemoteSourceBundleUploadRequest,
+    authenticated_principal: &str,
+    host_instance_id: &str,
+    stored_at: &str,
+) -> Result<TaskBoardRemoteSourceBundle, CliError> {
+    validate_upload(
+        request,
+        authenticated_principal,
+        host_instance_id,
+        stored_at,
+    )?;
+    let mut transaction = db
+        .begin_immediate_transaction("task board remote source bundle upload")
         .await?;
-        if let Some(stored) = stored.as_ref() {
-            let offer = assignment.require_offer()?;
-            let exact = stored.offer == *offer
-                && assignment.authenticated_principal.as_deref()
-                    == Some(stored.authenticated_principal.as_str());
-            if !exact {
-                return Err(concurrent(
-                    "remote source bundle changed from its accepted assignment",
-                ));
-            }
-        }
+    if let Some(existing) =
+        exact_source_bundle_replay_in_tx(&mut transaction, request, authenticated_principal).await?
+    {
         transaction
             .commit()
             .await
-            .map_err(|error| db_error(format!("commit remote source bundle load: {error}")))?;
-        Ok(stored)
+            .map_err(|error| db_error(format!("commit replayed remote source bundle: {error}")))?;
+        return Ok(existing);
     }
+    require_fresh_upload_identity_in_tx(&mut transaction, request, host_instance_id).await?;
+    let stored = seal_and_store_source_bundle_in_tx(
+        &mut transaction,
+        request,
+        authenticated_principal,
+        host_instance_id,
+        stored_at,
+    )
+    .await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit remote source bundle: {error}")))?;
+    Ok(stored)
+}
+
+pub(super) async fn task_board_remote_source_bundle(
+    db: &AsyncDaemonDb,
+    assignment: &TaskBoardRemoteAssignmentRecord,
+) -> Result<Option<TaskBoardRemoteSourceBundle>, CliError> {
+    let mut transaction = db
+        .pool()
+        .begin()
+        .await
+        .map_err(|error| db_error(format!("begin remote source bundle load: {error}")))?;
+    let stored = load_source_bundle_in_tx(
+        &mut transaction,
+        &assignment.assignment_id,
+        assignment.fencing_epoch,
+    )
+    .await?;
+    if let Some(stored) = stored.as_ref() {
+        let offer = assignment.require_offer()?;
+        let exact = stored.offer == *offer
+            && assignment.authenticated_principal.as_deref()
+                == Some(stored.authenticated_principal.as_str());
+        if !exact {
+            return Err(concurrent(
+                "remote source bundle changed from its accepted assignment",
+            ));
+        }
+    }
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit remote source bundle load: {error}")))?;
+    Ok(stored)
 }
 
 async fn seal_and_store_source_bundle_in_tx(
@@ -312,102 +339,6 @@ async fn require_no_offer_in_tx(
         ))
     } else {
         Ok(())
-    }
-}
-
-#[derive(sqlx::FromRow)]
-struct RemoteSourceBundleRow {
-    offer_json: String,
-    upload_request_sha256: String,
-    authenticated_principal: String,
-    source_kind: String,
-    base_revision: String,
-    result_revision: String,
-    advertised_ref: String,
-    response_json: String,
-    relative_path: String,
-    sha256: String,
-    size_bytes: i64,
-    media_type: String,
-    content: Vec<u8>,
-    content_pruned_at: Option<String>,
-}
-
-impl RemoteSourceBundleRow {
-    fn into_bundle(self) -> Result<TaskBoardRemoteSourceBundle, CliError> {
-        let offer = serde_json::from_str::<RemoteOfferRequest>(&self.offer_json)
-            .map_err(|error| db_error(format!("decode remote source bundle offer: {error}")))?;
-        offer
-            .validate()
-            .map_err(|error| db_error(format!("validate remote source bundle offer: {error}")))?;
-        let size_bytes = u64::try_from(self.size_bytes)
-            .map_err(|_| db_error("remote source bundle size is invalid"))?;
-        let artifact = RemoteArtifactEntry {
-            relative_path: self.relative_path,
-            sha256: self.sha256,
-            size_bytes,
-            media_type: self.media_type,
-        };
-        let source = source_bundle_coordinates(&offer.source)?;
-        let exact_source = self.source_kind == source.kind
-            && self.base_revision == source.base_revision
-            && self.result_revision == source.result_revision
-            && self.advertised_ref == source.advertised_ref
-            && &artifact == source.bundle;
-        if !exact_source {
-            return Err(db_error(
-                "remote source bundle columns contradict the sealed source material",
-            ));
-        }
-        let response = serde_json::from_str::<RemoteSourceBundleUploadResponse>(
-            &self.response_json,
-        )
-        .map_err(|error| db_error(format!("decode remote source bundle response: {error}")))?;
-        response
-            .validate_receipt(
-                &offer.binding,
-                &offer.request_sha256,
-                &self.upload_request_sha256,
-                &artifact,
-            )
-            .map_err(|error| {
-                db_error(format!("validate remote source bundle response: {error}"))
-            })?;
-        nonblank(
-            &self.authenticated_principal,
-            "remote source bundle authenticated principal",
-        )?;
-        let content = match self.content_pruned_at.as_deref() {
-            None => {
-                let request = RemoteSourceBundleUploadRequest::seal(offer.clone(), &self.content)
-                    .map_err(|error| {
-                    db_error(format!("validate remote source bundle bytes: {error}"))
-                })?;
-                if request.request_sha256 != self.upload_request_sha256 {
-                    return Err(db_error(
-                        "remote source bundle request digest is inconsistent",
-                    ));
-                }
-                Some(self.content)
-            }
-            Some(pruned_at) => {
-                canonical_time(pruned_at, "remote source bundle prune time")?;
-                if !self.content.is_empty() {
-                    return Err(db_error(
-                        "pruned remote source bundle retained content bytes",
-                    ));
-                }
-                None
-            }
-        };
-        Ok(TaskBoardRemoteSourceBundle {
-            offer,
-            upload_request_sha256: self.upload_request_sha256,
-            authenticated_principal: self.authenticated_principal,
-            response,
-            content,
-            content_pruned_at: self.content_pruned_at,
-        })
     }
 }
 

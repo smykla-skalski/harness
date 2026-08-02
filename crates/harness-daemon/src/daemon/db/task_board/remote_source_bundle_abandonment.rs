@@ -8,6 +8,7 @@ use super::remote_assignment_model::{
     canonical_time, concurrent, load_offer_collision_in_tx, nonblank,
 };
 use super::remote_offer_receipts::load_offer_receipt_collisions_in_tx;
+use super::remote_source_bundle_queries::RemoteSourceBundleQueries;
 use super::remote_source_bundles::{
     TaskBoardRemoteSourceBundle, load_source_bundle_collisions_in_tx,
 };
@@ -69,30 +70,12 @@ impl AsyncDaemonDb {
         upload: &RemoteSourceBundleUploadRequest,
         authenticated_principal: &str,
     ) -> Result<Option<TaskBoardRemoteSourceBundleAbandonment>, CliError> {
-        upload
-            .validate()
-            .map_err(|error| db_error(format!("validate source abandonment lookup: {error}")))?;
-        nonblank(
+        <Self as RemoteSourceBundleQueries>::exact_task_board_remote_source_bundle_abandonment(
+            self,
+            upload,
             authenticated_principal,
-            "source abandonment lookup principal",
-        )?;
-        let mut transaction = self
-            .pool()
-            .begin()
-            .await
-            .map_err(|error| db_error(format!("begin source abandonment lookup: {error}")))?;
-        let collisions = load_abandonment_collisions_in_tx(
-            &mut transaction,
-            &upload.offer,
-            &upload.request_sha256,
         )
-        .await?;
-        let stored = exact_upload_abandonment(&collisions, upload, authenticated_principal)?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit source abandonment lookup: {error}")))?;
-        Ok(stored)
+        .await
     }
 
     pub(crate) async fn verify_task_board_remote_source_bundle_receipt(
@@ -102,58 +85,14 @@ impl AsyncDaemonDb {
         observed_host_instance_id: &str,
         checked_at: &str,
     ) -> Result<RemoteSourceBundleReceiptVerificationResponse, CliError> {
-        validate_executor_identity(
-            request.offer.binding.host_id.as_str(),
+        <Self as RemoteSourceBundleQueries>::verify_task_board_remote_source_bundle_receipt(
+            self,
+            request,
             authenticated_principal,
             observed_host_instance_id,
             checked_at,
-        )?;
-        request
-            .validate()
-            .map_err(|error| db_error(format!("validate source receipt verification: {error}")))?;
-        let mut transaction = self
-            .pool()
-            .begin()
-            .await
-            .map_err(|error| db_error(format!("begin source receipt verification: {error}")))?;
-        require_current_local_host_in_tx(
-            &mut transaction,
-            &request.offer.binding.host_id,
-            authenticated_principal,
         )
-        .await?;
-        let abandonments = load_abandonment_collisions_in_tx(
-            &mut transaction,
-            &request.offer,
-            &request.request_sha256,
-        )
-        .await?;
-        if let Some(stored) =
-            exact_upload_abandonment(&abandonments, request, authenticated_principal)?
-        {
-            let verification = stored.request.verified_absence;
-            transaction.commit().await.map_err(|error| {
-                db_error(format!(
-                    "commit replayed source absence verification: {error}"
-                ))
-            })?;
-            return Ok(verification);
-        }
-        let collisions =
-            load_source_bundle_collisions_in_tx(&mut transaction, &request.offer).await?;
-        let receipt = exact_verified_receipt(&collisions, request, authenticated_principal)?;
-        let response = RemoteSourceBundleReceiptVerificationResponse::seal(
-            request,
-            observed_host_instance_id.into(),
-            checked_at.into(),
-            receipt,
-        )
-        .map_err(|error| db_error(format!("seal source receipt verification: {error}")))?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit source receipt verification: {error}")))?;
-        Ok(response)
+        .await
     }
 
     pub(crate) async fn abandon_task_board_remote_source_bundle(
@@ -163,56 +102,163 @@ impl AsyncDaemonDb {
         observed_host_instance_id: &str,
         abandoned_at: &str,
     ) -> Result<TaskBoardRemoteSourceBundleAbandonment, CliError> {
-        request
-            .validate()
-            .map_err(|error| db_error(format!("validate source abandonment: {error}")))?;
-        validate_executor_identity(
-            request.offer.binding.host_id.as_str(),
-            authenticated_principal,
-            observed_host_instance_id,
-            abandoned_at,
-        )?;
-        if request.verified_absence.observed_host_instance_id != observed_host_instance_id {
-            return Err(concurrent(
-                "source abandonment verification targets another executor instance",
-            ));
-        }
-        let mut transaction = self
-            .begin_immediate_transaction("task board remote source abandonment")
-            .await?;
-        require_current_local_host_in_tx(
-            &mut transaction,
-            &request.offer.binding.host_id,
-            authenticated_principal,
-        )
-        .await?;
-        let abandonments = load_abandonment_collisions_in_tx(
-            &mut transaction,
-            &request.offer,
-            &request.upload_request_sha256,
-        )
-        .await?;
-        if let Some(existing) = exact_abandonment(&abandonments, request, authenticated_principal)?
-        {
-            transaction.commit().await.map_err(|error| {
-                db_error(format!("commit replayed source abandonment: {error}"))
-            })?;
-            return Ok(existing);
-        }
-        let stored = seal_and_store_abandonment_in_tx(
-            &mut transaction,
+        <Self as RemoteSourceBundleQueries>::abandon_task_board_remote_source_bundle(
+            self,
             request,
             authenticated_principal,
             observed_host_instance_id,
             abandoned_at,
         )
+        .await
+    }
+}
+
+pub(super) async fn exact_task_board_remote_source_bundle_abandonment(
+    db: &AsyncDaemonDb,
+    upload: &RemoteSourceBundleUploadRequest,
+    authenticated_principal: &str,
+) -> Result<Option<TaskBoardRemoteSourceBundleAbandonment>, CliError> {
+    upload
+        .validate()
+        .map_err(|error| db_error(format!("validate source abandonment lookup: {error}")))?;
+    nonblank(
+        authenticated_principal,
+        "source abandonment lookup principal",
+    )?;
+    let mut transaction = db
+        .pool()
+        .begin()
+        .await
+        .map_err(|error| db_error(format!("begin source abandonment lookup: {error}")))?;
+    let collisions = load_abandonment_collisions_in_tx(
+        &mut transaction,
+        &upload.offer,
+        &upload.request_sha256,
+    )
+    .await?;
+    let stored = exact_upload_abandonment(&collisions, upload, authenticated_principal)?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit source abandonment lookup: {error}")))?;
+    Ok(stored)
+}
+
+pub(super) async fn verify_task_board_remote_source_bundle_receipt(
+    db: &AsyncDaemonDb,
+    request: &RemoteSourceBundleUploadRequest,
+    authenticated_principal: &str,
+    observed_host_instance_id: &str,
+    checked_at: &str,
+) -> Result<RemoteSourceBundleReceiptVerificationResponse, CliError> {
+    validate_executor_identity(
+        request.offer.binding.host_id.as_str(),
+        authenticated_principal,
+        observed_host_instance_id,
+        checked_at,
+    )?;
+    request
+        .validate()
+        .map_err(|error| db_error(format!("validate source receipt verification: {error}")))?;
+    let mut transaction = db
+        .pool()
+        .begin()
+        .await
+        .map_err(|error| db_error(format!("begin source receipt verification: {error}")))?;
+    require_current_local_host_in_tx(
+        &mut transaction,
+        &request.offer.binding.host_id,
+        authenticated_principal,
+    )
+    .await?;
+    let abandonments = load_abandonment_collisions_in_tx(
+        &mut transaction,
+        &request.offer,
+        &request.request_sha256,
+    )
+    .await?;
+    if let Some(stored) = exact_upload_abandonment(&abandonments, request, authenticated_principal)?
+    {
+        let verification = stored.request.verified_absence;
+        transaction.commit().await.map_err(|error| {
+            db_error(format!(
+                "commit replayed source absence verification: {error}"
+            ))
+        })?;
+        return Ok(verification);
+    }
+    let collisions = load_source_bundle_collisions_in_tx(&mut transaction, &request.offer).await?;
+    let receipt = exact_verified_receipt(&collisions, request, authenticated_principal)?;
+    let response = RemoteSourceBundleReceiptVerificationResponse::seal(
+        request,
+        observed_host_instance_id.into(),
+        checked_at.into(),
+        receipt,
+    )
+    .map_err(|error| db_error(format!("seal source receipt verification: {error}")))?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit source receipt verification: {error}")))?;
+    Ok(response)
+}
+
+pub(super) async fn abandon_task_board_remote_source_bundle(
+    db: &AsyncDaemonDb,
+    request: &RemoteSourceBundleAbandonRequest,
+    authenticated_principal: &str,
+    observed_host_instance_id: &str,
+    abandoned_at: &str,
+) -> Result<TaskBoardRemoteSourceBundleAbandonment, CliError> {
+    request
+        .validate()
+        .map_err(|error| db_error(format!("validate source abandonment: {error}")))?;
+    validate_executor_identity(
+        request.offer.binding.host_id.as_str(),
+        authenticated_principal,
+        observed_host_instance_id,
+        abandoned_at,
+    )?;
+    if request.verified_absence.observed_host_instance_id != observed_host_instance_id {
+        return Err(concurrent(
+            "source abandonment verification targets another executor instance",
+        ));
+    }
+    let mut transaction = db
+        .begin_immediate_transaction("task board remote source abandonment")
         .await?;
+    require_current_local_host_in_tx(
+        &mut transaction,
+        &request.offer.binding.host_id,
+        authenticated_principal,
+    )
+    .await?;
+    let abandonments = load_abandonment_collisions_in_tx(
+        &mut transaction,
+        &request.offer,
+        &request.upload_request_sha256,
+    )
+    .await?;
+    if let Some(existing) = exact_abandonment(&abandonments, request, authenticated_principal)? {
         transaction
             .commit()
             .await
-            .map_err(|error| db_error(format!("commit source abandonment: {error}")))?;
-        Ok(stored)
+            .map_err(|error| db_error(format!("commit replayed source abandonment: {error}")))?;
+        return Ok(existing);
     }
+    let stored = seal_and_store_abandonment_in_tx(
+        &mut transaction,
+        request,
+        authenticated_principal,
+        observed_host_instance_id,
+        abandoned_at,
+    )
+    .await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit source abandonment: {error}")))?;
+    Ok(stored)
 }
 
 fn exact_verified_receipt(

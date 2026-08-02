@@ -9,6 +9,7 @@ use super::remote_operation_trust::{
     TaskBoardRemoteOperationKind, TaskBoardRemoteOperationTrustFence,
     claim_controller_operation_trust_in_tx,
 };
+use super::remote_source_bundle_queries::RemoteSourceBundleQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::remote_wire::wire::{
     RemoteArtifactEntry, RemoteArtifactFetchRequest, RemoteArtifactFetchResponse,
@@ -75,41 +76,52 @@ impl AsyncDaemonDb {
         authenticated_principal: &str,
         trust: &TaskBoardRemoteOperationTrustFence,
     ) -> Result<bool, CliError> {
-        request
-            .validate()
-            .map_err(|error| db_error(format!("validate remote artifact authority: {error}")))?;
-        nonblank(
-            authenticated_principal,
-            "remote artifact authority principal",
-        )?;
-        let mut transaction = self
-            .begin_immediate_transaction("task board remote artifact I/O authority")
-            .await?;
-        let assignment =
-            require_assignment(&mut transaction, &request.binding.assignment_id).await?;
-        let expected_artifact = manifest_entry(&assignment, request)?;
-        require_artifact_assignment(
-            &assignment,
-            &request.binding,
-            &request.lease_id,
-            &request.offer_request_sha256,
-            authenticated_principal,
-            expected_artifact,
-        )?;
-        claim_controller_operation_trust_in_tx(
-            &mut transaction,
-            &assignment,
-            TaskBoardRemoteOperationKind::FetchArtifact,
-            &request.request_sha256,
-            Some(trust),
+        <Self as RemoteSourceBundleQueries>::claim_task_board_remote_artifact_fetch_io_authority_fenced(
+            self, request, authenticated_principal, trust,
         )
-        .await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit remote artifact I/O authority: {error}")))?;
-        Ok(true)
+        .await
     }
+}
+
+pub(super) async fn claim_task_board_remote_artifact_fetch_io_authority_fenced(
+    db: &AsyncDaemonDb,
+    request: &RemoteArtifactFetchRequest,
+    authenticated_principal: &str,
+    trust: &TaskBoardRemoteOperationTrustFence,
+) -> Result<bool, CliError> {
+    request
+        .validate()
+        .map_err(|error| db_error(format!("validate remote artifact authority: {error}")))?;
+    nonblank(
+        authenticated_principal,
+        "remote artifact authority principal",
+    )?;
+    let mut transaction = db
+        .begin_immediate_transaction("task board remote artifact I/O authority")
+        .await?;
+    let assignment = require_assignment(&mut transaction, &request.binding.assignment_id).await?;
+    let expected_artifact = manifest_entry(&assignment, request)?;
+    require_artifact_assignment(
+        &assignment,
+        &request.binding,
+        &request.lease_id,
+        &request.offer_request_sha256,
+        authenticated_principal,
+        expected_artifact,
+    )?;
+    claim_controller_operation_trust_in_tx(
+        &mut transaction,
+        &assignment,
+        TaskBoardRemoteOperationKind::FetchArtifact,
+        &request.request_sha256,
+        Some(trust),
+    )
+    .await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit remote artifact I/O authority: {error}")))?;
+    Ok(true)
 }
 
 /// `Some` when this exact content already landed under this path: an exact
@@ -162,25 +174,7 @@ impl AsyncDaemonDb {
         &self,
         input: &TaskBoardRemoteArtifactStoreInput<'_>,
     ) -> Result<TaskBoardRemoteArtifact, CliError> {
-        validate_artifact_input(input)?;
-        let mut transaction = self
-            .begin_immediate_transaction("task board remote artifact store")
-            .await?;
-        let assignment = require_assignment(&mut transaction, &input.binding.assignment_id).await?;
-        require_artifact_assignment(
-            &assignment,
-            input.binding,
-            input.lease_id,
-            input.offer_request_sha256,
-            input.authenticated_principal,
-            input.artifact,
-        )?;
-        let stored = store_or_reuse_artifact_row_in_tx(&mut transaction, input).await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit remote artifact: {error}")))?;
-        Ok(stored)
+        <Self as RemoteSourceBundleQueries>::store_task_board_remote_artifact(self, input).await
     }
 
     pub(crate) async fn task_board_remote_artifact(
@@ -188,47 +182,83 @@ impl AsyncDaemonDb {
         request: &RemoteArtifactFetchRequest,
         authenticated_principal: &str,
     ) -> Result<Option<TaskBoardRemoteArtifact>, CliError> {
-        request
-            .validate()
-            .map_err(|error| db_error(format!("validate remote artifact fetch: {error}")))?;
-        nonblank(authenticated_principal, "remote artifact fetch principal")?;
-        let mut transaction = self
-            .pool()
-            .begin()
-            .await
-            .map_err(|error| db_error(format!("begin remote artifact fetch: {error}")))?;
-        let assignment =
-            require_assignment(&mut transaction, &request.binding.assignment_id).await?;
-        let expected_artifact = manifest_entry(&assignment, request)?.clone();
-        require_artifact_assignment(
-            &assignment,
-            &request.binding,
-            &request.lease_id,
-            &request.offer_request_sha256,
+        <Self as RemoteSourceBundleQueries>::task_board_remote_artifact(
+            self,
+            request,
             authenticated_principal,
-            &expected_artifact,
-        )?;
-        let artifact = load_artifact_in_tx(
-            &mut transaction,
-            &request.binding.assignment_id,
-            request.binding.fencing_epoch,
-            &request.relative_path,
         )
-        .await?;
-        if artifact.as_ref().is_some_and(|stored| {
-            stored.authenticated_principal != authenticated_principal
-                || !stored.is_exact_fetch(request)
-        }) {
-            return Err(concurrent(
-                "remote artifact fetch conflicts with immutable content evidence",
-            ));
-        }
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit remote artifact fetch: {error}")))?;
-        Ok(artifact)
+        .await
     }
+}
+
+pub(super) async fn store_task_board_remote_artifact(
+    db: &AsyncDaemonDb,
+    input: &TaskBoardRemoteArtifactStoreInput<'_>,
+) -> Result<TaskBoardRemoteArtifact, CliError> {
+    validate_artifact_input(input)?;
+    let mut transaction = db
+        .begin_immediate_transaction("task board remote artifact store")
+        .await?;
+    let assignment = require_assignment(&mut transaction, &input.binding.assignment_id).await?;
+    require_artifact_assignment(
+        &assignment,
+        input.binding,
+        input.lease_id,
+        input.offer_request_sha256,
+        input.authenticated_principal,
+        input.artifact,
+    )?;
+    let stored = store_or_reuse_artifact_row_in_tx(&mut transaction, input).await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit remote artifact: {error}")))?;
+    Ok(stored)
+}
+
+pub(super) async fn task_board_remote_artifact(
+    db: &AsyncDaemonDb,
+    request: &RemoteArtifactFetchRequest,
+    authenticated_principal: &str,
+) -> Result<Option<TaskBoardRemoteArtifact>, CliError> {
+    request
+        .validate()
+        .map_err(|error| db_error(format!("validate remote artifact fetch: {error}")))?;
+    nonblank(authenticated_principal, "remote artifact fetch principal")?;
+    let mut transaction = db
+        .pool()
+        .begin()
+        .await
+        .map_err(|error| db_error(format!("begin remote artifact fetch: {error}")))?;
+    let assignment = require_assignment(&mut transaction, &request.binding.assignment_id).await?;
+    let expected_artifact = manifest_entry(&assignment, request)?.clone();
+    require_artifact_assignment(
+        &assignment,
+        &request.binding,
+        &request.lease_id,
+        &request.offer_request_sha256,
+        authenticated_principal,
+        &expected_artifact,
+    )?;
+    let artifact = load_artifact_in_tx(
+        &mut transaction,
+        &request.binding.assignment_id,
+        request.binding.fencing_epoch,
+        &request.relative_path,
+    )
+    .await?;
+    if artifact.as_ref().is_some_and(|stored| {
+        stored.authenticated_principal != authenticated_principal || !stored.is_exact_fetch(request)
+    }) {
+        return Err(concurrent(
+            "remote artifact fetch conflicts with immutable content evidence",
+        ));
+    }
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit remote artifact fetch: {error}")))?;
+    Ok(artifact)
 }
 
 fn validate_artifact_input(input: &TaskBoardRemoteArtifactStoreInput<'_>) -> Result<(), CliError> {

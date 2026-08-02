@@ -151,6 +151,7 @@ mod remote_source_bundle_controller;
 mod remote_source_bundle_prior;
 #[cfg(test)]
 mod remote_source_bundle_prior_tests;
+mod remote_source_bundle_queries;
 mod remote_source_bundle_reassignment;
 mod remote_source_bundle_reassignment_evidence;
 mod remote_source_bundle_recovery_controller;

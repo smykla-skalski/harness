@@ -10,6 +10,7 @@ use super::remote_operation_trust::{
     TaskBoardRemoteOperationKind, TaskBoardRemoteOperationTrustFence,
     claim_controller_operation_trust_in_tx, consume_controller_operation_trust_in_tx,
 };
+use super::remote_source_bundle_queries::RemoteSourceBundleQueries;
 use super::remote_source_bundles::{
     TaskBoardRemoteSourceBundle, insert_source_bundle_in_tx, load_source_bundle_collisions_in_tx,
     load_source_bundle_in_tx,
@@ -27,22 +28,12 @@ impl AsyncDaemonDb {
         request: &RemoteSourceBundleUploadRequest,
         authenticated_principal: &str,
     ) -> Result<Option<TaskBoardRemoteSourceBundle>, CliError> {
-        request
-            .validate()
-            .map_err(|error| db_error(format!("validate source upload replay: {error}")))?;
-        nonblank(authenticated_principal, "source upload replay principal")?;
-        let mut transaction =
-            self.pool().begin().await.map_err(|error| {
-                db_error(format!("begin source upload receipt replay: {error}"))
-            })?;
-        let collisions =
-            load_source_bundle_collisions_in_tx(&mut transaction, &request.offer).await?;
-        let result = exact_receipt(&collisions, request, authenticated_principal)?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit source upload receipt replay: {error}")))?;
-        Ok(result)
+        <Self as RemoteSourceBundleQueries>::exact_task_board_remote_source_bundle_upload_receipt(
+            self,
+            request,
+            authenticated_principal,
+        )
+        .await
     }
 
     pub(crate) async fn claim_task_board_remote_source_bundle_upload_io_authority_fenced(
@@ -51,43 +42,10 @@ impl AsyncDaemonDb {
         authenticated_principal: &str,
         trust: &TaskBoardRemoteOperationTrustFence,
     ) -> Result<bool, CliError> {
-        request
-            .validate()
-            .map_err(|error| db_error(format!("validate source upload authority: {error}")))?;
-        nonblank(authenticated_principal, "source upload authority principal")?;
-        let mut transaction = self
-            .begin_immediate_transaction("task board remote source upload authority")
-            .await?;
-        let collisions =
-            load_source_bundle_collisions_in_tx(&mut transaction, &request.offer).await?;
-        if exact_receipt(&collisions, request, authenticated_principal)?.is_some() {
-            transaction.commit().await.map_err(|error| {
-                db_error(format!("commit replayed source upload authority: {error}"))
-            })?;
-            return Ok(false);
-        }
-        if super::remote_source_bundle_abandonment::source_offer_is_abandoned_in_tx(
-            &mut transaction,
-            &request.offer,
+        <Self as RemoteSourceBundleQueries>::claim_task_board_remote_source_bundle_upload_io_authority_fenced(
+            self, request, authenticated_principal, trust,
         )
-        .await?
-        {
-            return Err(concurrent(
-                "source upload authority belongs to an abandoned generation",
-            ));
-        }
-        claim_upload_operation_trust_in_tx(
-            &mut transaction,
-            request,
-            authenticated_principal,
-            trust,
-        )
-        .await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit source upload authority: {error}")))?;
-        Ok(true)
+        .await
     }
 
     pub(crate) async fn record_task_board_remote_source_bundle_upload_response(
@@ -96,45 +54,121 @@ impl AsyncDaemonDb {
         response: &RemoteSourceBundleUploadResponse,
         authenticated_principal: &str,
     ) -> Result<TaskBoardRemoteSourceBundle, CliError> {
-        response
-            .validate(request)
-            .map_err(|error| db_error(format!("validate source upload response: {error}")))?;
-        nonblank(authenticated_principal, "source upload response principal")?;
-        let mut transaction = self
-            .begin_immediate_transaction("task board remote source upload response")
-            .await?;
-        let collisions =
-            load_source_bundle_collisions_in_tx(&mut transaction, &request.offer).await?;
-        if let Some(existing) = exact_receipt(&collisions, request, authenticated_principal)? {
-            require_unchanged_upload_response(&existing, response)?;
-            transaction.commit().await.map_err(|error| {
-                db_error(format!("commit replayed source upload response: {error}"))
-            })?;
-            return Ok(existing);
-        }
-        if super::remote_source_bundle_abandonment::source_offer_is_abandoned_in_tx(
-            &mut transaction,
-            &request.offer,
-        )
-        .await?
-        {
-            return Err(concurrent(
-                "source upload response belongs to an abandoned generation",
-            ));
-        }
-        let stored = store_source_bundle_receipt_in_tx(
-            &mut transaction,
+        <Self as RemoteSourceBundleQueries>::record_task_board_remote_source_bundle_upload_response(
+            self,
             request,
             response,
             authenticated_principal,
         )
-        .await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit source upload response: {error}")))?;
-        Ok(stored)
+        .await
     }
+}
+
+pub(super) async fn exact_task_board_remote_source_bundle_upload_receipt(
+    db: &AsyncDaemonDb,
+    request: &RemoteSourceBundleUploadRequest,
+    authenticated_principal: &str,
+) -> Result<Option<TaskBoardRemoteSourceBundle>, CliError> {
+    request
+        .validate()
+        .map_err(|error| db_error(format!("validate source upload replay: {error}")))?;
+    nonblank(authenticated_principal, "source upload replay principal")?;
+    let mut transaction = db
+        .pool()
+        .begin()
+        .await
+        .map_err(|error| db_error(format!("begin source upload receipt replay: {error}")))?;
+    let collisions = load_source_bundle_collisions_in_tx(&mut transaction, &request.offer).await?;
+    let result = exact_receipt(&collisions, request, authenticated_principal)?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit source upload receipt replay: {error}")))?;
+    Ok(result)
+}
+
+pub(super) async fn claim_task_board_remote_source_bundle_upload_io_authority_fenced(
+    db: &AsyncDaemonDb,
+    request: &RemoteSourceBundleUploadRequest,
+    authenticated_principal: &str,
+    trust: &TaskBoardRemoteOperationTrustFence,
+) -> Result<bool, CliError> {
+    request
+        .validate()
+        .map_err(|error| db_error(format!("validate source upload authority: {error}")))?;
+    nonblank(authenticated_principal, "source upload authority principal")?;
+    let mut transaction = db
+        .begin_immediate_transaction("task board remote source upload authority")
+        .await?;
+    let collisions = load_source_bundle_collisions_in_tx(&mut transaction, &request.offer).await?;
+    if exact_receipt(&collisions, request, authenticated_principal)?.is_some() {
+        transaction.commit().await.map_err(|error| {
+            db_error(format!("commit replayed source upload authority: {error}"))
+        })?;
+        return Ok(false);
+    }
+    if super::remote_source_bundle_abandonment::source_offer_is_abandoned_in_tx(
+        &mut transaction,
+        &request.offer,
+    )
+    .await?
+    {
+        return Err(concurrent(
+            "source upload authority belongs to an abandoned generation",
+        ));
+    }
+    claim_upload_operation_trust_in_tx(&mut transaction, request, authenticated_principal, trust)
+        .await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit source upload authority: {error}")))?;
+    Ok(true)
+}
+
+pub(super) async fn record_task_board_remote_source_bundle_upload_response(
+    db: &AsyncDaemonDb,
+    request: &RemoteSourceBundleUploadRequest,
+    response: &RemoteSourceBundleUploadResponse,
+    authenticated_principal: &str,
+) -> Result<TaskBoardRemoteSourceBundle, CliError> {
+    response
+        .validate(request)
+        .map_err(|error| db_error(format!("validate source upload response: {error}")))?;
+    nonblank(authenticated_principal, "source upload response principal")?;
+    let mut transaction = db
+        .begin_immediate_transaction("task board remote source upload response")
+        .await?;
+    let collisions = load_source_bundle_collisions_in_tx(&mut transaction, &request.offer).await?;
+    if let Some(existing) = exact_receipt(&collisions, request, authenticated_principal)? {
+        require_unchanged_upload_response(&existing, response)?;
+        transaction.commit().await.map_err(|error| {
+            db_error(format!("commit replayed source upload response: {error}"))
+        })?;
+        return Ok(existing);
+    }
+    if super::remote_source_bundle_abandonment::source_offer_is_abandoned_in_tx(
+        &mut transaction,
+        &request.offer,
+    )
+    .await?
+    {
+        return Err(concurrent(
+            "source upload response belongs to an abandoned generation",
+        ));
+    }
+    let stored = store_source_bundle_receipt_in_tx(
+        &mut transaction,
+        request,
+        response,
+        authenticated_principal,
+    )
+    .await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit source upload response: {error}")))?;
+    Ok(stored)
 }
 
 async fn claim_upload_operation_trust_in_tx(
@@ -205,28 +239,48 @@ impl AsyncDaemonDb {
         lease_expires_at: &str,
         deadline_at: &str,
     ) -> Result<(), CliError> {
-        let mut transaction = self
-            .begin_immediate_transaction("test controller source offer")
-            .await?;
-        let lifecycle_trust =
-            capture_lifecycle_trust_for_offer_in_tx(&mut transaction, request).await?;
-        let assignment = super::remote_assignment_model::RemoteAssignmentInsertInput {
+        <Self as RemoteSourceBundleQueries>::insert_task_board_remote_source_bundle_offer_for_test(
+            self,
             request,
             principal,
             offered_at,
-            lease_id: None,
             lease_expires_at,
             deadline_at,
-            executor_configuration_revision: None,
-            executor_checkout_path: None,
-            lifecycle_trust: Some(&lifecycle_trust),
-        };
-        insert_assignment_in_tx(&mut transaction, &assignment).await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit test controller source offer: {error}")))
+        )
+        .await
     }
+}
+
+#[cfg(test)]
+pub(super) async fn insert_task_board_remote_source_bundle_offer_for_test(
+    db: &AsyncDaemonDb,
+    request: &crate::task_board::remote_wire::wire::RemoteOfferRequest,
+    principal: &str,
+    offered_at: &str,
+    lease_expires_at: &str,
+    deadline_at: &str,
+) -> Result<(), CliError> {
+    let mut transaction = db
+        .begin_immediate_transaction("test controller source offer")
+        .await?;
+    let lifecycle_trust =
+        capture_lifecycle_trust_for_offer_in_tx(&mut transaction, request).await?;
+    let assignment = super::remote_assignment_model::RemoteAssignmentInsertInput {
+        request,
+        principal,
+        offered_at,
+        lease_id: None,
+        lease_expires_at,
+        deadline_at,
+        executor_configuration_revision: None,
+        executor_checkout_path: None,
+        lifecycle_trust: Some(&lifecycle_trust),
+    };
+    insert_assignment_in_tx(&mut transaction, &assignment).await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit test controller source offer: {error}")))
 }
 
 fn exact_receipt(

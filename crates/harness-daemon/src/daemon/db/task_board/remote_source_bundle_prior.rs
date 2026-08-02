@@ -3,6 +3,7 @@ use sqlx::query_as;
 
 use super::remote_artifacts::validate_artifact_evidence;
 use super::remote_assignment_model::concurrent;
+use super::remote_source_bundle_queries::RemoteSourceBundleQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::remote_wire::wire::RemoteOfferRequest;
 use crate::task_board::remote_wire::wire::RemoteSourceMaterial;
@@ -42,43 +43,51 @@ impl AsyncDaemonDb {
         execution: &TaskBoardWorkflowExecutionRecord,
         phase: TaskBoardExecutionPhase,
     ) -> Result<Option<TaskBoardRemotePriorPhaseBundle>, CliError> {
-        let identity = prior_implementation_identity(execution, phase)?;
-        let rows = query_as::<_, PriorBundleRow>(PriorBundleRow::SELECT)
-            .bind(&execution.execution_id)
-            .bind(&identity.action_key)
-            .bind(i64::from(identity.attempt))
-            .bind(&identity.idempotency_key)
-            .bind(&identity.result.base_head_revision)
-            .bind(&identity.result.head_revision)
-            .fetch_all(self.pool())
-            .await
-            .map_err(|error| db_error(format!("load adopted prior-phase bundle: {error}")))?;
-        let mut bundles = rows
-            .into_iter()
-            .map(|row| row.into_bundle(&identity))
-            .collect::<Result<Vec<_>, _>>()?;
-        bundles.extend(
-            self.task_board_materialized_prior_phase_bundles(&identity)
-                .await?,
-        );
-        consistent_bundle(bundles)
+        <Self as RemoteSourceBundleQueries>::task_board_remote_prior_phase_bundle(
+            self, execution, phase,
+        )
+        .await
     }
+}
 
-    async fn task_board_materialized_prior_phase_bundles(
-        &self,
-        identity: &PriorImplementationIdentity,
-    ) -> Result<Vec<TaskBoardRemotePriorPhaseBundle>, CliError> {
-        let rows = query_as::<_, MaterializedPriorBundleRow>(MaterializedPriorBundleRow::SELECT)
-            .bind(&identity.execution_id)
-            .bind(&identity.result.base_head_revision)
-            .bind(&identity.result.head_revision)
-            .fetch_all(self.pool())
-            .await
-            .map_err(|error| db_error(format!("load materialized prior-phase bundle: {error}")))?;
-        rows.into_iter()
-            .map(|row| row.into_bundle(identity))
-            .collect()
-    }
+pub(super) async fn task_board_remote_prior_phase_bundle(
+    db: &AsyncDaemonDb,
+    execution: &TaskBoardWorkflowExecutionRecord,
+    phase: TaskBoardExecutionPhase,
+) -> Result<Option<TaskBoardRemotePriorPhaseBundle>, CliError> {
+    let identity = prior_implementation_identity(execution, phase)?;
+    let rows = query_as::<_, PriorBundleRow>(PriorBundleRow::SELECT)
+        .bind(&execution.execution_id)
+        .bind(&identity.action_key)
+        .bind(i64::from(identity.attempt))
+        .bind(&identity.idempotency_key)
+        .bind(&identity.result.base_head_revision)
+        .bind(&identity.result.head_revision)
+        .fetch_all(db.pool())
+        .await
+        .map_err(|error| db_error(format!("load adopted prior-phase bundle: {error}")))?;
+    let mut bundles = rows
+        .into_iter()
+        .map(|row| row.into_bundle(&identity))
+        .collect::<Result<Vec<_>, _>>()?;
+    bundles.extend(task_board_materialized_prior_phase_bundles(db, &identity).await?);
+    consistent_bundle(bundles)
+}
+
+async fn task_board_materialized_prior_phase_bundles(
+    db: &AsyncDaemonDb,
+    identity: &PriorImplementationIdentity,
+) -> Result<Vec<TaskBoardRemotePriorPhaseBundle>, CliError> {
+    let rows = query_as::<_, MaterializedPriorBundleRow>(MaterializedPriorBundleRow::SELECT)
+        .bind(&identity.execution_id)
+        .bind(&identity.result.base_head_revision)
+        .bind(&identity.result.head_revision)
+        .fetch_all(db.pool())
+        .await
+        .map_err(|error| db_error(format!("load materialized prior-phase bundle: {error}")))?;
+    rows.into_iter()
+        .map(|row| row.into_bundle(identity))
+        .collect()
 }
 
 struct PriorImplementationIdentity {
