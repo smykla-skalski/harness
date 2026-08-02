@@ -1,16 +1,16 @@
 [package]
 name = "harness-reviews"
-version = "56.0.0"
+version = "57.0.0"
 edition = "2024"
 rust-version = "1.95"
 publish = false
 
 [dependencies]
-harness-github-api = { path = "../harness-github-api", version = "56.0.0" }
-harness-kernel = { path = "../harness-kernel", version = "56.0.0" }
-harness-protocol = { path = "../harness-protocol", version = "56.0.0" }
-harness-task-board = { path = "../harness-task-board", version = "56.0.0" }
-harness-workspace = { path = "../harness-workspace", version = "56.0.0" }
+harness-github-api = { path = "../harness-github-api", version = "57.0.0" }
+harness-kernel = { path = "../harness-kernel", version = "57.0.0" }
+harness-protocol = { path = "../harness-protocol", version = "57.0.0" }
+harness-task-board = { path = "../harness-task-board", version = "57.0.0" }
+harness-workspace = { path = "../harness-workspace", version = "57.0.0" }
 async-trait = "0.1.83"
 base64 = "0.23.0"
 chrono = { version = "0.4.44", features = ["serde"] }
@@ -33,8 +33,8 @@ utoipa = "5.5.0"
 
 [dev-dependencies]
 axum = { version = "=0.8.9", features = ["http2", "json", "ws"] }
-harness-github-api = { path = "../harness-github-api", version = "56.0.0", features = ["test-support"] }
-harness-task-board = { path = "../harness-task-board", version = "56.0.0", features = ["test-support"] }
+harness-github-api = { path = "../harness-github-api", version = "57.0.0", features = ["test-support"] }
+harness-task-board = { path = "../harness-task-board", version = "57.0.0", features = ["test-support"] }
 tempfile = "=3.27.0"
 
 [features]

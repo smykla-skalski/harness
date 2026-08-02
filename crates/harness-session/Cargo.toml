@@ -1,22 +1,22 @@
 [package]
 name = "harness-session"
-version = "56.0.0"
+version = "57.0.0"
 edition = "2024"
 rust-version = "1.95"
 publish = false
 
 [dependencies]
-harness-agents = { path = "../harness-agents", version = "56.0.0" }
-harness-daemon-client = { path = "../harness-daemon-client", version = "56.0.0" }
-harness-infra = { path = "../harness-infra", version = "56.0.0" }
-harness-kernel = { path = "../harness-kernel", version = "56.0.0" }
+harness-agents = { path = "../harness-agents", version = "57.0.0" }
+harness-daemon-client = { path = "../harness-daemon-client", version = "57.0.0" }
+harness-infra = { path = "../harness-infra", version = "57.0.0" }
+harness-kernel = { path = "../harness-kernel", version = "57.0.0" }
 # Only `types`, `classifier`, and `application::maintenance` (storage) are
 # reached from here; the `cli`-gated request/execute/render surface is not,
 # so this stays default-features = false the same way harness-daemon's own
 # dependency on harness-observe does.
-harness-observe = { path = "../harness-observe", version = "56.0.0", default-features = false }
-harness-protocol = { path = "../harness-protocol", version = "56.0.0" }
-harness-workspace = { path = "../harness-workspace", version = "56.0.0" }
+harness-observe = { path = "../harness-observe", version = "57.0.0", default-features = false }
+harness-protocol = { path = "../harness-protocol", version = "57.0.0" }
+harness-workspace = { path = "../harness-workspace", version = "57.0.0" }
 chrono = { version = "0.4.44", features = ["serde"] }
 clap = { version = "4.6.0", features = ["derive", "env"] }
 fs-err = "3.3.0"

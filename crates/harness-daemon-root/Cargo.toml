@@ -1,6 +1,6 @@
 [package]
 name = "harness-daemon-root"
-version = "56.0.0"
+version = "57.0.0"
 edition = "2024"
 rust-version = "1.95"
 publish = false
@@ -8,11 +8,11 @@ publish = false
 [dependencies]
 fs-err = "3.3.0"
 fs2 = "0.4.3"
-harness-infra = { path = "../harness-infra", version = "56.0.0" }
-harness-kernel = { path = "../harness-kernel", version = "56.0.0" }
-harness-protocol = { path = "../harness-protocol", version = "56.0.0" }
-harness-telemetry = { path = "../harness-telemetry", version = "56.0.0" }
-harness-workspace = { path = "../harness-workspace", version = "56.0.0" }
+harness-infra = { path = "../harness-infra", version = "57.0.0" }
+harness-kernel = { path = "../harness-kernel", version = "57.0.0" }
+harness-protocol = { path = "../harness-protocol", version = "57.0.0" }
+harness-telemetry = { path = "../harness-telemetry", version = "57.0.0" }
+harness-workspace = { path = "../harness-workspace", version = "57.0.0" }
 serde_json = "1.0.149"
 tracing = "0.1.44"
 uuid = { version = "1.18.1", features = ["v4"] }

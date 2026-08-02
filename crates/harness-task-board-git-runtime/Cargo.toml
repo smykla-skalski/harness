@@ -1,17 +1,17 @@
 [package]
 name = "harness-task-board-git-runtime"
-version = "56.0.0"
+version = "57.0.0"
 edition = "2024"
 rust-version = "1.95"
 publish = false
 
 [dependencies]
-harness-daemon-state = { path = "../harness-daemon-state", version = "56.0.0" }
-harness-kernel = { path = "../harness-kernel", version = "56.0.0" }
-harness-task-board = { path = "../harness-task-board", version = "56.0.0" }
+harness-daemon-state = { path = "../harness-daemon-state", version = "57.0.0" }
+harness-kernel = { path = "../harness-kernel", version = "57.0.0" }
+harness-task-board = { path = "../harness-task-board", version = "57.0.0" }
 
 [dev-dependencies]
-harness-daemon-state = { path = "../harness-daemon-state", version = "56.0.0", features = ["test-support"] }
+harness-daemon-state = { path = "../harness-daemon-state", version = "57.0.0", features = ["test-support"] }
 
 [features]
 daemon-runtime = ["harness-daemon-state/daemon-runtime"]
