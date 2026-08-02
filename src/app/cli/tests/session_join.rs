@@ -102,14 +102,14 @@ fn parse_session_agents_start_terminal() {
     ])
     .unwrap();
     let Command::Session {
-        command:
-            crate::session::transport::SessionCommand::Agents {
-                command:
-                    crate::session::transport::SessionAgentsCommand::Start {
-                        command: crate::session::transport::SessionAgentStartCommand::Terminal(args),
-                    },
-            },
+        command: crate::session::transport::SessionCommand::Agents { command },
     } = cli.command
+    else {
+        panic!("expected Session Agents Start Terminal");
+    };
+    let crate::session::transport::SessionAgentsCommand::Start {
+        command: crate::session::transport::SessionAgentStartCommand::Terminal(args),
+    } = *command
     else {
         panic!("expected Session Agents Start Terminal");
     };
@@ -158,14 +158,14 @@ fn parse_session_agents_start_codex() {
     ])
     .unwrap();
     let Command::Session {
-        command:
-            crate::session::transport::SessionCommand::Agents {
-                command:
-                    crate::session::transport::SessionAgentsCommand::Start {
-                        command: crate::session::transport::SessionAgentStartCommand::Codex(args),
-                    },
-            },
+        command: crate::session::transport::SessionCommand::Agents { command },
     } = cli.command
+    else {
+        panic!("expected Session Agents Start Codex");
+    };
+    let crate::session::transport::SessionAgentsCommand::Start {
+        command: crate::session::transport::SessionAgentStartCommand::Codex(args),
+    } = *command
     else {
         panic!("expected Session Agents Start Codex");
     };
