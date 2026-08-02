@@ -1,6 +1,7 @@
 use chrono::{DateTime, Duration, Utc};
 use sqlx::{QueryBuilder, Sqlite, SqliteConnection, Transaction, query, query_as};
 
+use super::queries::TaskBoardAutomationSchedulerQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::{
     TaskBoardAutomationHistoryRequest, TaskBoardAutomationHistoryResponse,
@@ -50,44 +51,65 @@ impl AsyncDaemonDb {
     pub(crate) async fn active_task_board_automation_run(
         &self,
     ) -> Result<Option<TaskBoardAutomationRunInfo>, CliError> {
-        let row = query_as::<_, RunRecordRow>(ACTIVE_RUN_INFO_SELECT_SQL)
-            .fetch_optional(self.pool())
-            .await
-            .map_err(|error| db_error(format!("load active task board automation run: {error}")))?;
-        row.as_ref().map(run_info_from_row).transpose()
+        <Self as TaskBoardAutomationSchedulerQueries>::active_task_board_automation_run(self).await
     }
 
     pub(crate) async fn task_board_automation_history(
         &self,
         request: &TaskBoardAutomationHistoryRequest,
     ) -> Result<TaskBoardAutomationHistoryResponse, CliError> {
-        let cursor = request
-            .before
-            .as_deref()
-            .map(parse_history_cursor)
-            .transpose()?;
-        let limit = request.normalized_limit();
-        history_response(
-            load_history_rows(self, cursor.as_ref(), limit).await?,
-            limit,
-        )
+        <Self as TaskBoardAutomationSchedulerQueries>::task_board_automation_history(self, request)
+            .await
     }
 
     pub(crate) async fn task_board_automation_run_detail(
         &self,
         run_id: &str,
     ) -> Result<Option<TaskBoardAutomationRunDetail>, CliError> {
-        let row = query_as::<_, RunRecordRow>(RUN_DETAIL_SELECT_SQL)
-            .bind(run_id)
-            .fetch_optional(self.pool())
-            .await
-            .map_err(|error| {
-                db_error(format!(
-                    "load task board automation run detail '{run_id}': {error}"
-                ))
-            })?;
-        row.as_ref().map(run_detail_from_row).transpose()
+        <Self as TaskBoardAutomationSchedulerQueries>::task_board_automation_run_detail(
+            self, run_id,
+        )
+        .await
     }
+}
+
+pub(super) async fn active_task_board_automation_run(
+    db: &AsyncDaemonDb,
+) -> Result<Option<TaskBoardAutomationRunInfo>, CliError> {
+    let row = query_as::<_, RunRecordRow>(ACTIVE_RUN_INFO_SELECT_SQL)
+        .fetch_optional(db.pool())
+        .await
+        .map_err(|error| db_error(format!("load active task board automation run: {error}")))?;
+    row.as_ref().map(run_info_from_row).transpose()
+}
+
+pub(super) async fn task_board_automation_history(
+    db: &AsyncDaemonDb,
+    request: &TaskBoardAutomationHistoryRequest,
+) -> Result<TaskBoardAutomationHistoryResponse, CliError> {
+    let cursor = request
+        .before
+        .as_deref()
+        .map(parse_history_cursor)
+        .transpose()?;
+    let limit = request.normalized_limit();
+    history_response(load_history_rows(db, cursor.as_ref(), limit).await?, limit)
+}
+
+pub(super) async fn task_board_automation_run_detail(
+    db: &AsyncDaemonDb,
+    run_id: &str,
+) -> Result<Option<TaskBoardAutomationRunDetail>, CliError> {
+    let row = query_as::<_, RunRecordRow>(RUN_DETAIL_SELECT_SQL)
+        .bind(run_id)
+        .fetch_optional(db.pool())
+        .await
+        .map_err(|error| {
+            db_error(format!(
+                "load task board automation run detail '{run_id}': {error}"
+            ))
+        })?;
+    row.as_ref().map(run_detail_from_row).transpose()
 }
 
 pub(super) async fn prune_terminal_run_history(

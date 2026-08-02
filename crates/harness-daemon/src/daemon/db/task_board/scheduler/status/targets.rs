@@ -1,6 +1,7 @@
 use sqlx::{Sqlite, Transaction, query_scalar};
 
 use super::super::super::automation_cancel_targets::cancel_target_in_tx;
+use super::super::queries::TaskBoardAutomationSchedulerQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardAutomationCancelTarget;
 
@@ -75,15 +76,27 @@ impl AsyncDaemonDb {
         &self,
         execution_id: &str,
     ) -> Result<Option<TaskBoardAutomationCancelTarget>, CliError> {
-        let mut transaction =
-            self.pool().begin().await.map_err(|error| {
-                db_error(format!("begin automation cancel target read: {error}"))
-            })?;
-        let target = cancel_target_in_tx(&mut transaction, execution_id).await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit automation cancel target read: {error}")))?;
-        Ok(target)
+        <Self as TaskBoardAutomationSchedulerQueries>::task_board_automation_cancel_target(
+            self,
+            execution_id,
+        )
+        .await
     }
+}
+
+pub(in super::super) async fn task_board_automation_cancel_target(
+    db: &AsyncDaemonDb,
+    execution_id: &str,
+) -> Result<Option<TaskBoardAutomationCancelTarget>, CliError> {
+    let mut transaction = db
+        .pool()
+        .begin()
+        .await
+        .map_err(|error| db_error(format!("begin automation cancel target read: {error}")))?;
+    let target = cancel_target_in_tx(&mut transaction, execution_id).await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit automation cancel target read: {error}")))?;
+    Ok(target)
 }

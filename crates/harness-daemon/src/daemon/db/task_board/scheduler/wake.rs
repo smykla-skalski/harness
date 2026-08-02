@@ -6,6 +6,7 @@ use sqlx::{QueryBuilder, Sqlite, query, query_as};
 use super::super::ORCHESTRATOR_CHANGE_SCOPE;
 use super::super::items::bump_change_in_tx;
 use super::super::mapper::{parse_json, to_json};
+use super::queries::TaskBoardAutomationSchedulerQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::{
     TASK_BOARD_AUTOMATION_WAKE_BATCH_LIMIT, TASK_BOARD_AUTOMATION_WAKE_PAYLOAD_SCHEMA_VERSION,
@@ -44,36 +45,20 @@ impl AsyncDaemonDb {
         request: &TaskBoardAutomationWakeRequest,
         now: DateTime<Utc>,
     ) -> Result<TaskBoardAutomationWakeEvent, CliError> {
-        let mut transaction = self
-            .begin_immediate_transaction("task board automation wake enqueue")
-            .await?;
-        let event = enqueue_in_tx(&mut transaction, request, now).await?;
-        commit(transaction, "task board automation wake enqueue").await?;
-        Ok(event)
+        <Self as TaskBoardAutomationSchedulerQueries>::enqueue_task_board_automation_wake_event(
+            self, request, now,
+        )
+        .await
     }
 
     pub(crate) async fn pending_task_board_automation_wake_events(
         &self,
         limit: u32,
     ) -> Result<Vec<TaskBoardAutomationWakeEvent>, CliError> {
-        if limit == 0 {
-            return Ok(Vec::new());
-        }
-        let rows = query_as::<_, TaskBoardAutomationWakeRow>(
-            "SELECT sequence, cause, entity_id, entity_revision, payload_json, created_at,
-                    processed_at
-             FROM task_board_orchestrator_wake_events
-             WHERE processed_at IS NULL ORDER BY sequence
-             LIMIT ?1",
+        <Self as TaskBoardAutomationSchedulerQueries>::pending_task_board_automation_wake_events(
+            self, limit,
         )
-        .bind(i64::from(limit.min(TASK_BOARD_AUTOMATION_WAKE_BATCH_LIMIT)))
-        .fetch_all(self.pool())
         .await
-        .map_err(|error| db_error(format!("load pending task board wake events: {error}")))?;
-        rows.into_iter()
-            .map(decode_task_board_automation_wake_row)
-            .map(|observation| observation.map(|observation| observation.event))
-            .collect()
     }
 
     pub(crate) async fn acknowledge_task_board_automation_wake_events(
@@ -81,18 +66,65 @@ impl AsyncDaemonDb {
         sequences: &[u64],
         processed_at: DateTime<Utc>,
     ) -> Result<u64, CliError> {
-        let sequences = normalize_sequences(sequences)?;
-        if sequences.is_empty() {
-            return Ok(0);
-        }
-        let mut transaction = self
-            .begin_immediate_transaction("task board automation wake acknowledgement")
-            .await?;
-        let changed =
-            acknowledge_wake_rows_in_tx(&mut transaction, &sequences, processed_at).await?;
-        commit(transaction, "task board automation wake acknowledgement").await?;
-        Ok(changed)
+        <Self as TaskBoardAutomationSchedulerQueries>::acknowledge_task_board_automation_wake_events(
+            self, sequences, processed_at,
+        )
+        .await
     }
+}
+
+pub(super) async fn enqueue_task_board_automation_wake_event(
+    db: &AsyncDaemonDb,
+    request: &TaskBoardAutomationWakeRequest,
+    now: DateTime<Utc>,
+) -> Result<TaskBoardAutomationWakeEvent, CliError> {
+    let mut transaction = db
+        .begin_immediate_transaction("task board automation wake enqueue")
+        .await?;
+    let event = enqueue_in_tx(&mut transaction, request, now).await?;
+    commit(transaction, "task board automation wake enqueue").await?;
+    Ok(event)
+}
+
+pub(super) async fn pending_task_board_automation_wake_events(
+    db: &AsyncDaemonDb,
+    limit: u32,
+) -> Result<Vec<TaskBoardAutomationWakeEvent>, CliError> {
+    if limit == 0 {
+        return Ok(Vec::new());
+    }
+    let rows = query_as::<_, TaskBoardAutomationWakeRow>(
+        "SELECT sequence, cause, entity_id, entity_revision, payload_json, created_at,
+                processed_at
+         FROM task_board_orchestrator_wake_events
+         WHERE processed_at IS NULL ORDER BY sequence
+         LIMIT ?1",
+    )
+    .bind(i64::from(limit.min(TASK_BOARD_AUTOMATION_WAKE_BATCH_LIMIT)))
+    .fetch_all(db.pool())
+    .await
+    .map_err(|error| db_error(format!("load pending task board wake events: {error}")))?;
+    rows.into_iter()
+        .map(decode_task_board_automation_wake_row)
+        .map(|observation| observation.map(|observation| observation.event))
+        .collect()
+}
+
+pub(super) async fn acknowledge_task_board_automation_wake_events(
+    db: &AsyncDaemonDb,
+    sequences: &[u64],
+    processed_at: DateTime<Utc>,
+) -> Result<u64, CliError> {
+    let sequences = normalize_sequences(sequences)?;
+    if sequences.is_empty() {
+        return Ok(0);
+    }
+    let mut transaction = db
+        .begin_immediate_transaction("task board automation wake acknowledgement")
+        .await?;
+    let changed = acknowledge_wake_rows_in_tx(&mut transaction, &sequences, processed_at).await?;
+    commit(transaction, "task board automation wake acknowledgement").await?;
+    Ok(changed)
 }
 
 async fn acknowledge_wake_rows_in_tx(

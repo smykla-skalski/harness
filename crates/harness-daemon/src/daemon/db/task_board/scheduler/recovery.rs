@@ -6,6 +6,7 @@ use super::audit::{
     broadcast_automation_audits, insert_automation_audit, parse_scope, terminal_event_type,
 };
 use super::control::{ensure_control_row, load_control_in_tx};
+use super::queries::TaskBoardAutomationSchedulerQueries;
 use super::runs::run_outcome_label;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::daemon::protocol::HarnessMonitorAuditEvent;
@@ -27,27 +28,37 @@ impl AsyncDaemonDb {
         &self,
         now: DateTime<Utc>,
     ) -> Result<u64, CliError> {
-        let mut transaction = self
-            .begin_immediate_transaction("task board automation startup recovery")
-            .await?;
-        ensure_control_row(&mut transaction, now).await?;
-        let events = expire_stale_runs(&mut transaction, now).await?;
-        if !events.is_empty() {
-            super::super::items::bump_change_in_tx(
-                &mut transaction,
-                super::super::ORCHESTRATOR_CHANGE_SCOPE,
-            )
-            .await?;
-        }
-        transaction.commit().await.map_err(|error| {
-            db_error(format!(
-                "commit task board automation startup recovery: {error}"
-            ))
-        })?;
-        broadcast_automation_audits(&events);
-        u64::try_from(events.len())
-            .map_err(|error| db_error(format!("count recovered automation runs: {error}")))
+        <Self as TaskBoardAutomationSchedulerQueries>::recover_stale_task_board_automation_runs(
+            self, now,
+        )
+        .await
     }
+}
+
+pub(super) async fn recover_stale_task_board_automation_runs(
+    db: &AsyncDaemonDb,
+    now: DateTime<Utc>,
+) -> Result<u64, CliError> {
+    let mut transaction = db
+        .begin_immediate_transaction("task board automation startup recovery")
+        .await?;
+    ensure_control_row(&mut transaction, now).await?;
+    let events = expire_stale_runs(&mut transaction, now).await?;
+    if !events.is_empty() {
+        super::super::items::bump_change_in_tx(
+            &mut transaction,
+            super::super::ORCHESTRATOR_CHANGE_SCOPE,
+        )
+        .await?;
+    }
+    transaction.commit().await.map_err(|error| {
+        db_error(format!(
+            "commit task board automation startup recovery: {error}"
+        ))
+    })?;
+    broadcast_automation_audits(&events);
+    u64::try_from(events.len())
+        .map_err(|error| db_error(format!("count recovered automation runs: {error}")))
 }
 
 pub(super) async fn expire_stale_runs(
