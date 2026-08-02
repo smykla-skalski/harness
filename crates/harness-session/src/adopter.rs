@@ -127,7 +127,7 @@ impl SessionAdopter {
     /// when the `.origin` marker does not match `state.json`'s `origin_path`.
     /// Returns [`AdoptionError::Io`] on filesystem failures.
     /// Returns [`AdoptionError::Parse`] on JSON decode failures.
-    #[expect(
+    #[allow(
         clippy::cognitive_complexity,
         reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
     )]
@@ -175,7 +175,7 @@ impl SessionAdopter {
     /// insufficient parent components. Returns [`AdoptionError::AlreadyAttached`]
     /// when a state file already exists for this session id. Returns
     /// [`AdoptionError::Storage`] on persistence failures.
-    #[expect(
+    #[allow(
         clippy::cognitive_complexity,
         reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
     )]

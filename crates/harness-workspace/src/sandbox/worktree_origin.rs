@@ -48,7 +48,7 @@ impl WorktreeOriginGrant {
 /// reach worktrees that need no grant at all, and refusing here would turn a
 /// working read into a failure.
 #[must_use]
-#[expect(
+#[allow(
     clippy::cognitive_complexity,
     reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
 )]
