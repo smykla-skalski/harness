@@ -55,6 +55,40 @@ struct SessionArchiveRerouteContractTests {
     #expect(fields["actor"] == .string("leader"))
   }
 
+  @Test("HTTP session deletion uses the destructive no-content route")
+  func httpSessionDelete() async throws {
+    SessionArchiveURLProtocol.reset()
+    SessionArchiveURLProtocol.configure(status: 204, body: "")
+    let client = try makeHTTPClient()
+
+    try await client.deleteSession(sessionID: "session-7")
+
+    #expect(SessionArchiveURLProtocol.lastRequestPath == "/v1/sessions/session-7")
+    #expect(SessionArchiveURLProtocol.lastRequestMethod == "DELETE")
+    #expect(SessionArchiveURLProtocol.lastRequestBody == nil)
+  }
+
+  @Test("WebSocket session deletion requires the daemon deleted flag")
+  func webSocketSessionDelete() async throws {
+    let probe = RPCProbe()
+    let fixture = try JSONDecoder().decode(
+      JSONValue.self,
+      from: Data(#"{"deleted":true}"#.utf8)
+    )
+    let transport = try makeWebSocketTransport(probe: probe, response: fixture)
+
+    try await transport.deleteSession(sessionID: "session-7")
+
+    let calls = await probe.calls
+    #expect(calls.map(\.method) == [.sessionDelete])
+    let params = try #require(calls.first?.params)
+    guard case .object(let fields) = params else {
+      Issue.record("expected object params, got \(params)")
+      return
+    }
+    #expect(fields == ["session_id": .string("session-7")])
+  }
+
   private func assertArchive(_ response: SessionArchiveResponse) {
     #expect(response.sessionId == "session-7")
     #expect(response.archivedAt == "2026-06-17T09:15:00Z")

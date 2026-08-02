@@ -237,6 +237,10 @@ actor PreviewHarnessClientState {
     )
   }
 
+  func deleteSession(sessionID: String) throws {
+    _ = try archiveSession(sessionID: sessionID)
+  }
+
   func timeline(for sessionID: String) -> [TimelineEntry] {
     if let timeline = timelinesBySessionID[sessionID] {
       return timeline

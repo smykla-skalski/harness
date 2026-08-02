@@ -217,6 +217,7 @@ pub(crate) mod task_board_github;
 mod task_board_host;
 mod task_board_orchestrator_control;
 mod task_board_orchestrator_db;
+mod task_board_orchestrator_execution;
 mod task_board_orchestrator_run_lease;
 mod task_board_orchestrator_settings;
 mod task_board_orchestrator_step_mode;

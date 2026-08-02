@@ -1,8 +1,11 @@
-use super::{github_discovery_request, should_sync_github_tasks};
+use super::{github_discovery_request, prepare_run, run_dispatch_phase, should_sync_github_tasks};
+use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::protocol::TaskBoardOrchestratorRunOnceRequest;
 use crate::task_board::github::GitHubAutomation;
 use crate::task_board::{
-    ExternalSyncDirection, TaskBoardOrchestratorDispatchInput, TaskBoardOrchestratorSettings,
-    TaskBoardStatus,
+    ExternalSyncDirection, TaskBoardAutomationDesiredMode, TaskBoardAutomationRunOutcome,
+    TaskBoardAutomationRunTrigger, TaskBoardAutomationScope, TaskBoardOrchestratorDispatchInput,
+    TaskBoardOrchestratorSettings, TaskBoardStatus,
 };
 
 /// The default settings already enable `SyncTaskBoard`, so this is the
@@ -115,4 +118,118 @@ fn discovery_pulls_every_status_not_the_dispatch_lane() {
     assert!(matches!(request.direction, ExternalSyncDirection::Pull));
     assert!(!request.dry_run);
     assert!(github_discovery_request(true).dry_run);
+}
+
+#[tokio::test]
+async fn a_run_dispatches_only_items_present_when_it_was_prepared() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let db = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
+        .await
+        .expect("open database");
+    let settings = settings_without_a_source();
+    db.replace_task_board_orchestrator_settings(&settings)
+        .await
+        .expect("save settings");
+    db.create_task_board_item(crate::task_board::TaskBoardItem::new(
+        "present-at-prepare".into(),
+        "Present at prepare".into(),
+        "The run owns this candidate".into(),
+        "2026-08-02T10:00:00Z".into(),
+    ))
+    .await
+    .expect("create initial item");
+    let request = TaskBoardOrchestratorRunOnceRequest {
+        status: Some(TaskBoardStatus::Todo),
+        dry_run: Some(true),
+        ..TaskBoardOrchestratorRunOnceRequest::default()
+    };
+    let prepared = prepare_run(&db, &request, &settings, None)
+        .await
+        .expect("prepare run");
+
+    db.create_task_board_item(crate::task_board::TaskBoardItem::new(
+        "arrived-after-prepare".into(),
+        "Arrived after prepare".into(),
+        "A sync can discover this, but the current run must not own it".into(),
+        "2026-08-02T10:00:01Z".into(),
+    ))
+    .await
+    .expect("create later item");
+
+    let (_, dispatch) = run_dispatch_phase(&db, &settings, &prepared, None)
+        .await
+        .expect("preview dispatch");
+    let planned_ids = dispatch
+        .plans
+        .iter()
+        .map(|plan| plan.board_item_id.as_str())
+        .collect::<Vec<_>>();
+
+    assert_eq!(planned_ids, ["present-at-prepare"]);
+}
+
+#[tokio::test]
+async fn stop_fences_dispatch_before_another_item_can_start() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let db = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
+        .await
+        .expect("open database");
+    db.start_task_board_automation(
+        TaskBoardAutomationDesiredMode::Continuous,
+        chrono::Utc::now(),
+    )
+    .await
+    .expect("start automation");
+    let start = super::super::TaskBoardAutomationRunSession::acquire(
+        &db,
+        TaskBoardAutomationRunTrigger::Manual,
+        Some("operator".into()),
+        false,
+        TaskBoardAutomationScope::default(),
+    )
+    .await
+    .expect("acquire run");
+    let super::super::TaskBoardAutomationRunStart::Acquired(session) = start else {
+        panic!("manual run should be acquired");
+    };
+    let settings = settings_without_a_source();
+    db.create_task_board_item(crate::task_board::TaskBoardItem::new(
+        "stop-fenced-item".into(),
+        "Stop-fenced item".into(),
+        "This item must not start after Stop".into(),
+        "2026-08-02T10:05:00Z".into(),
+    ))
+    .await
+    .expect("create item");
+    let prepared = prepare_run(
+        &db,
+        &TaskBoardOrchestratorRunOnceRequest {
+            status: Some(TaskBoardStatus::Todo),
+            dry_run: Some(false),
+            ..TaskBoardOrchestratorRunOnceRequest::default()
+        },
+        &settings,
+        Some(session.run_id()),
+    )
+    .await
+    .expect("prepare run");
+
+    db.stop_task_board_automation(chrono::Utc::now())
+        .await
+        .expect("stop automation");
+    let error = run_dispatch_phase(&db, &settings, &prepared, Some(&session))
+        .await
+        .expect_err("Stop must fence dispatch");
+
+    assert_eq!(error.code(), "KSRCLI092");
+    let item = db
+        .task_board_item("stop-fenced-item")
+        .await
+        .expect("load item");
+    assert_eq!(item.status, TaskBoardStatus::Todo);
+    let outcome = session
+        .finalize(TaskBoardAutomationRunOutcome::Failed, Some(&error))
+        .await
+        .expect("finalize cancelled run");
+    assert_eq!(outcome, TaskBoardAutomationRunOutcome::Cancelled);
 }

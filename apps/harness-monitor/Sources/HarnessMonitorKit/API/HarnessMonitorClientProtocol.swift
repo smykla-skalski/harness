@@ -122,6 +122,7 @@ public protocol HarnessMonitorClientProtocol: HarnessMonitorTaskBoardClientProto
     sessionID: String,
     request: SessionArchiveRequest
   ) async throws -> SessionArchiveResponse
+  func deleteSession(sessionID: String) async throws
   func sendSignal(
     sessionID: String,
     request: SignalSendRequest

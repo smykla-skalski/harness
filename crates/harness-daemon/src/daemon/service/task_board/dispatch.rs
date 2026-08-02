@@ -127,7 +127,7 @@ pub async fn dispatch_task_board_async(
 /// # Errors
 /// Returns `CliError` when the caller named one item and that item's kind
 /// blocks dispatch.
-fn reject_explicit_kind_block(
+pub(super) fn reject_explicit_kind_block(
     request: &TaskBoardDispatchRequest,
     plans: &[DispatchPlan],
 ) -> Result<(), CliError> {
@@ -269,7 +269,7 @@ fn apply_dispatch_plan(
     })
 }
 
-async fn apply_dispatch_plan_async(
+pub(super) async fn apply_dispatch_plan_async(
     request: &TaskBoardDispatchRequest,
     async_db: &AsyncDaemonDb,
     plan: &DispatchPlan,
@@ -401,7 +401,7 @@ pub fn unlink_dispatched_item(
     )
 }
 
-async fn build_dispatch_plans_for_request_async(
+pub(super) async fn build_dispatch_plans_for_request_async(
     db: &AsyncDaemonDb,
     request: &TaskBoardDispatchRequest,
 ) -> Result<Vec<DispatchPlan>, CliError> {

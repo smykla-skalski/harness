@@ -67,10 +67,7 @@ struct HarnessMonitorStoreRemoveSessionTests {
     #expect(
       client.recordedCallsIgnoringProjectCatalogReads()
         == [
-          .removeSession(
-            sessionID: PreviewFixtures.summary.sessionId,
-            actor: "harness-app"
-          )
+          .deleteSession(sessionID: PreviewFixtures.summary.sessionId)
         ]
     )
   }
@@ -108,7 +105,7 @@ struct HarnessMonitorStoreRemoveSessionTests {
   @Test("Stale refresh snapshots do not resurrect a removed session")
   func staleRefreshSnapshotsDoNotResurrectARemovedSession() async {
     let client = RecordingHarnessClient()
-    client.archiveSessionMutatesReadSnapshots = false
+    client.deleteSessionMutatesReadSnapshots = false
     let store = await makeBootstrappedStore(client: client)
 
     store.requestRemoveSessionConfirmation(sessionID: PreviewFixtures.summary.sessionId)
@@ -161,19 +158,16 @@ struct HarnessMonitorStoreRemoveSessionTests {
     #expect(
       client.recordedCallsIgnoringProjectCatalogReads()
         == [
-          .removeSession(
-            sessionID: PreviewFixtures.summary.sessionId,
-            actor: "harness-app"
-          )
+          .deleteSession(sessionID: PreviewFixtures.summary.sessionId)
         ]
     )
   }
 
-  @Test("Daemon missing-session archive replies still remove the stale session locally")
-  func missingSessionArchiveReplyStillRemovesSessionLocally() async {
+  @Test("Daemon missing-session delete replies still remove the stale session locally")
+  func missingSessionDeleteReplyStillRemovesSessionLocally() async {
     let client = RecordingHarnessClient()
-    client.archiveSessionMutatesReadSnapshots = false
-    client.configureArchiveSessionError(
+    client.deleteSessionMutatesReadSnapshots = false
+    client.configureDeleteSessionError(
       HarnessMonitorAPIError.server(
         code: 400,
         message:
@@ -196,10 +190,7 @@ struct HarnessMonitorStoreRemoveSessionTests {
     #expect(
       client.recordedCallsIgnoringProjectCatalogReads()
         == [
-          .removeSession(
-            sessionID: PreviewFixtures.summary.sessionId,
-            actor: "harness-app"
-          )
+          .deleteSession(sessionID: PreviewFixtures.summary.sessionId)
         ]
     )
   }
@@ -260,14 +251,8 @@ struct HarnessMonitorStoreRemoveSessionTests {
     #expect(
       client.recordedCallsIgnoringProjectCatalogReads()
         == [
-          .removeSession(
-            sessionID: PreviewFixtures.summary.sessionId,
-            actor: "harness-app"
-          ),
-          .removeSession(
-            sessionID: PreviewFixtures.signalRegressionSecondarySummary.sessionId,
-            actor: "harness-app"
-          ),
+          .deleteSession(sessionID: PreviewFixtures.summary.sessionId),
+          .deleteSession(sessionID: PreviewFixtures.signalRegressionSecondarySummary.sessionId),
         ]
     )
   }

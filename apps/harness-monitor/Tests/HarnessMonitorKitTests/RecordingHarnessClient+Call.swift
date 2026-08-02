@@ -103,7 +103,7 @@ extension RecordingHarnessClient {
     case adoptSession(bookmarkID: String?, sessionRoot: URL)
     case startSession(projectDir: String, baseRef: String?)
     case endSession(sessionID: String, actor: String)
-    case removeSession(sessionID: String, actor: String)
+    case deleteSession(sessionID: String)
     case observeSession(sessionID: String, actor: String)
     case removeAgent(sessionID: String, agentID: String, actor: String)
     case resolveCodexApproval(

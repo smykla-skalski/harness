@@ -3,12 +3,15 @@ import SwiftUI
 
 enum TaskBoardOverviewLiveOperation {
   case evaluateBoard
+  case start(TaskBoardAutomationSchedulingSettings)
   case runOnce(TaskBoardOrchestratorRunOnceRequest)
 
   var title: String {
     switch self {
     case .evaluateBoard:
       "Evaluate the live task board?"
+    case .start:
+      "Start live automation?"
     case .runOnce:
       "Run the task board live?"
     }
@@ -18,6 +21,8 @@ enum TaskBoardOverviewLiveOperation {
     switch self {
     case .evaluateBoard:
       "Evaluate Live"
+    case .start:
+      "Start Live"
     case .runOnce:
       "Run Once Live"
     }
@@ -26,9 +31,16 @@ enum TaskBoardOverviewLiveOperation {
   var message: String {
     switch self {
     case .evaluateBoard:
-      "This evaluates the board and applies any resulting item transitions."
+      "This evaluates the board and applies any resulting item transitions"
+    case .start(let scheduling):
+      """
+      Continuously syncs configured repositories and dispatches at most \
+      \(scheduling.maxDispatchesPerRun) per run, with at most \
+      \(scheduling.maxConcurrentWorkflows) workflows active. Stop prevents later dispatches; \
+      workflows already started continue until cancelled separately
+      """
     case .runOnce:
-      "This runs a live orchestrator tick, which can dispatch work and update board items."
+      "This runs a live orchestrator tick, which can dispatch work and update board items"
     }
   }
 }
@@ -73,6 +85,8 @@ extension TaskBoardOverviewView {
     switch operation {
     case .evaluateBoard:
       actions.evaluateTaskBoard()
+    case .start:
+      actions.startTaskBoardOrchestrator()
     case .runOnce(let request):
       actions.runTaskBoardOrchestratorOnce(request)
     }

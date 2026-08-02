@@ -188,12 +188,20 @@ extension RecordingHarnessClient {
     request: SessionArchiveRequest
   ) async throws -> SessionArchiveResponse {
     try await sleepIfNeeded(configuredMutationDelay())
-    record(.removeSession(sessionID: sessionID, actor: request.actor))
-    if let archiveSessionError = lock.withLock({ archiveSessionError }) {
-      throw archiveSessionError
+    return SessionArchiveResponse(
+      sessionId: sessionID,
+      archivedAt: "2026-03-28T14:26:00Z"
+    )
+  }
+
+  func deleteSession(sessionID: String) async throws {
+    try await sleepIfNeeded(configuredMutationDelay())
+    record(.deleteSession(sessionID: sessionID))
+    if let deleteSessionError = lock.withLock({ deleteSessionError }) {
+      throw deleteSessionError
     }
-    if archiveSessionMutatesReadSnapshots {
-      let archivedState = lock.withLock {
+    if deleteSessionMutatesReadSnapshots {
+      let remainingState = lock.withLock {
         let remainingSummaries =
           (sessionSummariesStorage ?? [detailStorage.session]).filter { $0.sessionId != sessionID }
         var details = sessionDetailsByID
@@ -203,15 +211,11 @@ extension RecordingHarnessClient {
         return (remainingSummaries, details, timelines)
       }
       configureSessions(
-        summaries: archivedState.0,
-        detailsByID: archivedState.1,
-        timelinesBySessionID: archivedState.2
+        summaries: remainingState.0,
+        detailsByID: remainingState.1,
+        timelinesBySessionID: remainingState.2
       )
     }
-    return SessionArchiveResponse(
-      sessionId: sessionID,
-      archivedAt: "2026-03-28T14:26:00Z"
-    )
   }
 
   func sendSignal(

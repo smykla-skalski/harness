@@ -126,9 +126,9 @@ extension RecordingHarnessClient {
     }
   }
 
-  func configureArchiveSessionError(_ error: (any Error)?) {
+  func configureDeleteSessionError(_ error: (any Error)?) {
     lock.withLock {
-      archiveSessionError = error
+      deleteSessionError = error
     }
   }
 

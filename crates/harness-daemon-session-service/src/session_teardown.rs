@@ -1,5 +1,6 @@
 use harness_session::storage as session_storage;
 use harness_session::types::SessionState;
+use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_workspace::workspace::harness_data_root;
 use harness_workspace::workspace::layout::{
     SessionLayout, sessions_root as workspace_sessions_root,
@@ -7,30 +8,28 @@ use harness_workspace::workspace::layout::{
 use harness_workspace::workspace::worktree::WorktreeController;
 
 /// Destroy the on-disk artifacts for a session: deregister the active-session
-/// marker and tear down its linked checkout. Failures are logged and swallowed so
-/// the caller's DB cleanup can always proceed.
+/// marker and tear down its linked checkout. The caller must not delete the DB
+/// row unless this succeeds, or the session would lose the only durable handle
+/// capable of retrying an orphaned worktree cleanup.
 ///
 /// For externally-rooted sessions (`external_origin` is `Some`), the worktree
 /// was not created by this daemon, so only deregistration runs; the worktree is
 /// left intact.
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
-)]
-pub fn destroy_session_artifacts(state: &SessionState) {
+pub fn destroy_session_artifacts(state: &SessionState) -> Result<(), CliError> {
     let layout = build_layout(state);
-    if let Err(error) = session_storage::deregister_active(&layout) {
-        tracing::warn!(%error, session_id = %state.session_id, "deregister active failed");
-    }
+    session_storage::deregister_active(&layout)?;
     if state.external_origin.is_some() {
         tracing::warn!(session_id = %state.session_id, "external session; skipping worktree destroy");
-        return;
+        return Ok(());
     }
-    if !state.origin_path.as_os_str().is_empty()
-        && let Err(error) = WorktreeController::destroy(&state.origin_path, &layout)
-    {
-        tracing::warn!(%error, session_id = %state.session_id, "worktree destroy failed");
+    if !state.origin_path.as_os_str().is_empty() {
+        WorktreeController::destroy(&state.origin_path, &layout).map_err(|error| {
+            CliError::from(CliErrorKind::workflow_io(format!(
+                "destroy session worktree: {error}"
+            )))
+        })?;
     }
+    Ok(())
 }
 
 fn build_layout(state: &SessionState) -> SessionLayout {
@@ -114,5 +113,21 @@ mod tests {
             layout.sessions_root.file_name().and_then(|v| v.to_str()),
             Some("sessions")
         );
+    }
+
+    #[test]
+    fn managed_worktree_destroy_failure_is_returned() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let xdg_data = temp.path().join("xdg-data");
+        temp_env::with_var("XDG_DATA_HOME", Some(&xdg_data), || {
+            let mut state = state_with_external_origin(PathBuf::new());
+            state.external_origin = None;
+            state.origin_path = temp.path().join("not-a-git-checkout");
+
+            let error = destroy_session_artifacts(&state)
+                .expect_err("managed worktree cleanup failure must reach the delete caller");
+
+            assert!(error.to_string().contains("remove"));
+        });
     }
 }

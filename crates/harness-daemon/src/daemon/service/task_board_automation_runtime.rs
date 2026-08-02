@@ -91,6 +91,10 @@ impl TaskBoardAutomationRunSession {
         self.sync_failed_scopes.load(Ordering::SeqCst)
     }
 
+    pub(crate) async fn ensure_active(&self) -> Result<(), CliError> {
+        self.guard().ensure_active().await
+    }
+
     pub(crate) async fn begin_stage(
         &self,
         sequence: u64,

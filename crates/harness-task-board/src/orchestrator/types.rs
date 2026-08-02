@@ -143,6 +143,8 @@ pub struct TaskBoardOrchestratorPreparedRun {
     pub run_id: String,
     pub started_at: String,
     pub input: TaskBoardOrchestratorDispatchInput,
+    #[serde(default)]
+    pub candidate_item_ids: Vec<String>,
     pub sync: TaskBoardSyncSummary,
     pub audit: TaskBoardAuditSummary,
 }

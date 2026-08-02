@@ -114,8 +114,8 @@ final class DecisionActionHandlerSupervisorCustomTests: XCTestCase {
   func test_closeSessionCustomActionResolvesWhenDaemonReportsAlreadyGone() async throws {
     let sessionID = PreviewFixtures.summary.sessionId
     let client = RecordingHarnessClient()
-    client.archiveSessionMutatesReadSnapshots = false
-    client.configureArchiveSessionError(
+    client.deleteSessionMutatesReadSnapshots = false
+    client.configureDeleteSessionError(
       HarnessMonitorAPIError.server(
         code: 400,
         message: "session not active: session '\(sessionID)' not found"

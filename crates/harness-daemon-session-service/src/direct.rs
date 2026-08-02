@@ -136,7 +136,7 @@ pub fn delete_session<S: SignalStorage>(
     let Some(state) = storage.load_session_state_for_mutation(session_id)? else {
         return Ok(false);
     };
-    destroy_session_artifacts(&state);
+    destroy_session_artifacts(&state)?;
     storage.delete_session_row(session_id)?;
     storage.bump_change(session_id)?;
     storage.bump_change("global")?;
@@ -154,7 +154,7 @@ pub async fn delete_session_async<A: AsyncSignalStorage>(
     let Some(state) = storage.load_session_state(session_id).await? else {
         return Ok(false);
     };
-    destroy_session_artifacts(&state);
+    destroy_session_artifacts(&state)?;
     storage.delete_session_row(session_id).await?;
     storage.bump_change(session_id).await?;
     storage.bump_change("global").await?;

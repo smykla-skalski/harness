@@ -236,6 +236,10 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
     return SessionArchiveResponse(wire: wire)
   }
 
+  public func deleteSession(sessionID: String) async throws {
+    let _: NoContent = try await delete("/v1/sessions/\(sessionID)")
+  }
+
   public func sendSignal(
     sessionID: String,
     request: SignalSendRequest

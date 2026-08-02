@@ -207,6 +207,7 @@ impl TaskBoardOrchestrator {
             run_id,
             started_at,
             input,
+            candidate_item_ids: items.iter().map(|item| item.id.clone()).collect(),
             sync: build_sync_summary(&items, &ExternalSyncConfig::from_env()),
             audit: build_audit_summary(&items),
         })

@@ -179,6 +179,19 @@ extension WebSocketTransport {
     return SessionArchiveResponse(wire: wire)
   }
 
+  public func deleteSession(sessionID: String) async throws {
+    struct Response: Decodable { let deleted: Bool }
+
+    let value = try await rpc(
+      method: .sessionDelete,
+      params: .object(["session_id": .string(sessionID)])
+    )
+    let response: Response = try decodePolicyWire(value)
+    guard response.deleted else {
+      throw HarnessMonitorAPIError.invalidResponse
+    }
+  }
+
   public func sendSignal(
     sessionID: String,
     request: SignalSendRequest

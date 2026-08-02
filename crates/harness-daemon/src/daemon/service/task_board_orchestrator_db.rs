@@ -4,10 +4,8 @@ use uuid::Uuid;
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{
-    TaskBoardDispatchRequest, TaskBoardEvaluateRequest, TaskBoardOrchestratorRunOnceRequest,
-    TaskBoardOrchestratorRunOnceResponse, TaskBoardSyncRequest,
+    TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorRunOnceResponse, TaskBoardSyncRequest,
 };
-use crate::task_board::TaskBoardWorkflowKind;
 use crate::task_board::github::GitHubAutomation;
 use crate::task_board::orchestrator::TaskBoardOrchestratorPreparedRun;
 use crate::task_board::{
@@ -22,15 +20,15 @@ use crate::workspace::utc_now;
 use harness_kernel::errors::CliError;
 
 use super::TaskBoardAutomationRunSession;
-use super::task_board::{dispatch_task_board_async, load_live_spawn_grants};
+use super::task_board::load_live_spawn_grants;
 use super::task_board_db::{
     active_external_sync_config_db, sync_task_board_for_orchestrator_db,
     sync_task_board_for_orchestrator_with_context_db, task_board_host_local_db,
 };
-use super::task_board_evaluation::evaluate_task_board_async;
-use super::task_board_github::run_task_board_github_automation_async;
 use super::task_board_orchestrator_control::task_board_orchestrator_status_db;
-use super::task_board_orchestrator_step_mode::scoped_dispatch_request;
+use super::task_board_orchestrator_execution::{
+    run_dispatch_phase, run_evaluation_phase, run_publish_phase,
+};
 
 pub(crate) async fn run_task_board_orchestrator_once_db(
     db: &AsyncDaemonDb,
@@ -110,6 +108,7 @@ async fn prepare_run(
         run_id,
         started_at,
         input,
+        candidate_item_ids: items.iter().map(|item| item.id.clone()).collect(),
         sync: build_sync_summary(&items, &config),
         audit: audit_summary(db, &items).await?,
     })
@@ -134,12 +133,12 @@ async fn execute_run(
     finish_stage(session, 2, "provider_sync", sync).await?;
 
     begin_stage(session, 3, "dispatch").await?;
-    let dispatch = run_dispatch_phase(db, settings, prepared).await;
-    let (request, dispatch) = finish_stage(session, 3, "dispatch", dispatch).await?;
+    let dispatch = run_dispatch_phase(db, settings, prepared, session).await;
+    let (_, dispatch) = finish_stage(session, 3, "dispatch", dispatch).await?;
     progress.0 = Some(dispatch.clone());
 
     begin_stage(session, 4, "evaluation").await?;
-    let evaluation = run_evaluation_phase(db, prepared, request.as_ref()).await;
+    let evaluation = run_evaluation_phase(db, prepared).await;
     let evaluation = finish_stage(session, 4, "evaluation", evaluation).await?;
     progress.1 = Some(evaluation.clone());
 
@@ -147,64 +146,6 @@ async fn execute_run(
     let publish = run_publish_phase(db, settings, prepared).await;
     finish_stage(session, 5, "publish", publish).await?;
     Ok((dispatch, evaluation))
-}
-
-/// A dry run has no request to dispatch, so it reports an empty summary rather
-/// than skipping the stage: the caller still records stage 3 as run.
-async fn run_dispatch_phase(
-    db: &AsyncDaemonDb,
-    settings: &TaskBoardOrchestratorSettings,
-    prepared: &TaskBoardOrchestratorPreparedRun,
-) -> Result<(Option<TaskBoardDispatchRequest>, DispatchExecutionSummary), CliError> {
-    let request = scoped_dispatch_request(db, settings, &prepared.input).await?;
-    let dispatch = match request.as_ref() {
-        Some(request) => dispatch_task_board_async(request, db).await?,
-        None => DispatchExecutionSummary::dry_run(Vec::new()),
-    };
-    Ok((request, dispatch))
-}
-
-/// Evaluation scopes to the item the dispatch stage actually picked, falling
-/// back to the run's own input when nothing was dispatched.
-async fn run_evaluation_phase(
-    db: &AsyncDaemonDb,
-    prepared: &TaskBoardOrchestratorPreparedRun,
-    request: Option<&TaskBoardDispatchRequest>,
-) -> Result<TaskBoardEvaluationSummary, CliError> {
-    record_tick(
-        db,
-        &prepared.run_id,
-        &prepared.started_at,
-        prepared.input.dry_run,
-        TaskBoardOrchestratorTickPhase::Evaluation,
-    )
-    .await?;
-    evaluate_task_board_async(
-        &TaskBoardEvaluateRequest {
-            item_id: request
-                .and_then(|request| request.item_id.clone())
-                .or_else(|| prepared.input.item_id.clone()),
-            status: None,
-            dry_run: prepared.input.dry_run,
-        },
-        db,
-    )
-    .await
-}
-
-/// Review workflows publish through their own route, so they are dropped here
-/// rather than filtered upstream where the dispatch stage still needs them.
-async fn run_publish_phase(
-    db: &AsyncDaemonDb,
-    settings: &TaskBoardOrchestratorSettings,
-    prepared: &TaskBoardOrchestratorPreparedRun,
-) -> Result<(), CliError> {
-    let mut items = items_for_input(db, &prepared.input).await?;
-    items.retain(|item| {
-        !(matches!(item.workflow_kind, TaskBoardWorkflowKind::Review)
-            || item.workflow_kind.is_read_only_review())
-    });
-    run_task_board_github_automation_async(settings, &prepared.input, &items, db).await
 }
 
 async fn finish_stage<T>(
@@ -315,7 +256,6 @@ async fn sync_github_tasks(
     } else {
         sync_task_board_for_orchestrator_db(db, &request).await?
     };
-    prepared.audit = audit_summary(db, &items_for_input(db, &prepared.input).await?).await?;
     Ok(())
 }
 
@@ -382,7 +322,7 @@ async fn items_for_input(
         .collect())
 }
 
-async fn record_tick(
+pub(super) async fn record_tick(
     db: &AsyncDaemonDb,
     run_id: &str,
     started_at: &str,

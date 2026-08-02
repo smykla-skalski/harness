@@ -74,9 +74,8 @@ extension HarnessMonitorStore {
           "selected_session_id": selectedSessionID ?? "nil",
         ]
       )
-      return try await archiveAndFinalizeRemovedSession(
+      return try await deleteAndFinalizeRemovedSession(
         sessionID: sessionID,
-        actorID: actorID,
         actionName: actionName,
         client: action.client
       )
@@ -117,26 +116,22 @@ extension HarnessMonitorStore {
     return true
   }
 
-  private func archiveAndFinalizeRemovedSession(
+  private func deleteAndFinalizeRemovedSession(
     sessionID: String,
-    actorID: String,
     actionName: String,
     client: any HarnessMonitorClientProtocol
   ) async throws -> Bool {
-    let measuredArchive = try await Self.measureOperation {
-      try await client.archiveSession(
-        sessionID: sessionID,
-        request: SessionArchiveRequest(actor: actorID)
-      )
+    let measuredDelete = try await Self.measureOperation {
+      try await client.deleteSession(sessionID: sessionID)
     }
-    _ = measuredArchive
+    _ = measuredDelete
     recordRequestSuccess()
     HarnessMonitorLogger.store.info(
-      "Remove session archive succeeded; sessionID=\(sessionID, privacy: .public)"
+      "Remove session delete succeeded; sessionID=\(sessionID, privacy: .public)"
     )
     HarnessMonitorUITestTrace.record(
       component: "store.remove-session",
-      event: "archive-succeeded",
+      event: "delete-succeeded",
       details: ["session_id": sessionID]
     )
     return await finalizeLocalSessionRemoval(
@@ -153,7 +148,7 @@ extension HarnessMonitorStore {
     actionID: String,
     client: any HarnessMonitorClientProtocol
   ) async -> Bool {
-    if shouldTreatMissingRemoveSessionArchiveAsLocalSuccess(error) {
+    if shouldTreatMissingRemoveSessionDeleteAsLocalSuccess(error) {
       recordRequestSuccess()
       HarnessMonitorLogger.store.info(
         """
@@ -165,7 +160,7 @@ extension HarnessMonitorStore {
       )
       HarnessMonitorUITestTrace.record(
         component: "store.remove-session",
-        event: "archive-missing-treated-as-success",
+        event: "delete-missing-treated-as-success",
         details: [
           "session_id": sessionID,
           "error": String(describing: error),
@@ -254,7 +249,7 @@ extension HarnessMonitorStore {
     return true
   }
 
-  private func shouldTreatMissingRemoveSessionArchiveAsLocalSuccess(
+  private func shouldTreatMissingRemoveSessionDeleteAsLocalSuccess(
     _ error: any Error
   ) -> Bool {
     guard let apiError = error as? HarnessMonitorAPIError else {

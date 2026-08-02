@@ -42,8 +42,8 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var heldTaskBoardDispatchItemIDs: [String] = []
   var taskBoardDispatchFailureMessages: [String: String] = [:]
   var mutationDelay: Duration?
-  var archiveSessionMutatesReadSnapshots = true
-  var archiveSessionError: (any Error)?
+  var deleteSessionMutatesReadSnapshots = true
+  var deleteSessionError: (any Error)?
   var projectSummariesStorage: [ProjectSummary]?
   var sessionSummariesStorage: [SessionSummary]?
   var taskBoardItemsStorage: [TaskBoardItem] = []

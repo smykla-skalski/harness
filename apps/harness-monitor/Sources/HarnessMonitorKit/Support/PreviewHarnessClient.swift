@@ -383,6 +383,11 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
     return try await state.archiveSession(sessionID: sessionID)
   }
 
+  public func deleteSession(sessionID: String) async throws {
+    try await performActionDelay()
+    try await state.deleteSession(sessionID: sessionID)
+  }
+
   public func sendSignal(
     sessionID _: String,
     request _: SignalSendRequest

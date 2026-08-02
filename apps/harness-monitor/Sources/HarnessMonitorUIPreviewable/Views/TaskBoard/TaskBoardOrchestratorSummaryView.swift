@@ -174,7 +174,7 @@ struct TaskBoardOrchestratorSummaryView: View {
       }
     } else if actions.canStartOrchestrator {
       Button {
-        actions.startTaskBoardOrchestrator()
+        triggerStart()
       } label: {
         Label("Start", systemImage: "play.circle")
           .font(captionSemibold)
@@ -201,6 +201,14 @@ struct TaskBoardOrchestratorSummaryView: View {
       .help(runOnceHelp)
       .accessibilityIdentifier("harness.task-board.orchestrator.run-once")
     }
+  }
+
+  private func triggerStart() {
+    guard !status.settings.dryRunDefault else {
+      actions.startTaskBoardOrchestrator()
+      return
+    }
+    pendingLiveOperation = .start(status.settings.scheduling)
   }
 
   /// Mirrors `TaskBoardOverviewView.requestRunOnce`: dry runs apply directly,

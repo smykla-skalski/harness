@@ -5,6 +5,7 @@ import Foundation
 #endif
 
 struct EmptyBody: Encodable {}
+struct NoContent: Decodable {}
 
 struct AnyEncodable: Encodable {
   private let encodeClosure: (Encoder) throws -> Void
@@ -165,6 +166,9 @@ extension HarnessMonitorAPIClient {
         span: span
       )
     #endif
+    if data.isEmpty, let noContent = NoContent() as? Response {
+      return noContent
+    }
     do {
       return try (customDecoder ?? decoder).decode(Response.self, from: data)
     } catch {

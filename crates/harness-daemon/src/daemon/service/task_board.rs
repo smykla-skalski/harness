@@ -48,6 +48,7 @@ pub(crate) use self::sync::{
 use super::repository_sync_support::external_sync_config_for_repository;
 
 mod dispatch;
+mod dispatch_orchestrator;
 mod dispatch_preparation;
 mod policy_canvas;
 mod policy_canvas_io;
@@ -59,6 +60,7 @@ mod sync;
 mod write_workflow_launch;
 
 pub(crate) use dispatch::load_live_spawn_grants;
+pub(crate) use dispatch_orchestrator::dispatch_task_board_for_orchestrator_async;
 pub(crate) use dispatch_preparation::prepare_claimed_task_board_dispatch;
 pub(crate) use read_only_workflow_launch::validate_read_only_workflow_launch;
 #[cfg(test)]
