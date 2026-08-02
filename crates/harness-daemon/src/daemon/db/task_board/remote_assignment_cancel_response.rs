@@ -42,12 +42,14 @@ impl AsyncDaemonDb {
         authenticated_principal: &str,
         recorded_at: &str,
     ) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
-        <Self as RemoteAssignmentExecutorLifecycleQueries>::record_task_board_remote_assignment_cancel(
-            self,
-            request,
-            response,
-            authenticated_principal,
-            recorded_at,
+        Box::pin(
+            <Self as RemoteAssignmentExecutorLifecycleQueries>::record_task_board_remote_assignment_cancel(
+                self,
+                request,
+                response,
+                authenticated_principal,
+                recorded_at,
+            ),
         )
         .await
     }

@@ -113,9 +113,9 @@ pub(crate) async fn create_task_board_item_db(
     item.session_id.clone_from(&request.session_id);
     item.work_item_id.clone_from(&request.work_item_id);
     let mutation = if request.status.is_some() {
-        db.create_task_board_item_at_requested_status(item).await?
+        Box::pin(db.create_task_board_item_at_requested_status(item)).await?
     } else {
-        db.create_task_board_item_with_triage(item).await?
+        Box::pin(db.create_task_board_item_with_triage(item)).await?
     };
     Ok(mutation.item)
 }

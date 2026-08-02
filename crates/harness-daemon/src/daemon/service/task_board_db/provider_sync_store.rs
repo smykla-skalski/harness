@@ -103,7 +103,7 @@ impl TaskBoardSyncStore for AsyncDaemonDb {
     }
 
     async fn create_item(&self, item: TaskBoardItem) -> Result<TaskBoardItem, CliError> {
-        self.create_task_board_item_with_provider_triage(item)
+        Box::pin(self.create_task_board_item_with_provider_triage(item))
             .await
             .map(|mutation| mutation.item)
     }
