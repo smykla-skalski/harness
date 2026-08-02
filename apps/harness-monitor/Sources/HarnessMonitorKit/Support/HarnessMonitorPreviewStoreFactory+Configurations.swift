@@ -16,6 +16,7 @@ extension HarnessMonitorPreviewStoreFactory {
       .taskDropCockpit: taskDropConfiguration,
       .taskBoardBoardOnly: taskBoardBoardOnlyConfiguration,
       .taskBoardDragPerformance: taskBoardDragPerformanceConfiguration,
+      .repositoriesSettings: repositoriesSettingsConfiguration,
       .offlineCached: offlineCachedConfiguration,
       .sidebarOverflow: overflowConfiguration,
       .empty: emptyConfiguration,
@@ -79,6 +80,23 @@ extension HarnessMonitorPreviewStoreFactory {
 
   static func taskBoardDragPerformanceConfiguration() -> PreviewStoreConfiguration {
     let fixtures = PreviewHarnessClient.Fixtures.taskBoardDragPerformance
+    let metrics = makeConnectionMetrics(latencyMs: 24, messagesPerSecond: 7.2)
+    return liveConfiguration(
+      mode: .dashboardLanding,
+      fixtures: fixtures,
+      metrics: metrics,
+      selection: PreviewSelectionState(
+        bookmarkedSessionIDs: [],
+        sessionFilter: .all,
+        selectedSessionID: nil,
+        selectedDetail: nil,
+        timeline: []
+      )
+    )
+  }
+
+  static func repositoriesSettingsConfiguration() -> PreviewStoreConfiguration {
+    let fixtures = PreviewHarnessClient.Fixtures.repositoriesSettings
     let metrics = makeConnectionMetrics(latencyMs: 24, messagesPerSecond: 7.2)
     return liveConfiguration(
       mode: .dashboardLanding,

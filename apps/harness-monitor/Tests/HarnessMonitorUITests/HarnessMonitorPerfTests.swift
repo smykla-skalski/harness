@@ -290,6 +290,27 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
     let repositoriesRoot = element(in: launched, identifier: Accessibility.settingsRepositoriesRoot)
     let saveButton = element(in: launched, identifier: Accessibility.settingsRepositoriesSaveButton)
     let ownerField = element(in: launched, identifier: Accessibility.settingsRepositoriesOwnerField)
+    let scopeSummary = element(
+      in: launched,
+      identifier: Accessibility.settingsRepoTaskBoardScopeSummary
+    )
+    let firstRow = element(in: launched, identifier: Accessibility.settingsRepositoriesRow(0))
+    let reviewsToggle = element(
+      in: launched,
+      identifier: Accessibility.settingsRepositoriesReviewsToggle(0)
+    )
+    let taskBoardToggle = element(
+      in: launched,
+      identifier: Accessibility.settingsRepositoriesTaskBoardToggle(0)
+    )
+    let onlyButton = element(
+      in: launched,
+      identifier: Accessibility.settingsRepositoriesTaskBoardOnlyButton(0)
+    )
+    let disclosure = element(
+      in: launched,
+      identifier: Accessibility.settingsRepositoriesOverridesDisclosure(0)
+    )
 
     waitForScenarioCompletion(app: launched, scenario: "repositories-settings")
 
@@ -300,6 +321,27 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
     )
     XCTAssertTrue(waitForElement(saveButton, timeout: Self.actionTimeout))
     XCTAssertTrue(waitForElement(ownerField, timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(scopeSummary, timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(firstRow, timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(reviewsToggle, timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(taskBoardToggle, timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(onlyButton, timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(disclosure, timeout: Self.actionTimeout))
+    XCTAssertTrue(reviewsToggle.isHittable)
+    XCTAssertTrue(taskBoardToggle.isHittable)
+    XCTAssertTrue(onlyButton.isHittable)
+    XCTAssertTrue(disclosure.isHittable)
+
+    disclosure.tap()
+    let firstOverrideToggle = element(
+      in: launched,
+      identifier: Accessibility.settingsRepositoriesOverrideToggle(0, "requestedReviewers")
+    )
+    XCTAssertTrue(
+      waitForElement(firstOverrideToggle, timeout: Self.actionTimeout),
+      "Repository settings should expose publication overrides in the default window"
+    )
+    XCTAssertTrue(firstOverrideToggle.isHittable)
 
     launched.terminate()
   }

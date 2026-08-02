@@ -5,6 +5,8 @@ struct RepositoriesMonitoredSection: View {
   @Binding var draft: SettingsSharedRepositoriesDraft
   @Binding var taskBoardDraft: TaskBoardGitSettingsDraft
   @State private var expandedRows: Set<String> = []
+  @State private var usesWideTableLayout = false
+  @State private var materializedRowCount: Int
   @Environment(\.fontScale)
   private var fontScale
 
@@ -12,27 +14,29 @@ struct RepositoriesMonitoredSection: View {
     HarnessMonitorTextSize.scaledFont(.body, by: fontScale)
   }
 
-  private var captionFont: Font {
-    HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
-  }
-
   private var captionSemibold: Font {
     HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
   }
 
-  /// Shared by the disclosure button and the header spacer above it, so the
-  /// columns stay aligned when either one moves.
-  private let disclosureColumnWidth: CGFloat = 24
+  init(
+    draft: Binding<SettingsSharedRepositoriesDraft>,
+    taskBoardDraft: Binding<TaskBoardGitSettingsDraft>,
+    initiallyExpandedRows: Set<String> = [],
+    initiallyMaterializedRowCount: Int = 6
+  ) {
+    _draft = draft
+    _taskBoardDraft = taskBoardDraft
+    _expandedRows = State(initialValue: initiallyExpandedRows)
+    _materializedRowCount = State(initialValue: max(0, initiallyMaterializedRowCount))
+  }
 
-  /// An expanded row outgrows a fixed row height, so the table only reserves
-  /// space for collapsed ones and lets the expanded panels push it taller.
-  /// Counted against the rows that still exist rather than against the expanded
-  /// set, which keeps the id of a repository deleted while it was open. Both
-  /// heights track `fontScale`, because the text inside them does.
-  private var repositoriesTableRowsHeight: CGFloat {
-    let visibleRows = min(draft.rows.count, 12)
-    let expanded = min(draft.rows.count(where: { expandedRows.contains($0.id) }), visibleRows)
-    return CGFloat(visibleRows) * collapsedRowHeight + CGFloat(expanded) * expandedPanelHeight
+  private var repositoriesTableViewportHeight: CGFloat {
+    let visibleRows = min(draft.rows.count, 8)
+    let visibleExpandedRows = draft.rows.prefix(visibleRows).count {
+      expandedRows.contains($0.id)
+    }
+    return CGFloat(visibleRows) * collapsedRowHeight
+      + CGFloat(visibleExpandedRows) * expandedPanelHeight
   }
 
   private var collapsedRowHeight: CGFloat { 44 * fontScale }
@@ -63,22 +67,32 @@ struct RepositoriesMonitoredSection: View {
   }
 
   private var repositoriesTable: some View {
-    VStack(spacing: 0) {
+    let enabledCount = draft.taskBoardEnabledCount
+    let minimumWideLayoutWidth = SettingsRepositoryTableMetrics.minimumWideLayoutWidth(
+      fontScale: fontScale
+    )
+    return VStack(spacing: 0) {
+      SettingsRepositoryTaskBoardScopeControls(
+        draft: $draft,
+        enabledCount: enabledCount
+      )
+      Divider()
       repositoriesTableHeader
       Divider()
 
       if draft.rows.isEmpty {
         repositoriesEmptyRow
+      } else if draft.rows.count <= 8 {
+        VStack(spacing: 0) {
+          repositoryRows(enabledCount: enabledCount)
+        }
       } else {
         ScrollView {
           LazyVStack(spacing: 0) {
-            ForEach(draft.rows) { row in
-              let index = draft.index(for: row.id) ?? 0
-              repositoryTableRow(row, index: index)
-            }
+            repositoryRows(enabledCount: enabledCount)
           }
         }
-        .frame(height: repositoriesTableRowsHeight)
+        .frame(height: repositoriesTableViewportHeight)
       }
     }
     .background(tableBackground)
@@ -87,46 +101,119 @@ struct RepositoriesMonitoredSection: View {
       RoundedRectangle(cornerRadius: 8, style: .continuous)
         .stroke(Color(nsColor: .separatorColor).opacity(0.55), lineWidth: 1)
     }
-  }
-
-  private func repositoryTableRow(_ row: SettingsSharedRepositoryRow, index: Int) -> some View {
-    VStack(spacing: 0) {
-      repositoryRow(row, index: index)
-      if expandedRows.contains(row.id) {
-        SettingsRepositoryAutomationOverridesPanel(
-          repository: row.repositoryPath,
-          index: index,
-          draft: $taskBoardDraft
-        )
+    .onGeometryChange(for: Bool.self) { proxy in
+      proxy.size.width >= minimumWideLayoutWidth
+    } action: { usesWideLayout in
+      if usesWideTableLayout != usesWideLayout {
+        usesWideTableLayout = usesWideLayout
       }
     }
-    .overlay(alignment: .top) {
-      Divider()
-        .opacity(index == 0 ? 0 : 1)
+    .task(id: draft.rows.map(\.id)) {
+      await materializeRepositoryRows()
     }
   }
 
   private var repositoriesTableHeader: some View {
-    HStack(spacing: HarnessMonitorTheme.spacingMD) {
-      Color.clear
-        .frame(width: disclosureColumnWidth, height: 1)
-      Text("Owner")
-        .frame(maxWidth: .infinity, alignment: .leading)
-      Text("Repository")
-        .frame(maxWidth: .infinity, alignment: .leading)
-      Text("Publishing")
-        .frame(width: 104, alignment: .leading)
-      Text("Reviews")
-        .frame(width: 116, alignment: .center)
-      Text("Task Board")
-        .frame(width: 110, alignment: .center)
-      Text("Action")
-        .frame(width: 72, alignment: .trailing)
+    Group {
+      if usesWideTableLayout {
+        wideTableHeader
+      } else {
+        compactTableHeader
+      }
     }
     .font(captionSemibold)
     .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
     .padding(.horizontal, HarnessMonitorTheme.spacingMD)
     .padding(.vertical, HarnessMonitorTheme.spacingSM)
+  }
+
+  private func repositoryRows(enabledCount: Int) -> some View {
+    ForEach(draft.rows.prefix(min(materializedRowCount, draft.rows.count))) { row in
+      let index = draft.index(for: row.id) ?? 0
+      let overrideCount = taskBoardDraft.overriddenKinds(for: row.repositoryPath).count
+      SettingsRepositoryTableRow(
+        draft: $draft,
+        taskBoardDraft: $taskBoardDraft,
+        expandedRows: $expandedRows,
+        row: row,
+        index: index,
+        overrideCount: overrideCount,
+        taskBoardEnabledCount: enabledCount,
+        usesWideLayout: usesWideTableLayout
+      )
+    }
+  }
+
+  private func materializeRepositoryRows() async {
+    while materializedRowCount < draft.rows.count {
+      do {
+        try await Task.sleep(for: .milliseconds(8))
+      } catch {
+        return
+      }
+      materializedRowCount = min(materializedRowCount + 32, draft.rows.count)
+    }
+  }
+
+  private var wideTableHeader: some View {
+    HStack(spacing: HarnessMonitorTheme.spacingMD) {
+      Color.clear
+        .frame(width: SettingsRepositoryTableMetrics.disclosureColumnWidth, height: 1)
+      Text("Owner")
+        .lineLimit(1)
+        .frame(
+          minWidth: SettingsRepositoryTableMetrics.ownerColumnMinWidth,
+          maxWidth: .infinity,
+          alignment: .leading
+        )
+        .layoutPriority(2)
+      Text("Repository")
+        .lineLimit(1)
+        .frame(
+          minWidth: SettingsRepositoryTableMetrics.repositoryColumnMinWidth,
+          maxWidth: .infinity,
+          alignment: .leading
+        )
+        .layoutPriority(2)
+      Text("Publishing")
+        .lineLimit(1)
+        .frame(width: SettingsRepositoryTableMetrics.publishingColumnWidth, alignment: .leading)
+      Text("Reviews")
+        .lineLimit(1)
+        .frame(width: SettingsRepositoryTableMetrics.reviewsColumnWidth, alignment: .center)
+      Text("Task Board")
+        .lineLimit(1)
+        .frame(
+          width: SettingsRepositoryTableMetrics.taskBoardColumnWidth(fontScale: fontScale),
+          alignment: .center
+        )
+      Text("Action")
+        .lineLimit(1)
+        .frame(width: SettingsRepositoryTableMetrics.actionColumnWidth, alignment: .trailing)
+    }
+  }
+
+  private var compactTableHeader: some View {
+    HStack(spacing: HarnessMonitorTheme.spacingMD) {
+      Color.clear
+        .frame(width: SettingsRepositoryTableMetrics.disclosureColumnWidth, height: 1)
+      Text("Repository")
+        .lineLimit(1)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .layoutPriority(2)
+      Text("Reviews")
+        .lineLimit(1)
+        .frame(width: SettingsRepositoryTableMetrics.reviewsColumnWidth, alignment: .center)
+      Text("Task Board")
+        .lineLimit(1)
+        .frame(
+          width: SettingsRepositoryTableMetrics.taskBoardColumnWidth(fontScale: fontScale),
+          alignment: .center
+        )
+      Text("Action")
+        .lineLimit(1)
+        .frame(width: SettingsRepositoryTableMetrics.actionColumnWidth, alignment: .trailing)
+    }
   }
 
   private var repositoriesEmptyRow: some View {
@@ -137,109 +224,6 @@ struct RepositoriesMonitoredSection: View {
       .padding(.horizontal, HarnessMonitorTheme.spacingMD)
       .padding(.vertical, HarnessMonitorTheme.spacingSM)
       .accessibilityIdentifier(HarnessMonitorAccessibility.settingsRepositoriesRow(0))
-  }
-
-  private func repositoryRow(_ row: SettingsSharedRepositoryRow, index: Int) -> some View {
-    HStack(spacing: HarnessMonitorTheme.spacingMD) {
-      disclosureButton(row, index: index)
-      Text(row.owner)
-        .font(bodyFont)
-        .textSelection(.enabled)
-        .frame(maxWidth: .infinity, alignment: .leading)
-      Text(row.repository)
-        .font(bodyFont)
-        .textSelection(.enabled)
-        .frame(maxWidth: .infinity, alignment: .leading)
-      Text(publishingSummary(row))
-        .font(captionFont)
-        .foregroundStyle(
-          taskBoardDraft.overriddenKinds(for: row.repositoryPath).isEmpty
-            ? HarnessMonitorTheme.tertiaryInk : HarnessMonitorTheme.accent
-        )
-        .frame(width: 104, alignment: .leading)
-      Toggle(
-        "Reviews",
-        isOn: Binding(
-          get: { row.reviewsEnabled },
-          set: { draft.setReviewsEnabled($0, for: row.id) }
-        )
-      )
-      .labelsHidden()
-      .toggleStyle(.switch)
-      .harnessNativeFormControl()
-      .frame(width: 116, alignment: .center)
-      .accessibilityIdentifier(
-        HarnessMonitorAccessibility.settingsRepositoriesReviewsToggle(index)
-      )
-      Toggle(
-        "Task Board",
-        isOn: Binding(
-          get: { row.taskBoardEnabled },
-          set: { draft.setTaskBoardEnabled($0, for: row.id) }
-        )
-      )
-      .labelsHidden()
-      .toggleStyle(.switch)
-      .harnessNativeFormControl()
-      .frame(width: 110, alignment: .center)
-      .accessibilityIdentifier(
-        HarnessMonitorAccessibility.settingsRepositoriesTaskBoardToggle(index)
-      )
-      Button(role: .destructive) {
-        // Forget the disclosure too, or re-adding the repository brings it back
-        // already expanded.
-        expandedRows.remove(row.id)
-        draft.remove(rowID: row.id)
-      } label: {
-        Image(systemName: "trash")
-          .frame(width: 18, height: 18)
-      }
-      .buttonStyle(.borderless)
-      .foregroundStyle(HarnessMonitorTheme.danger)
-      .help("Remove \(row.repositoryPath)")
-      .accessibilityLabel("Remove \(row.repositoryPath)")
-      .accessibilityIdentifier(HarnessMonitorAccessibility.settingsRepositoriesRemoveButton(index))
-      .frame(width: 72, alignment: .trailing)
-    }
-    .padding(.horizontal, HarnessMonitorTheme.spacingMD)
-    .padding(.vertical, HarnessMonitorTheme.spacingSM)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.settingsRepositoriesRow(index))
-  }
-
-  private func disclosureButton(_ row: SettingsSharedRepositoryRow, index: Int) -> some View {
-    let isExpanded = expandedRows.contains(row.id)
-    return Button {
-      if isExpanded {
-        expandedRows.remove(row.id)
-      } else {
-        expandedRows.insert(row.id)
-      }
-    } label: {
-      Image(systemName: "chevron.right")
-        .rotationEffect(.degrees(isExpanded ? 90 : 0))
-        // The glyph is small, but the target must not be: 24pt is the macOS
-        // minimum, and the shape makes the padding around the chevron clickable
-        // rather than leaving a hole the pointer can land in.
-        .frame(width: disclosureColumnWidth, height: disclosureColumnWidth)
-        .contentShape(Rectangle())
-    }
-    .buttonStyle(.borderless)
-    .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-    .help("Publication overrides for \(row.repositoryPath)")
-    .accessibilityLabel("Publication overrides for \(row.repositoryPath)")
-    .accessibilityValue(isExpanded ? "expanded" : "collapsed")
-    .accessibilityIdentifier(
-      HarnessMonitorAccessibility.settingsRepositoriesOverridesDisclosure(index)
-    )
-  }
-
-  private func publishingSummary(_ row: SettingsSharedRepositoryRow) -> String {
-    let count = taskBoardDraft.overriddenKinds(for: row.repositoryPath).count
-    switch count {
-    case 0: return "Inherited"
-    case 1: return "1 override"
-    default: return "\(count) overrides"
-    }
   }
 
   private var manualAddRow: some View {

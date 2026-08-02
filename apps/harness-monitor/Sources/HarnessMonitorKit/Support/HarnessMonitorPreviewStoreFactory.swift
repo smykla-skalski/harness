@@ -54,6 +54,7 @@ public enum HarnessMonitorPreviewStoreFactory {
     case taskDropCockpit
     case taskBoardBoardOnly
     case taskBoardDragPerformance
+    case repositoriesSettings
     case offlineCached
     case sidebarOverflow
     case empty
