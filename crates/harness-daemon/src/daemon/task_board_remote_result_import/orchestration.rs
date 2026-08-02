@@ -14,6 +14,7 @@ use crate::task_board::{
 };
 use crate::workspace::utc_now;
 use harness_kernel::errors::{CliError, CliErrorKind};
+use crate::daemon::db::task_board::prelude::*;
 
 #[expect(
     clippy::cognitive_complexity,

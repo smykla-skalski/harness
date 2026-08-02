@@ -8,7 +8,6 @@ use super::super::dispatch_admission_tx_ext::TaskBoardDispatchAdmissionTxExt;
 use super::super::item_tx_ext::TaskBoardItemTxExt;
 use super::super::lane_order::{LaneTransitionKind, replace_with_lane_transition_in_tx};
 use super::super::projects::resolve_item_project_in_tx;
-use super::super::item_core_queries::ItemCoreQueries;
 use super::super::triage_interface::Triage;
 use super::lifecycle::ensure_estimates_are_editable_in_tx;
 use super::{
@@ -21,72 +20,6 @@ use super::{
 enum DispatchReservationPolicy {
     Allow,
     Skip,
-}
-
-impl AsyncDaemonDb {
-    /// Atomically load and conditionally mutate one Task Board item. Never
-    /// evaluates `BuiltInV1`: every internal workflow/lifecycle mutation
-    /// (dispatch, planning, estimates, reviews, GitHub projection, ...) must
-    /// keep using this method so unrelated writes can never become
-    /// accidental triage ingress. The public update API and provider
-    /// create/reconcile/restore use the `_with_triage` methods below
-    /// instead.
-    pub(crate) async fn update_task_board_item<F>(
-        &self,
-        item_id: &str,
-        mutate: F,
-    ) -> Result<Option<TaskBoardMutation>, CliError>
-    where
-        F: FnOnce(&mut TaskBoardItem) -> Result<bool, CliError>,
-    {
-        <Self as ItemCoreQueries>::update_task_board_item(self, item_id, mutate).await
-    }
-
-    /// Evaluation follows session state, but it must not advance an item while
-    /// dispatch admission still owns the item's exact revision. See
-    /// [`ItemCoreQueries::update_task_board_item_for_evaluation`] for the
-    /// full contract.
-    pub(crate) async fn update_task_board_item_for_evaluation<F>(
-        &self,
-        item_id: &str,
-        mutate: F,
-    ) -> Result<Option<TaskBoardMutation>, CliError>
-    where
-        F: FnOnce(&mut TaskBoardItem) -> Result<bool, CliError>,
-    {
-        <Self as ItemCoreQueries>::update_task_board_item_for_evaluation(self, item_id, mutate).await
-    }
-
-    /// Like [`update_task_board_item`], but also evaluates `BuiltInV1` in the
-    /// same transaction, for the public update API. See
-    /// [`ItemCoreQueries::update_task_board_item_with_triage`] for the full
-    /// contract.
-    pub(crate) async fn update_task_board_item_with_triage<F>(
-        &self,
-        item_id: &str,
-        mutate: F,
-    ) -> Result<Option<TaskBoardMutation>, CliError>
-    where
-        F: FnOnce(&mut TaskBoardItem) -> Result<bool, CliError>,
-    {
-        <Self as ItemCoreQueries>::update_task_board_item_with_triage(self, item_id, mutate).await
-    }
-
-    /// Like [`update_task_board_item_with_triage`], but for provider
-    /// create/reconcile/restore. See
-    /// [`ItemCoreQueries::update_task_board_item_with_provider_triage`] for
-    /// the full contract.
-    pub(crate) async fn update_task_board_item_with_provider_triage<F>(
-        &self,
-        item_id: &str,
-        mutate: F,
-    ) -> Result<Option<TaskBoardMutation>, CliError>
-    where
-        F: FnOnce(&mut TaskBoardItem) -> Result<bool, CliError>,
-    {
-        <Self as ItemCoreQueries>::update_task_board_item_with_provider_triage(self, item_id, mutate)
-            .await
-    }
 }
 
 pub(crate) async fn update_task_board_item<F>(

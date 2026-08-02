@@ -13,6 +13,7 @@ use super::super::task_board_read_only_runtime::TaskBoardReadOnlyRuntime;
 use super::attempts::{invalid_transition, require_human};
 use super::reports::{load_codex_run, record_retry_or_human, transition_attempt};
 use super::requests::{attempt_run_identity, codex_attempt_request, run_context};
+use crate::daemon::db::task_board::prelude::*;
 
 /// Starts the Codex run backing a fresh attempt. `Ok(None)` means the attempt
 /// was already settled here - refused, claimed by another reconciler, or handed

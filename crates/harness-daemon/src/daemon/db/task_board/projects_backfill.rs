@@ -3,27 +3,11 @@ use std::collections::BTreeMap;
 use sqlx::{Sqlite, Transaction, query, query_as};
 
 use super::mapper::item_from_rows;
-use super::project_registry_queries::ProjectRegistryQueries;
 use super::projects::ensure_project_in_tx;
 use super::rows::{ExternalRefRow, ItemRow};
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardItem;
 use crate::task_board::project::{ItemProjectAttribution, item_attribution};
-
-impl AsyncDaemonDb {
-    /// Run the attribution rules over every live item that holds no project,
-    /// and return how many gained one. See
-    /// [`ProjectRegistryQueries::reattribute_unattributed_task_board_items`]
-    /// for the full contract.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] when the board cannot be read or written.
-    pub(crate) async fn reattribute_unattributed_task_board_items(
-        &self,
-    ) -> Result<usize, CliError> {
-        <Self as ProjectRegistryQueries>::reattribute_unattributed_task_board_items(self).await
-    }
-}
 
 /// Real implementation behind
 /// [`ProjectRegistryQueries::reattribute_unattributed_task_board_items`].

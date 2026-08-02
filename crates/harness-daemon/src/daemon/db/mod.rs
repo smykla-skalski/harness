@@ -90,7 +90,7 @@ mod schema;
 mod schema_migrations;
 mod schema_sql;
 #[allow(dead_code)]
-mod task_board;
+pub(crate) mod task_board;
 mod task_board_sync_coordinator;
 #[cfg(test)]
 pub(crate) use task_board::remote_assignment_terminal_handoff_tests::{

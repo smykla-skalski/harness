@@ -17,6 +17,7 @@ use crate::task_board::{
     TASK_BOARD_REMOTE_HEARTBEAT_TTL_SECONDS, TASK_BOARD_REMOTE_PROTOCOL_VERSION,
     TaskBoardExecutionHostConfig,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 const ROTATED_TOKEN_ENV: &str = "HARNESS_REMOTE_AUTHORITY_ROTATED_TOKEN";
 

@@ -9,6 +9,7 @@ use crate::daemon::codex_controller::CodexControllerHandle;
 use crate::daemon::db::{AsyncDaemonDb, complete_write_preparation};
 use crate::daemon::protocol::{CodexRunStatus, StreamEvent};
 use crate::task_board::AgentMode;
+use crate::daemon::db::task_board::prelude::*;
 
 #[tokio::test]
 async fn startup_reconciliation_releases_orphaned_codex_concurrency() {

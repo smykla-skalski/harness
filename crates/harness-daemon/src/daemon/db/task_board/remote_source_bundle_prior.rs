@@ -3,7 +3,6 @@ use sqlx::query_as;
 
 use super::remote_artifacts::validate_artifact_evidence;
 use super::remote_assignment_model::concurrent;
-use super::remote_source_bundle_queries::RemoteSourceBundleQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::remote_wire::wire::RemoteOfferRequest;
 use crate::task_board::remote_wire::wire::RemoteSourceMaterial;
@@ -34,19 +33,6 @@ impl TaskBoardRemotePriorPhaseBundle {
     ) -> Result<RemoteSourceBundleUploadRequest, CliError> {
         RemoteSourceBundleUploadRequest::seal(offer, &self.content)
             .map_err(|error| db_error(format!("seal prior-phase source upload: {error}")))
-    }
-}
-
-impl AsyncDaemonDb {
-    pub(crate) async fn task_board_remote_prior_phase_bundle(
-        &self,
-        execution: &TaskBoardWorkflowExecutionRecord,
-        phase: TaskBoardExecutionPhase,
-    ) -> Result<Option<TaskBoardRemotePriorPhaseBundle>, CliError> {
-        <Self as RemoteSourceBundleQueries>::task_board_remote_prior_phase_bundle(
-            self, execution, phase,
-        )
-        .await
     }
 }
 

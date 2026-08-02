@@ -13,6 +13,7 @@ use crate::task_board::{
     ExternalRef, ExternalRefProvider, Machine, TaskBoardGitRuntimeConfig, TaskBoardItem,
     TaskBoardOrchestratorSettings, TaskBoardOrchestratorState, TaskBoardStatus,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 mod admission_compensation;
 mod admission_dispatch;

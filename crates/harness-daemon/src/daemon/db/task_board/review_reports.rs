@@ -2,36 +2,14 @@ use chrono::DateTime;
 use sqlx::{Sqlite, Transaction, query, query_as};
 
 use super::ORCHESTRATOR_CHANGE_SCOPE;
-use super::item_core_queries::ItemCoreQueries;
 use super::items::bump_change_in_tx;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::{
     TaskBoardAiReviewReportRecord, TaskBoardAiReviewReportStatus, TaskBoardReportOnlyReviewFinding,
     validate_task_board_ai_review_report,
 };
-
-impl AsyncDaemonDb {
-    pub(crate) async fn append_task_board_ai_review_report(
-        &self,
-        report: &TaskBoardAiReviewReportRecord,
-    ) -> Result<bool, CliError> {
-        <Self as ItemCoreQueries>::append_task_board_ai_review_report(self, report).await
-    }
-
-    pub(crate) async fn task_board_ai_review_reports(
-        &self,
-        item_id: &str,
-    ) -> Result<Vec<TaskBoardAiReviewReportRecord>, CliError> {
-        <Self as ItemCoreQueries>::task_board_ai_review_reports(self, item_id).await
-    }
-
-    pub(crate) async fn task_board_latest_ai_review_report(
-        &self,
-        item_id: &str,
-    ) -> Result<Option<TaskBoardAiReviewReportRecord>, CliError> {
-        <Self as ItemCoreQueries>::task_board_latest_ai_review_report(self, item_id).await
-    }
-}
+#[cfg(test)]
+use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
 
 #[derive(Debug, sqlx::FromRow)]
 struct AiReviewReportRow {

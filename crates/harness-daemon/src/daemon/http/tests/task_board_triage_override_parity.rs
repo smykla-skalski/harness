@@ -6,6 +6,7 @@ use crate::daemon::protocol::{http_paths, ws_methods};
 use crate::task_board::{TaskBoardItem, TaskBoardStatus};
 
 use super::task_board_route_parity_support::{serve_http, ws_rpc};
+use crate::daemon::db::task_board::prelude::*;
 
 #[test]
 fn task_board_triage_override_set_and_clear_have_http_websocket_parity() {

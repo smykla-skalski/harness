@@ -1,5 +1,4 @@
 use super::triage_apply::triage_eligible;
-use super::triage_queries::TriageQueries;
 use super::triage_rules_bulk_load::{
     load_active_dispatch_reservation_item_ids_in_tx, load_triage_bulk_entries_in_tx,
 };
@@ -9,19 +8,6 @@ use crate::task_board::{
     TriageRuleSetPreviewDiffEntry, TriageRuleSetPreviewResult, TriageRuleSetV1,
     evaluate_triage_rule_set, validate_triage_rule_set,
 };
-
-impl AsyncDaemonDb {
-    /// Evaluate `candidate` against one frozen read of the current inbox
-    /// without persisting anything. See
-    /// [`TriageQueries::preview_task_board_triage_rules`] for the full
-    /// contract.
-    pub(crate) async fn preview_task_board_triage_rules(
-        &self,
-        candidate: TriageRuleSetV1,
-    ) -> Result<TriageRuleSetPreviewResult, CliError> {
-        <Self as TriageQueries>::preview_task_board_triage_rules(self, candidate).await
-    }
-}
 
 /// Evaluate `candidate` against one frozen read of the current inbox without
 /// persisting anything, whether or not the candidate is valid -- an author

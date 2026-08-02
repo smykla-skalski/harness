@@ -22,6 +22,7 @@ use harness_kernel::errors::CliError;
 #[cfg(test)]
 use super::policy::resume_reviews_policy_event_with_executor;
 use super::policy::{require_policy_runtime_db, resume_reviews_policy_event};
+use crate::daemon::db::task_board::prelude::*;
 
 /// Derive `reviews.checks_passed` wake-ups from a fresh reviews snapshot,
 /// durably enqueue them, and immediately attempt an inline resume so an open

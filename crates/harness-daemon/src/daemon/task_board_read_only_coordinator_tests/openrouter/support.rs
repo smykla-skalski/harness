@@ -3,6 +3,7 @@ use crate::task_board::TaskBoardWorkflowExecutionRecord;
 
 use super::super::fixture::{Fixture, RETRY_AT};
 use super::super::runtime::FakeReadOnlyRuntime;
+use crate::daemon::db::task_board::prelude::*;
 
 pub(super) async fn reconcile(db: &AsyncDaemonDb, runtime: &FakeReadOnlyRuntime, now: &str) {
     let report = super::super::super::task_board_read_only_coordinator::

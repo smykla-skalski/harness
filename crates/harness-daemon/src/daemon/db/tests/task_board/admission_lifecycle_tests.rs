@@ -14,6 +14,7 @@ use crate::task_board::{
     TaskBoardPolicyScope, TaskBoardPolicyWeekday, TaskBoardPolicyWindow,
     build_dispatch_plans_with_policy, canonical_admission_requirement_key,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 #[tokio::test]
 async fn configured_policy_rejects_missing_decision_and_ledger_evidence() {

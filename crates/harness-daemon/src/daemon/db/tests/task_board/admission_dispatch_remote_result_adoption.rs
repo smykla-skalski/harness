@@ -8,6 +8,7 @@ use crate::task_board::{
     TASK_BOARD_EXECUTION_TARGET_RESOURCE, TaskBoardAttemptState, TaskBoardExecutionDiagnostic,
     TaskBoardExecutionState, TaskBoardFailureClass, TaskBoardWorkflowExecutionCas,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 #[path = "admission_dispatch_remote_result_adoption_support.rs"]
 mod support;

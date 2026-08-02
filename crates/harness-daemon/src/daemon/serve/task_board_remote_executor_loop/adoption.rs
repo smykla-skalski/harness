@@ -26,6 +26,7 @@ use super::stop::claim_and_settle_invalid_remote_run;
 use super::stop::settle_lifecycle_settings_drift;
 use super::terminal::persist_terminal_snapshot;
 use super::{RemoteWorkerIdentity, claim_active_lifecycle_owner, concurrent};
+use crate::daemon::db::task_board::prelude::*;
 
 #[expect(
     clippy::cognitive_complexity,

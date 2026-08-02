@@ -13,6 +13,7 @@ use super::{
     active_external_sync_config_db, create_task_board_item_db, read_task_board_items_db,
     update_task_board_item_db, update_task_board_project_db,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 async fn connect(directory: &tempfile::TempDir) -> AsyncDaemonDb {
     AsyncDaemonDb::connect(&directory.path().join("harness.db"))

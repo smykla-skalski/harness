@@ -1,7 +1,6 @@
 use sqlx::{Sqlite, Transaction, query, query_as};
 
 use super::remote_assignment_model::{canonical_time, nonblank, phase_label, to_i64};
-use super::remote_assignment_start_settlement_queries::RemoteAssignmentStartSettlementQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::remote_wire::wire::{
     RemoteLease, RemoteOfferDisposition, RemoteOfferRequest, RemoteOfferResponse,
@@ -111,21 +110,6 @@ impl TaskBoardRemoteOfferReceipt {
             lease,
             rejection_code,
         })
-    }
-}
-
-impl AsyncDaemonDb {
-    pub(crate) async fn exact_task_board_remote_offer_receipt(
-        &self,
-        request: &RemoteOfferRequest,
-        authenticated_principal: &str,
-    ) -> Result<Option<TaskBoardRemoteOfferReceipt>, CliError> {
-        <Self as RemoteAssignmentStartSettlementQueries>::exact_task_board_remote_offer_receipt(
-            self,
-            request,
-            authenticated_principal,
-        )
-        .await
     }
 }
 

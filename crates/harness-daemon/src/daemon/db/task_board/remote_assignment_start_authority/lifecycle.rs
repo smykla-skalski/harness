@@ -7,7 +7,7 @@ use super::super::remote_assignment_lifecycle_owner::lifecycle_owner_expiry;
 use super::super::remote_assignment_model::{
     TaskBoardRemoteMutationOutcome, canonical_time, concurrent, nonblank, to_i64,
 };
-use super::super::remote_assignment_start_settlement_queries::RemoteAssignmentStartSettlementQueries;
+use super::super::remote_execution_queries::RemoteExecutionQueries;
 use super::super::remote_start_receipts::{
     InitialLifecycleOwner, durable_start_receipt_run_matches, start_receipt,
 };
@@ -18,46 +18,6 @@ use super::{
     start_adoption_replays,
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
-
-impl AsyncDaemonDb {
-    pub(crate) async fn adopt_task_board_remote_executor_start(
-        &self,
-        permit: &TaskBoardRemoteExecutorStartIoPermit,
-        project_dir: &Path,
-        started_at: &str,
-    ) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
-        <Self as RemoteAssignmentStartSettlementQueries>::adopt_task_board_remote_executor_start(
-            self, permit, project_dir, started_at,
-        )
-        .await
-    }
-
-    pub(crate) async fn adopt_task_board_remote_executor_start_owned(
-        &self,
-        permit: &TaskBoardRemoteExecutorStartIoPermit,
-        project_dir: &Path,
-        started_at: &str,
-        owner_instance_id: &str,
-        owner_at: &str,
-    ) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
-        <Self as RemoteAssignmentStartSettlementQueries>::adopt_task_board_remote_executor_start_owned(
-            self, permit, project_dir, started_at, owner_instance_id, owner_at,
-        )
-        .await
-    }
-
-    pub(crate) async fn expire_task_board_remote_executor_start_without_run(
-        &self,
-        authority: &TaskBoardRemoteExecutorStartAuthority,
-        reason: &str,
-        observed_at: &str,
-    ) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
-        <Self as RemoteAssignmentStartSettlementQueries>::expire_task_board_remote_executor_start_without_run(
-            self, authority, reason, observed_at,
-        )
-        .await
-    }
-}
 
 pub(in super::super) async fn adopt_task_board_remote_executor_start(
     db: &AsyncDaemonDb,

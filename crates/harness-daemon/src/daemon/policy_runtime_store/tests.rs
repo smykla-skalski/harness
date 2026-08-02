@@ -9,6 +9,7 @@ use crate::task_board::policy_runtime::models::{
     PolicyRunRequest, PolicyRunStatus, PolicyRunStep, PolicyRunSubject, PolicyRunTrigger,
 };
 use crate::task_board::policy_runtime::providers::PolicyProviderRegistry;
+use crate::daemon::db::task_board::prelude::*;
 
 #[tokio::test]
 async fn executor_starts_and_resumes_the_same_database_run() {

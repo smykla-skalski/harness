@@ -11,7 +11,6 @@ use super::remote_assignment_model::{
     nonblank, to_i64,
 };
 use super::remote_offer_receipts::load_offer_receipt_collisions_in_tx;
-use super::remote_source_bundle_queries::RemoteSourceBundleQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::remote_wire::wire::{
     RemoteOfferRequest, RemoteSourceBundleUploadRequest, RemoteSourceBundleUploadResponse,
@@ -52,32 +51,6 @@ impl TaskBoardRemoteSourceBundle {
         })?;
         RemoteSourceBundleUploadRequest::seal(self.offer.clone(), content)
             .map_err(|error| db_error(format!("rebuild remote source bundle request: {error}")))
-    }
-}
-
-impl AsyncDaemonDb {
-    pub(crate) async fn store_task_board_remote_source_bundle(
-        &self,
-        request: &RemoteSourceBundleUploadRequest,
-        authenticated_principal: &str,
-        host_instance_id: &str,
-        stored_at: &str,
-    ) -> Result<TaskBoardRemoteSourceBundle, CliError> {
-        <Self as RemoteSourceBundleQueries>::store_task_board_remote_source_bundle(
-            self,
-            request,
-            authenticated_principal,
-            host_instance_id,
-            stored_at,
-        )
-        .await
-    }
-
-    pub(crate) async fn task_board_remote_source_bundle(
-        &self,
-        assignment: &TaskBoardRemoteAssignmentRecord,
-    ) -> Result<Option<TaskBoardRemoteSourceBundle>, CliError> {
-        <Self as RemoteSourceBundleQueries>::task_board_remote_source_bundle(self, assignment).await
     }
 }
 

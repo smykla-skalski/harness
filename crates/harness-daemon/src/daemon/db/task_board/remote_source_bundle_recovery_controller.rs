@@ -31,59 +31,6 @@ use operations::{
     settle_upload_operation_if_present,
 };
 
-impl AsyncDaemonDb {
-    pub(crate) async fn adopt_verified_task_board_remote_source_bundle_receipt(
-        &self,
-        request: &RemoteSourceBundleUploadRequest,
-        verification: &RemoteSourceBundleReceiptVerificationResponse,
-        authenticated_principal: &str,
-        trust: &TaskBoardRemoteOperationTrustFence,
-    ) -> Result<Option<TaskBoardRemoteSourceBundle>, CliError> {
-        <Self as RemoteSourceBundleQueries>::adopt_verified_task_board_remote_source_bundle_receipt(
-            self,
-            request,
-            verification,
-            authenticated_principal,
-            trust,
-        )
-        .await
-    }
-
-    pub(crate) async fn record_task_board_remote_source_bundle_abandonment(
-        &self,
-        request: &RemoteSourceBundleAbandonRequest,
-        response: &RemoteSourceBundleAbandonResponse,
-        authenticated_principal: &str,
-        trust: &TaskBoardRemoteOperationTrustFence,
-    ) -> Result<TaskBoardRemoteSourceBundleAbandonment, CliError> {
-        <Self as RemoteSourceBundleQueries>::record_task_board_remote_source_bundle_abandonment(
-            self,
-            request,
-            response,
-            authenticated_principal,
-            trust,
-        )
-        .await
-    }
-
-    pub(crate) async fn reassign_rejected_task_board_remote_source_bundle_offer(
-        &self,
-        reassignment: &super::remote_source_bundle_reassignment::TaskBoardRemoteSourceOfferReassignment<
-            '_,
-        >,
-        predecessor: &RemoteOfferRequest,
-        rejection: &RemoteOfferResponse,
-    ) -> Result<TaskBoardRemoteOfferOutcome, CliError> {
-        <Self as RemoteSourceBundleQueries>::reassign_rejected_task_board_remote_source_bundle_offer(
-            self,
-            reassignment,
-            predecessor,
-            rejection,
-        )
-        .await
-    }
-}
-
 pub(super) async fn adopt_verified_task_board_remote_source_bundle_receipt(
     db: &AsyncDaemonDb,
     request: &RemoteSourceBundleUploadRequest,

@@ -9,6 +9,7 @@ use crate::daemon::db::{
 use crate::task_board::{
     TaskBoardExecutionAttemptCas, TaskBoardRemoteAssignmentState, TaskBoardWorkflowExecutionCas,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 #[tokio::test]
 async fn due_active_poll_observes_completed_and_failed_before_renewal() {

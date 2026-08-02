@@ -10,6 +10,7 @@ use crate::daemon::protocol::{
 };
 use crate::feature_flags::TASK_BOARD_AUTOMATION_V2_ENV;
 use crate::task_board::{TaskBoardAutomationDesiredMode, TaskBoardRemoteAssignmentState};
+use crate::daemon::db::task_board::prelude::*;
 
 const REASON: &str = "operator requested exact remote cancellation";
 

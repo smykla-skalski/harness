@@ -8,6 +8,7 @@ use crate::task_board::{
     TaskBoardExecutionState, TaskBoardTerminalOutcome, TaskBoardTerminalOutcomeKind,
     TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionCasOutcome,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 #[tokio::test]
 async fn terminal_local_start_charges_prepared_admission_before_release() {

@@ -4,6 +4,8 @@ use super::super::{
     clean_restore_patch, connect, exclusion_context, pre_dispatch_item, restored_item,
 };
 use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
+use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
+use crate::daemon::db::task_board::provider_queries::ProviderQueries;
 
 #[tokio::test]
 async fn restore_isolates_a_rejected_missing_parent_and_still_applies_the_rest() {

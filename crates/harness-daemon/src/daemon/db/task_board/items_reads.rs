@@ -3,56 +3,12 @@ use std::collections::BTreeMap;
 use sqlx::{Sqlite, Transaction, query_as, query_scalar};
 
 use super::ITEMS_CHANGE_SCOPE;
-use super::item_core_queries::ItemCoreQueries;
 use super::items::TaskBoardItemSnapshot;
 use super::lane_order::TaskBoardItemsSnapshot;
 use super::mapper::item_from_rows;
 use super::rows::{ExternalRefRow, ItemRow};
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::{TaskBoardItem, TaskBoardStatus, sort_task_board_items};
-
-impl AsyncDaemonDb {
-    /// Read a single consistent item-list sequence and per-item revisions.
-    pub(crate) async fn task_board_items_snapshot(
-        &self,
-        status: Option<TaskBoardStatus>,
-    ) -> Result<TaskBoardItemsSnapshot, CliError> {
-        <Self as ItemCoreQueries>::task_board_items_snapshot(self, status).await
-    }
-
-    /// Test a picked item against its list sequence and row revision.
-    pub(crate) async fn task_board_item_snapshot_is_current(
-        &self,
-        item_id: &str,
-        item_revision: i64,
-        items_change_seq: i64,
-    ) -> Result<bool, CliError> {
-        <Self as ItemCoreQueries>::task_board_item_snapshot_is_current(
-            self,
-            item_id,
-            item_revision,
-            items_change_seq,
-        )
-        .await
-    }
-
-    /// List Task Board items including tombstones.
-    pub(crate) async fn list_task_board_items_including_deleted(
-        &self,
-    ) -> Result<Vec<TaskBoardItem>, CliError> {
-        <Self as ItemCoreQueries>::list_task_board_items_including_deleted(self).await
-    }
-
-    /// Like [`list_task_board_items_including_deleted`], but keeps each
-    /// item's row revision. See
-    /// [`ItemCoreQueries::list_task_board_item_snapshots_including_deleted`]
-    /// for the full contract.
-    pub(crate) async fn list_task_board_item_snapshots_including_deleted(
-        &self,
-    ) -> Result<Vec<TaskBoardItemSnapshot>, CliError> {
-        <Self as ItemCoreQueries>::list_task_board_item_snapshots_including_deleted(self).await
-    }
-}
 
 pub(crate) async fn task_board_items_snapshot(
     db: &AsyncDaemonDb,

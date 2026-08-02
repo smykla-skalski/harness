@@ -7,7 +7,6 @@ use super::super::lane_order::{
     replace_with_lane_transition_in_tx,
 };
 use super::super::projects::resolve_item_project_in_tx;
-use super::super::item_core_queries::ItemCoreQueries;
 use super::super::triage_interface::Triage;
 use super::{
     TaskBoardMutation, TaskBoardMutationKind, TaskBoardTriageIngress, TriageEvaluator,
@@ -15,57 +14,6 @@ use super::{
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
 use crate::task_board::TaskBoardItem;
-
-impl AsyncDaemonDb {
-    /// Insert one new Task Board item. Never evaluates `BuiltInV1`: every
-    /// internal lane/dispatch/workflow/migration/test-fixture constructor
-    /// must keep using this method so an unrelated internal create can never
-    /// become accidental triage ingress. The public create API and provider
-    /// import use the `_with_triage` methods below instead.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] when the item is invalid or the insert fails.
-    pub async fn create_task_board_item(
-        &self,
-        item: TaskBoardItem,
-    ) -> Result<TaskBoardMutation, CliError> {
-        Box::pin(<Self as ItemCoreQueries>::create_task_board_item(
-            self, item,
-        ))
-        .await
-    }
-
-    /// Like [`create_task_board_item`], but also evaluates `BuiltInV1` in the
-    /// same transaction, for the public create API.
-    pub(crate) async fn create_task_board_item_with_triage(
-        &self,
-        item: TaskBoardItem,
-    ) -> Result<TaskBoardMutation, CliError> {
-        Box::pin(<Self as ItemCoreQueries>::create_task_board_item_with_triage(self, item)).await
-    }
-
-    /// Like [`create_task_board_item_with_triage`], but for a create whose
-    /// request named the starting lane. See
-    /// [`ItemCoreQueries::create_task_board_item_at_requested_status`] for
-    /// the full contract.
-    pub(crate) async fn create_task_board_item_at_requested_status(
-        &self,
-        item: TaskBoardItem,
-    ) -> Result<TaskBoardMutation, CliError> {
-        Box::pin(<Self as ItemCoreQueries>::create_task_board_item_at_requested_status(self, item))
-            .await
-    }
-
-    /// Like [`create_task_board_item`], but also evaluates `BuiltInV1` in the
-    /// same transaction, for provider import.
-    pub(crate) async fn create_task_board_item_with_provider_triage(
-        &self,
-        item: TaskBoardItem,
-    ) -> Result<TaskBoardMutation, CliError> {
-        Box::pin(<Self as ItemCoreQueries>::create_task_board_item_with_provider_triage(self, item))
-            .await
-    }
-}
 
 pub(crate) async fn create_task_board_item(
     db: &AsyncDaemonDb,

@@ -4,6 +4,7 @@ use tempfile::{TempDir, tempdir};
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::TaskBoardItem;
+use crate::daemon::db::task_board::prelude::*;
 
 struct TestDb {
     db: AsyncDaemonDb,

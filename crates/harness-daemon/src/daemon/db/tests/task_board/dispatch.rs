@@ -10,6 +10,7 @@ use crate::task_board::{
     PolicyAction, PolicyReasonCode, SessionIntent, TaskBoardItem, TaskBoardStatus,
     build_dispatch_plans_with_policy,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 #[tokio::test]
 async fn task_board_dispatch_intents_survive_until_worker_outcome() {

@@ -5,6 +5,7 @@ use tempfile::{TempDir, tempdir};
 use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::TaskBoardItem;
 use crate::task_board::types::TaskBoardItemKind;
+use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
 
 #[tokio::test]
 async fn a_future_kind_deserializes_safely_and_survives_an_unrelated_update() {

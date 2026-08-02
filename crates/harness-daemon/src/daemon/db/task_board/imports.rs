@@ -5,7 +5,6 @@ use sqlx::{Sqlite, Transaction, query, query_as};
 use uuid::Uuid;
 
 use super::aggregates::upsert_machine_in_tx;
-use super::import_lifecycle_queries::ImportLifecycleQueries;
 use super::items::bump_change_in_tx;
 use super::lane_order::{
     LaneTransitionWrite, insert_with_lane_transition_in_tx, record_lane_transition_audit_in_tx,
@@ -15,6 +14,7 @@ use super::{
     ITEMS_CHANGE_SCOPE, MACHINES_CHANGE_SCOPE, ORCHESTRATOR_CHANGE_SCOPE,
     POLICY_RUNTIME_CHANGE_SCOPE, RUNTIME_CONFIG_CHANGE_SCOPE,
 };
+use crate::daemon::db::task_board::import_lifecycle_queries::ImportLifecycleQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
 use crate::task_board::legacy_import::LegacyTaskBoardSnapshot;
 use crate::task_board::{
@@ -44,38 +44,6 @@ pub(crate) struct TaskBoardImportMarker {
     pub(crate) secret_handoff_digest: Option<String>,
     pub(crate) secret_handoff_phase: String,
     pub(crate) secret_acknowledged_at: Option<String>,
-}
-
-impl AsyncDaemonDb {
-    pub(crate) async fn import_legacy_task_board(
-        &self,
-        snapshot: &LegacyTaskBoardSnapshot,
-        staged_path: Option<&Path>,
-        runtime_config: &TaskBoardGitRuntimeConfig,
-        secret_handoff_digest: Option<&str>,
-    ) -> Result<TaskBoardImportResult, CliError> {
-        <Self as ImportLifecycleQueries>::import_legacy_task_board(
-            self,
-            snapshot,
-            staged_path,
-            runtime_config,
-            secret_handoff_digest,
-        )
-        .await
-    }
-
-    pub(crate) async fn initialize_empty_task_board(
-        &self,
-        runtime_config: &TaskBoardGitRuntimeConfig,
-        secret_handoff_digest: Option<&str>,
-    ) -> Result<TaskBoardImportResult, CliError> {
-        <Self as ImportLifecycleQueries>::initialize_empty_task_board(
-            self,
-            runtime_config,
-            secret_handoff_digest,
-        )
-        .await
-    }
 }
 
 /// Real implementation behind [`ImportLifecycleQueries::import_legacy_task_board`].

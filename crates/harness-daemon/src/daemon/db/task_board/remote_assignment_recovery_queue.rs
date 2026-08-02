@@ -2,7 +2,6 @@ use chrono::{Duration, SecondsFormat};
 use sha2::{Digest, Sha256};
 use sqlx::{Sqlite, Transaction, query, query_as, query_scalar};
 
-use super::remote_assignment_executor_lifecycle_queries::RemoteAssignmentExecutorLifecycleQueries;
 use super::remote_assignment_model::canonical_time;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 
@@ -173,20 +172,6 @@ pub(super) struct RawRecoveryCandidate {
     pub(super) assignment_updated_at: String,
     pub(super) request_sha256: Option<String>,
     pub(super) lease_id: Option<String>,
-}
-
-impl AsyncDaemonDb {
-    pub(super) async fn quarantine_remote_recovery_failure(
-        &self,
-        candidate: &RawRecoveryCandidate,
-        now: &str,
-        error: &CliError,
-    ) -> Result<(), CliError> {
-        <Self as RemoteAssignmentExecutorLifecycleQueries>::quarantine_remote_recovery_failure(
-            self, candidate, now, error,
-        )
-        .await
-    }
 }
 
 pub(super) async fn quarantine_remote_recovery_failure(

@@ -13,6 +13,7 @@ use crate::task_board::TaskBoardOrchestratorRunOnceRequest;
 #[cfg(test)]
 use crate::task_board::TaskBoardOrchestratorState;
 use harness_kernel::errors::CliError;
+use crate::daemon::db::task_board::prelude::*;
 
 struct AutonomousOrchestratorIntent {
     enabled: bool,

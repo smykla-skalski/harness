@@ -16,6 +16,7 @@ use harness_kernel::errors::CliError;
 
 use super::task_board_db::task_board_host_local_db;
 use super::task_board_orchestrator_settings::{apply_settings_update, normalize_github_inbox};
+use crate::daemon::db::task_board::prelude::*;
 
 pub(crate) async fn task_board_orchestrator_status_db(
     db: &AsyncDaemonDb,

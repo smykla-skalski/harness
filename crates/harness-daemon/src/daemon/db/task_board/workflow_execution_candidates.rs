@@ -1,7 +1,6 @@
 use sqlx::query_as;
 
 use super::workflow_execution_attempts::load_execution_attempts_in_tx;
-use super::workflow_execution_queries::WorkflowExecutionQueries;
 use super::workflow_execution_rows::WorkflowExecutionRow;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardWorkflowExecutionRecord;
@@ -43,27 +42,6 @@ const SELECT_PROJECTABLE_EXECUTIONS: &str = "SELECT execution.*
               WHEN 'human_required' THEN 'workflow requires human review' WHEN 'failed' THEN
               'workflow failed' ELSE 'workflow was cancelled' END) END))
       ) ORDER BY execution.updated_at, execution.execution_id LIMIT ?1";
-
-impl AsyncDaemonDb {
-    pub(crate) async fn ready_task_board_workflow_executions(
-        &self,
-        now: &str,
-        limit: usize,
-    ) -> Result<Vec<TaskBoardWorkflowExecutionRecord>, CliError> {
-        <Self as WorkflowExecutionQueries>::ready_task_board_workflow_executions(self, now, limit)
-            .await
-    }
-
-    pub(crate) async fn projectable_task_board_read_only_workflow_executions(
-        &self,
-        limit: usize,
-    ) -> Result<Vec<TaskBoardWorkflowExecutionRecord>, CliError> {
-        <Self as WorkflowExecutionQueries>::projectable_task_board_read_only_workflow_executions(
-            self, limit,
-        )
-        .await
-    }
-}
 
 pub(super) async fn ready_task_board_workflow_executions(
     db: &AsyncDaemonDb,

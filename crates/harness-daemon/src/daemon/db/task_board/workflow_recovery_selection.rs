@@ -3,7 +3,6 @@ use std::collections::BTreeSet;
 use sqlx::{Sqlite, Transaction, query, query_as, query_scalar};
 
 use super::workflow_execution_candidates::load_candidates;
-use super::workflow_execution_queries::WorkflowExecutionQueries;
 use super::workflow_execution_rows::WorkflowExecutionRow;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardWorkflowExecutionRecord;
@@ -73,25 +72,6 @@ const SELECT_THROUGH_CURSOR: &str = "SELECT * FROM task_board_workflow_execution
       )
       AND (updated_at < ?1 OR (updated_at = ?1 AND execution_id <= ?2))
     ORDER BY updated_at, execution_id LIMIT ?3";
-impl AsyncDaemonDb {
-    pub(crate) async fn recoverable_task_board_workflow_executions(
-        &self,
-        limit: usize,
-    ) -> Result<Vec<TaskBoardWorkflowExecutionRecord>, CliError> {
-        <Self as WorkflowExecutionQueries>::recoverable_task_board_workflow_executions(self, limit)
-            .await
-    }
-
-    pub(crate) async fn remote_candidate_task_board_workflow_executions(
-        &self,
-        limit: usize,
-    ) -> Result<Vec<TaskBoardWorkflowExecutionRecord>, CliError> {
-        <Self as WorkflowExecutionQueries>::remote_candidate_task_board_workflow_executions(
-            self, limit,
-        )
-        .await
-    }
-}
 
 pub(super) async fn recoverable_task_board_workflow_executions(
     db: &AsyncDaemonDb,

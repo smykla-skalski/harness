@@ -5,6 +5,8 @@ use crate::task_board::{
     ExternalProvider, ExternalRefProvider, ExternalSyncField, TaskBoardConflictState,
     TaskBoardItem, TaskBoardSyncConflict,
 };
+use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
+use crate::daemon::db::task_board::provider_queries::ProviderQueries;
 
 #[tokio::test]
 async fn stale_empty_conflict_replacement_is_a_noop() {

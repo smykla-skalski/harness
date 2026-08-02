@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::ops::Deref;
 
 use tempfile::{TempDir, tempdir};
+use crate::daemon::db::task_board::prelude::*;
 
 #[path = "admission_dispatch_completion_evidence.rs"]
 mod completion_evidence_tests;

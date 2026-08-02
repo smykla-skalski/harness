@@ -13,6 +13,7 @@ use crate::task_board::remote_wire::wire::{
     RemoteAssignmentWireState, RemoteSettledRequest, RemoteSettledResponse,
     TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 #[tokio::test]
 async fn lost_settlement_response_restarts_with_one_exact_authority_and_receipt() {

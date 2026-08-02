@@ -29,6 +29,7 @@ use crate::task_board::remote_wire::wire_limits::{
     MAX_REMOTE_SOURCE_ABANDON_JSON_BYTES, MAX_REMOTE_SOURCE_BUNDLE_JSON_BYTES,
 };
 use harness_kernel::errors::CliErrorKind;
+use crate::daemon::db::task_board::prelude::*;
 
 pub(crate) const ADVERTISE_PATH: &str = "/v1/task-board-execution/advertise";
 pub(crate) const OFFER_PATH: &str = "/v1/task-board-execution/offers";

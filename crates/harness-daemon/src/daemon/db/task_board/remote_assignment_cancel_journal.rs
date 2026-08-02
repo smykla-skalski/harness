@@ -2,7 +2,6 @@
 
 use sqlx::{Sqlite, Transaction, query};
 
-use super::remote_assignment_executor_lifecycle_queries::RemoteAssignmentExecutorLifecycleQueries;
 use super::remote_assignment_io_authority::active_target_matches;
 use super::remote_assignment_io_authority::monotonic_time;
 use super::remote_assignment_model::{
@@ -20,19 +19,6 @@ use crate::task_board::{
     TASK_BOARD_REMOTE_CANCEL_INTENT_AT_RESOURCE, TASK_BOARD_REMOTE_CANCEL_INTENT_REASON_RESOURCE,
     TASK_BOARD_REMOTE_CANCEL_INTENT_RESOURCE, TaskBoardWorkflowExecutionRecord,
 };
-
-impl AsyncDaemonDb {
-    pub(crate) async fn task_board_remote_cancel_intent(
-        &self,
-        assignment_id: &str,
-    ) -> Result<Option<RemoteCancelRequest>, CliError> {
-        <Self as RemoteAssignmentExecutorLifecycleQueries>::task_board_remote_cancel_intent(
-            self,
-            assignment_id,
-        )
-        .await
-    }
-}
 
 pub(super) async fn task_board_remote_cancel_intent(
     db: &AsyncDaemonDb,

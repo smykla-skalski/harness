@@ -8,6 +8,7 @@ use super::fixture::{AttemptSeed, NOW, RETRY_AT, seed_execution};
 use super::load_execution;
 use super::prepared_report_fixture::seed_dispatched_initial_report;
 use super::runtime::{FakeReadOnlyRuntime, PlannedReport};
+use crate::daemon::db::task_board::prelude::*;
 
 #[tokio::test]
 async fn second_reconciler_waits_for_claimed_report_without_orphaning_run() {

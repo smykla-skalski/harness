@@ -7,6 +7,9 @@ use crate::task_board::{
     TaskBoardAutomationWakeEntityKind, TaskBoardAutomationWakePayload,
     TaskBoardAutomationWakeRequest, TaskBoardOrchestratorSettings,
 };
+use crate::daemon::db::task_board::import_lifecycle_queries::ImportLifecycleQueries;
+use crate::daemon::db::task_board::orchestrator_settings_queries::OrchestratorSettingsQueries;
+use crate::daemon::db::task_board::scheduler::queries::TaskBoardAutomationSchedulerQueries;
 
 #[tokio::test]
 async fn control_defaults_without_persisted_intent() {

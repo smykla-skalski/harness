@@ -4,7 +4,6 @@ use self::atomic::{AtomicCasExpectation, apply_atomic_cas_in_tx, decide_atomic_c
 use super::ORCHESTRATOR_CHANGE_SCOPE;
 use super::items::bump_change_in_tx;
 use super::remote_assignment_fencing::concurrent;
-use super::workflow_execution_queries::WorkflowExecutionQueries;
 use super::workflow_execution_rows::{ExecutionAttemptRow, attempt_artifact_json, label};
 use super::workflow_executions::load_execution_in_tx;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
@@ -19,44 +18,6 @@ use crate::task_board::{
 
 const SELECT_ATTEMPTS: &str = "SELECT * FROM task_board_execution_attempts
     WHERE execution_id = ?1 ORDER BY action_key, attempt";
-
-impl AsyncDaemonDb {
-    pub(crate) async fn create_task_board_execution_attempt(
-        &self,
-        proposed: &TaskBoardExecutionAttemptRecord,
-    ) -> Result<TaskBoardExecutionAttemptCreateOutcome, CliError> {
-        <Self as WorkflowExecutionQueries>::create_task_board_execution_attempt(self, proposed)
-            .await
-    }
-
-    pub(crate) async fn compare_and_set_task_board_execution_attempt(
-        &self,
-        expected: &TaskBoardExecutionAttemptCas,
-        updated: &TaskBoardExecutionAttemptRecord,
-    ) -> Result<TaskBoardExecutionAttemptCasOutcome, CliError> {
-        <Self as WorkflowExecutionQueries>::compare_and_set_task_board_execution_attempt(
-            self, expected, updated,
-        )
-        .await
-    }
-
-    pub(crate) async fn compare_and_set_task_board_workflow_execution_and_attempt(
-        &self,
-        expected_execution: &TaskBoardWorkflowExecutionCas,
-        updated_execution: &TaskBoardWorkflowExecutionRecord,
-        expected_attempt: &TaskBoardExecutionAttemptCas,
-        updated_attempt: &TaskBoardExecutionAttemptRecord,
-    ) -> Result<Option<TaskBoardWorkflowExecutionRecord>, CliError> {
-        <Self as WorkflowExecutionQueries>::compare_and_set_task_board_workflow_execution_and_attempt(
-            self,
-            expected_execution,
-            updated_execution,
-            expected_attempt,
-            updated_attempt,
-        )
-        .await
-    }
-}
 
 pub(super) async fn create_task_board_execution_attempt(
     db: &AsyncDaemonDb,

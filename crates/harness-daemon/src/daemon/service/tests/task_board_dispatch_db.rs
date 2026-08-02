@@ -8,6 +8,7 @@ use crate::task_board::{
     AgentMode, HARNESS_GITHUB_TOKEN_ENV, TaskBoardGitHubProjectConfig, TaskBoardItem,
     TaskBoardWorkflowKind, build_dispatch_plans_with_policy,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 struct CrashedDispatchPreparation {
     db: crate::daemon::db::AsyncDaemonDb,

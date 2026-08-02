@@ -21,6 +21,7 @@ use crate::task_board::{
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::super::task_board_automation_startup::initialize_control_from_legacy_intent;
+use crate::daemon::db::task_board::prelude::*;
 
 const MINIMUM_TICK_INTERVAL: Duration = Duration::from_secs(1);
 const MAX_COORDINATOR_BACKOFF_SECONDS: u64 = 3_600;

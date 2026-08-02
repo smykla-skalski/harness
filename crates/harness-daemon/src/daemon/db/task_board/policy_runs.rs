@@ -4,7 +4,6 @@ use sqlx::{Sqlite, Transaction, query, query_as};
 use super::POLICY_RUNTIME_CHANGE_SCOPE;
 use super::items::bump_change_in_tx;
 use super::mapper::{label, parse_json, to_json};
-use super::policy_runtime_queries::PolicyRuntimeQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::policy_runtime::events::run_matches_event;
 use crate::task_board::policy_runtime::models::{
@@ -14,79 +13,6 @@ use crate::task_board::policy_runtime::repository::{
     BeginRunOutcome, begin_run_in_document, claim_waiting_run_in_document, save_run_in_document,
 };
 use crate::task_board::policy_runtime::scheduler::timer_wait_is_due;
-
-impl AsyncDaemonDb {
-    pub(crate) async fn save_policy_workflow_run(
-        &self,
-        run: &PolicyWorkflowRun,
-    ) -> Result<i64, CliError> {
-        <Self as PolicyRuntimeQueries>::save_policy_workflow_run(self, run).await
-    }
-
-    pub(crate) async fn begin_policy_workflow_run(
-        &self,
-        run: PolicyWorkflowRun,
-        trigger: PolicyRunTrigger,
-        now: DateTime<Utc>,
-    ) -> Result<BeginRunOutcome, CliError> {
-        <Self as PolicyRuntimeQueries>::begin_policy_workflow_run(self, run, trigger, now).await
-    }
-
-    pub(crate) async fn claim_waiting_policy_run(
-        &self,
-        run_id: &str,
-        trigger: PolicyRunTrigger,
-    ) -> Result<Option<PolicyWorkflowRun>, CliError> {
-        <Self as PolicyRuntimeQueries>::claim_waiting_policy_run(self, run_id, trigger).await
-    }
-
-    pub(crate) async fn policy_workflow_runs(&self) -> Result<Vec<PolicyWorkflowRun>, CliError> {
-        <Self as PolicyRuntimeQueries>::policy_workflow_runs(self).await
-    }
-
-    pub(crate) async fn policy_run_by_id(
-        &self,
-        run_id: &str,
-    ) -> Result<Option<PolicyWorkflowRun>, CliError> {
-        <Self as PolicyRuntimeQueries>::policy_run_by_id(self, run_id).await
-    }
-
-    pub(crate) async fn policy_runs_for_subject(
-        &self,
-        workflow_id: &str,
-        subject_key: &str,
-    ) -> Result<Vec<PolicyWorkflowRun>, CliError> {
-        <Self as PolicyRuntimeQueries>::policy_runs_for_subject(self, workflow_id, subject_key)
-            .await
-    }
-
-    pub(crate) async fn active_policy_runs_for_subject(
-        &self,
-        workflow_id: &str,
-        subject_key: &str,
-    ) -> Result<Vec<PolicyWorkflowRun>, CliError> {
-        <Self as PolicyRuntimeQueries>::active_policy_runs_for_subject(
-            self,
-            workflow_id,
-            subject_key,
-        )
-        .await
-    }
-
-    pub(crate) async fn policy_run_ids_ready_for_event(
-        &self,
-        event: &PolicyWorkflowEvent,
-    ) -> Result<Vec<String>, CliError> {
-        <Self as PolicyRuntimeQueries>::policy_run_ids_ready_for_event(self, event).await
-    }
-
-    pub(crate) async fn policy_runs_ready_for_timer(
-        &self,
-        now: DateTime<Utc>,
-    ) -> Result<Vec<PolicyWorkflowRun>, CliError> {
-        <Self as PolicyRuntimeQueries>::policy_runs_ready_for_timer(self, now).await
-    }
-}
 
 /// Real implementations behind the matching [`PolicyRuntimeQueries`] methods,
 /// called from the single consolidated trait impl in

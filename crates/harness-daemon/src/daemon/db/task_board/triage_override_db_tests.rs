@@ -3,6 +3,7 @@ use tempfile::tempdir;
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::{TaskBoardItem, TaskBoardStatus};
+use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
 
 #[path = "triage_override_clear_audit_tests.rs"]
 mod clear_audit;

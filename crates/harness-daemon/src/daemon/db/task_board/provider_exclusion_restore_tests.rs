@@ -7,6 +7,8 @@ use crate::task_board::{
     ProviderExclusionAuditContext, ProviderExclusionRestoreOutcome, TaskBoardLaneOrigin,
     matched_exclusion_label,
 };
+use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
+use crate::daemon::db::task_board::provider_queries::ProviderQueries;
 
 #[path = "provider_exclusion_restore_parent_tests.rs"]
 mod parent_tests;

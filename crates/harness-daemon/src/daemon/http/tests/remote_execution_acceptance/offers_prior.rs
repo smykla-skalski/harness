@@ -13,6 +13,7 @@ use crate::task_board::{
     TaskBoardExecutionState, TaskBoardPhaseCapabilityProfile, TaskBoardWorkflowExecutionCas,
     TaskBoardWorkflowKind, advance_task_board_workflow,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 #[test]
 fn authenticated_two_daemon_offer_acceptance_uses_adopted_default_task_prior_bundle_for_review() {

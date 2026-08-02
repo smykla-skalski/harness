@@ -13,6 +13,8 @@ use crate::task_board::{
     TaskBoardAutomationAdmissionState, TaskBoardAutomationDesiredMode,
     TaskBoardAutomationRunOutcome, TaskBoardAutomationRunTrigger,
 };
+use crate::daemon::db::task_board::import_lifecycle_queries::ImportLifecycleQueries;
+use crate::daemon::db::task_board::scheduler::queries::TaskBoardAutomationSchedulerQueries;
 
 #[tokio::test]
 async fn run_lease_serializes_manual_and_scheduled_triggers() {

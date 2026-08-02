@@ -11,7 +11,6 @@ use super::remote_assignment_io_authority::{
     active_target_matches, has_remote_io_authority, monotonic_time,
 };
 use super::remote_assignment_model::{TaskBoardRemoteAssignmentRecord, concurrent};
-use super::remote_assignment_start_settlement_queries::RemoteAssignmentStartSettlementQueries;
 use super::remote_assignment_status_failure::settle_failed_remote_attempt_in_tx;
 use super::workflow_execution_attempts::update_attempt_in_tx;
 use super::workflow_execution_fencing::WorkflowExecutionFencing;
@@ -47,23 +46,6 @@ pub(crate) enum TaskBoardRemoteResultAdoptionOutcome {
     Updated(TaskBoardWorkflowExecutionRecord),
     Replayed(TaskBoardWorkflowExecutionRecord),
     Stale(TaskBoardWorkflowExecutionRecord),
-}
-
-impl AsyncDaemonDb {
-    pub(crate) async fn adopt_task_board_remote_terminal_result(
-        &self,
-        expected: &TaskBoardWorkflowExecutionCas,
-        assignment_id: &str,
-        fencing_epoch: u64,
-    ) -> Result<TaskBoardRemoteResultAdoptionOutcome, CliError> {
-        <Self as RemoteAssignmentStartSettlementQueries>::adopt_task_board_remote_terminal_result(
-            self,
-            expected,
-            assignment_id,
-            fencing_epoch,
-        )
-        .await
-    }
 }
 
 pub(super) async fn adopt_task_board_remote_terminal_result(

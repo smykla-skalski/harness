@@ -10,6 +10,7 @@ use super::controller_settlement_tests::{settlement, settlement_ready_controller
 use super::controller_tests::{cancel_request, cancel_response};
 use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::TaskBoardRemoteAssignmentState;
+use crate::daemon::db::task_board::prelude::*;
 
 #[tokio::test]
 async fn offer_response_cannot_cross_a_host_trust_rotation() {

@@ -12,7 +12,6 @@ use super::super::remote_assignment_lease::{commit_noop, finish_mutation, requir
 use super::super::remote_assignment_model::{
     TaskBoardRemoteAssignmentRecord, TaskBoardRemoteMutationOutcome, concurrent, to_i64,
 };
-use super::super::remote_assignment_start_settlement_queries::RemoteAssignmentStartSettlementQueries;
 use super::super::remote_start_failure_receipts::{
     start_failure_receipt, start_failure_receipt_values,
 };
@@ -34,19 +33,6 @@ pub(crate) const REMOTE_START_INTERRUPTED_WITHOUT_RUN_ERROR_CODE: &str =
     "remote_start_interrupted_without_run";
 pub(crate) const REMOTE_START_INTERRUPTED_WITHOUT_RUN_FAILURE_CLASS: TaskBoardFailureClass =
     TaskBoardFailureClass::Transient;
-
-impl AsyncDaemonDb {
-    pub(crate) async fn fail_task_board_remote_executor_start_without_run(
-        &self,
-        permit: &TaskBoardRemoteExecutorStartIoPermit,
-        response: &RemoteStatusResponse,
-    ) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
-        <Self as RemoteAssignmentStartSettlementQueries>::fail_task_board_remote_executor_start_without_run(
-            self, permit, response,
-        )
-        .await
-    }
-}
 
 #[expect(
     clippy::cognitive_complexity,

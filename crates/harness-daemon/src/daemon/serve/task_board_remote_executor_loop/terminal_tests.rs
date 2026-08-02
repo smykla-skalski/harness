@@ -17,6 +17,7 @@ use crate::task_board::{
     TaskBoardFailureClass, TaskBoardLocalAttemptResult, TaskBoardPhaseVerdict,
     TaskBoardRemoteAssignmentState, TaskBoardReviewResult, TaskBoardReviewerOutcome,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 const OWNER: &str = "instance-a";
 

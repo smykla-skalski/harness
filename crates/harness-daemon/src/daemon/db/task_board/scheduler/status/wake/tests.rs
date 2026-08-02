@@ -8,6 +8,7 @@ use crate::task_board::{
     TaskBoardAutomationWakePayload, TaskBoardAutomationWakeRecoveryReason,
     TaskBoardAutomationWakeRequest,
 };
+use crate::daemon::db::task_board::scheduler::queries::TaskBoardAutomationSchedulerQueries;
 
 #[tokio::test]
 async fn wake_projection_uses_sequence_order_and_is_read_only() {

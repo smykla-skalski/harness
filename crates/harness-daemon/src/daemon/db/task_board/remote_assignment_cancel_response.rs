@@ -4,7 +4,6 @@ use super::remote_assignment_active_fence::{
     TaskBoardRemoteControllerHandoffKind, controller_handoff_matches_in_tx,
 };
 use super::remote_assignment_authority_settlement::settle_cancel_io_authority_in_tx;
-use super::remote_assignment_executor_lifecycle_queries::RemoteAssignmentExecutorLifecycleQueries;
 use super::remote_assignment_lease::{
     commit_noop, exact_mutation_replay, finish_mutation, mutation_binding_matches,
     require_assignment,
@@ -32,27 +31,6 @@ struct AdoptedCancelClaim {
     request_sha256: String,
     response_json: String,
     receipt_sha256: String,
-}
-
-impl AsyncDaemonDb {
-    pub(crate) async fn record_task_board_remote_assignment_cancel(
-        &self,
-        request: &RemoteCancelRequest,
-        response: &RemoteCancelResponse,
-        authenticated_principal: &str,
-        recorded_at: &str,
-    ) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
-        Box::pin(
-            <Self as RemoteAssignmentExecutorLifecycleQueries>::record_task_board_remote_assignment_cancel(
-                self,
-                request,
-                response,
-                authenticated_principal,
-                recorded_at,
-            ),
-        )
-        .await
-    }
 }
 
 pub(super) async fn record_task_board_remote_assignment_cancel(

@@ -10,6 +10,7 @@ use crate::task_board::{
 };
 
 use super::admission_dispatch::{configure_policy, preparing_intent, test_db};
+use crate::daemon::db::task_board::prelude::*;
 
 #[tokio::test]
 async fn compensation_survives_reservation_horizon_and_retry_with_exact_usage() {

@@ -10,7 +10,7 @@ use super::remote_assignment_recovery_queue::{
     RawRecoveryCandidate, clear_recovery_quarantine_in_tx, due_assignment_page,
 };
 use super::remote_operation_trust::abandon_controller_operation_trust_in_tx;
-use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
+use crate::daemon::db::task_board::remote_assignment_executor_lifecycle_queries::RemoteAssignmentExecutorLifecycleQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardRemoteAssignmentState;
 
@@ -37,12 +37,6 @@ pub(crate) struct TaskBoardRemoteRecoveryBatch {
 }
 
 impl AsyncDaemonDb {
-    pub(crate) async fn recover_task_board_remote_assignments(
-        &self,
-        now: &str,
-    ) -> Result<TaskBoardRemoteRecoveryBatch, CliError> {
-        <Self as RemoteExecutionQueries>::recover_task_board_remote_assignments(self, now).await
-    }
 
     pub(crate) async fn task_board_remote_assignment_recovery_deadline(
         &self,

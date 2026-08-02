@@ -11,6 +11,7 @@ use harness_task_board_git_runtime::{
     handoff_error, normalized_runtime_config, pending_legacy_secret_runtime,
     signing_verify_response, validated_repository,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 #[cfg(test)]
 pub use harness_task_board_git_runtime::{

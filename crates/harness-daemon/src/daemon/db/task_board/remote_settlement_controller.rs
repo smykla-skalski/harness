@@ -10,53 +10,12 @@ use super::remote_operation_trust::{
     TaskBoardRemoteOperationKind, TaskBoardRemoteOperationTrustFence,
     claim_controller_operation_trust_in_tx, consume_controller_operation_trust_in_tx,
 };
-use super::remote_assignment_start_settlement_queries::RemoteAssignmentStartSettlementQueries;
 use super::remote_settlement_receipts::{
     TaskBoardRemoteSettlementReceipt, insert_settlement_in_tx, load_settlement_collisions_in_tx,
     load_settlement_in_tx, require_current_settlement_window, require_exact_terminal_assignment,
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::remote_wire::wire::{RemoteSettledRequest, RemoteSettledResponse};
-
-impl AsyncDaemonDb {
-    #[cfg(test)]
-    pub(crate) async fn claim_task_board_remote_settlement_io_authority(
-        &self,
-        request: &RemoteSettledRequest,
-        authenticated_principal: &str,
-        authority_at: &str,
-    ) -> Result<Option<RemoteSettledResponse>, CliError> {
-        <Self as RemoteAssignmentStartSettlementQueries>::claim_task_board_remote_settlement_io_authority(
-            self, request, authenticated_principal, authority_at,
-        )
-        .await
-    }
-
-    pub(crate) async fn claim_task_board_remote_settlement_io_authority_fenced(
-        &self,
-        request: &RemoteSettledRequest,
-        authenticated_principal: &str,
-        authority_at: &str,
-        trust: &TaskBoardRemoteOperationTrustFence,
-    ) -> Result<Option<RemoteSettledResponse>, CliError> {
-        <Self as RemoteAssignmentStartSettlementQueries>::claim_task_board_remote_settlement_io_authority_fenced(
-            self, request, authenticated_principal, authority_at, trust,
-        )
-        .await
-    }
-
-    pub(crate) async fn record_task_board_remote_settlement_response(
-        &self,
-        request: &RemoteSettledRequest,
-        response: &RemoteSettledResponse,
-        authenticated_principal: &str,
-    ) -> Result<TaskBoardRemoteSettlementReceipt, CliError> {
-        <Self as RemoteAssignmentStartSettlementQueries>::record_task_board_remote_settlement_response(
-            self, request, response, authenticated_principal,
-        )
-        .await
-    }
-}
 
 /// Claim one exact terminal assignment generation before settlement I/O.
 ///

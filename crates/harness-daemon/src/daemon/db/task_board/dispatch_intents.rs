@@ -5,7 +5,6 @@ use self::completion::{
     apply_dispatch_completion_in_tx, screen_dispatch_completion_in_tx, settle_dispatch_intent_in_tx,
 };
 use super::ITEMS_CHANGE_SCOPE;
-use super::dispatch_admission_queries::DispatchAdmissionQueries;
 use super::dispatch_workflow_start::validate_pending_dispatch;
 use super::item_tx_ext::TaskBoardItemTxExt;
 use super::items::bump_change_in_tx;
@@ -137,56 +136,6 @@ pub(crate) struct ClaimedTaskBoardDispatch {
     pub(crate) applied: DispatchAppliedTask,
     pub(crate) consumed_approval_grant_id: Option<String>,
     pub(crate) action: TaskBoardDispatchClaimAction,
-}
-
-impl AsyncDaemonDb {
-    /// Atomically link a Task Board item to its created task and enqueue worker startup.
-    pub(crate) async fn link_and_enqueue_task_board_dispatch(
-        &self,
-        board_item_id: &str,
-        session_id: &str,
-        work_item_id: &str,
-        lifecycle: &DispatchLifecycle,
-    ) -> Result<DispatchAppliedTask, CliError> {
-        <Self as DispatchAdmissionQueries>::link_and_enqueue_task_board_dispatch(
-            self,
-            board_item_id,
-            session_id,
-            work_item_id,
-            lifecycle,
-        )
-        .await
-    }
-
-    /// Claim one pending or lease-expired worker startup for an item.
-    pub(crate) async fn claim_task_board_dispatch(
-        &self,
-        board_item_id: &str,
-    ) -> Result<Option<ClaimedTaskBoardDispatch>, CliError> {
-        <Self as DispatchAdmissionQueries>::claim_task_board_dispatch(self, board_item_id).await
-    }
-
-    /// Claim the next pending worker startup, including lease-expired work after restart.
-    pub(crate) async fn claim_next_task_board_dispatch(
-        &self,
-    ) -> Result<Option<ClaimedTaskBoardDispatch>, CliError> {
-        <Self as DispatchAdmissionQueries>::claim_next_task_board_dispatch(self).await
-    }
-
-    pub(crate) async fn complete_task_board_dispatch(
-        &self,
-        intent_id: &str,
-        claim_token: &str,
-        managed_worker_id: &str,
-    ) -> Result<TaskBoardItem, CliError> {
-        <Self as DispatchAdmissionQueries>::complete_task_board_dispatch(
-            self,
-            intent_id,
-            claim_token,
-            managed_worker_id,
-        )
-        .await
-    }
 }
 
 /// Real implementations behind the matching [`DispatchAdmissionQueries`]

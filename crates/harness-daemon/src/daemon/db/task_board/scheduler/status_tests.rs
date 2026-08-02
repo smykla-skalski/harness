@@ -9,6 +9,8 @@ use crate::task_board::{
     TaskBoardAutomationEffectiveState, TaskBoardAutomationQueueSummary,
     TaskBoardAutomationSchedulingSettings, TaskBoardItem, TaskBoardOrchestratorSettings,
 };
+use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
+use crate::daemon::db::task_board::scheduler::queries::TaskBoardAutomationSchedulerQueries;
 
 #[tokio::test]
 async fn snapshot_is_consistent_bounded_and_read_only() {

@@ -36,7 +36,6 @@ use super::remote_assignment_model::{
     TaskBoardRemoteAssignmentRecord, canonical_time, concurrent, nonblank, to_i64,
 };
 use super::remote_start_receipts::{durable_start_receipt_run_matches, receipt_matches_permit};
-use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardRemoteAssignmentState;
 
@@ -54,23 +53,6 @@ pub(crate) struct TaskBoardRemoteExecutorStartAuthority {
     pub(crate) sha256: String,
     pub(crate) acquired_at: String,
     pub(crate) identity: TaskBoardRemoteExecutorIdentity,
-}
-
-impl AsyncDaemonDb {
-    pub(crate) async fn claim_task_board_remote_executor_start_authority(
-        &self,
-        assignment_id: &str,
-        host_instance_id: &str,
-        authority_at: &str,
-    ) -> Result<Option<TaskBoardRemoteExecutorStartAuthority>, CliError> {
-        <Self as RemoteExecutionQueries>::claim_task_board_remote_executor_start_authority(
-            self,
-            assignment_id,
-            host_instance_id,
-            authority_at,
-        )
-        .await
-    }
 }
 
 #[expect(

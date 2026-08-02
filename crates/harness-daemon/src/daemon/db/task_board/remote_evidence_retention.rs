@@ -1,7 +1,6 @@
 use chrono::Duration;
 use sqlx::{Sqlite, Transaction, query};
 
-use super::remote_assignment_authority_queries::RemoteAssignmentAuthorityQueries;
 use super::remote_assignment_model::canonical_time;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 
@@ -14,18 +13,6 @@ pub(crate) struct TaskBoardRemoteEvidencePruneResult {
     pub(crate) source_bundle_contents: u64,
     pub(crate) offer_receipts: u64,
     pub(crate) settlement_receipts: u64,
-}
-
-impl AsyncDaemonDb {
-    pub(crate) async fn prune_task_board_remote_execution_evidence(
-        &self,
-        now: &str,
-    ) -> Result<TaskBoardRemoteEvidencePruneResult, CliError> {
-        <Self as RemoteAssignmentAuthorityQueries>::prune_task_board_remote_execution_evidence(
-            self, now,
-        )
-        .await
-    }
 }
 
 pub(super) async fn prune_task_board_remote_execution_evidence(

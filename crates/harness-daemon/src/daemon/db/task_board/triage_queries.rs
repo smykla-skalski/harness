@@ -36,25 +36,6 @@ pub(crate) struct TaskBoardTriageHistoryPage {
 mod reads;
 use reads::{task_board_triage_current, task_board_triage_history};
 
-impl AsyncDaemonDb {
-    pub(crate) async fn task_board_triage_current(
-        &self,
-        item_id: &str,
-    ) -> Result<TaskBoardTriageCurrentRead, CliError> {
-        <Self as TriageQueries>::task_board_triage_current(self, item_id).await
-    }
-
-    pub(crate) async fn task_board_triage_history(
-        &self,
-        item_id: &str,
-        before_generation: Option<u64>,
-        limit: u32,
-    ) -> Result<TaskBoardTriageHistoryPage, CliError> {
-        <Self as TriageQueries>::task_board_triage_history(self, item_id, before_generation, limit)
-            .await
-    }
-}
-
 pub(crate) trait TriageQueries: Send + Sync {
     async fn task_board_triage_current(
         &self,

@@ -13,6 +13,7 @@ use crate::task_board::{
 use super::admission_dispatch::{
     admission_policy, configure_policy, ledger_kind_state, preparing_intent, test_db,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 async fn prepare_compensation_lane_shift(db: &AsyncDaemonDb) -> (String, String) {
     configure_policy(db, admission_policy(1)).await;

@@ -2,7 +2,6 @@
 
 use sqlx::Transaction;
 
-use super::remote_assignment_authority_queries::RemoteAssignmentAuthorityQueries;
 use super::remote_assignment_cleanup::persist_cleanup_completion_in_tx;
 use super::remote_assignment_lease::{commit_noop, finish_mutation, require_assignment};
 use super::remote_assignment_model::{TaskBoardRemoteMutationOutcome, concurrent, nonblank};
@@ -21,33 +20,6 @@ use crate::task_board::TaskBoardWorkflowExecutionCas;
 use crate::task_board::remote_wire::wire_cleanup::{
     RemoteCleanupObservationRequest, RemoteCleanupObservationResponse,
 };
-
-impl AsyncDaemonDb {
-    pub(crate) async fn claim_task_board_remote_cleanup_observation_fenced(
-        &self,
-        request: &RemoteCleanupObservationRequest,
-        principal: &str,
-        trust: &TaskBoardRemoteHostTrustFence,
-    ) -> Result<Option<RemoteCleanupObservationResponse>, CliError> {
-        <Self as RemoteAssignmentAuthorityQueries>::claim_task_board_remote_cleanup_observation_fenced(
-            self, request, principal, trust,
-        )
-        .await
-    }
-
-    pub(crate) async fn record_task_board_remote_cleanup_observation(
-        &self,
-        request: &RemoteCleanupObservationRequest,
-        response: &RemoteCleanupObservationResponse,
-        principal: &str,
-        trust: &TaskBoardRemoteHostTrustFence,
-    ) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
-        <Self as RemoteAssignmentAuthorityQueries>::record_task_board_remote_cleanup_observation(
-            self, request, response, principal, trust,
-        )
-        .await
-    }
-}
 
 pub(super) async fn claim_task_board_remote_cleanup_observation_fenced(
     db: &AsyncDaemonDb,

@@ -6,7 +6,6 @@ use super::audit::{
     broadcast_automation_audits, insert_automation_audit, parse_scope, terminal_event_type,
 };
 use super::control::{ensure_control_row, load_control_in_tx};
-use super::queries::TaskBoardAutomationSchedulerQueries;
 use super::runs::run_outcome_label;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::daemon::protocol::HarnessMonitorAuditEvent;
@@ -20,19 +19,6 @@ struct StaleRunRow {
     scope_json: String,
     state: String,
     stop_generation: i64,
-}
-
-impl AsyncDaemonDb {
-    /// Expire coordinator runs left stale across daemon startup.
-    pub(crate) async fn recover_stale_task_board_automation_runs(
-        &self,
-        now: DateTime<Utc>,
-    ) -> Result<u64, CliError> {
-        <Self as TaskBoardAutomationSchedulerQueries>::recover_stale_task_board_automation_runs(
-            self, now,
-        )
-        .await
-    }
 }
 
 pub(super) async fn recover_stale_task_board_automation_runs(

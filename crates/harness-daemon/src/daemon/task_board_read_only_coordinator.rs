@@ -11,6 +11,7 @@ use harness_kernel::errors::CliError;
 use super::task_board_read_only_runtime::{
     ProductionTaskBoardReadOnlyRuntime, TaskBoardReadOnlyRuntime,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 mod agent_turn_reports;
 mod attempt_recovery;

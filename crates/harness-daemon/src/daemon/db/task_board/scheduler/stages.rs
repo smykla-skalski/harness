@@ -8,7 +8,6 @@ use sqlx::{query, query_as};
 use super::super::ORCHESTRATOR_CHANGE_SCOPE;
 use super::super::items::bump_change_in_tx;
 use super::audit::{broadcast_automation_audits, insert_automation_audit, parse_scope};
-use super::queries::TaskBoardAutomationSchedulerQueries;
 use super::runs::TaskBoardAutomationRunLease;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardAutomationRunStage;
@@ -18,20 +17,6 @@ use crate::task_board::TaskBoardAutomationRunStage;
 struct StoredStageSummary {
     #[serde(default)]
     stages: Vec<TaskBoardAutomationRunStage>,
-}
-
-impl AsyncDaemonDb {
-    pub(crate) async fn upsert_task_board_automation_run_stage(
-        &self,
-        lease: &TaskBoardAutomationRunLease,
-        stage: &TaskBoardAutomationRunStage,
-        now: DateTime<Utc>,
-    ) -> Result<u64, CliError> {
-        <Self as TaskBoardAutomationSchedulerQueries>::upsert_task_board_automation_run_stage(
-            self, lease, stage, now,
-        )
-        .await
-    }
 }
 
 pub(super) async fn upsert_task_board_automation_run_stage(

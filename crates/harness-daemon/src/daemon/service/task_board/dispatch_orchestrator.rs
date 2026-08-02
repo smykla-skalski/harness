@@ -12,6 +12,7 @@ use super::super::TaskBoardAutomationRunSession;
 use super::dispatch::{
     apply_dispatch_plan_async, build_dispatch_plans_for_request_async, reject_explicit_kind_block,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 pub(crate) async fn dispatch_task_board_for_orchestrator_async(
     request: &TaskBoardDispatchRequest,

@@ -2,7 +2,6 @@ use sqlx::{Sqlite, Transaction, query, query_as, query_scalar};
 
 use super::super::ITEMS_CHANGE_SCOPE;
 use super::super::admission_lifecycle::commit_compensating_dispatch_admission_in_tx;
-use super::super::dispatch_admission_queries::DispatchAdmissionQueries;
 use super::super::dispatch_admission_tx_ext::TaskBoardDispatchAdmissionTxExt;
 use super::super::item_tx_ext::TaskBoardItemTxExt;
 use super::super::items::bump_change_in_tx;
@@ -129,107 +128,6 @@ pub(in crate::daemon::db::task_board) async fn has_active_dispatch_reservation_i
     .fetch_one(transaction.as_mut())
     .await
     .map_err(|error| db_error(format!("check task board dispatch reservation: {error}")))
-}
-
-impl AsyncDaemonDb {
-    pub(crate) async fn begin_task_board_dispatch_compensation(
-        &self,
-        intent_id: &str,
-        claim_token: &str,
-        managed_worker_id: &str,
-        reason: &str,
-    ) -> Result<(), CliError> {
-        <Self as DispatchAdmissionQueries>::begin_task_board_dispatch_compensation(
-            self,
-            intent_id,
-            claim_token,
-            managed_worker_id,
-            reason,
-        )
-        .await
-    }
-
-    pub(crate) async fn task_board_dispatch_is_completed(
-        &self,
-        applied: &DispatchAppliedTask,
-    ) -> Result<bool, CliError> {
-        <Self as DispatchAdmissionQueries>::task_board_dispatch_is_completed(self, applied).await
-    }
-
-    pub(crate) async fn task_board_dispatch_completion_matches(
-        &self,
-        intent_id: &str,
-        execution_id: &str,
-        managed_worker_id: &str,
-        admission_owner_id: &str,
-        side_effect_worker_id: &str,
-        require_workflow_evidence: bool,
-    ) -> Result<bool, CliError> {
-        <Self as DispatchAdmissionQueries>::task_board_dispatch_completion_matches(
-            self,
-            intent_id,
-            execution_id,
-            managed_worker_id,
-            admission_owner_id,
-            side_effect_worker_id,
-            require_workflow_evidence,
-        )
-        .await
-    }
-
-    pub(crate) async fn task_board_dispatch_is_held(
-        &self,
-        applied: &DispatchAppliedTask,
-    ) -> Result<bool, CliError> {
-        <Self as DispatchAdmissionQueries>::task_board_dispatch_is_held(self, applied).await
-    }
-
-    pub(crate) async fn renew_task_board_dispatch_claim(
-        &self,
-        intent_id: &str,
-        claim_token: &str,
-    ) -> Result<(), CliError> {
-        <Self as DispatchAdmissionQueries>::renew_task_board_dispatch_claim(
-            self,
-            intent_id,
-            claim_token,
-        )
-        .await
-    }
-
-    pub(crate) async fn fail_task_board_dispatch(
-        &self,
-        intent_id: &str,
-        claim_token: &str,
-        consumed_approval_grant_id: Option<&str>,
-        reason: &str,
-    ) -> Result<(), CliError> {
-        <Self as DispatchAdmissionQueries>::fail_task_board_dispatch(
-            self,
-            intent_id,
-            claim_token,
-            consumed_approval_grant_id,
-            reason,
-        )
-        .await
-    }
-
-    pub(crate) async fn finalize_task_board_dispatch_compensation(
-        &self,
-        intent_id: &str,
-        claim_token: &str,
-        managed_worker_id: &str,
-        reason: &str,
-    ) -> Result<(), CliError> {
-        <Self as DispatchAdmissionQueries>::finalize_task_board_dispatch_compensation(
-            self,
-            intent_id,
-            claim_token,
-            managed_worker_id,
-            reason,
-        )
-        .await
-    }
 }
 
 /// Real implementations behind the matching [`DispatchAdmissionQueries`]

@@ -14,6 +14,7 @@ use super::{
     attempt_recovery, dependency_triage, in_progress, ingestion, lifecycle, refusal, reports,
     revision_validation,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 #[expect(
     clippy::cognitive_complexity,

@@ -11,6 +11,7 @@ use crate::daemon::db::{TaskBoardAutomationRunAdmission, TaskBoardAutomationRunL
 use crate::task_board::{
     TaskBoardAutomationRunOutcome, TaskBoardAutomationRunStage, TaskBoardAutomationRunTrigger,
 };
+use crate::daemon::db::task_board::scheduler::queries::TaskBoardAutomationSchedulerQueries;
 
 #[derive(Deserialize)]
 struct StoredStageSummary {

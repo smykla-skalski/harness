@@ -17,6 +17,7 @@ use crate::task_board::remote_wire::wire::{
     RemoteStatusResponse,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
+use crate::daemon::db::task_board::prelude::*;
 
 /// Authenticated, pinned controller-side connection to one configured executor.
 ///

@@ -6,6 +6,9 @@ use crate::task_board::{
     resolve_task_board_reviewers,
 };
 use harness_kernel::errors::CliError;
+use crate::daemon::db::task_board::dispatch_admission_queries::DispatchAdmissionQueries;
+use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
+use crate::daemon::db::task_board::orchestrator_settings_queries::OrchestratorSettingsQueries;
 
 const APPROVED_AT: &str = "2026-07-18T10:00:00Z";
 

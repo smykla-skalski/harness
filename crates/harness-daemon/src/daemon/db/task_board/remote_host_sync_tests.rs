@@ -4,6 +4,9 @@ use super::remote_assignment_test_support::{
 use super::remote_settlement_test_support::unknown_workspace_assignment;
 use super::{TaskBoardRemoteMutationOutcome, TaskBoardRemoteOfferOutcome};
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::task_board::orchestrator_settings_queries::OrchestratorSettingsQueries;
+use crate::daemon::db::task_board::remote_assignment_authority_queries::RemoteAssignmentAuthorityQueries;
+use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 
 const SETTLED_AT: &str = "2026-07-19T10:00:40Z";
 const CLEANED_AT: &str = "2026-07-19T10:00:50Z";

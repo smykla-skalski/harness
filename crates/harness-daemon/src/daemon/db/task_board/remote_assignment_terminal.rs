@@ -15,7 +15,6 @@ use super::remote_operation_trust::{
     TaskBoardRemoteOperationKind, TaskBoardRemoteOperationTrustFence,
     consume_successor_recovery_operation_trust_in_tx,
 };
-use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardRemoteAssignmentState;
 use crate::task_board::remote_wire::wire::{
@@ -50,20 +49,6 @@ const PREDECESSOR_ACCEPTANCE_LABELS: OfferScreenLabels = OfferScreenLabels {
 };
 
 impl AsyncDaemonDb {
-    pub(crate) async fn record_task_board_remote_offer_response(
-        &self,
-        response: &RemoteOfferResponse,
-        authenticated_principal: &str,
-        observed_at: &str,
-    ) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
-        <Self as RemoteExecutionQueries>::record_task_board_remote_offer_response(
-            self,
-            response,
-            authenticated_principal,
-            observed_at,
-        )
-        .await
-    }
     pub(crate) async fn record_task_board_remote_predecessor_offer_acceptance(
         &self,
         response: &RemoteOfferResponse,

@@ -25,7 +25,6 @@ use super::remote_operation_trust::{
 use super::remote_outbound_sources::{
     exact_outbound_source_content_in_tx, persist_outbound_source_in_tx,
 };
-use super::remote_source_bundle_queries::RemoteSourceBundleQueries;
 use super::remote_source_bundle_reassignment_evidence::{
     SourceReassignmentEvidence, require_reassignment_evidence_in_tx,
 };
@@ -55,36 +54,6 @@ pub(crate) struct TaskBoardRemoteSourceOfferReassignment<'a> {
     pub(crate) trust: &'a TaskBoardRemoteOperationTrustFence,
     pub(crate) offered_at: &'a str,
     pub(crate) lease_expires_at: &'a str,
-}
-
-impl AsyncDaemonDb {
-    pub(crate) async fn reassign_abandoned_task_board_remote_source_bundle_offer(
-        &self,
-        reassignment: &TaskBoardRemoteSourceOfferReassignment<'_>,
-        abandonment_request: &RemoteSourceBundleAbandonRequest,
-        abandonment_response: &RemoteSourceBundleAbandonResponse,
-    ) -> Result<TaskBoardRemoteOfferOutcome, CliError> {
-        <Self as RemoteSourceBundleQueries>::reassign_abandoned_task_board_remote_source_bundle_offer(
-            self,
-            reassignment,
-            abandonment_request,
-            abandonment_response,
-        )
-        .await
-    }
-
-    pub(super) async fn reassign_task_board_remote_source_bundle_offer(
-        &self,
-        reassignment: &TaskBoardRemoteSourceOfferReassignment<'_>,
-        evidence: SourceReassignmentEvidence<'_>,
-    ) -> Result<TaskBoardRemoteOfferOutcome, CliError> {
-        <Self as RemoteSourceBundleQueries>::reassign_task_board_remote_source_bundle_offer(
-            self,
-            reassignment,
-            evidence,
-        )
-        .await
-    }
 }
 
 pub(super) async fn reassign_abandoned_task_board_remote_source_bundle_offer(

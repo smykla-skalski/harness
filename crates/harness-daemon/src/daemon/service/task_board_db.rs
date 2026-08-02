@@ -23,6 +23,7 @@ use crate::workspace::utc_now;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::task_board::load_live_spawn_grants;
+use crate::daemon::db::task_board::prelude::*;
 
 pub(crate) use crate::task_board::external::{
     TaskBoardSyncCoordinatorFence, TaskBoardSyncCoordinatorFenceDecision,

@@ -22,6 +22,7 @@ use crate::daemon::protocol::{CodexRunMode, CodexRunRequest};
 use crate::session::types::{CONTROL_PLANE_ACTOR_ID, SessionRole};
 use crate::task_board::{TaskBoardTriageEscalationConfig, render_triage_escalation_prompt};
 use harness_kernel::errors::{CliError, CliErrorKind};
+use crate::daemon::db::task_board::prelude::*;
 
 const TICK_INTERVAL: Duration = Duration::from_secs(5);
 const SCRATCH_DIR_NAME: &str = "triage-escalation-scratch";

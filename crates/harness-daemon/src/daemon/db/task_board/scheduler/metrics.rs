@@ -1,7 +1,6 @@
 use chrono::Utc;
 use sqlx::query_as;
 
-use super::queries::TaskBoardAutomationSchedulerQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardAutomationMetrics;
 
@@ -15,14 +14,6 @@ struct AutomationMetricsRow {
     runs_failed: i64,
     runs_cancelled: i64,
     open_conflicts: i64,
-}
-
-impl AsyncDaemonDb {
-    pub(crate) async fn task_board_automation_metrics(
-        &self,
-    ) -> Result<TaskBoardAutomationMetrics, CliError> {
-        <Self as TaskBoardAutomationSchedulerQueries>::task_board_automation_metrics(self).await
-    }
 }
 
 pub(super) async fn task_board_automation_metrics(

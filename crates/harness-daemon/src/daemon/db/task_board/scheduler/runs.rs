@@ -10,7 +10,6 @@ use super::audit::{
     broadcast_automation_audits, insert_automation_audit, parse_scope, terminal_event_type,
 };
 use super::control::{TaskBoardAutomationControlRecord, ensure_control_row, load_control_in_tx};
-use super::queries::TaskBoardAutomationSchedulerQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::daemon::protocol::HarnessMonitorAuditEvent;
 use crate::task_board::{
@@ -72,43 +71,6 @@ enum RunAdmissionDecision {
         admission: TaskBoardAutomationRunAdmission,
         context: &'static str,
     },
-}
-
-impl AsyncDaemonDb {
-    pub(crate) async fn try_acquire_task_board_automation_run(
-        &self,
-        request: &TaskBoardRunAcquireRequest,
-    ) -> Result<TaskBoardAutomationRunAdmission, CliError> {
-        <Self as TaskBoardAutomationSchedulerQueries>::try_acquire_task_board_automation_run(
-            self, request,
-        )
-        .await
-    }
-
-    pub(crate) async fn heartbeat_task_board_automation_run(
-        &self,
-        lease: &TaskBoardAutomationRunLease,
-        now: DateTime<Utc>,
-    ) -> Result<TaskBoardAutomationRunFence, CliError> {
-        <Self as TaskBoardAutomationSchedulerQueries>::heartbeat_task_board_automation_run(
-            self, lease, now,
-        )
-        .await
-    }
-
-    pub(crate) async fn finalize_task_board_automation_run(
-        &self,
-        lease: &TaskBoardAutomationRunLease,
-        outcome: TaskBoardAutomationRunOutcome,
-        error_kind: Option<&str>,
-        error: Option<&str>,
-        now: DateTime<Utc>,
-    ) -> Result<TaskBoardAutomationRunOutcome, CliError> {
-        <Self as TaskBoardAutomationSchedulerQueries>::finalize_task_board_automation_run(
-            self, lease, outcome, error_kind, error, now,
-        )
-        .await
-    }
 }
 
 pub(super) async fn try_acquire_task_board_automation_run(

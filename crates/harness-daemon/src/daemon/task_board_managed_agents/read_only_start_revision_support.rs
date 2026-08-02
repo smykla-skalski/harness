@@ -1,6 +1,7 @@
 //! Shared durable-state helpers for managed read-only start tests
 
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::task_board::prelude::*;
 
 pub(super) async fn bump_settings_revision(db: &AsyncDaemonDb) {
     let mut settings = db

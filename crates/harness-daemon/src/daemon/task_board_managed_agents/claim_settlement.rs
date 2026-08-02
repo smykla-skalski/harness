@@ -9,6 +9,7 @@ use super::{
     recover_same_applied_worker, start_worker_for_applied_task_in_lane, stop_worker_in_lane,
     validate_workflow_launch,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 pub(crate) async fn settle_claimed_task_board_worker(
     state: &DaemonHttpState,

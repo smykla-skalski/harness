@@ -3,7 +3,6 @@ use uuid::Uuid;
 
 use super::ITEMS_CHANGE_SCOPE;
 use super::admission_lifecycle::TaskBoardAdmissionCheck;
-use super::dispatch_admission_queries::DispatchAdmissionQueries;
 use super::dispatch_admission_tx_ext::TaskBoardDispatchAdmissionTxExt;
 use super::dispatch_intents::{
     ClaimedTaskBoardDispatch, TaskBoardDispatchClaimAction, decode_applied,
@@ -16,12 +15,13 @@ use super::items::bump_change_in_tx;
 use super::lane_order::{
     LaneTransitionKind, record_lane_transition_audit_in_tx, replace_with_lane_transition_in_tx,
 };
-use crate::daemon::db::{AsyncDaemonDb, CliError, CliErrorKind, db_error, utc_now};
+#[cfg(test)]
+use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::{CliError, CliErrorKind, db_error, utc_now};
 use crate::task_board::policy_graph::PolicyCanvasWorkspace;
 use crate::task_board::{
-    DispatchAppliedTask, PolicyAction, PolicyDecision, SpawnGateSwitches,
-    TaskBoardHeldDispatchSummary, TaskBoardItem, consumed_grant_id, dispatch_policy_from_graph,
-    rendered_worker_prompt,
+    DispatchAppliedTask, PolicyAction, PolicyDecision, SpawnGateSwitches, TaskBoardItem,
+    consumed_grant_id, dispatch_policy_from_graph, rendered_worker_prompt,
 };
 use harness_policy_graph_store::{
     consume_approval_grant_in_tx_at, live_approval_grant_in_tx_at, load_workspace_in_tx,
@@ -46,31 +46,6 @@ pub(crate) struct HeldTaskBoardDispatch {
 pub(crate) struct ClaimedHeldTaskBoardDispatch {
     pub(crate) claim: ClaimedTaskBoardDispatch,
     pub(crate) rendered_prompt: String,
-}
-
-impl AsyncDaemonDb {
-    pub(crate) async fn held_task_board_dispatch_summary(
-        &self,
-    ) -> Result<TaskBoardHeldDispatchSummary, CliError> {
-        <Self as DispatchAdmissionQueries>::held_task_board_dispatch_summary(self).await
-    }
-
-    pub(crate) async fn held_task_board_dispatch(
-        &self,
-        board_item_id: &str,
-    ) -> Result<HeldTaskBoardDispatch, CliError> {
-        <Self as DispatchAdmissionQueries>::held_task_board_dispatch(self, board_item_id).await
-    }
-
-    /// Atomically re-evaluate current spawn policy, consume any one-shot grant,
-    /// and claim a held intent immediately before worker startup.
-    pub(crate) async fn claim_held_task_board_dispatch(
-        &self,
-        board_item_id: &str,
-    ) -> Result<ClaimedHeldTaskBoardDispatch, CliError> {
-        <Self as DispatchAdmissionQueries>::claim_held_task_board_dispatch(self, board_item_id)
-            .await
-    }
 }
 
 // Real implementations behind the matching `DispatchAdmissionQueries` methods

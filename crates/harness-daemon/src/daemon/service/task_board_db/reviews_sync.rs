@@ -18,6 +18,7 @@ use crate::task_board::{
     TaskBoardWorkflowKind, normalize_repository_slug, sync_external_tasks,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
+use crate::daemon::db::task_board::prelude::*;
 
 pub(super) struct SharedReviewRequestClient {
     repository: String,

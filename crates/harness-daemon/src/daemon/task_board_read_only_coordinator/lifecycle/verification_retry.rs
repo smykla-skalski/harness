@@ -11,6 +11,7 @@ use crate::task_board::{
 use harness_kernel::errors::CliError;
 
 use super::invalid_transition;
+use crate::daemon::db::task_board::prelude::*;
 
 pub(super) async fn schedule_publish_verification_retry(
     db: &AsyncDaemonDb,

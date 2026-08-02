@@ -5,35 +5,7 @@
 
 use sqlx::query_scalar;
 
-use super::super::remote_assignment_authority_queries::RemoteAssignmentAuthorityQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
-
-impl AsyncDaemonDb {
-    /// Conservatively fences local work while any unresolved controller generation exists.
-    ///
-    /// An older claimed worker can still produce side effects after workflow ownership advances,
-    /// so only dedicated terminal or fallback settlement releases this execution-wide fence.
-    pub(crate) async fn task_board_execution_has_active_remote_assignment(
-        &self,
-        execution_id: &str,
-    ) -> Result<bool, CliError> {
-        <Self as RemoteAssignmentAuthorityQueries>::task_board_execution_has_active_remote_assignment(
-            self, execution_id,
-        )
-        .await
-    }
-
-    pub(crate) async fn task_board_execution_generation_has_active_remote_assignment(
-        &self,
-        execution_id: &str,
-        fencing_epoch: u64,
-    ) -> Result<bool, CliError> {
-        <Self as RemoteAssignmentAuthorityQueries>::task_board_execution_generation_has_active_remote_assignment(
-            self, execution_id, fencing_epoch,
-        )
-        .await
-    }
-}
 
 pub(in super::super) async fn task_board_execution_has_active_remote_assignment(
     db: &AsyncDaemonDb,

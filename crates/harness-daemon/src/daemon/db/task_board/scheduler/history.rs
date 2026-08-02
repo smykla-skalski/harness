@@ -1,7 +1,6 @@
 use chrono::{DateTime, Duration, Utc};
 use sqlx::{QueryBuilder, Sqlite, SqliteConnection, Transaction, query, query_as};
 
-use super::queries::TaskBoardAutomationSchedulerQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::{
     TaskBoardAutomationHistoryRequest, TaskBoardAutomationHistoryResponse,
@@ -45,32 +44,6 @@ struct RunRecordRow {
 struct HistoryCursor {
     completed_at: String,
     run_id: String,
-}
-
-impl AsyncDaemonDb {
-    pub(crate) async fn active_task_board_automation_run(
-        &self,
-    ) -> Result<Option<TaskBoardAutomationRunInfo>, CliError> {
-        <Self as TaskBoardAutomationSchedulerQueries>::active_task_board_automation_run(self).await
-    }
-
-    pub(crate) async fn task_board_automation_history(
-        &self,
-        request: &TaskBoardAutomationHistoryRequest,
-    ) -> Result<TaskBoardAutomationHistoryResponse, CliError> {
-        <Self as TaskBoardAutomationSchedulerQueries>::task_board_automation_history(self, request)
-            .await
-    }
-
-    pub(crate) async fn task_board_automation_run_detail(
-        &self,
-        run_id: &str,
-    ) -> Result<Option<TaskBoardAutomationRunDetail>, CliError> {
-        <Self as TaskBoardAutomationSchedulerQueries>::task_board_automation_run_detail(
-            self, run_id,
-        )
-        .await
-    }
 }
 
 pub(super) async fn active_task_board_automation_run(

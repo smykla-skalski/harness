@@ -3,81 +3,8 @@ use std::path::Path;
 use sqlx::{query, query_as};
 use uuid::Uuid;
 
-use super::import_lifecycle_queries::ImportLifecycleQueries;
 use super::imports::TaskBoardImportMarker;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
-
-impl AsyncDaemonDb {
-    pub(crate) async fn task_board_instance_id(&self) -> Result<String, CliError> {
-        <Self as ImportLifecycleQueries>::task_board_instance_id(self).await
-    }
-
-    pub(crate) async fn task_board_import_marker(
-        &self,
-        source_kind: &str,
-    ) -> Result<Option<TaskBoardImportMarker>, CliError> {
-        <Self as ImportLifecycleQueries>::task_board_import_marker(self, source_kind).await
-    }
-
-    pub(crate) async fn task_board_revision(&self) -> Result<i64, CliError> {
-        <Self as ImportLifecycleQueries>::task_board_revision(self).await
-    }
-
-    pub(crate) async fn pending_task_board_secret_handoff(
-        &self,
-    ) -> Result<Option<TaskBoardImportMarker>, CliError> {
-        <Self as ImportLifecycleQueries>::pending_task_board_secret_handoff(self).await
-    }
-
-    pub(crate) async fn completed_task_board_secret_handoff(
-        &self,
-    ) -> Result<Option<TaskBoardImportMarker>, CliError> {
-        <Self as ImportLifecycleQueries>::completed_task_board_secret_handoff(self).await
-    }
-
-    pub(crate) async fn task_board_secret_handoff(
-        &self,
-        migration_id: &str,
-    ) -> Result<Option<TaskBoardImportMarker>, CliError> {
-        <Self as ImportLifecycleQueries>::task_board_secret_handoff(self, migration_id).await
-    }
-
-    pub(crate) async fn acknowledge_task_board_secret_handoff(
-        &self,
-        migration_id: &str,
-        digest: &str,
-    ) -> Result<(), CliError> {
-        <Self as ImportLifecycleQueries>::acknowledge_task_board_secret_handoff(
-            self,
-            migration_id,
-            digest,
-        )
-        .await
-    }
-
-    pub(crate) async fn complete_task_board_secret_handoff(
-        &self,
-        migration_id: &str,
-    ) -> Result<(), CliError> {
-        <Self as ImportLifecycleQueries>::complete_task_board_secret_handoff(self, migration_id)
-            .await
-    }
-
-    pub(crate) async fn mark_task_board_archive_complete(
-        &self,
-        source_kind: &str,
-        archive_path: &Path,
-        archived_at: &str,
-    ) -> Result<(), CliError> {
-        <Self as ImportLifecycleQueries>::mark_task_board_archive_complete(
-            self,
-            source_kind,
-            archive_path,
-            archived_at,
-        )
-        .await
-    }
-}
 
 /// Real implementation behind [`ImportLifecycleQueries::task_board_instance_id`].
 pub(super) async fn task_board_instance_id(db: &AsyncDaemonDb) -> Result<String, CliError> {

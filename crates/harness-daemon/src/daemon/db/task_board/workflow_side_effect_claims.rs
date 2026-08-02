@@ -20,7 +20,6 @@ use super::remote_assignment_fencing::RemoteAssignmentFencing;
 use super::workflow_execution_attempts::{
     attempt_cas_matches, attempt_identity_matches, update_attempt_in_tx, validate_attempt_phase,
 };
-use super::workflow_execution_queries::WorkflowExecutionQueries;
 use super::workflow_execution_revisions::live_execution_revision_mismatch_in_tx;
 use super::workflow_executions::{cas_mismatch, load_execution_in_tx, update_execution_in_tx};
 use super::workflow_first_start_admission::{
@@ -30,25 +29,6 @@ use super::workflow_first_start_admission::{
 enum SideEffectClaimDisposition {
     Claim,
     AlreadyClaimed,
-}
-
-impl AsyncDaemonDb {
-    pub(crate) async fn claim_task_board_workflow_side_effect(
-        &self,
-        expected_execution: &TaskBoardWorkflowExecutionCas,
-        expected_attempt: &TaskBoardExecutionAttemptCas,
-        claimed_attempt: &TaskBoardExecutionAttemptRecord,
-        now: &str,
-    ) -> Result<Option<TaskBoardExecutionAttemptRecord>, CliError> {
-        <Self as WorkflowExecutionQueries>::claim_task_board_workflow_side_effect(
-            self,
-            expected_execution,
-            expected_attempt,
-            claimed_attempt,
-            now,
-        )
-        .await
-    }
 }
 
 pub(super) async fn claim_task_board_workflow_side_effect(

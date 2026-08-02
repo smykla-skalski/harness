@@ -22,20 +22,6 @@ use crate::task_board::remote_wire::wire::{
 };
 
 impl AsyncDaemonDb {
-    pub(crate) async fn claim_task_board_remote_assignment(
-        &self,
-        request: &RemoteClaimRequest,
-        authenticated_principal: &str,
-        claimed_at: &str,
-    ) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
-        <Self as RemoteExecutionQueries>::claim_task_board_remote_assignment(
-            self,
-            request,
-            authenticated_principal,
-            claimed_at,
-        )
-        .await
-    }
 
     pub(crate) async fn mark_task_board_remote_assignment_running(
         &self,

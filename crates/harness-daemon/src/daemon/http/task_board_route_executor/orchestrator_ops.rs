@@ -21,6 +21,7 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::super::{DaemonHttpState, require_async_db};
 use super::run_blocking;
+use crate::daemon::db::task_board::prelude::*;
 
 pub(crate) async fn orchestrator_status(
     state: &DaemonHttpState,

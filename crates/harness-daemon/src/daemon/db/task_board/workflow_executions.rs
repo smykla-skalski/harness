@@ -3,7 +3,6 @@ use sqlx::{Sqlite, Transaction, query, query_as, query_scalar};
 use super::ORCHESTRATOR_CHANGE_SCOPE;
 use super::items::bump_change_in_tx;
 use super::remote_assignment_fencing::RemoteAssignmentFencing;
-use super::workflow_execution_queries::WorkflowExecutionQueries;
 use super::workflow_execution_attempts::load_execution_attempts_in_tx;
 use super::workflow_execution_rows::{WorkflowExecutionRow, execution_json, label, phase_label};
 use crate::daemon::db::{AsyncDaemonDb, CliError, CliErrorKind, db_error};
@@ -62,48 +61,6 @@ fn validate_new_workflow_execution_input(
         return Err(db_error("new workflow execution cannot contain attempts"));
     }
     Ok(())
-}
-
-impl AsyncDaemonDb {
-    pub(crate) async fn create_or_load_task_board_workflow_execution(
-        &self,
-        proposed: &TaskBoardWorkflowExecutionRecord,
-    ) -> Result<TaskBoardWorkflowExecutionCreateOutcome, CliError> {
-        <Self as WorkflowExecutionQueries>::create_or_load_task_board_workflow_execution(
-            self, proposed,
-        )
-        .await
-    }
-
-    pub(crate) async fn task_board_workflow_execution(
-        &self,
-        execution_id: &str,
-    ) -> Result<Option<TaskBoardWorkflowExecutionRecord>, CliError> {
-        <Self as WorkflowExecutionQueries>::task_board_workflow_execution(self, execution_id).await
-    }
-
-    pub(crate) async fn active_task_board_workflow_execution(
-        &self,
-        item_id: &str,
-    ) -> Result<Option<TaskBoardWorkflowExecutionRecord>, CliError> {
-        <Self as WorkflowExecutionQueries>::active_task_board_workflow_execution(self, item_id)
-            .await
-    }
-
-    pub(crate) async fn compare_and_set_task_board_workflow_execution(
-        &self,
-        expected: &TaskBoardWorkflowExecutionCas,
-        updated: &TaskBoardWorkflowExecutionRecord,
-    ) -> Result<TaskBoardWorkflowExecutionCasOutcome, CliError> {
-        <Self as WorkflowExecutionQueries>::compare_and_set_task_board_workflow_execution(
-            self, expected, updated,
-        )
-        .await
-    }
-
-    pub(crate) async fn task_board_configuration_revision(&self) -> Result<u64, CliError> {
-        <Self as WorkflowExecutionQueries>::task_board_configuration_revision(self).await
-    }
 }
 
 pub(super) async fn create_or_load_task_board_workflow_execution(

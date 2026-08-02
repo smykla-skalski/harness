@@ -7,6 +7,7 @@ use crate::task_board::{
 
 use super::fixture::{NOW, RETRY_AT, seed_execution_with_reviewer_runtime};
 use super::runtime::FakeReadOnlyRuntime;
+use crate::daemon::db::task_board::prelude::*;
 
 #[path = "openrouter/support.rs"]
 mod support;

@@ -19,7 +19,6 @@
 use sqlx::{Sqlite, Transaction, query, query_as, query_scalar};
 
 use super::ITEMS_CHANGE_SCOPE;
-use super::item_core_queries::ItemCoreQueries;
 use super::item_tx_ext::TaskBoardItemTxExt;
 use super::lane_order::{LaneTransitionWrite, record_lane_transition_audit_in_tx};
 use super::mapper::item_from_rows;
@@ -104,53 +103,6 @@ enum TaskBoardTriageIngress {
 pub(super) enum TaskBoardMutationKind {
     Create,
     Update,
-}
-
-impl AsyncDaemonDb {
-    /// Load one Task Board item, including tombstones.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] when the item does not exist or the load fails.
-    pub async fn task_board_item(&self, item_id: &str) -> Result<TaskBoardItem, CliError> {
-        <Self as ItemCoreQueries>::task_board_item(self, item_id).await
-    }
-
-    /// Load one Task Board item with the row revision used by automation CAS.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] when the item does not exist or the load fails.
-    pub async fn task_board_item_snapshot(
-        &self,
-        item_id: &str,
-    ) -> Result<TaskBoardItemSnapshot, CliError> {
-        <Self as ItemCoreQueries>::task_board_item_snapshot(self, item_id).await
-    }
-
-    /// Like [`task_board_item`], but returns `Ok(None)` for a genuinely
-    /// missing item instead of an error. See
-    /// [`ItemCoreQueries::find_task_board_item`] for the full contract.
-    pub(crate) async fn find_task_board_item(
-        &self,
-        item_id: &str,
-    ) -> Result<Option<TaskBoardItem>, CliError> {
-        <Self as ItemCoreQueries>::find_task_board_item(self, item_id).await
-    }
-
-    /// List active Task Board items in the legacy stable ordering.
-    pub(crate) async fn list_task_board_items(
-        &self,
-        status: Option<TaskBoardStatus>,
-    ) -> Result<Vec<TaskBoardItem>, CliError> {
-        <Self as ItemCoreQueries>::list_task_board_items(self, status).await
-    }
-
-    /// Tombstone one Task Board item.
-    pub(crate) async fn delete_task_board_item(
-        &self,
-        item_id: &str,
-    ) -> Result<TaskBoardMutation, CliError> {
-        <Self as ItemCoreQueries>::delete_task_board_item(self, item_id).await
-    }
 }
 
 pub(crate) async fn task_board_item(

@@ -8,7 +8,6 @@ use super::remote_assignment_fencing::{RemoteAssignmentFencing, RemoteTargetStop
 use super::workflow_execution_attempts::{
     attempt_cas_matches, validate_atomic_execution_attempt_update,
 };
-use super::workflow_execution_queries::WorkflowExecutionQueries;
 use super::workflow_executions::{cas_mismatch, load_execution_in_tx, update_execution_in_tx};
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::daemon::protocol::HarnessMonitorAuditEvent;
@@ -20,31 +19,6 @@ use crate::task_board::{
 pub(crate) struct AuditedRemoteCancelCasOutcome {
     pub(crate) record: Option<TaskBoardWorkflowExecutionRecord>,
     pub(crate) audit_inserted: bool,
-}
-
-impl AsyncDaemonDb {
-    pub(crate) async fn compare_and_set_task_board_remote_cancel_with_audit(
-        &self,
-        expected_execution: &TaskBoardWorkflowExecutionCas,
-        target: &TaskBoardAutomationCancelTarget,
-        updated_execution: &TaskBoardWorkflowExecutionRecord,
-        expected_attempt: &TaskBoardExecutionAttemptCas,
-        updated_attempt: &TaskBoardExecutionAttemptRecord,
-        audit: &HarnessMonitorAuditEvent,
-    ) -> Result<AuditedRemoteCancelCasOutcome, CliError> {
-        Box::pin(
-            <Self as WorkflowExecutionQueries>::compare_and_set_task_board_remote_cancel_with_audit(
-                self,
-                expected_execution,
-                target,
-                updated_execution,
-                expected_attempt,
-                updated_attempt,
-                audit,
-            ),
-        )
-        .await
-    }
 }
 
 pub(super) async fn compare_and_set_task_board_remote_cancel_with_audit(

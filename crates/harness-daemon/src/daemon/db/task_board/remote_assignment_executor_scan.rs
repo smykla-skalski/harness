@@ -1,6 +1,5 @@
 use sqlx::{Sqlite, Transaction, query, query_as};
 
-use super::remote_assignment_executor_lifecycle_queries::RemoteAssignmentExecutorLifecycleQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 
 const ACTIVE_QUEUE: &str = "task_board_remote_executor_active";
@@ -38,18 +37,6 @@ impl ScanClass {
             Self::Active => "active",
             Self::Terminal => "terminal",
         }
-    }
-}
-
-impl AsyncDaemonDb {
-    /// Selects bounded, restart-fair executor work and durably advances both cursors.
-    pub(crate) async fn scan_task_board_remote_executor_assignments(
-        &self,
-    ) -> Result<TaskBoardRemoteExecutorScan, CliError> {
-        <Self as RemoteAssignmentExecutorLifecycleQueries>::scan_task_board_remote_executor_assignments(
-            self,
-        )
-        .await
     }
 }
 

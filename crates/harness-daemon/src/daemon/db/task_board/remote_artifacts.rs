@@ -9,7 +9,6 @@ use super::remote_operation_trust::{
     TaskBoardRemoteOperationKind, TaskBoardRemoteOperationTrustFence,
     claim_controller_operation_trust_in_tx,
 };
-use super::remote_source_bundle_queries::RemoteSourceBundleQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::remote_wire::wire::{
     RemoteArtifactEntry, RemoteArtifactFetchRequest, RemoteArtifactFetchResponse,
@@ -66,20 +65,6 @@ impl TaskBoardRemoteArtifact {
             && self.offer_request_sha256 == request.offer_request_sha256
             && self.artifact.relative_path == request.relative_path
             && self.artifact.sha256 == request.expected_sha256
-    }
-}
-
-impl AsyncDaemonDb {
-    pub(crate) async fn claim_task_board_remote_artifact_fetch_io_authority_fenced(
-        &self,
-        request: &RemoteArtifactFetchRequest,
-        authenticated_principal: &str,
-        trust: &TaskBoardRemoteOperationTrustFence,
-    ) -> Result<bool, CliError> {
-        <Self as RemoteSourceBundleQueries>::claim_task_board_remote_artifact_fetch_io_authority_fenced(
-            self, request, authenticated_principal, trust,
-        )
-        .await
     }
 }
 
@@ -167,28 +152,6 @@ async fn store_or_reuse_artifact_row_in_tx(
     )
     .await?
     .ok_or_else(|| db_error("persisted remote artifact disappeared"))
-}
-
-impl AsyncDaemonDb {
-    pub(crate) async fn store_task_board_remote_artifact(
-        &self,
-        input: &TaskBoardRemoteArtifactStoreInput<'_>,
-    ) -> Result<TaskBoardRemoteArtifact, CliError> {
-        <Self as RemoteSourceBundleQueries>::store_task_board_remote_artifact(self, input).await
-    }
-
-    pub(crate) async fn task_board_remote_artifact(
-        &self,
-        request: &RemoteArtifactFetchRequest,
-        authenticated_principal: &str,
-    ) -> Result<Option<TaskBoardRemoteArtifact>, CliError> {
-        <Self as RemoteSourceBundleQueries>::task_board_remote_artifact(
-            self,
-            request,
-            authenticated_principal,
-        )
-        .await
-    }
 }
 
 pub(super) async fn store_task_board_remote_artifact(

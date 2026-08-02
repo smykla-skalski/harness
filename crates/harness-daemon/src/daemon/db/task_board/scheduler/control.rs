@@ -3,7 +3,6 @@ use sqlx::{Sqlite, Transaction, query, query_as};
 
 use super::super::ORCHESTRATOR_CHANGE_SCOPE;
 use super::super::items::bump_change_in_tx;
-use super::queries::TaskBoardAutomationSchedulerQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::{
     TaskBoardAutomationAdmissionState, TaskBoardAutomationDesiredMode,
@@ -27,82 +26,6 @@ impl Default for TaskBoardAutomationControlRecord {
             stop_generation: 0,
             updated_at: String::new(),
         }
-    }
-}
-
-impl AsyncDaemonDb {
-    pub(crate) async fn initialize_task_board_automation_control_from_legacy_intent(
-        &self,
-        desired_mode: TaskBoardAutomationDesiredMode,
-        now: DateTime<Utc>,
-    ) -> Result<TaskBoardAutomationControlRecord, CliError> {
-        <Self as TaskBoardAutomationSchedulerQueries>::initialize_task_board_automation_control_from_legacy_intent(
-            self, desired_mode, now,
-        )
-        .await
-    }
-
-    pub(crate) async fn task_board_automation_control(
-        &self,
-    ) -> Result<TaskBoardAutomationControlRecord, CliError> {
-        <Self as TaskBoardAutomationSchedulerQueries>::task_board_automation_control(self).await
-    }
-
-    pub(crate) async fn start_task_board_automation(
-        &self,
-        desired_mode: TaskBoardAutomationDesiredMode,
-        now: DateTime<Utc>,
-    ) -> Result<TaskBoardAutomationControlRecord, CliError> {
-        <Self as TaskBoardAutomationSchedulerQueries>::start_task_board_automation(
-            self,
-            desired_mode,
-            now,
-        )
-        .await
-    }
-
-    pub(crate) async fn start_task_board_automation_with_wake(
-        &self,
-        desired_mode: TaskBoardAutomationDesiredMode,
-        wake: &TaskBoardAutomationWakeRequest,
-        now: DateTime<Utc>,
-    ) -> Result<TaskBoardAutomationControlRecord, CliError> {
-        <Self as TaskBoardAutomationSchedulerQueries>::start_task_board_automation_with_wake(
-            self,
-            desired_mode,
-            wake,
-            now,
-        )
-        .await
-    }
-
-    pub(crate) async fn replace_task_board_orchestrator_settings_for_automation(
-        &self,
-        settings: &TaskBoardOrchestratorSettings,
-        desired_mode: TaskBoardAutomationDesiredMode,
-        now: DateTime<Utc>,
-    ) -> Result<i64, CliError> {
-        <Self as TaskBoardAutomationSchedulerQueries>::replace_task_board_orchestrator_settings_for_automation(
-            self, settings, desired_mode, now,
-        )
-        .await
-    }
-
-    pub(crate) async fn stop_task_board_automation(
-        &self,
-        now: DateTime<Utc>,
-    ) -> Result<TaskBoardAutomationControlRecord, CliError> {
-        <Self as TaskBoardAutomationSchedulerQueries>::stop_task_board_automation(self, now).await
-    }
-
-    pub(crate) async fn finish_task_board_automation_drain_if_idle(
-        &self,
-        now: DateTime<Utc>,
-    ) -> Result<TaskBoardAutomationControlRecord, CliError> {
-        <Self as TaskBoardAutomationSchedulerQueries>::finish_task_board_automation_drain_if_idle(
-            self, now,
-        )
-        .await
     }
 }
 

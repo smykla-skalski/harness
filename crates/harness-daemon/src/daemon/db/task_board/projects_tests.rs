@@ -6,6 +6,7 @@ use crate::task_board::project_color::TaskBoardProjectColor;
 use crate::task_board::project_shape::TaskBoardProjectShape;
 
 use super::{ColorEdit, DisplayNameEdit, ProjectEdit};
+use crate::daemon::db::task_board::project_registry_queries::ProjectRegistryQueries;
 
 async fn database() -> (tempfile::TempDir, AsyncDaemonDb) {
     let directory = tempdir().expect("tempdir");

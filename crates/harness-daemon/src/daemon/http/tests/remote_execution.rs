@@ -29,6 +29,7 @@ use crate::task_board::{
 };
 
 use super::test_http_state_with_db;
+use crate::daemon::db::task_board::prelude::*;
 
 const HOST_ID: &str = "executor-a";
 const OTHER_EXECUTOR: &str = "executor-b";

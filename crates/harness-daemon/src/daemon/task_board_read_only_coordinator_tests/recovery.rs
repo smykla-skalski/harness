@@ -7,6 +7,7 @@ use crate::task_board::{
 use super::fixture::{AttemptSeed, NOW, RETRY_AT, seed_execution};
 use super::runtime::{FakeReadOnlyRuntime, PlannedReport};
 use super::{load_execution, tick};
+use crate::daemon::db::task_board::prelude::ItemCoreQueries;
 
 #[tokio::test]
 async fn retry_wait_child_recovers_running_starting_and_pending_parents_without_launch() {

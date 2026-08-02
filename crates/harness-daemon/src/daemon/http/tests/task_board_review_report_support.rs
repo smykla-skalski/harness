@@ -6,6 +6,7 @@ use crate::task_board::{
     TaskBoardWorkflowExecutionArtifacts, TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowKind,
     TaskBoardWorkflowSnapshot, TaskBoardWorkflowStatus, start_task_board_workflow,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 pub(super) async fn seed_running_execution(
     db: &AsyncDaemonDb,

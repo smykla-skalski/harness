@@ -24,6 +24,7 @@ use super::{
     github_projection, merge_segment_repository_labels, policy, policy_event_inbox, review_item_key,
 };
 use crate::daemon::service::observe_async_db;
+use crate::daemon::db::task_board::prelude::*;
 
 /// Re-fetch a focused list of dependency update pull requests by GraphQL ID,
 /// patching matching cache entries in place and returning the refreshed items.

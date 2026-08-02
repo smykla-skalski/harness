@@ -18,41 +18,11 @@ pub(super) use pending::{decode_executor_stop_pending, stop_pending_digest};
 
 use super::ORCHESTRATOR_CHANGE_SCOPE;
 use super::items::bump_change_in_tx;
-use super::remote_assignment_executor_lifecycle_queries::RemoteAssignmentExecutorLifecycleQueries;
 use super::remote_assignment_lease::{commit_noop, finish_mutation, require_assignment};
 use super::remote_assignment_model::{
     TaskBoardRemoteMutationOutcome, canonical_time, concurrent, to_i64,
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError, TaskBoardRemoteExecutorRun, db_error};
-
-impl AsyncDaemonDb {
-    pub(crate) async fn claim_task_board_remote_executor_stop_pending<S>(
-        &self,
-        authority: &TaskBoardRemoteExecutorStopAuthority,
-        snapshot: &S,
-        reason: TaskBoardRemoteExecutorStopReason,
-        acquired_at: &str,
-    ) -> Result<Option<TaskBoardRemoteExecutorStopPending>, CliError>
-    where
-        S: Clone + Into<TaskBoardRemoteExecutorRun>,
-    {
-        <Self as RemoteAssignmentExecutorLifecycleQueries>::claim_task_board_remote_executor_stop_pending(
-            self, authority, snapshot, reason, acquired_at,
-        )
-        .await
-    }
-
-    pub(crate) async fn settle_task_board_remote_executor_stop_pending(
-        &self,
-        pending: &TaskBoardRemoteExecutorStopPending,
-        observed_at: &str,
-    ) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
-        <Self as RemoteAssignmentExecutorLifecycleQueries>::settle_task_board_remote_executor_stop_pending(
-            self, pending, observed_at,
-        )
-        .await
-    }
-}
 
 #[expect(
     clippy::cognitive_complexity,

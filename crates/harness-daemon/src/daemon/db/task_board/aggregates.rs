@@ -7,7 +7,6 @@ use serde::de::DeserializeOwned;
 use sqlx::{Sqlite, Transaction, query, query_as};
 
 use super::mapper::{machine_from_row, parse_json, to_json};
-use super::orchestrator_settings_queries::OrchestratorSettingsQueries;
 use super::projects::register_configured_repositories_in_tx;
 use super::remote_assignment_start_authority::refuse_settings_replacement_during_executor_start_io;
 use super::remote_hosts::sync_remote_hosts_in_tx;
@@ -29,95 +28,6 @@ pub(crate) struct TaskBoardOrchestratorSettingsSnapshot {
     pub(crate) settings: TaskBoardOrchestratorSettings,
     pub(crate) row_revision: i64,
     pub(crate) change_revision: i64,
-}
-
-impl AsyncDaemonDb {
-    pub(crate) async fn task_board_machines(&self) -> Result<Vec<Machine>, CliError> {
-        <Self as OrchestratorSettingsQueries>::task_board_machines(self).await
-    }
-
-    pub(crate) async fn upsert_task_board_machine(
-        &self,
-        machine: &Machine,
-    ) -> Result<(Machine, i64), CliError> {
-        <Self as OrchestratorSettingsQueries>::upsert_task_board_machine(self, machine).await
-    }
-
-    pub(crate) async fn task_board_local_machine_id(&self) -> Result<Option<String>, CliError> {
-        <Self as OrchestratorSettingsQueries>::task_board_local_machine_id(self).await
-    }
-
-    pub(crate) async fn set_task_board_local_machine(
-        &self,
-        machine: &Machine,
-    ) -> Result<(Machine, i64), CliError> {
-        <Self as OrchestratorSettingsQueries>::set_task_board_local_machine(self, machine).await
-    }
-
-    pub(crate) async fn touch_task_board_local_machine(
-        &self,
-    ) -> Result<Option<(Machine, i64)>, CliError> {
-        <Self as OrchestratorSettingsQueries>::touch_task_board_local_machine(self).await
-    }
-
-    /// `pub`, not `pub(crate)`: `harness-db-schema`'s own v43 tombstone
-    /// migration test reads and replaces the orchestrator settings row
-    /// directly to exercise a rebind scenario.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL failures.
-    pub async fn task_board_orchestrator_settings(
-        &self,
-    ) -> Result<TaskBoardOrchestratorSettings, CliError> {
-        <Self as OrchestratorSettingsQueries>::task_board_orchestrator_settings(self).await
-    }
-
-    pub(crate) async fn task_board_orchestrator_settings_snapshot(
-        &self,
-    ) -> Result<TaskBoardOrchestratorSettingsSnapshot, CliError> {
-        <Self as OrchestratorSettingsQueries>::task_board_orchestrator_settings_snapshot(self).await
-    }
-
-    /// `pub`, not `pub(crate)`: see `task_board_orchestrator_settings` above.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL failures.
-    pub async fn replace_task_board_orchestrator_settings(
-        &self,
-        settings: &TaskBoardOrchestratorSettings,
-    ) -> Result<i64, CliError> {
-        <Self as OrchestratorSettingsQueries>::replace_task_board_orchestrator_settings(
-            self, settings,
-        )
-        .await
-    }
-
-    pub(crate) async fn task_board_orchestrator_state(
-        &self,
-    ) -> Result<TaskBoardOrchestratorState, CliError> {
-        <Self as OrchestratorSettingsQueries>::task_board_orchestrator_state(self).await
-    }
-
-    pub(crate) async fn replace_task_board_orchestrator_state(
-        &self,
-        state: &TaskBoardOrchestratorState,
-    ) -> Result<i64, CliError> {
-        <Self as OrchestratorSettingsQueries>::replace_task_board_orchestrator_state(self, state)
-            .await
-    }
-
-    pub(crate) async fn task_board_runtime_config(
-        &self,
-    ) -> Result<TaskBoardGitRuntimeConfig, CliError> {
-        <Self as OrchestratorSettingsQueries>::task_board_runtime_config(self).await
-    }
-
-    pub(crate) async fn replace_task_board_runtime_config(
-        &self,
-        config: &TaskBoardGitRuntimeConfig,
-    ) -> Result<i64, CliError> {
-        <Self as OrchestratorSettingsQueries>::replace_task_board_runtime_config(self, config).await
-    }
 }
 
 /// Real implementation behind [`OrchestratorSettingsQueries::task_board_machines`].

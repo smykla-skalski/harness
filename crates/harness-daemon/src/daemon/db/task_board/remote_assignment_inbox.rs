@@ -17,7 +17,6 @@ use super::remote_offer_receipts::{
 };
 use super::remote_source_bundle_abandonment::source_offer_is_abandoned_in_tx;
 use super::remote_source_bundles::require_source_bundle_in_tx;
-use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::remote_wire::wire::RemoteOfferRequest;
 use crate::task_board::{
@@ -37,25 +36,6 @@ struct AcceptedHostOffer {
     settings_revision: i64,
     checkout_path: String,
     lease_expires_at: String,
-}
-
-impl AsyncDaemonDb {
-    pub(crate) async fn accept_task_board_remote_assignment_offer(
-        &self,
-        request: &RemoteOfferRequest,
-        authenticated_principal: &str,
-        host_instance_id: &str,
-        accepted_at: &str,
-    ) -> Result<TaskBoardRemoteOfferOutcome, CliError> {
-        <Self as RemoteExecutionQueries>::accept_task_board_remote_assignment_offer(
-            self,
-            request,
-            authenticated_principal,
-            host_instance_id,
-            accepted_at,
-        )
-        .await
-    }
 }
 
 pub(super) async fn accept_task_board_remote_assignment_offer(

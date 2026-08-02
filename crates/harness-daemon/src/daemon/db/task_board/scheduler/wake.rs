@@ -6,7 +6,6 @@ use sqlx::{QueryBuilder, Sqlite, query, query_as};
 use super::super::ORCHESTRATOR_CHANGE_SCOPE;
 use super::super::items::bump_change_in_tx;
 use super::super::mapper::{parse_json, to_json};
-use super::queries::TaskBoardAutomationSchedulerQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::{
     TASK_BOARD_AUTOMATION_WAKE_BATCH_LIMIT, TASK_BOARD_AUTOMATION_WAKE_PAYLOAD_SCHEMA_VERSION,
@@ -37,40 +36,6 @@ pub(super) struct TaskBoardAutomationWakeObservation {
 struct WakeAcknowledgementRow {
     sequence: i64,
     processed_at: Option<String>,
-}
-
-impl AsyncDaemonDb {
-    pub(crate) async fn enqueue_task_board_automation_wake_event(
-        &self,
-        request: &TaskBoardAutomationWakeRequest,
-        now: DateTime<Utc>,
-    ) -> Result<TaskBoardAutomationWakeEvent, CliError> {
-        <Self as TaskBoardAutomationSchedulerQueries>::enqueue_task_board_automation_wake_event(
-            self, request, now,
-        )
-        .await
-    }
-
-    pub(crate) async fn pending_task_board_automation_wake_events(
-        &self,
-        limit: u32,
-    ) -> Result<Vec<TaskBoardAutomationWakeEvent>, CliError> {
-        <Self as TaskBoardAutomationSchedulerQueries>::pending_task_board_automation_wake_events(
-            self, limit,
-        )
-        .await
-    }
-
-    pub(crate) async fn acknowledge_task_board_automation_wake_events(
-        &self,
-        sequences: &[u64],
-        processed_at: DateTime<Utc>,
-    ) -> Result<u64, CliError> {
-        <Self as TaskBoardAutomationSchedulerQueries>::acknowledge_task_board_automation_wake_events(
-            self, sequences, processed_at,
-        )
-        .await
-    }
 }
 
 pub(super) async fn enqueue_task_board_automation_wake_event(

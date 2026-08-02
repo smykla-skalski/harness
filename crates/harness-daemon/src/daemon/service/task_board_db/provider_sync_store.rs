@@ -14,6 +14,7 @@ use crate::task_board::{
     TaskBoardSyncStore,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
+use crate::daemon::db::task_board::prelude::*;
 
 #[async_trait]
 impl TaskBoardExternalCreateStore for AsyncDaemonDb {

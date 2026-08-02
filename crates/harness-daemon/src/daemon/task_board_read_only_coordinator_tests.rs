@@ -18,6 +18,7 @@ use crate::task_board::{
 use driver::HeadlessWorkflowDriver;
 use fixture::{FROZEN_HEAD, Fixture, NOW, admission_state, seed_execution};
 use runtime::{FakeReadOnlyRuntime, PlannedReport};
+use crate::daemon::db::task_board::prelude::*;
 
 #[tokio::test]
 async fn local_review_completes_evaluation_cleanup_and_atomic_projection() {

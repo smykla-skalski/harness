@@ -13,6 +13,7 @@ use crate::task_board::{
 };
 use harness_kernel::errors::CliError;
 use harness_policy_graph_store::consume_approval_grant_in_tx;
+use crate::daemon::db::task_board::prelude::*;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum IntentPhase {

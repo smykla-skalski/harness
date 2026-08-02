@@ -4,6 +4,7 @@ use crate::task_board::{
 
 use super::fixture::{AttemptSeed, NOW, RETRY_AT, seed_additional_execution, seed_execution};
 use super::runtime::{FakeReadOnlyRuntime, PlannedReport};
+use crate::daemon::db::task_board::prelude::*;
 
 #[tokio::test]
 async fn recovery_cursor_advances_after_no_progress() {

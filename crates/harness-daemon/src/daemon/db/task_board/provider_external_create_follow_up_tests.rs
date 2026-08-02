@@ -5,6 +5,8 @@ use crate::task_board::{
     ExternalProvider, ExternalRefProvider, ExternalSyncField, TaskBoardConflictState,
     TaskBoardExternalCreateIntent, TaskBoardExternalCreateIntentState, TaskBoardSyncConflict,
 };
+use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
+use crate::daemon::db::task_board::provider_queries::ProviderQueries;
 
 #[tokio::test]
 async fn pending_follow_up_query_is_provider_filtered_and_deterministic() {

@@ -7,6 +7,8 @@ use crate::task_board::{
     ExternalProvider, ProviderExclusionAuditContext, ProviderExclusionRestoreOutcome,
     TaskBoardConflictState, TaskBoardSyncConflict,
 };
+use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
+use crate::daemon::db::task_board::provider_queries::ProviderQueries;
 
 fn conflict(
     conflict_id: &str,

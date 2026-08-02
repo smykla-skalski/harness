@@ -8,6 +8,7 @@ use crate::task_board::{
     TaskBoardOrchestratorWorkflow, TaskBoardPhaseCapabilityProfile,
     TaskBoardRepositoryAutomationConfig,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 impl AcceptanceFixture {
     pub(super) async fn configure_matrix_controller(

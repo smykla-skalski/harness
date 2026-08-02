@@ -1,7 +1,6 @@
 use super::{
     RenewalFence, RenewalLabels, renewal_response_replayed, settle_renewal_response_in_tx,
 };
-use super::super::remote_assignment_executor_lifecycle_queries::RemoteAssignmentExecutorLifecycleQueries;
 use crate::daemon::db::TaskBoardRemoteAssignmentRecord;
 use crate::daemon::db::task_board::remote_assignment_lease::{
     commit_noop, mutation_binding_matches, renew_request_for_record, require_assignment,
@@ -16,27 +15,6 @@ use crate::daemon::db::task_board::remote_operation_trust::{
 use crate::daemon::db::{AsyncDaemonDb, CliError, TaskBoardRemoteHostTrustFence, db_error};
 use crate::task_board::TaskBoardRemoteAssignmentState;
 use crate::task_board::remote_wire::wire::{RemoteLeaseRenewRequest, RemoteLeaseRenewResponse};
-
-impl AsyncDaemonDb {
-    pub(crate) async fn record_pending_task_board_remote_assignment_lease_renewal_replay(
-        &self,
-        request: &RemoteLeaseRenewRequest,
-        response: &RemoteLeaseRenewResponse,
-        authenticated_principal: &str,
-        recorded_at: &str,
-        trust: &TaskBoardRemoteHostTrustFence,
-    ) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
-        <Self as RemoteAssignmentExecutorLifecycleQueries>::record_pending_task_board_remote_assignment_lease_renewal_replay(
-            self,
-            request,
-            response,
-            authenticated_principal,
-            recorded_at,
-            trust,
-        )
-        .await
-    }
-}
 
 pub(in super::super) async fn record_pending_task_board_remote_assignment_lease_renewal_replay(
     db: &AsyncDaemonDb,

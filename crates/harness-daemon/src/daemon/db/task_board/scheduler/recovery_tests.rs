@@ -6,6 +6,8 @@ use super::test_support::{
     acquire_request, automation_audit_count, database, fail_automation_audit_inserts, instant,
 };
 use crate::task_board::{TaskBoardAutomationDesiredMode, TaskBoardAutomationRunTrigger};
+use crate::daemon::db::task_board::import_lifecycle_queries::ImportLifecycleQueries;
+use crate::daemon::db::task_board::scheduler::queries::TaskBoardAutomationSchedulerQueries;
 
 #[tokio::test]
 async fn startup_recovery_expires_stale_run_and_publishes_revision() {

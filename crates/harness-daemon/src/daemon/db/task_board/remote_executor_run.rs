@@ -1,4 +1,3 @@
-use crate::daemon::db::task_board::remote_assignment_start_settlement_queries::RemoteAssignmentStartSettlementQueries;
 use crate::daemon::db::{
     AgentTurnRunSnapshot, AgentTurnRunStatus, AsyncDaemonDb, CliError, db_error,
 };
@@ -48,32 +47,6 @@ pub(crate) struct TaskBoardRemoteExecutorRun {
     pub(crate) updated_at: String,
     pub(crate) model: Option<String>,
     pub(crate) effort: Option<String>,
-}
-
-impl AsyncDaemonDb {
-    pub(crate) async fn task_board_remote_executor_run(
-        &self,
-        offer: &RemoteOfferRequest,
-        run_id: &str,
-    ) -> Result<Option<TaskBoardRemoteExecutorRun>, CliError> {
-        <Self as RemoteAssignmentStartSettlementQueries>::task_board_remote_executor_run(
-            self, offer, run_id,
-        )
-        .await
-    }
-
-    pub(crate) async fn task_board_remote_runtime_provenance(
-        &self,
-        execution_id: &str,
-        run_id: &str,
-    ) -> Result<Option<TaskBoardRemoteRuntimeProvenance>, CliError> {
-        <Self as RemoteAssignmentStartSettlementQueries>::task_board_remote_runtime_provenance(
-            self,
-            execution_id,
-            run_id,
-        )
-        .await
-    }
 }
 
 pub(super) async fn task_board_remote_executor_run(

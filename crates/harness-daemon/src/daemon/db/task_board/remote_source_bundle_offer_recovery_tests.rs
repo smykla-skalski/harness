@@ -19,6 +19,11 @@ use crate::task_board::{
     TaskBoardExecutionAttemptCas, TaskBoardExecutionHostAdvertisement,
     TaskBoardPhaseCapabilityProfile, TaskBoardRemoteAssignmentState, TaskBoardWorkflowExecutionCas,
 };
+use crate::daemon::db::task_board::remote_assignment_authority_queries::RemoteAssignmentAuthorityQueries;
+use crate::daemon::db::task_board::remote_assignment_start_settlement_queries::RemoteAssignmentStartSettlementQueries;
+use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
+use crate::daemon::db::task_board::remote_source_bundle_queries::RemoteSourceBundleQueries;
+use crate::daemon::db::task_board::workflow_execution_queries::WorkflowExecutionQueries;
 
 const SUCCESSOR_INSTANCE: &str = "instance-b";
 const UPLOADED_AT: &str = "2026-07-19T10:00:01Z";

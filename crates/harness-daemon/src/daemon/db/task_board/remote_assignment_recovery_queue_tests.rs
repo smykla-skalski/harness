@@ -5,6 +5,8 @@ use super::remote_assignment_test_support::{
     AFTER_EXPIRY, ControllerFixture, NOW, controller_fixture, offer_controller,
 };
 use crate::daemon::db::db_error;
+use crate::daemon::db::task_board::remote_assignment_executor_lifecycle_queries::RemoteAssignmentExecutorLifecycleQueries;
+use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 
 const REPLACED_AT: &str = "2026-07-19T10:00:01Z";
 

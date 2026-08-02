@@ -7,6 +7,7 @@ use crate::daemon::db::{
 use crate::task_board::remote_wire::wire::{
     RemoteOfferDisposition, RemoteOfferRequest, RemoteOfferResponse,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 #[derive(Debug)]
 pub(crate) enum RemotePredecessorOfferRecoveryOutcome {

@@ -5,37 +5,9 @@ use super::remote_assignment_model::{
     TaskBoardRemoteAssignmentRecord, TaskBoardRemoteMutationOutcome, canonical_time, concurrent,
     nonblank, to_i64,
 };
-use super::remote_assignment_authority_queries::RemoteAssignmentAuthorityQueries;
 use super::remote_settlement_receipts::{load_settlement_in_tx, require_exact_terminal_assignment};
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::remote_wire::wire::RemoteSettledRequest;
-
-impl AsyncDaemonDb {
-    pub(crate) async fn complete_task_board_remote_assignment_cleanup(
-        &self,
-        request: &RemoteSettledRequest,
-        authenticated_principal: &str,
-        completed_at: &str,
-    ) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
-        <Self as RemoteAssignmentAuthorityQueries>::complete_task_board_remote_assignment_cleanup(
-            self,
-            request,
-            authenticated_principal,
-            completed_at,
-        )
-        .await
-    }
-
-    pub(crate) async fn task_board_remote_executor_active_assignment_count(
-        &self,
-        host_id: &str,
-    ) -> Result<u32, CliError> {
-        <Self as RemoteAssignmentAuthorityQueries>::task_board_remote_executor_active_assignment_count(
-            self, host_id,
-        )
-        .await
-    }
-}
 
 pub(super) async fn complete_task_board_remote_assignment_cleanup(
     db: &AsyncDaemonDb,

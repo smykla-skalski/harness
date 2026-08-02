@@ -2,7 +2,6 @@ use sqlx::{Sqlite, Transaction, query, query_as, query_scalar};
 use uuid::Uuid;
 
 use super::triage_apply_agent::apply_agent_triage_verdict_in_tx;
-use super::triage_queries::TriageQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
 use crate::task_board::{
     TaskBoardTriageEscalationStatus, TaskBoardTriageEscalationVerdictOutcome, TriageVerdict,
@@ -16,85 +15,6 @@ pub(crate) struct ClaimedTaskBoardTriageEscalation {
     pub(crate) evidence_fingerprint: String,
     pub(crate) verdict_token: String,
     pub(crate) managed_run_id: String,
-}
-
-impl AsyncDaemonDb {
-    /// Apply one agent-reported verdict. See
-    /// [`TriageQueries::report_task_board_triage_escalation_verdict`] for
-    /// the full contract.
-    pub(crate) async fn report_task_board_triage_escalation_verdict(
-        &self,
-        escalation_id: &str,
-        verdict_token: &str,
-        reported_fingerprint: &str,
-        verdict: TriageVerdict,
-        rationale: &str,
-    ) -> Result<TaskBoardTriageEscalationVerdictOutcome, CliError> {
-        <Self as TriageQueries>::report_task_board_triage_escalation_verdict(
-            self,
-            escalation_id,
-            verdict_token,
-            reported_fingerprint,
-            verdict,
-            rationale,
-        )
-        .await
-    }
-
-    /// Count of currently `running` escalations, for the executor to size
-    /// its next claim batch against `max_concurrent`.
-    pub(crate) async fn count_running_task_board_triage_escalations(
-        &self,
-    ) -> Result<usize, CliError> {
-        <Self as TriageQueries>::count_running_task_board_triage_escalations(self).await
-    }
-
-    /// Claim up to `limit` `pending` rows. See
-    /// [`TriageQueries::claim_pending_task_board_triage_escalations`] for
-    /// the full contract.
-    pub(crate) async fn claim_pending_task_board_triage_escalations(
-        &self,
-        limit: usize,
-    ) -> Result<Vec<ClaimedTaskBoardTriageEscalation>, CliError> {
-        <Self as TriageQueries>::claim_pending_task_board_triage_escalations(self, limit).await
-    }
-
-    /// Sweep every `running` row whose `started_at` is older than
-    /// `timeout_seconds` to `timed_out`. See
-    /// [`TriageQueries::sweep_stale_task_board_triage_escalations`] for the
-    /// full contract.
-    pub(crate) async fn sweep_stale_task_board_triage_escalations(
-        &self,
-        timeout_seconds: u64,
-    ) -> Result<Vec<String>, CliError> {
-        <Self as TriageQueries>::sweep_stale_task_board_triage_escalations(self, timeout_seconds)
-            .await
-    }
-
-    /// Mark one `running` escalation `failed` immediately, with the real
-    /// failure reason.
-    pub(crate) async fn fail_running_task_board_triage_escalation(
-        &self,
-        escalation_id: &str,
-        failure_reason: &str,
-    ) -> Result<(), CliError> {
-        <Self as TriageQueries>::fail_running_task_board_triage_escalation(
-            self,
-            escalation_id,
-            failure_reason,
-        )
-        .await
-    }
-
-    /// The current escalation status for one item, if it has a live
-    /// (pending/running) escalation -- the only two states ever surfaced to
-    /// a reader, matching [`TaskBoardTriageEscalationStatus`]'s closed shape.
-    pub(crate) async fn task_board_triage_escalation_status_for_item(
-        &self,
-        item_id: &str,
-    ) -> Result<Option<TaskBoardTriageEscalationStatus>, CliError> {
-        <Self as TriageQueries>::task_board_triage_escalation_status_for_item(self, item_id).await
-    }
 }
 
 pub(super) async fn report_task_board_triage_escalation_verdict(

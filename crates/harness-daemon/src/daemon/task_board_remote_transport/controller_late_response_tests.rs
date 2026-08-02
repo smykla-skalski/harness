@@ -12,6 +12,7 @@ use crate::daemon::db::TaskBoardRemoteMutationOutcome;
 use crate::task_board::{
     TaskBoardAttemptState, TaskBoardExecutionState, TaskBoardRemoteAssignmentState,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 #[tokio::test]
 async fn claim_response_received_after_l1_expiry_never_exposes_running_state() {

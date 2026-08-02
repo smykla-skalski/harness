@@ -12,6 +12,7 @@ use crate::daemon::task_board_remote_transport::controller_authority_test_suppor
     TestTlsMaterial, test_tls_material,
 };
 use crate::task_board::{TaskBoardExecutionState, TaskBoardRemoteAssignmentState};
+use crate::daemon::db::task_board::prelude::*;
 
 #[test]
 fn claimed_execution_settles_safely_after_two_daemon_restart() {

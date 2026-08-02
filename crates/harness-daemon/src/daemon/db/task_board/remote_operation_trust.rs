@@ -3,7 +3,6 @@ use sqlx::{Sqlite, Transaction, query, query_as};
 use super::remote_assignment_model::{
     TaskBoardRemoteAssignmentRecord, concurrent, nonblank, to_i64,
 };
-use super::remote_assignment_authority_queries::RemoteAssignmentAuthorityQueries;
 use super::remote_lifecycle_trust::{
     TaskBoardRemoteLifecycleTrustSnapshot, load_generation_lifecycle_trust_in_tx,
 };
@@ -65,46 +64,6 @@ pub(crate) struct TaskBoardRemoteOperationTrustFence {
     pub(crate) host: TaskBoardRemoteHostTrustFence,
     pub(crate) observed_host_instance_id: String,
     pub(crate) advertisement_sha256: String,
-}
-
-impl AsyncDaemonDb {
-    pub(crate) async fn task_board_remote_operation_trust_fence(
-        &self,
-        host_id: &str,
-    ) -> Result<TaskBoardRemoteOperationTrustFence, CliError> {
-        <Self as RemoteAssignmentAuthorityQueries>::task_board_remote_operation_trust_fence(
-            self, host_id,
-        )
-        .await
-    }
-
-    pub(crate) async fn complete_task_board_remote_operation_trust(
-        &self,
-        assignment_id: &str,
-        kind: TaskBoardRemoteOperationKind,
-        request_sha256: &str,
-    ) -> Result<(), CliError> {
-        <Self as RemoteAssignmentAuthorityQueries>::complete_task_board_remote_operation_trust(
-            self,
-            assignment_id,
-            kind,
-            request_sha256,
-        )
-        .await
-    }
-
-    pub(crate) async fn task_board_remote_lifecycle_operation_trust_fence(
-        &self,
-        assignment_id: &str,
-        kind: TaskBoardRemoteOperationKind,
-    ) -> Result<TaskBoardRemoteOperationTrustFence, CliError> {
-        <Self as RemoteAssignmentAuthorityQueries>::task_board_remote_lifecycle_operation_trust_fence(
-            self,
-            assignment_id,
-            kind,
-        )
-        .await
-    }
 }
 
 pub(super) async fn task_board_remote_operation_trust_fence(

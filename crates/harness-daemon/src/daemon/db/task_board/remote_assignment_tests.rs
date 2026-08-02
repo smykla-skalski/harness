@@ -14,6 +14,8 @@ use crate::task_board::{
     TaskBoardRemoteAssignmentState, TaskBoardReviewResult, TaskBoardReviewerOutcome,
     TaskBoardWorkflowKind,
 };
+use crate::daemon::db::task_board::orchestrator_settings_queries::OrchestratorSettingsQueries;
+use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 
 const FORK_REPOSITORY: &str = "contributor/harness";
 

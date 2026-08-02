@@ -16,6 +16,7 @@ use harness_kernel::errors::CliError;
 
 use super::TaskBoardOrchestratorRunGuard;
 use super::task_board_db::TaskBoardSyncRunContext;
+use crate::daemon::db::task_board::prelude::*;
 
 pub(crate) enum TaskBoardAutomationRunStart {
     Acquired(Box<TaskBoardAutomationRunSession>),

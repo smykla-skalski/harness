@@ -18,6 +18,7 @@ use super::reports::{
     transition_attempt,
 };
 use super::requests::run_context;
+use crate::daemon::db::task_board::prelude::*;
 
 pub(super) const DEPENDENCY_TRIAGE_ACTION: &str = "dependency_triage";
 

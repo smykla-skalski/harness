@@ -5,6 +5,7 @@ use crate::daemon::db::{AsyncDaemonDb, TaskBoardRemoteMutationOutcome};
 use crate::task_board::remote_wire::wire_cleanup::{
     RemoteCleanupObservationRequest, RemoteCleanupObservationResponse,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 impl RemoteExecutionControllerClient {
     pub(crate) async fn observe_cleanup(

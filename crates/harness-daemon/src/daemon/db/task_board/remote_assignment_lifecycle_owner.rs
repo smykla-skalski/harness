@@ -12,7 +12,6 @@ use super::remote_assignment_start_authority::{
     executor_lifecycle_settings_still_compatible, remote_executor_identity,
 };
 use super::remote_start_receipts::durable_start_receipt_run_matches;
-use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardRemoteAssignmentState;
 
@@ -45,20 +44,6 @@ pub(super) struct ExecutorLifecycleOwnerEvidence {
 }
 
 impl AsyncDaemonDb {
-    pub(crate) async fn claim_task_board_remote_executor_lifecycle_owner(
-        &self,
-        assignment_id: &str,
-        owner_instance_id: &str,
-        acquired_at: &str,
-    ) -> Result<Option<TaskBoardRemoteExecutorLifecycleOwner>, CliError> {
-        <Self as RemoteExecutionQueries>::claim_task_board_remote_executor_lifecycle_owner(
-            self,
-            assignment_id,
-            owner_instance_id,
-            acquired_at,
-        )
-        .await
-    }
 
     #[expect(
         clippy::cognitive_complexity,

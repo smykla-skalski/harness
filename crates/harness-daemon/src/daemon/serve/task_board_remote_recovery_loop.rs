@@ -10,6 +10,7 @@ use crate::daemon::http::DaemonHttpState;
 use crate::daemon::service::task_board_remote_controller::drive_task_board_remote_controller;
 use crate::daemon::service::task_board_remote_controller::drive_task_board_remote_controller_before_local_work;
 use harness_kernel::errors::{CliError, CliErrorKind};
+use crate::daemon::db::task_board::prelude::*;
 
 const MINIMUM_RETRY: Duration = Duration::from_secs(1);
 const MAXIMUM_RETRY: Duration = Duration::from_mins(1);

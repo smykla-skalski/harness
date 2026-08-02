@@ -9,6 +9,7 @@ use crate::daemon::db::{
     TaskBoardRemoteMutationOutcome, remote_executor_fixture, remote_executor_identity,
 };
 use crate::task_board::TaskBoardRemoteAssignmentState;
+use crate::daemon::db::task_board::prelude::*;
 
 #[tokio::test]
 async fn settings_can_win_during_provisioning_and_force_exact_cleanup() {

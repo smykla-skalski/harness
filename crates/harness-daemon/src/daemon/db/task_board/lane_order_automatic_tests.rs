@@ -1,4 +1,6 @@
 use super::*;
+use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
+use crate::daemon::db::task_board::lane_placement_queries::LanePlacementQueries;
 
 #[tokio::test]
 async fn automatic_rerank_preserves_manual_anchor_and_updates_each_shift_once() {

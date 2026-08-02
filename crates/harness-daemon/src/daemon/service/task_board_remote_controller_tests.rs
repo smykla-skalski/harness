@@ -12,6 +12,7 @@ use crate::task_board::{
     TaskBoardPhaseCapabilityProfile, TaskBoardWorkflowExecutionCas,
 };
 use harness_kernel::errors::CliErrorKind;
+use crate::daemon::db::task_board::prelude::*;
 
 #[path = "task_board_remote_controller_tests/active_poll.rs"]
 mod active_poll;

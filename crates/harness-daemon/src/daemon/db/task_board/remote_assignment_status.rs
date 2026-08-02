@@ -13,7 +13,6 @@ use super::remote_operation_trust::{
 };
 use super::workflow_executions::load_execution_in_tx;
 use super::{ORCHESTRATOR_CHANGE_SCOPE, items::bump_change_in_tx};
-use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::remote_wire::wire::RemoteClaimRequest;
 use crate::task_board::remote_wire::wire::{RemoteStatusRequest, RemoteStatusResponse};
@@ -77,22 +76,6 @@ impl AsyncDaemonDb {
         .await
     }
 
-    pub(crate) async fn record_task_board_remote_assignment_status(
-        &self,
-        request: &RemoteStatusRequest,
-        response: &RemoteStatusResponse,
-        authenticated_principal: &str,
-    ) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
-        Box::pin(
-            <Self as RemoteExecutionQueries>::record_task_board_remote_assignment_status(
-                self,
-                request,
-                response,
-                authenticated_principal,
-            ),
-        )
-        .await
-    }
 }
 
 pub(super) async fn record_task_board_remote_assignment_status(

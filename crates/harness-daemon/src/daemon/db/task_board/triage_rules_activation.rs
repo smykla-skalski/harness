@@ -2,7 +2,6 @@ use sqlx::{Sqlite, Transaction, query, query_scalar};
 
 use super::triage_apply_rules::ActiveRuleSetEvaluator;
 use super::triage_rules_reevaluation::reevaluate_all_triage_eligible_items_in_tx;
-use super::triage_queries::TriageQueries;
 use super::triage_rules_store::{
     is_canonical_triage_rule_set_actor, record_triage_rule_set_audit_in_tx,
 };
@@ -12,27 +11,6 @@ use crate::task_board::{
     TriageRuleSetValidationReport, validate_triage_rule_set,
 };
 use harness_kernel::errors::CliErrorKind;
-
-impl AsyncDaemonDb {
-    /// CAS-activate `candidate`, or deactivate back to the `BuiltInV1`
-    /// default when `candidate` is `None`. See
-    /// [`TriageQueries::activate_task_board_triage_rules`] for the full
-    /// contract.
-    pub(crate) async fn activate_task_board_triage_rules(
-        &self,
-        candidate: Option<TriageRuleSetV1>,
-        actor: String,
-        expected_active_revision: Option<i64>,
-    ) -> Result<TriageRuleSetActivationResult, CliError> {
-        <Self as TriageQueries>::activate_task_board_triage_rules(
-            self,
-            candidate,
-            actor,
-            expected_active_revision,
-        )
-        .await
-    }
-}
 
 /// CAS-activate `candidate`, or deactivate back to the `BuiltInV1` default
 /// when `candidate` is `None`. Validates first: an invalid candidate is

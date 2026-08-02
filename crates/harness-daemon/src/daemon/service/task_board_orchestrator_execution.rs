@@ -13,6 +13,7 @@ use super::task_board_evaluation::evaluate_task_board_async;
 use super::task_board_github::run_task_board_github_automation_async;
 use super::task_board_orchestrator_db::record_tick;
 use super::task_board_orchestrator_step_mode::scoped_dispatch_request;
+use crate::daemon::db::task_board::prelude::*;
 
 /// A dry run has no request to dispatch, so it reports an empty summary rather
 /// than skipping the stage: the caller still records stage 3 as run.

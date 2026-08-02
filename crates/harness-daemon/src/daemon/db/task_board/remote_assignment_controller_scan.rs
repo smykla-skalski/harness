@@ -5,6 +5,7 @@ use super::remote_assignment_recovery_queue::{
     CONTROLLER_PROGRESSION_QUARANTINE_CODE, RawRecoveryCandidate,
     quarantine_remote_recovery_failure_in_tx,
 };
+use crate::daemon::db::task_board::remote_assignment_executor_lifecycle_queries::RemoteAssignmentExecutorLifecycleQueries;
 use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 
@@ -56,13 +57,6 @@ struct ScanRow {
 }
 
 impl AsyncDaemonDb {
-    pub(crate) async fn next_task_board_remote_controller_assignment(
-        &self,
-        now: &str,
-    ) -> Result<Option<TaskBoardRemoteControllerScanStep>, CliError> {
-        <Self as RemoteExecutionQueries>::next_task_board_remote_controller_assignment(self, now)
-            .await
-    }
 
     async fn claim_next_controller_scan_cursor(
         &self,

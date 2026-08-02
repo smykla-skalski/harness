@@ -12,6 +12,7 @@ use crate::daemon::http::{AsyncDaemonDbSlot, DaemonHttpState, ManagedAgentMutati
 use crate::daemon::state::{DaemonManifest, HostBridgeManifest};
 use crate::daemon::websocket::ReplayBuffer;
 use crate::task_board::{TaskBoardItem, TaskBoardStatus, TaskBoardTriageEscalationConfig};
+use crate::daemon::db::task_board::prelude::*;
 
 #[test]
 fn sanitized_segment_keeps_safe_characters_and_replaces_the_rest() {

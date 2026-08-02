@@ -10,7 +10,6 @@ use super::remote_operation_trust::{
     TaskBoardRemoteOperationKind, TaskBoardRemoteOperationTrustFence,
     claim_controller_operation_trust_in_tx, consume_controller_operation_trust_in_tx,
 };
-use super::remote_source_bundle_queries::RemoteSourceBundleQueries;
 use super::remote_source_bundles::{
     TaskBoardRemoteSourceBundle, insert_source_bundle_in_tx, load_source_bundle_collisions_in_tx,
     load_source_bundle_in_tx,
@@ -21,48 +20,6 @@ use crate::task_board::remote_wire::wire::RemoteOfferRequest;
 use crate::task_board::remote_wire::wire::{
     RemoteSourceBundleUploadRequest, RemoteSourceBundleUploadResponse,
 };
-
-impl AsyncDaemonDb {
-    pub(crate) async fn exact_task_board_remote_source_bundle_upload_receipt(
-        &self,
-        request: &RemoteSourceBundleUploadRequest,
-        authenticated_principal: &str,
-    ) -> Result<Option<TaskBoardRemoteSourceBundle>, CliError> {
-        <Self as RemoteSourceBundleQueries>::exact_task_board_remote_source_bundle_upload_receipt(
-            self,
-            request,
-            authenticated_principal,
-        )
-        .await
-    }
-
-    pub(crate) async fn claim_task_board_remote_source_bundle_upload_io_authority_fenced(
-        &self,
-        request: &RemoteSourceBundleUploadRequest,
-        authenticated_principal: &str,
-        trust: &TaskBoardRemoteOperationTrustFence,
-    ) -> Result<bool, CliError> {
-        <Self as RemoteSourceBundleQueries>::claim_task_board_remote_source_bundle_upload_io_authority_fenced(
-            self, request, authenticated_principal, trust,
-        )
-        .await
-    }
-
-    pub(crate) async fn record_task_board_remote_source_bundle_upload_response(
-        &self,
-        request: &RemoteSourceBundleUploadRequest,
-        response: &RemoteSourceBundleUploadResponse,
-        authenticated_principal: &str,
-    ) -> Result<TaskBoardRemoteSourceBundle, CliError> {
-        <Self as RemoteSourceBundleQueries>::record_task_board_remote_source_bundle_upload_response(
-            self,
-            request,
-            response,
-            authenticated_principal,
-        )
-        .await
-    }
-}
 
 pub(super) async fn exact_task_board_remote_source_bundle_upload_receipt(
     db: &AsyncDaemonDb,
@@ -230,26 +187,6 @@ fn require_unchanged_upload_response(
 }
 
 #[cfg(test)]
-impl AsyncDaemonDb {
-    pub(crate) async fn insert_task_board_remote_source_bundle_offer_for_test(
-        &self,
-        request: &crate::task_board::remote_wire::wire::RemoteOfferRequest,
-        principal: &str,
-        offered_at: &str,
-        lease_expires_at: &str,
-        deadline_at: &str,
-    ) -> Result<(), CliError> {
-        <Self as RemoteSourceBundleQueries>::insert_task_board_remote_source_bundle_offer_for_test(
-            self,
-            request,
-            principal,
-            offered_at,
-            lease_expires_at,
-            deadline_at,
-        )
-        .await
-    }
-}
 
 #[cfg(test)]
 pub(super) async fn insert_task_board_remote_source_bundle_offer_for_test(

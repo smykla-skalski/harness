@@ -6,6 +6,9 @@ use crate::task_board::remote_wire::wire::{
     RemoteArtifactFetchRequest, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
 use crate::task_board::{TaskBoardExecutionPhase, TaskBoardRemoteAssignmentState};
+use crate::daemon::db::task_board::remote_assignment_executor_lifecycle_queries::RemoteAssignmentExecutorLifecycleQueries;
+use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
+use crate::daemon::db::task_board::remote_source_bundle_queries::RemoteSourceBundleQueries;
 
 #[tokio::test]
 async fn terminal_artifacts_and_status_commit_once_under_the_exact_owner() {

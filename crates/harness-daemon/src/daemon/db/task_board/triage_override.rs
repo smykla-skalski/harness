@@ -8,7 +8,6 @@ use super::triage_apply::{
 };
 use super::triage_apply_rules::ensure_current_active_triage_decision_in_tx;
 use super::triage_decisions::current_triage_decision_in_tx;
-use super::triage_queries::TriageQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::{
     BUILTIN_V1_EVALUATOR_IDENTITY, TaskBoardItem, TaskBoardTriageEffectiveOutcome,
@@ -210,30 +209,6 @@ pub(crate) struct TaskBoardTriageOverrideMutationResult {
     pub(crate) shifted: Vec<TaskBoardLaneShift>,
     pub(crate) override_: Option<TaskBoardTriageOverride>,
     pub(crate) effective: Option<TaskBoardTriageEffectiveOutcome>,
-}
-
-impl AsyncDaemonDb {
-    /// Set (or replace) a durable triage override under one item-revision
-    /// and item-list sequence CAS. See
-    /// [`TriageQueries::set_task_board_triage_override`] for the full
-    /// contract.
-    pub(crate) async fn set_task_board_triage_override(
-        &self,
-        input: TaskBoardTriageOverrideSetInput,
-    ) -> Result<TaskBoardTriageOverrideMutationResult, CliError> {
-        <Self as TriageQueries>::set_task_board_triage_override(self, input).await
-    }
-
-    /// Clear a durable triage override under one item-revision and
-    /// item-list sequence CAS. See
-    /// [`TriageQueries::clear_task_board_triage_override`] for the full
-    /// contract.
-    pub(crate) async fn clear_task_board_triage_override(
-        &self,
-        input: TaskBoardTriageOverrideClearInput,
-    ) -> Result<TaskBoardTriageOverrideMutationResult, CliError> {
-        <Self as TriageQueries>::clear_task_board_triage_override(self, input).await
-    }
 }
 
 pub(super) async fn set_task_board_triage_override(

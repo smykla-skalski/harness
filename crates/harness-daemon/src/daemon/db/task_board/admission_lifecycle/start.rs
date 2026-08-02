@@ -1,6 +1,5 @@
 use sqlx::{Sqlite, Transaction, query_as, query_scalar};
 
-use super::super::dispatch_admission_queries::DispatchAdmissionQueries;
 use super::super::dispatch_admission_tx_ext::TaskBoardDispatchAdmissionTxExt;
 use super::super::item_tx_ext::TaskBoardItemTxExt;
 use super::TaskBoardAdmissionCheck;
@@ -8,25 +7,6 @@ use crate::daemon::db::{AsyncDaemonDb, CliError, CliErrorKind, db_error};
 use crate::task_board::{
     AgentMode, TaskBoardItem, TaskBoardLaunchCapability, validate_launch_capability,
 };
-
-impl AsyncDaemonDb {
-    pub(crate) async fn validate_task_board_dispatch_admission_start(
-        &self,
-        intent_id: &str,
-        claim_token: &str,
-        actual_capability: Option<TaskBoardLaunchCapability>,
-        expected_read_only_fence: Option<(i64, u64)>,
-    ) -> Result<(), CliError> {
-        <Self as DispatchAdmissionQueries>::validate_task_board_dispatch_admission_start(
-            self,
-            intent_id,
-            claim_token,
-            actual_capability,
-            expected_read_only_fence,
-        )
-        .await
-    }
-}
 
 /// Real implementation behind
 /// [`DispatchAdmissionQueries::validate_task_board_dispatch_admission_start`],

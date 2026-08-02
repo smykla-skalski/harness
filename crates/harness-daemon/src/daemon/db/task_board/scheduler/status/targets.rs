@@ -1,7 +1,6 @@
 use sqlx::{Sqlite, Transaction, query_scalar};
 
 use super::super::super::automation_cancel_targets::cancel_target_in_tx;
-use super::super::queries::TaskBoardAutomationSchedulerQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardAutomationCancelTarget;
 
@@ -69,19 +68,6 @@ pub(super) async fn load(
     let truncated = targets.len() > MAX_CANCELABLE_TARGETS;
     targets.truncate(MAX_CANCELABLE_TARGETS);
     Ok(CancelTargetPage { targets, truncated })
-}
-
-impl AsyncDaemonDb {
-    pub(crate) async fn task_board_automation_cancel_target(
-        &self,
-        execution_id: &str,
-    ) -> Result<Option<TaskBoardAutomationCancelTarget>, CliError> {
-        <Self as TaskBoardAutomationSchedulerQueries>::task_board_automation_cancel_target(
-            self,
-            execution_id,
-        )
-        .await
-    }
 }
 
 pub(in super::super) async fn task_board_automation_cancel_target(

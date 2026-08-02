@@ -1,6 +1,8 @@
 use sqlx::{query, query_scalar};
 
 use super::*;
+use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
+use crate::daemon::db::task_board::lane_placement_queries::LanePlacementQueries;
 
 #[tokio::test]
 async fn position_change_rejects_item_revision_overflow_without_writes() {

@@ -16,6 +16,7 @@ use crate::task_board::{
     TaskBoardAttemptState, TaskBoardExecutionState, TaskBoardStatus, TaskBoardWorkflowStatus,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
+use crate::daemon::db::task_board::prelude::*;
 
 const HOST: &str = "executor-a";
 const STATUS_AT: &str = "2026-07-19T10:02:01Z";

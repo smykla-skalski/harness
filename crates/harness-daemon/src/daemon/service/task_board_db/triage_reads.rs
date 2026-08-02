@@ -10,6 +10,7 @@ use crate::daemon::protocol::{
 };
 use crate::infra::io::validate_safe_segment;
 use harness_kernel::errors::CliError;
+use crate::daemon::db::task_board::prelude::*;
 
 pub(crate) async fn get_task_board_item_triage_current_db(
     db: &AsyncDaemonDb,

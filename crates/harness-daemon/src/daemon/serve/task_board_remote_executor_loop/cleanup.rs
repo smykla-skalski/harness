@@ -22,6 +22,7 @@ use crate::workspace::project_resolver::resolve_name;
 use crate::workspace::utc_now;
 use crate::workspace::worktree::WorktreeController;
 use harness_kernel::errors::{CliError, CliErrorKind};
+use crate::daemon::db::task_board::prelude::*;
 
 pub(super) async fn reconcile_settled_executor_cleanup(
     state: &DaemonHttpState,

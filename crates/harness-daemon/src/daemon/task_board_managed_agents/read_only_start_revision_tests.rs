@@ -20,6 +20,7 @@ use super::{
     codex_worker_request, managed_worker_id, settle_claimed_task_board_worker,
     start_worker_for_applied_task,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 mod read_only_start_revision_support;
 

@@ -1,6 +1,5 @@
 use sqlx::{Sqlite, Transaction, query, query_as, query_scalar};
 
-use super::triage_queries::TriageQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
 use crate::task_board::{
     TriageRuleSetAuditEntry, TriageRuleSetAuditKind, TriageRuleSetDraft,
@@ -36,46 +35,6 @@ pub(super) fn decode_rule_set(rules_json: &str) -> Result<TriageRuleSetV1, CliEr
 
 pub(super) fn is_canonical_triage_rule_set_actor(value: &str) -> bool {
     is_canonical_bounded_text(value, MAX_TRIAGE_RULE_SET_ACTOR_BYTES)
-}
-
-impl AsyncDaemonDb {
-    pub(crate) async fn load_task_board_triage_rules_draft(
-        &self,
-    ) -> Result<Option<TriageRuleSetDraft>, CliError> {
-        <Self as TriageQueries>::load_task_board_triage_rules_draft(self).await
-    }
-
-    /// CAS-save a draft candidate. See
-    /// [`TriageQueries::save_task_board_triage_rules_draft`] for the full
-    /// contract.
-    pub(crate) async fn save_task_board_triage_rules_draft(
-        &self,
-        candidate: TriageRuleSetV1,
-        actor: String,
-        expected_revision: Option<i64>,
-    ) -> Result<TriageRuleSetDraftSaveResult, CliError> {
-        <Self as TriageQueries>::save_task_board_triage_rules_draft(
-            self,
-            candidate,
-            actor,
-            expected_revision,
-        )
-        .await
-    }
-
-    pub(crate) async fn list_task_board_triage_rules_revisions(
-        &self,
-        limit: u32,
-    ) -> Result<Vec<TriageRuleSetRevisionSummary>, CliError> {
-        <Self as TriageQueries>::list_task_board_triage_rules_revisions(self, limit).await
-    }
-
-    pub(crate) async fn list_task_board_triage_rules_audit(
-        &self,
-        limit: u32,
-    ) -> Result<Vec<TriageRuleSetAuditEntry>, CliError> {
-        <Self as TriageQueries>::list_task_board_triage_rules_audit(self, limit).await
-    }
 }
 
 pub(super) async fn load_task_board_triage_rules_draft(

@@ -11,6 +11,8 @@ use crate::task_board::remote_wire::wire::{
     test_codex_launch,
 };
 use crate::task_board::{TaskBoardExecutionPhase, TaskBoardWorkflowKind};
+use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
+use crate::daemon::db::task_board::remote_source_bundle_queries::RemoteSourceBundleQueries;
 
 // The prior phase's own base; the bundle result revision must equal the current
 // binding's base_revision (SOURCE_REVISION) or the upload seal rejects it.

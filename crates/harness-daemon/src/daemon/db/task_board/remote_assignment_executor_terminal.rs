@@ -4,7 +4,6 @@ use super::remote_artifacts::{
     TaskBoardRemoteArtifactStoreInput, exact_artifact_replay, insert_artifact_in_tx,
     load_artifact_in_tx, validate_artifact_evidence,
 };
-use super::remote_assignment_executor_lifecycle_queries::RemoteAssignmentExecutorLifecycleQueries;
 use super::remote_assignment_lease::{commit_noop, finish_mutation, require_assignment};
 use super::remote_assignment_lifecycle_owner::TaskBoardRemoteExecutorLifecycleOwner;
 use super::remote_assignment_model::{
@@ -29,20 +28,6 @@ pub(crate) const REMOTE_IMPLEMENTATION_BUNDLE_MEDIA_TYPE: &str = "application/x-
 pub(crate) struct TaskBoardRemoteTerminalArtifact {
     pub(crate) entry: RemoteArtifactEntry,
     pub(crate) content: Vec<u8>,
-}
-
-impl AsyncDaemonDb {
-    pub(crate) async fn complete_task_board_remote_executor_terminal(
-        &self,
-        owner: &TaskBoardRemoteExecutorLifecycleOwner,
-        response: &RemoteStatusResponse,
-        artifacts: &[TaskBoardRemoteTerminalArtifact],
-    ) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
-        <Self as RemoteAssignmentExecutorLifecycleQueries>::complete_task_board_remote_executor_terminal(
-            self, owner, response, artifacts,
-        )
-        .await
-    }
 }
 
 #[expect(

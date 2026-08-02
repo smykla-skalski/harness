@@ -12,6 +12,7 @@ use harness_testkit::with_isolated_harness_env;
 use tempfile::tempdir;
 
 use super::{update_task_board_git_runtime_config, validate_repository_tokens};
+use crate::daemon::db::task_board::prelude::*;
 
 #[test]
 fn runtime_key_material_sync_never_persists_durable_config() {

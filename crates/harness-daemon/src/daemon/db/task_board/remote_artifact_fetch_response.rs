@@ -8,30 +8,10 @@ use super::remote_assignment_model::{canonical_time, concurrent, nonblank};
 use super::remote_operation_trust::{
     TaskBoardRemoteOperationKind, consume_controller_operation_trust_in_tx,
 };
-use super::remote_source_bundle_queries::RemoteSourceBundleQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::remote_wire::wire::{
     RemoteArtifactFetchRequest, RemoteArtifactFetchResponse,
 };
-
-impl AsyncDaemonDb {
-    pub(crate) async fn record_task_board_remote_artifact_fetch_response(
-        &self,
-        request: &RemoteArtifactFetchRequest,
-        response: &RemoteArtifactFetchResponse,
-        authenticated_principal: &str,
-        stored_at: &str,
-    ) -> Result<TaskBoardRemoteArtifact, CliError> {
-        <Self as RemoteSourceBundleQueries>::record_task_board_remote_artifact_fetch_response(
-            self,
-            request,
-            response,
-            authenticated_principal,
-            stored_at,
-        )
-        .await
-    }
-}
 
 /// Atomically adopts authenticated artifact bytes and consumes the exact
 /// current host-trust token that authorized their network fetch.

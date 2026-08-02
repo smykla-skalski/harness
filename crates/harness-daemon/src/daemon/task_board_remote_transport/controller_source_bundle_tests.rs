@@ -11,6 +11,7 @@ use crate::task_board::remote_wire::wire::{
     RemoteArtifactEntry, RemoteArtifactManifest, RemoteSourceBundleUploadRequest,
     RemoteSourceBundleUploadResponse, RemoteSourceMaterial,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 const BASE: &str = "1111111111111111111111111111111111111111";
 const RESULT: &str = "2222222222222222222222222222222222222222";

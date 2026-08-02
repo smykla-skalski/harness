@@ -7,6 +7,7 @@ use crate::task_board::{
     TaskBoardAutomationRunTrigger, TaskBoardAutomationScope, TaskBoardOrchestratorDispatchInput,
     TaskBoardOrchestratorSettings, TaskBoardStatus,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 /// The default settings already enable `SyncTaskBoard`, so this is the
 /// configuration the tests below vary one field at a time from.

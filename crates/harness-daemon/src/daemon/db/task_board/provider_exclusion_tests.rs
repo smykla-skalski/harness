@@ -8,6 +8,8 @@ use crate::task_board::{
     ProviderExclusionRestoreOutcome, TaskBoardItem, TaskBoardLaneOrigin, TaskBoardStatus,
     TaskBoardTombstoneCause,
 };
+use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
+use crate::daemon::db::task_board::provider_queries::ProviderQueries;
 
 #[path = "provider_exclusion_restore_tests.rs"]
 mod restore_tests;

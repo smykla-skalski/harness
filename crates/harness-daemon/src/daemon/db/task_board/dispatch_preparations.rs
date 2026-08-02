@@ -3,8 +3,6 @@ use uuid::Uuid;
 
 use super::admission::{TaskBoardDispatchAdmissionSnapshot, evaluate_dispatch_admission_in_tx};
 use super::admission_reservations::persist_admission_snapshot_in_tx;
-use super::dispatch_admission_queries::DispatchAdmissionQueries;
-use super::dispatch_preparation_claim::TaskBoardPreparationClaim;
 use super::dispatch_workflow_launch::rebind_write_launch;
 use super::item_tx_ext::TaskBoardItemTxExt;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
@@ -121,107 +119,6 @@ async fn consume_prepared_approval_grant(
         }
     }
     Ok(())
-}
-
-impl AsyncDaemonDb {
-    /// Reserve one dispatch before creating its session or task side effects.
-    pub(crate) async fn reserve_task_board_dispatch(
-        &self,
-        plan: &DispatchPlan,
-        actor: &str,
-        project_dir: Option<&str>,
-        hold_worker: bool,
-    ) -> Result<ReservedTaskBoardDispatch, CliError> {
-        <Self as DispatchAdmissionQueries>::reserve_task_board_dispatch(
-            self,
-            plan,
-            actor,
-            project_dir,
-            hold_worker,
-        )
-        .await
-    }
-
-    /// Claims a preparation, or reports why it could not be claimed.
-    pub(crate) async fn attempt_task_board_dispatch_preparation_claim(
-        &self,
-        intent_id: &str,
-    ) -> Result<TaskBoardPreparationClaim, CliError> {
-        <Self as DispatchAdmissionQueries>::attempt_task_board_dispatch_preparation_claim(
-            self, intent_id,
-        )
-        .await
-    }
-
-    /// For callers that only act on the claim itself. Anything reported to a
-    /// person should take the reason from the attempt above instead.
-    pub(crate) async fn claim_task_board_dispatch_preparation(
-        &self,
-        intent_id: &str,
-    ) -> Result<Option<ClaimedTaskBoardDispatchPreparation>, CliError> {
-        <Self as DispatchAdmissionQueries>::claim_task_board_dispatch_preparation(self, intent_id)
-            .await
-    }
-
-    pub(crate) async fn claim_next_task_board_dispatch_preparation(
-        &self,
-    ) -> Result<Option<ClaimedTaskBoardDispatchPreparation>, CliError> {
-        <Self as DispatchAdmissionQueries>::claim_next_task_board_dispatch_preparation(self).await
-    }
-
-    /// Renew a claimed preparation while its session or worktree is being created.
-    pub(crate) async fn renew_task_board_dispatch_preparation(
-        &self,
-        claim: &ClaimedTaskBoardDispatchPreparation,
-    ) -> Result<(), CliError> {
-        <Self as DispatchAdmissionQueries>::renew_task_board_dispatch_preparation(self, claim).await
-    }
-
-    pub(crate) async fn complete_task_board_dispatch_preparation(
-        &self,
-        claim: &ClaimedTaskBoardDispatchPreparation,
-        branch: &str,
-        worktree: &str,
-    ) -> Result<DispatchAppliedTask, CliError> {
-        <Self as DispatchAdmissionQueries>::complete_task_board_dispatch_preparation(
-            self, claim, branch, worktree,
-        )
-        .await
-    }
-
-    /// Atomically link a prepared session task and expose it for worker startup.
-    pub(crate) async fn complete_task_board_dispatch_preparation_with_workflow(
-        &self,
-        claim: &ClaimedTaskBoardDispatchPreparation,
-        branch: &str,
-        worktree: &str,
-        read_only_workflow: Option<TaskBoardReadOnlyWorkflowLaunch>,
-        write_workflow: Option<Box<TaskBoardWriteWorkflowLaunch>>,
-    ) -> Result<DispatchAppliedTask, CliError> {
-        <Self as DispatchAdmissionQueries>::complete_task_board_dispatch_preparation_with_workflow(
-            self,
-            claim,
-            branch,
-            worktree,
-            read_only_workflow,
-            write_workflow,
-        )
-        .await
-    }
-
-    /// Hands a failed preparation back to the queue, or retires it once its
-    /// retry budget is spent so the item stops being held by a dispatch that
-    /// cannot finish.
-    pub(crate) async fn release_task_board_dispatch_preparation(
-        &self,
-        claim: &ClaimedTaskBoardDispatchPreparation,
-        reason: &str,
-    ) -> Result<TaskBoardPreparationRelease, CliError> {
-        <Self as DispatchAdmissionQueries>::release_task_board_dispatch_preparation(
-            self, claim, reason,
-        )
-        .await
-    }
 }
 
 /// Real implementations behind the matching [`DispatchAdmissionQueries`]

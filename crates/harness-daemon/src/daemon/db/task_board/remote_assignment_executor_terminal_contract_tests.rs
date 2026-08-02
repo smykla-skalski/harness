@@ -3,6 +3,8 @@ use sqlx::query_scalar;
 use super::TaskBoardRemoteMutationOutcome;
 use super::remote_assignment_executor_terminal_test_support::*;
 use crate::task_board::{TaskBoardExecutionPhase, TaskBoardRemoteAssignmentState};
+use crate::daemon::db::task_board::remote_assignment_executor_lifecycle_queries::RemoteAssignmentExecutorLifecycleQueries;
+use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 
 #[tokio::test]
 async fn completed_review_rejects_missing_extra_wrong_path_and_tampered_bytes() {

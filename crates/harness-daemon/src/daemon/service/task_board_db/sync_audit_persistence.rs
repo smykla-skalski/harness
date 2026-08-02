@@ -11,6 +11,7 @@ use harness_kernel::errors::CliError;
 
 use super::TaskBoardSyncAuditTrigger;
 use super::metrics::SyncExecutionMetrics;
+use crate::daemon::db::task_board::prelude::*;
 
 const SYNC_AUDIT_TITLE: &str = "Sync task-board providers";
 

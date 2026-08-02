@@ -14,7 +14,6 @@ use crate::daemon::db::task_board::remote_assignment_lease::{
 use crate::daemon::db::task_board::remote_assignment_model::{
     TaskBoardRemoteMutationOutcome, canonical_time, concurrent, nonblank, to_i64,
 };
-use crate::daemon::db::task_board::remote_assignment_start_settlement_queries::RemoteAssignmentStartSettlementQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardRemoteAssignmentState;
 
@@ -80,55 +79,6 @@ pub(super) async fn revoke_unpermitted_start_in_tx(
     )
     .await?;
     Ok(())
-}
-
-impl AsyncDaemonDb {
-    pub(crate) async fn authorize_task_board_remote_executor_provisioning(
-        &self,
-        authority: &TaskBoardRemoteExecutorStartAuthority,
-        authorized_at: &str,
-    ) -> Result<Option<TaskBoardRemoteExecutorStartAuthority>, CliError> {
-        <Self as RemoteAssignmentStartSettlementQueries>::authorize_task_board_remote_executor_provisioning(
-            self, authority, authorized_at,
-        )
-        .await
-    }
-
-    pub(crate) async fn revoke_task_board_remote_executor_start_after_cleanup(
-        &self,
-        authority: &TaskBoardRemoteExecutorStartAuthority,
-        observed_at: &str,
-    ) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
-        <Self as RemoteAssignmentStartSettlementQueries>::revoke_task_board_remote_executor_start_after_cleanup(
-            self, authority, observed_at,
-        )
-        .await
-    }
-
-    pub(crate) async fn abandon_task_board_remote_executor_start_after_restart(
-        &self,
-        authority: &TaskBoardRemoteExecutorStartAuthority,
-        successor_instance_id: &str,
-        observed_at: &str,
-    ) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
-        <Self as RemoteAssignmentStartSettlementQueries>::abandon_task_board_remote_executor_start_after_restart(
-            self, authority, successor_instance_id, observed_at,
-        )
-        .await
-    }
-
-    pub(crate) async fn abandon_task_board_remote_executor_claim_after_restart(
-        &self,
-        assignment_id: &str,
-        identity: &TaskBoardRemoteExecutorIdentity,
-        successor_instance_id: &str,
-        observed_at: &str,
-    ) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
-        <Self as RemoteAssignmentStartSettlementQueries>::abandon_task_board_remote_executor_claim_after_restart(
-            self, assignment_id, identity, successor_instance_id, observed_at,
-        )
-        .await
-    }
 }
 
 /// Revalidates frozen executor settings while provisioning remains reversible.

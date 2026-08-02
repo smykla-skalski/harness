@@ -6,6 +6,7 @@ use crate::task_board::{
 use harness_kernel::errors::CliError;
 
 use super::attempts::invalid_transition;
+use crate::daemon::db::task_board::prelude::*;
 
 pub(super) async fn current_revisions(
     db: &AsyncDaemonDb,

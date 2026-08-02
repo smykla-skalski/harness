@@ -4,6 +4,8 @@ use sqlx::query;
 use super::test_support::{database, instant, seed_run};
 use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::TaskBoardItem;
+use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
+use crate::daemon::db::task_board::scheduler::queries::TaskBoardAutomationSchedulerQueries;
 
 #[tokio::test]
 async fn metrics_count_active_every_terminal_outcome_and_open_conflicts() {

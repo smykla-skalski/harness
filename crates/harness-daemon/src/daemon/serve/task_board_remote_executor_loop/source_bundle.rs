@@ -11,6 +11,7 @@ use crate::git::source_bundle_import::GitSourceBundleImportPlan;
 use crate::task_board::remote_wire::wire::RemoteSourceBundleUploadRequest;
 use crate::task_board::remote_wire::wire::{RemoteOfferRequest, RemoteSourceMaterial};
 use harness_kernel::errors::{CliError, CliErrorKind};
+use crate::daemon::db::task_board::prelude::*;
 
 pub(super) async fn materialize_repository_snapshot(
     db: &AsyncDaemonDb,

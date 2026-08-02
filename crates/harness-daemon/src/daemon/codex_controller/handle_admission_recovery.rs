@@ -6,6 +6,7 @@ use crate::daemon::service as daemon_service;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::handle::CodexControllerHandle;
+use crate::daemon::db::task_board::prelude::*;
 
 const MISSING_RUN_RECOVERY_REASON: &str = "Codex worker was missing after daemon restart";
 

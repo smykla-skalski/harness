@@ -6,7 +6,6 @@ use super::remote_assignment_fencing::RemoteAssignmentFencing;
 use super::workflow_execution_attempts::{
     attempt_cas_matches, update_attempt_in_tx, validate_attempt_phase,
 };
-use super::workflow_execution_queries::WorkflowExecutionQueries;
 use super::workflow_executions::{cas_mismatch, load_execution_in_tx, update_execution_in_tx};
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::{
@@ -17,24 +16,6 @@ use crate::task_board::{
     validate_task_board_attempt_update, validate_task_board_execution_target_update,
     validate_task_board_workflow_execution,
 };
-
-impl AsyncDaemonDb {
-    /// Selects the exact local target before any local runtime side effect is claimable.
-    pub(crate) async fn select_task_board_local_execution_target(
-        &self,
-        expected_execution: &TaskBoardWorkflowExecutionCas,
-        expected_attempt: &TaskBoardExecutionAttemptCas,
-        selected_at: &str,
-    ) -> Result<bool, CliError> {
-        <Self as WorkflowExecutionQueries>::select_task_board_local_execution_target(
-            self,
-            expected_execution,
-            expected_attempt,
-            selected_at,
-        )
-        .await
-    }
-}
 
 pub(super) async fn select_task_board_local_execution_target(
     db: &AsyncDaemonDb,

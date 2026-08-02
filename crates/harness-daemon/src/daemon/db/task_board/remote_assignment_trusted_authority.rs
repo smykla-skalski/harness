@@ -1,4 +1,3 @@
-use super::remote_assignment_authority_queries::RemoteAssignmentAuthorityQueries;
 use super::remote_assignment_io_authority::{
     RemoteIoAuthorityClaim, RemoteIoAuthorityRequestEvidence, claim_remote_io_authority,
     require_authority_parent,
@@ -16,91 +15,6 @@ use crate::task_board::TaskBoardRemoteAssignmentState;
 use crate::task_board::remote_wire::wire::{
     RemoteCancelRequest, RemoteClaimRequest, RemoteLeaseRenewRequest, RemoteOfferRequest,
 };
-
-impl AsyncDaemonDb {
-    pub(crate) async fn claim_task_board_remote_offer_io_authority_fenced(
-        &self,
-        request: &RemoteOfferRequest,
-        authenticated_principal: &str,
-        authority_at: &str,
-        trust: &TaskBoardRemoteOperationTrustFence,
-    ) -> Result<Option<TaskBoardRemoteIoAuthority>, CliError> {
-        <Self as RemoteAssignmentAuthorityQueries>::claim_task_board_remote_offer_io_authority_fenced(
-            self,
-            request,
-            authenticated_principal,
-            authority_at,
-            trust,
-        )
-        .await
-    }
-
-    pub(crate) async fn claim_task_board_remote_claim_io_authority_fenced(
-        &self,
-        request: &RemoteClaimRequest,
-        authenticated_principal: &str,
-        authority_at: &str,
-        trust: &TaskBoardRemoteOperationTrustFence,
-    ) -> Result<Option<TaskBoardRemoteIoAuthority>, CliError> {
-        <Self as RemoteAssignmentAuthorityQueries>::claim_task_board_remote_claim_io_authority_fenced(
-            self,
-            request,
-            authenticated_principal,
-            authority_at,
-            trust,
-        )
-        .await
-    }
-
-    pub(crate) async fn claim_task_board_remote_renew_io_authority_fenced(
-        &self,
-        request: &RemoteLeaseRenewRequest,
-        authenticated_principal: &str,
-        authority_at: &str,
-        trust: &TaskBoardRemoteOperationTrustFence,
-    ) -> Result<Option<TaskBoardRemoteIoAuthority>, CliError> {
-        <Self as RemoteAssignmentAuthorityQueries>::claim_task_board_remote_renew_io_authority_fenced(
-            self,
-            request,
-            authenticated_principal,
-            authority_at,
-            trust,
-        )
-        .await
-    }
-
-    pub(crate) async fn claim_task_board_remote_cancel_io_authority_fenced(
-        &self,
-        request: &RemoteCancelRequest,
-        authenticated_principal: &str,
-        authority_at: &str,
-        trust: &TaskBoardRemoteOperationTrustFence,
-    ) -> Result<Option<TaskBoardRemoteIoAuthority>, CliError> {
-        <Self as RemoteAssignmentAuthorityQueries>::claim_task_board_remote_cancel_io_authority_fenced(
-            self,
-            request,
-            authenticated_principal,
-            authority_at,
-            trust,
-        )
-        .await
-    }
-
-    pub(crate) async fn require_pending_task_board_remote_renew_replay_authority_fenced(
-        &self,
-        request: &RemoteLeaseRenewRequest,
-        authenticated_principal: &str,
-        trust: &TaskBoardRemoteHostTrustFence,
-    ) -> Result<bool, CliError> {
-        <Self as RemoteAssignmentAuthorityQueries>::require_pending_task_board_remote_renew_replay_authority_fenced(
-            self,
-            request,
-            authenticated_principal,
-            trust,
-        )
-        .await
-    }
-}
 
 pub(super) async fn claim_task_board_remote_offer_io_authority_fenced(
     db: &AsyncDaemonDb,

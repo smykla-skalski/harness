@@ -3,6 +3,7 @@ use harness_kernel::errors::CliError;
 use harness_protocol::daemon::task_board::automation_snapshot::TaskBoardAutomationSnapshot;
 
 use crate::daemon::db::imports::DaemonDbSessionResync;
+use crate::daemon::db::task_board::prelude::TaskBoardAutomationSchedulerQueries;
 use crate::daemon::db::{
     AsyncDaemonDb, DaemonDb, PreparedRuntimeTranscriptResync, PreparedSessionResync,
     prepare_runtime_transcript_resync, prepare_session_resync,
@@ -26,7 +27,7 @@ impl AsyncWatchStorage for AsyncDaemonDb {
     async fn task_board_automation_snapshot(
         &self,
     ) -> Result<TaskBoardAutomationSnapshot, CliError> {
-        Self::task_board_automation_snapshot(self).await
+        <Self as TaskBoardAutomationSchedulerQueries>::task_board_automation_snapshot(self).await
     }
 }
 

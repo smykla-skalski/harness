@@ -10,6 +10,8 @@ use crate::task_board::{
     TaskBoardSyncConflict,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
+use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
+use crate::daemon::db::task_board::provider_queries::ProviderQueries;
 
 #[tokio::test]
 async fn provider_scope_failure_backoff_is_isolated_and_reset_by_success() {

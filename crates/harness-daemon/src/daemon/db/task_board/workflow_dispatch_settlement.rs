@@ -12,7 +12,6 @@ use super::item_tx_ext::TaskBoardItemTxExt;
 use super::items::bump_change_in_tx;
 use super::remote_assignment_fencing::RemoteAssignmentFencing;
 use super::workflow_dispatch::workflow_owner;
-use super::workflow_execution_queries::WorkflowExecutionQueries;
 use super::workflow_executions::load_execution_in_tx;
 use super::workflow_start_admission::commit_frozen_start_admission_in_tx;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
@@ -24,32 +23,6 @@ use crate::task_board::{
     TASK_BOARD_EXECUTION_TARGET_ATTEMPT_RESOURCE, TASK_BOARD_EXECUTION_TARGET_RESOURCE,
     TaskBoardExecutionAttemptRecord, TaskBoardItem, TaskBoardWorkflowExecutionRecord,
 };
-
-impl AsyncDaemonDb {
-    /// Persist a workflow execution and its first attempt without charging admission.
-    pub(crate) async fn prepare_task_board_workflow_dispatch(
-        &self,
-        intent_id: &str,
-        claim_token: &str,
-    ) -> Result<TaskBoardItem, CliError> {
-        <Self as WorkflowExecutionQueries>::prepare_task_board_workflow_dispatch(
-            self, intent_id, claim_token,
-        )
-        .await
-    }
-
-    /// Commit admission only after the exact local or remote worker durably started.
-    pub(crate) async fn complete_task_board_workflow_dispatch_start(
-        &self,
-        execution_id: &str,
-    ) -> Result<bool, CliError> {
-        <Self as WorkflowExecutionQueries>::complete_task_board_workflow_dispatch_start(
-            self,
-            execution_id,
-        )
-        .await
-    }
-}
 
 pub(super) async fn prepare_task_board_workflow_dispatch(
     db: &AsyncDaemonDb,

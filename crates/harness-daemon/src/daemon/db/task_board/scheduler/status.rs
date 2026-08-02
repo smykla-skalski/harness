@@ -6,7 +6,6 @@ mod queue;
 pub(super) mod targets;
 mod wake;
 
-use super::queries::TaskBoardAutomationSchedulerQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardAutomationCancelTarget;
 use crate::task_board::{
@@ -58,14 +57,6 @@ struct StoredInstant {
 struct ProviderBackoff {
     earliest: StoredInstant,
     latest: StoredInstant,
-}
-
-impl AsyncDaemonDb {
-    pub(crate) async fn task_board_automation_snapshot(
-        &self,
-    ) -> Result<TaskBoardAutomationSnapshot, CliError> {
-        <Self as TaskBoardAutomationSchedulerQueries>::task_board_automation_snapshot(self).await
-    }
 }
 
 pub(super) async fn task_board_automation_snapshot(

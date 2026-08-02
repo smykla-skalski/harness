@@ -1,5 +1,6 @@
 use crate::daemon::db::AsyncDaemonDb;
 use harness_kernel::errors::CliError;
+use crate::daemon::db::task_board::prelude::*;
 
 pub(super) async fn executor_assignment_ids(db: &AsyncDaemonDb) -> Result<Vec<String>, CliError> {
     let scan = db.scan_task_board_remote_executor_assignments().await?;

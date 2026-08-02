@@ -1,7 +1,6 @@
 use sqlx::{Sqlite, Transaction};
 
 use super::admission_lifecycle::release_managed_worker_admission_in_tx;
-use super::workflow_execution_queries::WorkflowExecutionQueries;
 use super::workflow_executions::load_execution_in_tx;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardItem;
@@ -14,6 +13,10 @@ pub(super) use dispatch::{PreparedDispatchSettlement, settle_prepared_dispatch_i
 #[path = "workflow_terminal_in_tx.rs"]
 mod in_tx;
 pub(super) use in_tx::project_terminal_execution_in_tx;
+#[cfg(test)]
+use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
+#[cfg(test)]
+use crate::daemon::db::task_board::workflow_execution_queries::WorkflowExecutionQueries;
 
 #[derive(Debug)]
 pub(crate) struct TaskBoardWorkflowTerminalProjection {
@@ -21,17 +24,6 @@ pub(crate) struct TaskBoardWorkflowTerminalProjection {
     pub(crate) item_revision: i64,
     pub(crate) item_changed: bool,
     pub(crate) admission_released: bool,
-}
-
-impl AsyncDaemonDb {
-    pub(crate) async fn recover_orphaned_task_board_read_only_workflow_admissions(
-        &self,
-    ) -> Result<Vec<String>, CliError> {
-        <Self as WorkflowExecutionQueries>::recover_orphaned_task_board_read_only_workflow_admissions(
-            self,
-        )
-        .await
-    }
 }
 
 pub(super) async fn recover_orphaned_task_board_read_only_workflow_admissions(
@@ -90,19 +82,6 @@ async fn recover_orphaned_admission_owner_in_tx(
         return Ok(false);
     }
     release_managed_worker_admission_in_tx(transaction, owner).await
-}
-
-impl AsyncDaemonDb {
-    pub(crate) async fn project_task_board_read_only_workflow_terminal(
-        &self,
-        execution_id: &str,
-    ) -> Result<TaskBoardWorkflowTerminalProjection, CliError> {
-        <Self as WorkflowExecutionQueries>::project_task_board_read_only_workflow_terminal(
-            self,
-            execution_id,
-        )
-        .await
-    }
 }
 
 pub(super) async fn project_task_board_read_only_workflow_terminal(

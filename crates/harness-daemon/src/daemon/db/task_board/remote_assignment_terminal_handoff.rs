@@ -6,7 +6,6 @@ use super::remote_assignment_active_fence::{
     TaskBoardRemoteControllerHandoffKind, controller_handoff_matches_in_tx,
     record_controller_handoff_in_tx,
 };
-use super::remote_assignment_executor_lifecycle_queries::RemoteAssignmentExecutorLifecycleQueries;
 use super::remote_assignment_lease::{commit_noop, finish_mutation, require_assignment};
 use super::remote_assignment_model::{
     TaskBoardRemoteAssignmentRecord, TaskBoardRemoteMutationOutcome, canonical_time, concurrent,
@@ -19,36 +18,6 @@ use crate::task_board::{
     TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionRecord,
     task_board_remote_execution_target,
 };
-
-impl AsyncDaemonDb {
-    pub(crate) async fn record_task_board_remote_terminal_cleanup_handoff(
-        &self,
-        expected_assignment: &TaskBoardRemoteAssignmentRecord,
-        expected_parent: &TaskBoardWorkflowExecutionCas,
-        handed_off_at: &str,
-    ) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
-        <Self as RemoteAssignmentExecutorLifecycleQueries>::record_task_board_remote_terminal_cleanup_handoff(
-            self,
-            expected_assignment,
-            expected_parent,
-            handed_off_at,
-        )
-        .await
-    }
-
-    pub(crate) async fn task_board_remote_assignment_has_settlement_handoff(
-        &self,
-        assignment_id: &str,
-        fencing_epoch: u64,
-    ) -> Result<bool, CliError> {
-        <Self as RemoteAssignmentExecutorLifecycleQueries>::task_board_remote_assignment_has_settlement_handoff(
-            self,
-            assignment_id,
-            fencing_epoch,
-        )
-        .await
-    }
-}
 
 pub(super) async fn record_task_board_remote_terminal_cleanup_handoff(
     db: &AsyncDaemonDb,

@@ -1,7 +1,6 @@
 use sqlx::error::DatabaseError;
 use sqlx::{FromRow, Sqlite, Transaction, query, query_as};
 
-use super::project_registry_queries::ProjectRegistryQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::project::{
     ItemProjectAttribution, TaskBoardProject, TaskBoardProjectSource, item_attribution,
@@ -236,56 +235,6 @@ pub(crate) async fn register_configured_repositories_in_tx(
         .await?;
     }
     Ok(())
-}
-
-impl AsyncDaemonDb {
-    /// Register `raw_slug` if needed and return its project identifier. See
-    /// [`ProjectRegistryQueries::ensure_task_board_project`] for the full
-    /// contract.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] when the registry cannot be read or written.
-    pub(crate) async fn ensure_task_board_project(
-        &self,
-        source: TaskBoardProjectSource,
-        raw_slug: &str,
-    ) -> Result<Option<String>, CliError> {
-        <Self as ProjectRegistryQueries>::ensure_task_board_project(self, source, raw_slug).await
-    }
-
-    /// Every registered project, ordered so callers render a stable list.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] when the registry cannot be read.
-    pub(crate) async fn list_task_board_projects(&self) -> Result<Vec<TaskBoardProject>, CliError> {
-        <Self as ProjectRegistryQueries>::list_task_board_projects(self).await
-    }
-
-    /// Read one project by identifier.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] when the registry cannot be read.
-    pub(crate) async fn get_task_board_project(
-        &self,
-        project_id: &str,
-    ) -> Result<Option<TaskBoardProject>, CliError> {
-        <Self as ProjectRegistryQueries>::get_task_board_project(self, project_id).await
-    }
-
-    /// Rename a project and/or set its display name. See
-    /// [`ProjectRegistryQueries::update_task_board_project`] for the full
-    /// contract.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] when the project is unknown, the slug is unusable,
-    /// or the new slug already belongs to another project of the same source.
-    pub(crate) async fn update_task_board_project(
-        &self,
-        project_id: &str,
-        edit: ProjectEdit<'_>,
-    ) -> Result<TaskBoardProject, CliError> {
-        <Self as ProjectRegistryQueries>::update_task_board_project(self, project_id, edit).await
-    }
 }
 
 /// Real implementation behind

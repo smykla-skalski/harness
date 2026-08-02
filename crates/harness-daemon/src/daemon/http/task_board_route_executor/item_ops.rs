@@ -22,6 +22,7 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_task_board_remote_viewer::{TaskBoardReadListResponse, project_task_board_list};
 
 use super::super::{DaemonHttpState, require_async_db};
+use crate::daemon::db::task_board::prelude::*;
 
 pub(crate) async fn capabilities(
     state: &DaemonHttpState,

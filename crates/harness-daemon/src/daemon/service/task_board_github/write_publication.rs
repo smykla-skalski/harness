@@ -13,6 +13,7 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 use super::DatabaseAutomationRequest;
 use super::support::{action_policy, load_session_worktrees_async, managed_branch_name};
 use super::workflow::automate_item_with_database_policy;
+use crate::daemon::db::task_board::prelude::*;
 
 #[path = "write_publication/client.rs"]
 mod client;

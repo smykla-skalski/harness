@@ -10,6 +10,7 @@ use crate::task_board::remote_wire::wire::{
 use crate::task_board::{
     TASK_BOARD_EXECUTION_TARGET_RESOURCE, TaskBoardExecutionState, TaskBoardRemoteAssignmentState,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 #[tokio::test]
 async fn cancel_adopts_unreported_start_evidence_and_accounts_exactly_once() {

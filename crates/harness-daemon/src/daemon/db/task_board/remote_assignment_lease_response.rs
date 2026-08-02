@@ -2,7 +2,6 @@ use sqlx::query;
 
 use super::remote_assignment_authority_settlement::clear_renew_io_authority_in_tx;
 use super::remote_assignment_controller_recovery::recover_controller_remote_assignment_in_tx;
-use super::remote_assignment_executor_lifecycle_queries::RemoteAssignmentExecutorLifecycleQueries;
 use super::remote_assignment_lease::{
     commit_noop, exact_mutation_replay, finish_mutation, mutation_binding_matches,
     renew_request_for_record, require_assignment,
@@ -19,25 +18,6 @@ use crate::task_board::remote_wire::wire::{RemoteLeaseRenewRequest, RemoteLeaseR
 
 #[path = "remote_assignment_lease_response/replay.rs"]
 pub(super) mod replay;
-
-impl AsyncDaemonDb {
-    pub(crate) async fn record_task_board_remote_assignment_lease_renewal(
-        &self,
-        request: &RemoteLeaseRenewRequest,
-        response: &RemoteLeaseRenewResponse,
-        authenticated_principal: &str,
-        recorded_at: &str,
-    ) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
-        <Self as RemoteAssignmentExecutorLifecycleQueries>::record_task_board_remote_assignment_lease_renewal(
-            self,
-            request,
-            response,
-            authenticated_principal,
-            recorded_at,
-        )
-        .await
-    }
-}
 
 pub(super) async fn record_task_board_remote_assignment_lease_renewal(
     db: &AsyncDaemonDb,

@@ -19,6 +19,7 @@ use crate::task_board::{
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::requests;
+use crate::daemon::db::task_board::prelude::*;
 
 pub(super) async fn finish_terminal_assignment(
     db: &AsyncDaemonDb,

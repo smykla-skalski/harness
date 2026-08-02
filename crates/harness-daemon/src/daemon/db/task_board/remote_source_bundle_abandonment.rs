@@ -8,7 +8,6 @@ use super::remote_assignment_model::{
     canonical_time, concurrent, load_offer_collision_in_tx, nonblank,
 };
 use super::remote_offer_receipts::load_offer_receipt_collisions_in_tx;
-use super::remote_source_bundle_queries::RemoteSourceBundleQueries;
 use super::remote_source_bundles::{
     TaskBoardRemoteSourceBundle, load_source_bundle_collisions_in_tx,
 };
@@ -61,55 +60,6 @@ impl TaskBoardRemoteSourceBundleAbandonment {
         self.request.offer == upload.offer
             && self.request.upload_request_sha256 == upload.request_sha256
             && self.authenticated_principal == principal
-    }
-}
-
-impl AsyncDaemonDb {
-    pub(crate) async fn exact_task_board_remote_source_bundle_abandonment(
-        &self,
-        upload: &RemoteSourceBundleUploadRequest,
-        authenticated_principal: &str,
-    ) -> Result<Option<TaskBoardRemoteSourceBundleAbandonment>, CliError> {
-        <Self as RemoteSourceBundleQueries>::exact_task_board_remote_source_bundle_abandonment(
-            self,
-            upload,
-            authenticated_principal,
-        )
-        .await
-    }
-
-    pub(crate) async fn verify_task_board_remote_source_bundle_receipt(
-        &self,
-        request: &RemoteSourceBundleUploadRequest,
-        authenticated_principal: &str,
-        observed_host_instance_id: &str,
-        checked_at: &str,
-    ) -> Result<RemoteSourceBundleReceiptVerificationResponse, CliError> {
-        <Self as RemoteSourceBundleQueries>::verify_task_board_remote_source_bundle_receipt(
-            self,
-            request,
-            authenticated_principal,
-            observed_host_instance_id,
-            checked_at,
-        )
-        .await
-    }
-
-    pub(crate) async fn abandon_task_board_remote_source_bundle(
-        &self,
-        request: &RemoteSourceBundleAbandonRequest,
-        authenticated_principal: &str,
-        observed_host_instance_id: &str,
-        abandoned_at: &str,
-    ) -> Result<TaskBoardRemoteSourceBundleAbandonment, CliError> {
-        <Self as RemoteSourceBundleQueries>::abandon_task_board_remote_source_bundle(
-            self,
-            request,
-            authenticated_principal,
-            observed_host_instance_id,
-            abandoned_at,
-        )
-        .await
     }
 }
 
