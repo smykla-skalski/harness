@@ -5,6 +5,7 @@ use super::remote_assignment_model::{
     TaskBoardRemoteAssignmentRecord, TaskBoardRemoteMutationOutcome, canonical_time, concurrent,
     nonblank, to_i64,
 };
+use super::remote_assignment_authority_queries::RemoteAssignmentAuthorityQueries;
 use super::remote_settlement_receipts::{load_settlement_in_tx, require_exact_terminal_assignment};
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::remote_wire::wire::RemoteSettledRequest;
@@ -16,47 +17,72 @@ impl AsyncDaemonDb {
         authenticated_principal: &str,
         completed_at: &str,
     ) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
-        request
-            .validate()
-            .map_err(|error| db_error(format!("validate remote cleanup request: {error}")))?;
-        nonblank(authenticated_principal, "remote cleanup principal")?;
-        canonical_time(completed_at, "remote cleanup completion time")?;
-        let mut transaction = self
-            .begin_immediate_transaction("task board remote cleanup completion")
-            .await?;
-        let assignment =
-            require_assignment(&mut transaction, &request.binding.assignment_id).await?;
-        if !persist_cleanup_completion_in_tx(
-            &mut transaction,
-            &assignment,
+        <Self as RemoteAssignmentAuthorityQueries>::complete_task_board_remote_assignment_cleanup(
+            self,
             request,
             authenticated_principal,
             completed_at,
         )
-        .await?
-        {
-            commit_noop(transaction, "replayed remote cleanup completion").await?;
-            return Ok(TaskBoardRemoteMutationOutcome::Replayed(assignment));
-        }
-        finish_mutation(transaction, &assignment.assignment_id, "cleanup completion").await
+        .await
     }
 
     pub(crate) async fn task_board_remote_executor_active_assignment_count(
         &self,
         host_id: &str,
     ) -> Result<u32, CliError> {
-        nonblank(host_id, "remote executor host")?;
-        let mut transaction =
-            self.pool().begin().await.map_err(|error| {
-                db_error(format!("begin remote executor active count: {error}"))
-            })?;
-        let count = active_remote_assignments_in_tx(&mut transaction, host_id).await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit remote executor active count: {error}")))?;
-        Ok(count)
+        <Self as RemoteAssignmentAuthorityQueries>::task_board_remote_executor_active_assignment_count(
+            self, host_id,
+        )
+        .await
     }
+}
+
+pub(super) async fn complete_task_board_remote_assignment_cleanup(
+    db: &AsyncDaemonDb,
+    request: &RemoteSettledRequest,
+    authenticated_principal: &str,
+    completed_at: &str,
+) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
+    request
+        .validate()
+        .map_err(|error| db_error(format!("validate remote cleanup request: {error}")))?;
+    nonblank(authenticated_principal, "remote cleanup principal")?;
+    canonical_time(completed_at, "remote cleanup completion time")?;
+    let mut transaction = db
+        .begin_immediate_transaction("task board remote cleanup completion")
+        .await?;
+    let assignment = require_assignment(&mut transaction, &request.binding.assignment_id).await?;
+    if !persist_cleanup_completion_in_tx(
+        &mut transaction,
+        &assignment,
+        request,
+        authenticated_principal,
+        completed_at,
+    )
+    .await?
+    {
+        commit_noop(transaction, "replayed remote cleanup completion").await?;
+        return Ok(TaskBoardRemoteMutationOutcome::Replayed(assignment));
+    }
+    finish_mutation(transaction, &assignment.assignment_id, "cleanup completion").await
+}
+
+pub(super) async fn task_board_remote_executor_active_assignment_count(
+    db: &AsyncDaemonDb,
+    host_id: &str,
+) -> Result<u32, CliError> {
+    nonblank(host_id, "remote executor host")?;
+    let mut transaction = db
+        .pool()
+        .begin()
+        .await
+        .map_err(|error| db_error(format!("begin remote executor active count: {error}")))?;
+    let count = active_remote_assignments_in_tx(&mut transaction, host_id).await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit remote executor active count: {error}")))?;
+    Ok(count)
 }
 
 pub(super) async fn persist_cleanup_completion_in_tx(

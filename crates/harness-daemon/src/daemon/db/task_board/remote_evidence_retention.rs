@@ -1,6 +1,7 @@
 use chrono::Duration;
 use sqlx::{Sqlite, Transaction, query};
 
+use super::remote_assignment_authority_queries::RemoteAssignmentAuthorityQueries;
 use super::remote_assignment_model::canonical_time;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 
@@ -20,16 +21,26 @@ impl AsyncDaemonDb {
         &self,
         now: &str,
     ) -> Result<TaskBoardRemoteEvidencePruneResult, CliError> {
-        let mut transaction = self
-            .begin_immediate_transaction("task board remote evidence retention")
-            .await?;
-        let result = prune_remote_evidence_in_tx(&mut transaction, now).await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit remote evidence retention: {error}")))?;
-        Ok(result)
+        <Self as RemoteAssignmentAuthorityQueries>::prune_task_board_remote_execution_evidence(
+            self, now,
+        )
+        .await
     }
+}
+
+pub(super) async fn prune_task_board_remote_execution_evidence(
+    db: &AsyncDaemonDb,
+    now: &str,
+) -> Result<TaskBoardRemoteEvidencePruneResult, CliError> {
+    let mut transaction = db
+        .begin_immediate_transaction("task board remote evidence retention")
+        .await?;
+    let result = prune_remote_evidence_in_tx(&mut transaction, now).await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit remote evidence retention: {error}")))?;
+    Ok(result)
 }
 
 pub(super) async fn prune_remote_evidence_in_tx(

@@ -3,6 +3,7 @@ use sqlx::{Sqlite, Transaction, query, query_as};
 use super::remote_assignment_model::{
     TaskBoardRemoteAssignmentRecord, concurrent, nonblank, to_i64,
 };
+use super::remote_assignment_authority_queries::RemoteAssignmentAuthorityQueries;
 use super::remote_lifecycle_trust::{
     TaskBoardRemoteLifecycleTrustSnapshot, load_generation_lifecycle_trust_in_tx,
 };
@@ -71,14 +72,10 @@ impl AsyncDaemonDb {
         &self,
         host_id: &str,
     ) -> Result<TaskBoardRemoteOperationTrustFence, CliError> {
-        nonblank(host_id, "remote operation trust host")?;
-        query_as::<_, OperationHostRow>(OperationHostRow::SELECT)
-            .bind(host_id)
-            .fetch_optional(self.pool())
-            .await
-            .map_err(|error| db_error(format!("load remote operation trust: {error}")))?
-            .ok_or_else(|| concurrent("remote operation host is not configured"))?
-            .into_fence()
+        <Self as RemoteAssignmentAuthorityQueries>::task_board_remote_operation_trust_fence(
+            self, host_id,
+        )
+        .await
     }
 
     pub(crate) async fn complete_task_board_remote_operation_trust(
@@ -87,23 +84,13 @@ impl AsyncDaemonDb {
         kind: TaskBoardRemoteOperationKind,
         request_sha256: &str,
     ) -> Result<(), CliError> {
-        let mut transaction = self
-            .begin_immediate_transaction("task board remote operation trust completion")
-            .await?;
-        let assignment =
-            super::remote_assignment_lease::require_assignment(&mut transaction, assignment_id)
-                .await?;
-        consume_controller_operation_trust_in_tx(
-            &mut transaction,
-            &assignment,
+        <Self as RemoteAssignmentAuthorityQueries>::complete_task_board_remote_operation_trust(
+            self,
+            assignment_id,
             kind,
             request_sha256,
         )
-        .await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit remote operation trust: {error}")))
+        .await
     }
 
     pub(crate) async fn task_board_remote_lifecycle_operation_trust_fence(
@@ -111,32 +98,79 @@ impl AsyncDaemonDb {
         assignment_id: &str,
         kind: TaskBoardRemoteOperationKind,
     ) -> Result<TaskBoardRemoteOperationTrustFence, CliError> {
-        if kind.requires_enabled_host() {
-            return Err(db_error(
-                "remote lifecycle trust fence requested for a fresh operation kind",
-            ));
-        }
-        let mut transaction = self
-            .begin_immediate_transaction("task board lifecycle operation trust")
-            .await?;
-        let assignment =
-            super::remote_assignment_lease::require_assignment(&mut transaction, assignment_id)
-                .await?;
-        let generation = load_generation_lifecycle_trust_in_tx(
-            &mut transaction,
+        <Self as RemoteAssignmentAuthorityQueries>::task_board_remote_lifecycle_operation_trust_fence(
+            self,
             assignment_id,
-            assignment.fencing_epoch,
+            kind,
         )
-        .await?;
-        let fence =
-            load_operation_fence_for_kind_in_tx(&mut transaction, &assignment, kind, &generation)
-                .await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit lifecycle operation trust: {error}")))?;
-        Ok(fence)
+        .await
     }
+}
+
+pub(super) async fn task_board_remote_operation_trust_fence(
+    db: &AsyncDaemonDb,
+    host_id: &str,
+) -> Result<TaskBoardRemoteOperationTrustFence, CliError> {
+    nonblank(host_id, "remote operation trust host")?;
+    query_as::<_, OperationHostRow>(OperationHostRow::SELECT)
+        .bind(host_id)
+        .fetch_optional(db.pool())
+        .await
+        .map_err(|error| db_error(format!("load remote operation trust: {error}")))?
+        .ok_or_else(|| concurrent("remote operation host is not configured"))?
+        .into_fence()
+}
+
+pub(super) async fn complete_task_board_remote_operation_trust(
+    db: &AsyncDaemonDb,
+    assignment_id: &str,
+    kind: TaskBoardRemoteOperationKind,
+    request_sha256: &str,
+) -> Result<(), CliError> {
+    let mut transaction = db
+        .begin_immediate_transaction("task board remote operation trust completion")
+        .await?;
+    let assignment =
+        super::remote_assignment_lease::require_assignment(&mut transaction, assignment_id)
+            .await?;
+    consume_controller_operation_trust_in_tx(&mut transaction, &assignment, kind, request_sha256)
+        .await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit remote operation trust: {error}")))
+}
+
+pub(super) async fn task_board_remote_lifecycle_operation_trust_fence(
+    db: &AsyncDaemonDb,
+    assignment_id: &str,
+    kind: TaskBoardRemoteOperationKind,
+) -> Result<TaskBoardRemoteOperationTrustFence, CliError> {
+    if kind.requires_enabled_host() {
+        return Err(db_error(
+            "remote lifecycle trust fence requested for a fresh operation kind",
+        ));
+    }
+    let mut transaction = db
+        .begin_immediate_transaction("task board lifecycle operation trust")
+        .await?;
+    let assignment =
+        super::remote_assignment_lease::require_assignment(&mut transaction, assignment_id)
+            .await?;
+    let generation = load_generation_lifecycle_trust_in_tx(
+        &mut transaction,
+        assignment_id,
+        assignment.fencing_epoch,
+    )
+    .await?;
+    let fence =
+        load_operation_fence_for_kind_in_tx(&mut transaction, &assignment, kind, &generation)
+            .await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit lifecycle operation trust: {error}")))?;
+    Ok(fence)
 }
 
 pub(super) fn has_controller_operation_trust(assignment: &TaskBoardRemoteAssignmentRecord) -> bool {

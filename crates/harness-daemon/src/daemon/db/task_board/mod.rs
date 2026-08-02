@@ -45,6 +45,7 @@ mod remote_artifact_fetch_response;
 mod remote_artifacts;
 mod remote_assignment_active_fence;
 mod remote_assignment_archival_fence;
+mod remote_assignment_authority_queries;
 #[cfg(test)]
 mod remote_assignment_archival_fence_tests;
 mod remote_assignment_authority_settlement;

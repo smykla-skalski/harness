@@ -2,6 +2,7 @@
 
 use sqlx::Transaction;
 
+use super::remote_assignment_authority_queries::RemoteAssignmentAuthorityQueries;
 use super::remote_assignment_cleanup::persist_cleanup_completion_in_tx;
 use super::remote_assignment_lease::{commit_noop, finish_mutation, require_assignment};
 use super::remote_assignment_model::{TaskBoardRemoteMutationOutcome, concurrent, nonblank};
@@ -28,28 +29,10 @@ impl AsyncDaemonDb {
         principal: &str,
         trust: &TaskBoardRemoteHostTrustFence,
     ) -> Result<Option<RemoteCleanupObservationResponse>, CliError> {
-        validate_request(request, principal)?;
-        let mut transaction = self
-            .begin_immediate_transaction("task board remote cleanup observation")
-            .await?;
-        let assignment =
-            match screen_cleanup_observation_claim_in_tx(&mut transaction, request, principal)
-                .await?
-            {
-                CleanupObservationClaimScreen::Replayed(response) => {
-                    commit_noop(transaction, "replayed remote cleanup observation").await?;
-                    return Ok(Some(*response));
-                }
-                CleanupObservationClaimScreen::Ready(assignment) => assignment,
-            };
-        claim_cleanup_observation_authority_in_tx(&mut transaction, &assignment, request, trust)
-            .await?;
-        transaction.commit().await.map_err(|error| {
-            db_error(format!(
-                "commit remote cleanup observation authority: {error}"
-            ))
-        })?;
-        Ok(None)
+        <Self as RemoteAssignmentAuthorityQueries>::claim_task_board_remote_cleanup_observation_fenced(
+            self, request, principal, trust,
+        )
+        .await
     }
 
     pub(crate) async fn record_task_board_remote_cleanup_observation(
@@ -59,41 +42,76 @@ impl AsyncDaemonDb {
         principal: &str,
         trust: &TaskBoardRemoteHostTrustFence,
     ) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
-        validate_response(request, response, principal)?;
-        let mut transaction = self
-            .begin_immediate_transaction("task board remote cleanup response")
-            .await?;
-        let assignment =
-            require_assignment(&mut transaction, &request.binding.assignment_id).await?;
-        let (receipt, replayed) = screen_cleanup_observation_record_in_tx(
-            &mut transaction,
-            &assignment,
-            request,
-            response,
-            principal,
-        )
-        .await?;
-        if replayed {
-            commit_noop(transaction, "replayed remote cleanup response").await?;
-            return Ok(TaskBoardRemoteMutationOutcome::Replayed(assignment));
-        }
-        settle_cleanup_observation_in_tx(
-            &mut transaction,
-            &assignment,
-            request,
-            &receipt,
-            principal,
-            &response.cleanup_completed_at,
-            trust,
-        )
-        .await?;
-        finish_mutation(
-            transaction,
-            &assignment.assignment_id,
-            "cleanup observation",
+        <Self as RemoteAssignmentAuthorityQueries>::record_task_board_remote_cleanup_observation(
+            self, request, response, principal, trust,
         )
         .await
     }
+}
+
+pub(super) async fn claim_task_board_remote_cleanup_observation_fenced(
+    db: &AsyncDaemonDb,
+    request: &RemoteCleanupObservationRequest,
+    principal: &str,
+    trust: &TaskBoardRemoteHostTrustFence,
+) -> Result<Option<RemoteCleanupObservationResponse>, CliError> {
+    validate_request(request, principal)?;
+    let mut transaction = db
+        .begin_immediate_transaction("task board remote cleanup observation")
+        .await?;
+    let assignment =
+        match screen_cleanup_observation_claim_in_tx(&mut transaction, request, principal).await? {
+            CleanupObservationClaimScreen::Replayed(response) => {
+                commit_noop(transaction, "replayed remote cleanup observation").await?;
+                return Ok(Some(*response));
+            }
+            CleanupObservationClaimScreen::Ready(assignment) => assignment,
+        };
+    claim_cleanup_observation_authority_in_tx(&mut transaction, &assignment, request, trust)
+        .await?;
+    transaction.commit().await.map_err(|error| {
+        db_error(format!(
+            "commit remote cleanup observation authority: {error}"
+        ))
+    })?;
+    Ok(None)
+}
+
+pub(super) async fn record_task_board_remote_cleanup_observation(
+    db: &AsyncDaemonDb,
+    request: &RemoteCleanupObservationRequest,
+    response: &RemoteCleanupObservationResponse,
+    principal: &str,
+    trust: &TaskBoardRemoteHostTrustFence,
+) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
+    validate_response(request, response, principal)?;
+    let mut transaction = db
+        .begin_immediate_transaction("task board remote cleanup response")
+        .await?;
+    let assignment = require_assignment(&mut transaction, &request.binding.assignment_id).await?;
+    let (receipt, replayed) = screen_cleanup_observation_record_in_tx(
+        &mut transaction,
+        &assignment,
+        request,
+        response,
+        principal,
+    )
+    .await?;
+    if replayed {
+        commit_noop(transaction, "replayed remote cleanup response").await?;
+        return Ok(TaskBoardRemoteMutationOutcome::Replayed(assignment));
+    }
+    settle_cleanup_observation_in_tx(
+        &mut transaction,
+        &assignment,
+        request,
+        &receipt,
+        principal,
+        &response.cleanup_completed_at,
+        trust,
+    )
+    .await?;
+    finish_mutation(transaction, &assignment.assignment_id, "cleanup observation").await
 }
 
 /// Either this exact claim already has a recorded response, or the

@@ -1,5 +1,7 @@
+use super::remote_assignment_authority_queries::RemoteAssignmentAuthorityQueries;
 use super::remote_assignment_io_authority::{
-    RemoteIoAuthorityClaim, RemoteIoAuthorityRequestEvidence, require_authority_parent,
+    RemoteIoAuthorityClaim, RemoteIoAuthorityRequestEvidence, claim_remote_io_authority,
+    require_authority_parent,
 };
 use super::remote_assignment_lease::{commit_noop, renew_request_for_record};
 use super::remote_assignment_model::{concurrent, load_assignment_in_tx};
@@ -23,16 +25,14 @@ impl AsyncDaemonDb {
         authority_at: &str,
         trust: &TaskBoardRemoteOperationTrustFence,
     ) -> Result<Option<TaskBoardRemoteIoAuthority>, CliError> {
-        request
-            .validate()
-            .map_err(|error| db_error(format!("validate remote offer I/O authority: {error}")))?;
-        let claim = RemoteIoAuthorityClaim {
-            request: RemoteIoAuthorityRequestEvidence::Offer(request),
-            principal: authenticated_principal,
+        <Self as RemoteAssignmentAuthorityQueries>::claim_task_board_remote_offer_io_authority_fenced(
+            self,
+            request,
+            authenticated_principal,
             authority_at,
-            expected_trust: Some(trust),
-        };
-        self.claim_remote_io_authority(&claim).await
+            trust,
+        )
+        .await
     }
 
     pub(crate) async fn claim_task_board_remote_claim_io_authority_fenced(
@@ -42,16 +42,14 @@ impl AsyncDaemonDb {
         authority_at: &str,
         trust: &TaskBoardRemoteOperationTrustFence,
     ) -> Result<Option<TaskBoardRemoteIoAuthority>, CliError> {
-        request
-            .validate()
-            .map_err(|error| db_error(format!("validate remote claim I/O authority: {error}")))?;
-        let claim = RemoteIoAuthorityClaim {
-            request: RemoteIoAuthorityRequestEvidence::Claim(request),
-            principal: authenticated_principal,
+        <Self as RemoteAssignmentAuthorityQueries>::claim_task_board_remote_claim_io_authority_fenced(
+            self,
+            request,
+            authenticated_principal,
             authority_at,
-            expected_trust: Some(trust),
-        };
-        self.claim_remote_io_authority(&claim).await
+            trust,
+        )
+        .await
     }
 
     pub(crate) async fn claim_task_board_remote_renew_io_authority_fenced(
@@ -61,16 +59,14 @@ impl AsyncDaemonDb {
         authority_at: &str,
         trust: &TaskBoardRemoteOperationTrustFence,
     ) -> Result<Option<TaskBoardRemoteIoAuthority>, CliError> {
-        request
-            .validate()
-            .map_err(|error| db_error(format!("validate remote renewal I/O authority: {error}")))?;
-        let claim = RemoteIoAuthorityClaim {
-            request: RemoteIoAuthorityRequestEvidence::Renew(request),
-            principal: authenticated_principal,
+        <Self as RemoteAssignmentAuthorityQueries>::claim_task_board_remote_renew_io_authority_fenced(
+            self,
+            request,
+            authenticated_principal,
             authority_at,
-            expected_trust: Some(trust),
-        };
-        self.claim_remote_io_authority(&claim).await
+            trust,
+        )
+        .await
     }
 
     pub(crate) async fn claim_task_board_remote_cancel_io_authority_fenced(
@@ -80,16 +76,14 @@ impl AsyncDaemonDb {
         authority_at: &str,
         trust: &TaskBoardRemoteOperationTrustFence,
     ) -> Result<Option<TaskBoardRemoteIoAuthority>, CliError> {
-        request
-            .validate()
-            .map_err(|error| db_error(format!("validate remote cancel I/O authority: {error}")))?;
-        let claim = RemoteIoAuthorityClaim {
-            request: RemoteIoAuthorityRequestEvidence::Cancel(request),
-            principal: authenticated_principal,
+        <Self as RemoteAssignmentAuthorityQueries>::claim_task_board_remote_cancel_io_authority_fenced(
+            self,
+            request,
+            authenticated_principal,
             authority_at,
-            expected_trust: Some(trust),
-        };
-        self.claim_remote_io_authority(&claim).await
+            trust,
+        )
+        .await
     }
 
     pub(crate) async fn require_pending_task_board_remote_renew_replay_authority_fenced(
@@ -98,50 +92,140 @@ impl AsyncDaemonDb {
         authenticated_principal: &str,
         trust: &TaskBoardRemoteHostTrustFence,
     ) -> Result<bool, CliError> {
-        request.validate().map_err(|error| {
-            db_error(format!("validate pending remote renewal replay: {error}"))
-        })?;
-        let mut transaction = self
-            .begin_immediate_transaction("pending remote renewal replay authority")
-            .await?;
-        let Some(assignment) =
-            load_assignment_in_tx(&mut transaction, &request.binding.assignment_id).await?
-        else {
-            commit_noop(transaction, "missing pending renewal replay assignment").await?;
-            return Ok(false);
-        };
-        let exact = matches!(
-            assignment.state,
-            TaskBoardRemoteAssignmentState::Claimed
-                | TaskBoardRemoteAssignmentState::Started
-                | TaskBoardRemoteAssignmentState::Running
-        ) && assignment.offer.as_ref().map(|offer| &offer.binding)
-            == Some(&request.binding)
-            && assignment.request_sha256.as_deref() == Some(request.offer_request_sha256.as_str())
-            && assignment.authenticated_principal.as_deref() == Some(authenticated_principal)
-            && assignment.lease_id.as_deref() == Some(request.lease_id.as_str())
-            && renew_request_for_record(&assignment)? == *request;
-        if !exact {
-            return Err(concurrent(
-                "pending remote renewal replay changed its assignment evidence",
-            ));
-        }
-        require_pending_operation_replay_trust_in_tx(
-            &mut transaction,
-            &assignment,
-            TaskBoardRemoteOperationKind::Renew,
-            &request.request_sha256,
+        <Self as RemoteAssignmentAuthorityQueries>::require_pending_task_board_remote_renew_replay_authority_fenced(
+            self,
+            request,
+            authenticated_principal,
             trust,
         )
-        .await?;
-        require_authority_parent(
-            &mut transaction,
-            &assignment,
-            TaskBoardRemoteIoAuthorityKind::Renew,
-            &request.request_sha256,
-        )
-        .await?;
-        commit_noop(transaction, "pending remote renewal replay authority").await?;
-        Ok(true)
+        .await
     }
+}
+
+pub(super) async fn claim_task_board_remote_offer_io_authority_fenced(
+    db: &AsyncDaemonDb,
+    request: &RemoteOfferRequest,
+    authenticated_principal: &str,
+    authority_at: &str,
+    trust: &TaskBoardRemoteOperationTrustFence,
+) -> Result<Option<TaskBoardRemoteIoAuthority>, CliError> {
+    request
+        .validate()
+        .map_err(|error| db_error(format!("validate remote offer I/O authority: {error}")))?;
+    let claim = RemoteIoAuthorityClaim {
+        request: RemoteIoAuthorityRequestEvidence::Offer(request),
+        principal: authenticated_principal,
+        authority_at,
+        expected_trust: Some(trust),
+    };
+    claim_remote_io_authority(db, &claim).await
+}
+
+pub(super) async fn claim_task_board_remote_claim_io_authority_fenced(
+    db: &AsyncDaemonDb,
+    request: &RemoteClaimRequest,
+    authenticated_principal: &str,
+    authority_at: &str,
+    trust: &TaskBoardRemoteOperationTrustFence,
+) -> Result<Option<TaskBoardRemoteIoAuthority>, CliError> {
+    request
+        .validate()
+        .map_err(|error| db_error(format!("validate remote claim I/O authority: {error}")))?;
+    let claim = RemoteIoAuthorityClaim {
+        request: RemoteIoAuthorityRequestEvidence::Claim(request),
+        principal: authenticated_principal,
+        authority_at,
+        expected_trust: Some(trust),
+    };
+    claim_remote_io_authority(db, &claim).await
+}
+
+pub(super) async fn claim_task_board_remote_renew_io_authority_fenced(
+    db: &AsyncDaemonDb,
+    request: &RemoteLeaseRenewRequest,
+    authenticated_principal: &str,
+    authority_at: &str,
+    trust: &TaskBoardRemoteOperationTrustFence,
+) -> Result<Option<TaskBoardRemoteIoAuthority>, CliError> {
+    request
+        .validate()
+        .map_err(|error| db_error(format!("validate remote renewal I/O authority: {error}")))?;
+    let claim = RemoteIoAuthorityClaim {
+        request: RemoteIoAuthorityRequestEvidence::Renew(request),
+        principal: authenticated_principal,
+        authority_at,
+        expected_trust: Some(trust),
+    };
+    claim_remote_io_authority(db, &claim).await
+}
+
+pub(super) async fn claim_task_board_remote_cancel_io_authority_fenced(
+    db: &AsyncDaemonDb,
+    request: &RemoteCancelRequest,
+    authenticated_principal: &str,
+    authority_at: &str,
+    trust: &TaskBoardRemoteOperationTrustFence,
+) -> Result<Option<TaskBoardRemoteIoAuthority>, CliError> {
+    request
+        .validate()
+        .map_err(|error| db_error(format!("validate remote cancel I/O authority: {error}")))?;
+    let claim = RemoteIoAuthorityClaim {
+        request: RemoteIoAuthorityRequestEvidence::Cancel(request),
+        principal: authenticated_principal,
+        authority_at,
+        expected_trust: Some(trust),
+    };
+    claim_remote_io_authority(db, &claim).await
+}
+
+pub(super) async fn require_pending_task_board_remote_renew_replay_authority_fenced(
+    db: &AsyncDaemonDb,
+    request: &RemoteLeaseRenewRequest,
+    authenticated_principal: &str,
+    trust: &TaskBoardRemoteHostTrustFence,
+) -> Result<bool, CliError> {
+    request
+        .validate()
+        .map_err(|error| db_error(format!("validate pending remote renewal replay: {error}")))?;
+    let mut transaction = db
+        .begin_immediate_transaction("pending remote renewal replay authority")
+        .await?;
+    let Some(assignment) =
+        load_assignment_in_tx(&mut transaction, &request.binding.assignment_id).await?
+    else {
+        commit_noop(transaction, "missing pending renewal replay assignment").await?;
+        return Ok(false);
+    };
+    let exact = matches!(
+        assignment.state,
+        TaskBoardRemoteAssignmentState::Claimed
+            | TaskBoardRemoteAssignmentState::Started
+            | TaskBoardRemoteAssignmentState::Running
+    ) && assignment.offer.as_ref().map(|offer| &offer.binding) == Some(&request.binding)
+        && assignment.request_sha256.as_deref() == Some(request.offer_request_sha256.as_str())
+        && assignment.authenticated_principal.as_deref() == Some(authenticated_principal)
+        && assignment.lease_id.as_deref() == Some(request.lease_id.as_str())
+        && renew_request_for_record(&assignment)? == *request;
+    if !exact {
+        return Err(concurrent(
+            "pending remote renewal replay changed its assignment evidence",
+        ));
+    }
+    require_pending_operation_replay_trust_in_tx(
+        &mut transaction,
+        &assignment,
+        TaskBoardRemoteOperationKind::Renew,
+        &request.request_sha256,
+        trust,
+    )
+    .await?;
+    require_authority_parent(
+        &mut transaction,
+        &assignment,
+        TaskBoardRemoteIoAuthorityKind::Renew,
+        &request.request_sha256,
+    )
+    .await?;
+    commit_noop(transaction, "pending remote renewal replay authority").await?;
+    Ok(true)
 }
