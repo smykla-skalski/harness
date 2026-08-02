@@ -101,6 +101,14 @@ public enum HarnessMonitorAccessibility {
     "harness.dashboard.window.toolbar.separator-suppressed"
   public static let dashboardSidebar = "harness.dashboard.sidebar"
   public static let dashboardScrollView = "harness.dashboard.scroll"
+  public static let dashboardAgentsRoot = "harness.dashboard.agents"
+  public static let dashboardAgentsList = "harness.dashboard.agents.list"
+  public static let dashboardAgentDetail = "harness.dashboard.agents.detail"
+  public static let dashboardAgentsRefreshButton = "harness.dashboard.agents.refresh"
+  public static let dashboardAgentsLoadState = "harness.dashboard.agents.load-state"
+  public static func dashboardAgentRow(_ identity: String) -> String {
+    "harness.dashboard.agents.row.\(slug(identity))"
+  }
   public static let dashboardAuditRoot = "harness.dashboard.audit"
   public static let dashboardAuditDetailDivider =
     "harness.dashboard.audit.content-detail-divider"

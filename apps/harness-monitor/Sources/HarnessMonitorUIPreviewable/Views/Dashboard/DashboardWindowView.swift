@@ -184,6 +184,7 @@ public struct DashboardWindowView: View {
               selectedRoute: selectedRouteBinding,
               store: store,
               dashboardUI: dashboardUI,
+              history: history,
               policyCanvasViewModelStore: policyCanvasViewModelStore,
               sessionCatalog: sessionCatalog,
               operationsInspectorVisible: operationsInspectorVisible,

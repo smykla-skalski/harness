@@ -291,6 +291,45 @@ struct HarnessMonitorStoreNavigationTests {
     #expect(!history.canGoForward)
   }
 
+  @Test("Global window history restores Dashboard agent selections")
+  func globalWindowHistoryRestoresAgentSelections() async throws {
+    let store = try await makeNavigationStore()
+    let history = GlobalWindowNavigationHistory(store: store)
+    let workspace = DashboardAgentWorkspaceIdentity(
+      projectID: "harness",
+      checkoutID: "main"
+    )
+    let first = DashboardAgentIdentity(
+      workspace: workspace,
+      runtimeKind: .terminal,
+      managedAgentID: "terminal-1"
+    )
+    let second = DashboardAgentIdentity(
+      workspace: workspace,
+      runtimeKind: .codex,
+      managedAgentID: "codex-1"
+    )
+
+    history.installDashboardStateIfNeeded(route: .taskBoard)
+    history.recordDashboardRoute(.agents)
+    history.recordDashboardAgentSelection(first)
+    history.recordDashboardAgentSelection(second)
+
+    history.navigateBack()
+
+    let dashboardRequest = try #require(history.pendingDashboardRestoreRequest)
+    let agentsRequest = try #require(history.pendingDashboardAgentsRestoreRequest)
+    #expect(dashboardRequest.selection == .agents(first))
+    #expect(agentsRequest.identity == first)
+    history.finishDashboardRestoreRequest(dashboardRequest.requestID)
+    history.finishDashboardAgentsRestoreRequest(agentsRequest.requestID)
+
+    history.navigateForward()
+
+    let forwardRequest = try #require(history.pendingDashboardAgentsRestoreRequest)
+    #expect(forwardRequest.identity == second)
+  }
+
   // MARK: - Fixtures
 
   func makeNavigationStore() async throws -> HarnessMonitorStore {

@@ -3,6 +3,12 @@
   "configuration": "Preview",
   "entries": [
     {
+      "id": "DashboardAgentsRouteView",
+      "description": "Dashboard agent browser grouped by workspace with persistent selection",
+      "file": "Sources/HarnessMonitorUIPreviewable/Views/Agents/Previews/PreviewDashboardAgentsRouteView.swift",
+      "index": 0
+    },
+    {
       "id": "SettingsView",
       "description": "Settings root window",
       "file": "Sources/HarnessMonitorUIPreviewable/Views/Settings/Previews/PreviewSettingsView.swift",

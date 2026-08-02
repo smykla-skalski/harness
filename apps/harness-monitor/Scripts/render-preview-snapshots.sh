@@ -8,6 +8,7 @@ Usage:
   mise run monitor:preview -- <suite> [output-directory]
 
 Suites:
+  dashboard-agents
   dashboard-diff-lab
   task-board-lane-alignment
   task-board-inspector
@@ -20,6 +21,7 @@ EOF
 
 if [[ "${1:-}" == "--list" ]]; then
   printf '%s\n' \
+    dashboard-agents \
     dashboard-diff-lab \
     task-board-lane-alignment \
     task-board-inspector \
@@ -37,7 +39,7 @@ if [[ -z "$suite" ]]; then
 fi
 
 case "$suite" in
-  dashboard-diff-lab|task-board-lane-alignment|task-board-inspector|task-board-review-report|task-board-workflow-progress|task-board-filters|secret-migration-consent) ;;
+  dashboard-agents|dashboard-diff-lab|task-board-lane-alignment|task-board-inspector|task-board-review-report|task-board-workflow-progress|task-board-filters|secret-migration-consent) ;;
   *)
     printf 'error: unknown preview suite: %s\n' "$suite" >&2
     usage >&2
@@ -85,6 +87,9 @@ cleanup() {
 trap cleanup EXIT
 
 case "$suite" in
+  dashboard-agents)
+    HARNESS_DASHBOARD_AGENTS_PREVIEW_DUMP="$staging_directory" "$host"
+    ;;
   dashboard-diff-lab)
     HARNESS_DIFF_LAB_DUMP="$staging_directory" "$host"
     ;;

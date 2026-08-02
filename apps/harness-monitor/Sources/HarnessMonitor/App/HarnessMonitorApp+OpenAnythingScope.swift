@@ -158,7 +158,7 @@ func openAnythingContextDomain(
     return .reviews
   case .taskBoard:
     return .taskBoard
-  case .policyCanvas, .audit, .diagnostics, .debugging:
+  case .agents, .policyCanvas, .audit, .diagnostics, .debugging:
     return nil
   }
 }

@@ -6,6 +6,7 @@ struct DashboardRouteContent: View, Equatable {
   @Binding var selectedRoute: DashboardWindowRoute
   let store: HarnessMonitorStore
   let dashboardUI: HarnessMonitorStore.ContentDashboardSlice
+  let history: GlobalWindowNavigationHistory
   let policyCanvasViewModelStore: DashboardPolicyCanvasViewModelStore
   let sessionCatalog: HarnessMonitorStore.SessionCatalogSlice
   let operationsInspectorVisible: Bool
@@ -19,6 +20,7 @@ struct DashboardRouteContent: View, Equatable {
     lhs.route == rhs.route
       && lhs.store === rhs.store
       && lhs.dashboardUI === rhs.dashboardUI
+      && lhs.history === rhs.history
       && lhs.policyCanvasViewModelStore === rhs.policyCanvasViewModelStore
       && lhs.sessionCatalog === rhs.sessionCatalog
       && lhs.operationsInspectorVisible == rhs.operationsInspectorVisible
@@ -26,6 +28,7 @@ struct DashboardRouteContent: View, Equatable {
   }
 
   private var isTaskBoardVisible: Bool { route == .taskBoard }
+  private var isAgentsVisible: Bool { route == .agents }
   private var isAuditVisible: Bool { route == .audit }
   private var isDiagnosticsVisible: Bool { route == .diagnostics }
   private var isDebuggingVisible: Bool { route == .debugging }
@@ -52,6 +55,16 @@ struct DashboardRouteContent: View, Equatable {
       .opacity(isTaskBoardVisible ? 1 : 0)
       .allowsHitTesting(isTaskBoardVisible)
       .accessibilityHidden(!isTaskBoardVisible)
+
+      DashboardRetainedAuxiliaryRoute(isVisible: isAgentsVisible) {
+        DashboardAgentsRouteView(
+          store: store,
+          sessions: sessionCatalog.sessions,
+          history: history,
+          isRouteVisible: isAgentsVisible
+        )
+      }
+      .layoutValue(key: DashboardRetainedRouteKey.self, value: .agents)
 
       DashboardRetainedAuxiliaryRoute(isVisible: isAuditVisible) {
         DashboardAuditRouteView(

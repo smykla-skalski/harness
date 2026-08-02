@@ -116,6 +116,7 @@ struct DashboardPerfRouteHook: ViewModifier {
 
 public enum DashboardWindowRoute: String, CaseIterable, Identifiable, Sendable {
   case taskBoard
+  case agents
   case policyCanvas
   case reviews
   case audit
@@ -128,6 +129,8 @@ public enum DashboardWindowRoute: String, CaseIterable, Identifiable, Sendable {
     switch self {
     case .taskBoard:
       "Board"
+    case .agents:
+      "Agents"
     case .policyCanvas:
       "Policies"
     case .audit:
@@ -145,6 +148,8 @@ public enum DashboardWindowRoute: String, CaseIterable, Identifiable, Sendable {
     switch self {
     case .taskBoard:
       "square.grid.2x2"
+    case .agents:
+      "person.2"
     case .policyCanvas:
       "point.3.connected.trianglepath.dotted"
     case .audit:

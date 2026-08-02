@@ -9,12 +9,15 @@ enum GlobalWindowNavigationEntry: Hashable {
 
 enum DashboardWindowSelection: Hashable, Sendable {
   case route(DashboardWindowRoute)
+  case agents(DashboardAgentIdentity)
   case reviews(DashboardReviewsHistorySelection)
 
   var route: DashboardWindowRoute {
     switch self {
     case .route(let route):
       route
+    case .agents:
+      .agents
     case .reviews:
       .reviews
     }
@@ -25,6 +28,11 @@ enum DashboardWindowSelection: Hashable, Sendable {
       return nil
     }
     return selection
+  }
+
+  var agentIdentity: DashboardAgentIdentity? {
+    guard case .agents(let identity) = self else { return nil }
+    return identity
   }
 }
 
@@ -38,6 +46,11 @@ struct DashboardWindowNavigationRestoreRequest: Equatable, Sendable {
 struct DashboardReviewsNavigationRestoreRequest: Equatable, Sendable {
   let requestID: Int
   let selection: DashboardReviewsHistorySelection
+}
+
+struct DashboardAgentsNavigationRestoreRequest: Equatable, Sendable {
+  let requestID: Int
+  let identity: DashboardAgentIdentity
 }
 
 struct SessionWindowNavigationRestoreRequest: Equatable, Sendable {

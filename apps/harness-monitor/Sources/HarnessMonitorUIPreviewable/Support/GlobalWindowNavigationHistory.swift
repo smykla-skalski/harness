@@ -12,6 +12,7 @@ public final class GlobalWindowNavigationHistory {
   private(set) var dashboardSelection: DashboardWindowSelection
   private(set) var latestSessionSelections: [String: SessionSelection] = [:]
   private(set) var pendingDashboardRestoreRequest: DashboardWindowNavigationRestoreRequest?
+  private(set) var pendingDashboardAgentsRestoreRequest: DashboardAgentsNavigationRestoreRequest?
   private(set) var pendingDashboardReviewsRestoreRequest: DashboardReviewsNavigationRestoreRequest?
   private(set) var pendingSessionRestoreRequest: SessionWindowNavigationRestoreRequest?
 
@@ -70,7 +71,12 @@ public final class GlobalWindowNavigationHistory {
   func installDashboardStateIfNeeded(route: DashboardWindowRoute) {
     let selection = DashboardWindowSelection.route(route)
     dashboardSelection = selection
-    guard currentEntry == nil || shouldReplaceInitialDashboardEntry(with: selection) else {
+    guard
+      currentEntry == nil
+        || shouldReplaceInitialDashboardHistoryEntry(
+          currentEntry, selection, backStack.isEmpty, forwardStack.isEmpty
+        )
+    else {
       return
     }
     currentEntry = .dashboard(selection: selection)
@@ -94,6 +100,10 @@ public final class GlobalWindowNavigationHistory {
     recordDashboardSelection(.route(route))
   }
 
+  func recordDashboardAgentSelection(_ identity: DashboardAgentIdentity) {
+    recordDashboardSelection(.agents(identity))
+  }
+
   func recordDashboardSelection(
     _ selection: DashboardWindowSelection,
     lineOnlyCoalesces: Bool = true
@@ -114,7 +124,15 @@ public final class GlobalWindowNavigationHistory {
     {
       return
     }
-    if shouldUpgradeCurrentDashboardEntry(to: selection) {
+    if let identity = selection.agentIdentity,
+      pendingDashboardAgentsRestoreRequest?.identity == identity
+    {
+      return
+    }
+    let hasPendingDetailRestore =
+      pendingDashboardReviewsRestoreRequest != nil
+      || pendingDashboardAgentsRestoreRequest != nil
+    if shouldUpgradeDashboardHistoryEntry(currentEntry, selection, hasPendingDetailRestore) {
       currentEntry = .dashboard(selection: selection)
       return
     }
@@ -203,6 +221,7 @@ public final class GlobalWindowNavigationHistory {
     restoreRequestSequence += 1
     dashboardSelection = .route(route)
     pendingSessionRestoreRequest = nil
+    pendingDashboardAgentsRestoreRequest = nil
     pendingDashboardReviewsRestoreRequest = nil
     pendingDashboardRestoreRequest = DashboardWindowNavigationRestoreRequest(
       requestID: restoreRequestSequence,
@@ -240,17 +259,17 @@ public final class GlobalWindowNavigationHistory {
   }
 
   func finishDashboardRestoreRequest(_ requestID: Int) {
-    guard pendingDashboardRestoreRequest?.requestID == requestID else {
-      return
-    }
+    guard pendingDashboardRestoreRequest?.requestID == requestID else { return }
     pendingDashboardRestoreRequest = nil
   }
 
   func finishDashboardReviewsRestoreRequest(_ requestID: Int) {
-    guard pendingDashboardReviewsRestoreRequest?.requestID == requestID else {
-      return
-    }
+    guard pendingDashboardReviewsRestoreRequest?.requestID == requestID else { return }
     pendingDashboardReviewsRestoreRequest = nil
+  }
+  func finishDashboardAgentsRestoreRequest(_ requestID: Int) {
+    guard pendingDashboardAgentsRestoreRequest?.requestID == requestID else { return }
+    pendingDashboardAgentsRestoreRequest = nil
   }
 
   func finishSessionRestoreRequest(
@@ -293,6 +312,14 @@ public final class GlobalWindowNavigationHistory {
         requestID: restoreRequestSequence,
         selection: selection
       )
+      if case .agents(let identity) = selection {
+        pendingDashboardAgentsRestoreRequest = DashboardAgentsNavigationRestoreRequest(
+          requestID: restoreRequestSequence,
+          identity: identity
+        )
+      } else {
+        pendingDashboardAgentsRestoreRequest = nil
+      }
       if case .reviews(let reviewsSelection) = selection {
         pendingDashboardReviewsRestoreRequest = DashboardReviewsNavigationRestoreRequest(
           requestID: restoreRequestSequence,
@@ -304,6 +331,7 @@ public final class GlobalWindowNavigationHistory {
     case .session(let sessionID, let selection):
       latestSessionSelections[sessionID] = selection
       pendingDashboardRestoreRequest = nil
+      pendingDashboardAgentsRestoreRequest = nil
       pendingDashboardReviewsRestoreRequest = nil
       pendingSessionRestoreRequest = SessionWindowNavigationRestoreRequest(
         requestID: restoreRequestSequence,
@@ -389,31 +417,4 @@ public final class GlobalWindowNavigationHistory {
       && current.lineSelection != next.lineSelection
   }
 
-  private func shouldUpgradeCurrentDashboardEntry(
-    to selection: DashboardWindowSelection
-  ) -> Bool {
-    guard pendingDashboardReviewsRestoreRequest == nil else {
-      return false
-    }
-    guard let currentEntry else {
-      return false
-    }
-    guard case .dashboard(selection: .route(.reviews)) = currentEntry else {
-      return false
-    }
-    return selection.route == .reviews
-  }
-
-  private func shouldReplaceInitialDashboardEntry(
-    with selection: DashboardWindowSelection
-  ) -> Bool {
-    guard backStack.isEmpty && forwardStack.isEmpty else {
-      return false
-    }
-    return currentEntry
-      == .dashboard(
-        selection: .route(DashboardRouteRestorationDefaults.defaultRoute)
-      )
-      && selection != .route(DashboardRouteRestorationDefaults.defaultRoute)
-  }
 }

@@ -4,6 +4,15 @@ import Testing
 
 @Suite("Dashboard window route titles")
 struct DashboardWindowRouteTitleTests {
+  @Test("Agents route exposes accessible Dashboard navigation chrome")
+  func agentsRouteUsesDashboardChrome() {
+    #expect(DashboardWindowRoute.agents.rawValue == "agents")
+    #expect(DashboardWindowRoute.agents.title == "Agents")
+    #expect(DashboardWindowRoute.agents.systemImage == "person.2")
+    #expect(DashboardWindowRoute.agents.navigationTitle == "Dashboard")
+    #expect(DashboardWindowRoute.agents.navigationSubtitle == "Agents")
+  }
+
   @Test("Policies route keeps its sidebar title and clears dashboard title chrome")
   func policiesRouteKeepsSidebarTitleAndClearsDashboardTitleChrome() {
     #expect(DashboardWindowRoute.policyCanvas.title == "Policies")
