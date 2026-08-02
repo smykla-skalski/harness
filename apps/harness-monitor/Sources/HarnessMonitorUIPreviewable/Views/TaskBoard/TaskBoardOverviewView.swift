@@ -45,8 +45,6 @@ public struct TaskBoardOverviewView: View {
   @State private var taskBoardSelectionDispatcher = TaskBoardSelectionDispatcher()
   @State private var relativeTimeClock = TaskBoardRelativeTimeClock()
   @State private var localHostRoutingState = TaskBoardLocalHostRoutingState()
-  @AppStorage(TaskBoardEvaluatePreferences.dryRunStorageKey)
-  var evaluateDryRun = TaskBoardEvaluatePreferences.defaultDryRun
   @State private var evaluatePreviewState = TaskBoardEvaluatePreviewState()
   @State private var pendingLiveOperation: TaskBoardOverviewLiveOperation?
   @AppStorage(TaskBoardLaneCollapsePreferences.storageKey)
@@ -75,6 +73,10 @@ public struct TaskBoardOverviewView: View {
   }
 
   var metrics: TaskBoardOverviewMetrics { TaskBoardOverviewMetrics(fontScale: fontScale) }
+
+  var evaluateDryRun: Bool {
+    orchestratorStatus?.settings.dryRunDefault ?? true
+  }
 
   var laneMetrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
 

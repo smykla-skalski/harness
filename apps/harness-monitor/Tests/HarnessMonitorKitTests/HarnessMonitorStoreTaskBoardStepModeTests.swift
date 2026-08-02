@@ -162,7 +162,7 @@ struct HarnessMonitorStoreTaskBoardStepModeTests {
 
   private func recordedStepModeMutations(_ client: RecordingHarnessClient) -> [Bool] {
     client.recordedCalls().compactMap { call in
-      guard case .updateTaskBoardOrchestratorSettings(let stepMode, _, _, _) = call else {
+      guard case .updateTaskBoardOrchestratorSettings(let stepMode, _, _, _, _) = call else {
         return nil
       }
       return stepMode

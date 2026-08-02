@@ -192,4 +192,13 @@ extension TaskBoardOverviewActions {
       }
     )
   }
+
+  func setTaskBoardDryRun(_ enabled: Bool) {
+    guard canSetDryRun, let store else { return }
+    HarnessMonitorAsyncWorkQueue.shared.submit(
+      .init(title: enabled ? "Enabling task-board dry run" : "Disabling task-board dry run") {
+        await store.setTaskBoardDryRunDefault(enabled: enabled)
+      }
+    )
+  }
 }

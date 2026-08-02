@@ -153,6 +153,7 @@ public enum TaskBoardInspectorPreviewRenderer {
         textSizeIndex: HarnessMonitorTextSize.scales.count - 1,
         directory: directory
       )
+      && TaskBoardOrchestratorControlsPreviewRenderer.dump(toDirectory: directory)
       && TaskBoardReviewReportPreviewRenderer.dump(toDirectory: directory)
   }
 

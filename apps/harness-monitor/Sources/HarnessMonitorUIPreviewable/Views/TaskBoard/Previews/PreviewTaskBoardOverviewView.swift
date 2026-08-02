@@ -1,3 +1,4 @@
+import AppKit
 import HarnessMonitorKit
 import SwiftUI
 
@@ -16,6 +17,29 @@ import SwiftUI
   .frame(width: 1_120)
 }
 
+#Preview("Task Board Orchestrator Controls") {
+  TaskBoardOrchestratorControlsPreview()
+    .harnessPreviewSceneAppearance()
+}
+
+private struct TaskBoardOrchestratorControlsPreview: View {
+  @State private var pendingLiveOperation: TaskBoardOverviewLiveOperation?
+
+  var body: some View {
+    TaskBoardOrchestratorSummaryView(
+      status: TaskBoardPreviewFixtures.orchestratorStatus(dryRunDefault: true),
+      actions: TaskBoardOverviewActions(
+        store: TaskBoardPreviewFixtures.store,
+        scope: .dashboard
+      ),
+      pendingLiveOperation: $pendingLiveOperation
+    )
+    .padding(24)
+    .frame(width: 1_120, height: 180)
+    .background(Color(nsColor: .windowBackgroundColor))
+  }
+}
+
 private enum TaskBoardPreviewFixtures {
   @MainActor static let store: HarnessMonitorStore = {
     HarnessMonitorPreviewStoreFactory.makeStore(for: .taskBoardBoardOnly)
@@ -28,19 +52,23 @@ private enum TaskBoardPreviewFixtures {
     blocked: 1
   )
 
-  static let orchestratorStatus = TaskBoardOrchestratorStatus(
-    enabled: true,
-    running: false,
-    workflowExecutionCounts: [
-      TaskBoardWorkflowExecutionCount(status: .running, count: 1),
-      TaskBoardWorkflowExecutionCount(status: .paused, count: 1),
-    ],
-    settings: TaskBoardOrchestratorSettings(
-      enabledWorkflows: [.defaultTask, .prReview],
-      dryRunDefault: false,
-      policyVersion: "preview"
+  static let orchestratorStatus = orchestratorStatus(dryRunDefault: false)
+
+  static func orchestratorStatus(dryRunDefault: Bool) -> TaskBoardOrchestratorStatus {
+    TaskBoardOrchestratorStatus(
+      enabled: true,
+      running: false,
+      workflowExecutionCounts: [
+        TaskBoardWorkflowExecutionCount(status: .running, count: 1),
+        TaskBoardWorkflowExecutionCount(status: .paused, count: 1),
+      ],
+      settings: TaskBoardOrchestratorSettings(
+        enabledWorkflows: [.defaultTask, .prReview],
+        dryRunDefault: dryRunDefault,
+        policyVersion: "preview"
+      )
     )
-  )
+  }
 
   static let snapshot = TaskBoardInboxSnapshot(
     sessions: [PreviewFixtures.taskDropSummary, secondarySession],
@@ -132,4 +160,52 @@ private enum TaskBoardPreviewFixtures {
       checkpointSummary: nil
     ),
   ]
+}
+
+@MainActor
+public enum TaskBoardOrchestratorControlsPreviewRenderer {
+  public static func dump(toDirectory directory: String) -> Bool {
+    render(
+      name: "orchestrator-controls-default",
+      textSizeIndex: HarnessMonitorTextSize.defaultIndex,
+      directory: directory
+    )
+      && render(
+        name: "orchestrator-controls-largest-text",
+        textSizeIndex: HarnessMonitorTextSize.scales.count - 1,
+        directory: directory
+      )
+  }
+
+  private static func render(
+    name: String,
+    textSizeIndex: Int,
+    directory: String
+  ) -> Bool {
+    let content = TaskBoardOrchestratorControlsPreview()
+      .harnessPreviewSceneAppearance(textSizeIndex: textSizeIndex)
+    let view = NSHostingView(rootView: content)
+    view.setFrameSize(NSSize(width: 1_120, height: 180))
+    view.layoutSubtreeIfNeeded()
+
+    guard let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) else {
+      return false
+    }
+    view.cacheDisplay(in: view.bounds, to: bitmap)
+    guard let data = bitmap.representation(using: .png, properties: [:]), !data.isEmpty else {
+      return false
+    }
+
+    do {
+      try data.write(
+        to: URL(fileURLWithPath: directory)
+          .appendingPathComponent(name)
+          .appendingPathExtension("png"),
+        options: .atomic
+      )
+      return true
+    } catch {
+      return false
+    }
+  }
 }

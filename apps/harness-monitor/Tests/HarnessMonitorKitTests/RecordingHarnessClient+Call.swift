@@ -181,6 +181,7 @@ extension RecordingHarnessClient {
     case revokeTaskBoardPlan(id: String, actor: String?)
     case updateTaskBoardOrchestratorSettings(
       stepMode: Bool?,
+      dryRunDefault: Bool?,
       policyVersion: String?,
       clearProjectDir: Bool,
       clearDispatchStatusFilter: Bool

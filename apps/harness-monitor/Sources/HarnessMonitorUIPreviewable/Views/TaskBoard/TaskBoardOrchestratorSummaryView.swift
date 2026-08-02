@@ -142,6 +142,21 @@ struct TaskBoardOrchestratorSummaryView: View {
       .accessibilityIdentifier("harness.task-board.orchestrator.step-mode")
     }
 
+    if actions.canSetDryRun {
+      Toggle(
+        "Dry Run",
+        isOn: Binding(
+          get: { status.settings.dryRunDefault },
+          set: { enabled in actions.setTaskBoardDryRun(enabled) }
+        )
+      )
+      .toggleStyle(.switch)
+      .controlSize(HarnessMonitorControlMetrics.compactControlSize)
+      .disabled(isActionInFlight)
+      .help("Preview task-board runs and evaluations without applying changes")
+      .accessibilityIdentifier("harness.task-board.orchestrator.dry-run")
+    }
+
     if status.running {
       if actions.canStopOrchestrator {
         Button {

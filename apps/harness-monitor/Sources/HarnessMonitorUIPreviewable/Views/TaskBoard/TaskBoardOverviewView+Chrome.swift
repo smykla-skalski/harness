@@ -130,12 +130,6 @@ extension TaskBoardOverviewView {
     }
 
     if actions.canEvaluateBoard {
-      Toggle("Dry run", isOn: $evaluateDryRun)
-        .toggleStyle(.checkbox)
-        .controlSize(HarnessMonitorControlMetrics.compactControlSize)
-        .disabled(isActionInFlight)
-        .help("Preview the evaluate without applying any board changes")
-        .accessibilityIdentifier("harness.task-board.evaluate.dry-run")
       Button {
         triggerBoardEvaluate()
       } label: {

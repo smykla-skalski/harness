@@ -49,6 +49,7 @@ public struct TaskBoardOverviewActions: Equatable {
   var canStartOrchestrator: Bool { hasStore && isDashboardScope }
   var canStopOrchestrator: Bool { hasStore && isDashboardScope }
   var canSetStepMode: Bool { hasStore && isDashboardScope }
+  var canSetDryRun: Bool { hasStore && isDashboardScope }
 
   var canMoveInboxItems: Bool { hasStore }
   var canMoveTaskBoardItems: Bool { hasStore }

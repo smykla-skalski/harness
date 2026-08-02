@@ -160,7 +160,7 @@ extension HarnessMonitorStore {
     return taskBoardOrchestratorStatus(baseStatus, applying: confirmedSettings)
   }
 
-  private func taskBoardOrchestratorStatus(
+  func taskBoardOrchestratorStatus(
     _ status: TaskBoardOrchestratorStatus,
     applying settings: TaskBoardOrchestratorSettings
   ) -> TaskBoardOrchestratorStatus {

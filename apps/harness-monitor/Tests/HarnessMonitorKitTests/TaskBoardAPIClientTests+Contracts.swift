@@ -340,6 +340,7 @@ extension TaskBoardAPIClientTests {
         ),
         .updateTaskBoardOrchestratorSettings(
           stepMode: true,
+          dryRunDefault: false,
           policyVersion: "task-board-policy-v3",
           clearProjectDir: true,
           clearDispatchStatusFilter: true
