@@ -40,6 +40,20 @@ Stay read-only outside the assigned worktree except for repository or remote sta
 
 A `replay` task ends only when clean local `main` and the session worktree point to the same commit, with any `upstream/main` difference reported. If completed local replay commits block the post-merge PR fast-forward, require a stable, signed, signed-off local range, rebase and re-sign only that range onto merged `upstream/main`, then wait for the user to push it; stop for the user when unpublished commits fail that precondition, and never cherry-pick the PR commit on top of the local range. Successful `pr` delivery ends only after the user merges and local `main` matches `upstream/main`; the session worktree and branch then either realign and stay reusable, or, for a one-off non-umbrella issue or task, get removed and deleted per the closeout variant in the delivery guide. A closed-unmerged PR uses the guide's explicit undelivered terminal state. The agent never merges the PR.
 
+## Visual changes
+
+Any change that alters what Harness Monitor renders, on macOS, iOS, or watchOS, requires user approval of an HTML snapshot gallery before the first commit of that change. This covers layout, typography, spacing, color, iconography, state presentation, animation endpoints, and any new or restyled view. It is not satisfied by a description, a code diff, a screenshot pasted into chat, or a build that compiles.
+
+Render the affected snapshots, inspect every emitted image yourself, then hand the user the gallery path and wait. Do not commit, and do not start delivery, until the user approves. When the user asks for changes, re-render and hand over the gallery again. `docs/agent-guides/monitor-previews.md` owns the mechanics, the suite registry, and how each platform produces its images.
+
+```bash
+HARNESS_MONITOR_BUILD_LANE=<session-lane> \
+HARNESS_MONITOR_RUNTIME_LANE=<session-lane> \
+mise run monitor:preview -- <suite> tmp/preview-snapshots/<suite>/<task>
+```
+
+That command assumes the assigned Monitor worktree and its session lanes, and it is safe to rerun; each run rebuilds the preview host and overwrites the output directory. `mise run monitor:preview -- --list` names the registered suites. A visual change with no suite that covers it needs one added before the change lands, since an unrendered surface cannot be approved.
+
 ## UI test failures
 
 When UI tests are failing, run one failing test at a time using `XCODE_ONLY_TESTING`. Never run a broad suite or multiple failing tests together — XCUITest runs block the whole machine and the run time compounds fast. Fix one, verify it passes, then move to the next.

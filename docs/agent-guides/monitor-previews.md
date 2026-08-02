@@ -20,7 +20,23 @@ mise run monitor:preview -- --list
 
 `monitor:preview` builds the `HarnessMonitorUIPreviews` scheme in the active build lane, runs `HarnessMonitorPreviewHost` with no window or Dock presence, verifies that the renderer produced fresh non-empty PNGs, copies them to the requested directory, and generates an `index.html` gallery. The gallery shows each image at its exact point dimensions and render scale and links to the original PNG. Keep generated snapshots and galleries under the worktree's ignored `tmp/preview-snapshots/` tree and do not commit them.
 
-After every visual task, render the affected suite and inspect every emitted image with the environment's native image inspection tool. Obtain explicit user approval of the generated gallery before starting PR delivery. Include the clickable gallery path in the approval request so the user can review every exact-size snapshot without launching the application.
+After every visual task, render the affected suite and inspect every emitted image with the environment's native image inspection tool.
+
+## The approval gate
+
+A change that alters what the app renders needs the user's explicit approval of the generated gallery before its first commit, per the root `AGENTS.md`. Hand over the clickable `index.html` path so the user can review every exact-size snapshot without launching the application, then wait. A description of the change, the diff, or a single screenshot pasted into chat does not stand in for the gallery. When the user asks for changes, re-render the suite and hand over the gallery again; approval covers the images the user actually saw, not the ones that replaced them.
+
+The gate applies to layout, typography, spacing, color, iconography, state presentation, animation endpoints, and any new or restyled view, on macOS, iOS, and watchOS alike. It does not apply to a change that leaves rendering identical, such as a pure refactor, a rename, or a behavior fix with no visual surface; say plainly that rendering is unchanged rather than skipping the gate silently.
+
+When no registered suite covers the changed surface, add one before the change lands. An unrendered surface cannot be approved, and a suite that renders a neighboring view is not evidence for the view you changed.
+
+## iOS and watch surfaces
+
+`HarnessMonitorPreviewHost` is an AppKit host and every registered suite targets macOS, so the shell snapshot path does not reach the iOS or watch apps today. A visual change there still needs the same approved gallery.
+
+Until a device-family host exists, capture those surfaces from a Simulator through the XcodeBuildMCP workflow, write the PNGs under the worktree's ignored `tmp/preview-snapshots/<surface>/<task>/`, and hand over a gallery page built over them in the same exact-size, click-through-to-PNG form the shell suites emit. Record the simulator device and OS version alongside the images, since a watch or phone snapshot is meaningless without the screen size that produced it.
+
+Extending the preview host to render iOS and watch views off-screen is the durable fix and removes the manual step. Treat the Simulator path as the interim, not the target.
 
 ## Authoring rules
 
