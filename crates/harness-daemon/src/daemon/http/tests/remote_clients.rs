@@ -1,3 +1,4 @@
+use crate::daemon::remote_identity_queries::RemoteIdentitySyncQueries;
 use reqwest::StatusCode;
 use serde_json::Value;
 

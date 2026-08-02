@@ -1,5 +1,6 @@
 use super::schema_sql::CREATE_SCHEMA;
 use super::{CliError, Connection, DaemonDb, Path, db_error};
+use crate::daemon::remote_identity_queries::RemoteIdentitySyncQueries;
 use rusqlite::ffi::ErrorCode;
 use rusqlite::{Transaction, TransactionBehavior};
 use std::cell::RefCell;

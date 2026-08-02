@@ -1,3 +1,4 @@
+use crate::daemon::remote_identity_queries::RemoteIdentitySyncQueries;
 use axum::Json;
 use axum::body::Body;
 use axum::extract::{MatchedPath, State};

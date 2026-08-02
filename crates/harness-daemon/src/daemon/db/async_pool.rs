@@ -1,3 +1,4 @@
+use crate::daemon::remote_identity_queries::RemoteIdentityQueries;
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 

@@ -3,6 +3,7 @@ use crate::daemon::remote::{RemoteAccessScope, RemoteRole};
 use crate::daemon::remote_pairing::{
     RemotePairingClaimRequest, RemotePairingCode, RemotePairingRecord, RemotePairingStatus,
 };
+use crate::daemon::remote_pairing_queries::RemotePairingQueries;
 
 #[test]
 fn remote_pairing_status_classifies_lifecycle_without_exposing_records() {

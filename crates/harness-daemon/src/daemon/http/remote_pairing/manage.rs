@@ -11,6 +11,8 @@
 //! those, and attributing them to whichever broker asks would hand one broker
 //! another's links.
 
+use crate::daemon::remote_identity_queries::RemoteIdentitySyncQueries;
+use crate::daemon::remote_pairing_queries::{RemotePairingAsyncQueries, RemotePairingQueries};
 use std::time::Instant;
 
 use axum::Json;

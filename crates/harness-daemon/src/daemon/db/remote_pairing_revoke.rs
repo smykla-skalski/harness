@@ -8,60 +8,16 @@ use sqlx::{Row, Sqlite, Transaction, query};
 
 use super::remote_identity::INSERT_REMOTE_AUDIT_EVENT_SQL;
 use super::remote_identity_async::prune_remote_audit_events_in_transaction;
-use super::{AsyncDaemonDb, CliError, db_error};
+use super::{CliError, db_error};
 use crate::daemon::remote_identity::{RemoteAuditEvent, RemoteAuditOutcome};
 use crate::daemon::remote_pairing_queries::{RemotePairingRevokeOutcome, RemotePairingRevoked};
 
-impl AsyncDaemonDb {
-    /// Revoke a pairing and record who did it, atomically.
-    ///
-    /// A claimed link is revoked by cutting off the device it became, because
-    /// that credential is what still reaches the daemon. An unclaimed one is
-    /// marked on the pairing row instead, since there is no client yet, and the
-    /// claim path refuses a link marked that way.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL failure.
-    pub(crate) async fn revoke_remote_pairing_with_audit(
-        &self,
-        pairing_id: &str,
-        revoked_at: &str,
-        audit: &RemoteAuditEvent,
-    ) -> Result<RemotePairingRevoked, CliError> {
-        // Immediate rather than deferred: every branch below decides what to
-        // write from what the SELECT saw, and a deferred transaction takes no
-        // write lock until the first write, leaving room for the device to be
-        // revoked or the link to be claimed in between.
-        let mut transaction = self
-            .pool()
-            .begin_with("BEGIN IMMEDIATE")
-            .await
-            .map_err(|error| {
-                db_error(format!("begin remote pairing revoke transaction: {error}"))
-            })?;
-
-        let Some((outcome, effective_at)) =
-            decide_pairing_revoke_outcome_in_tx(&mut transaction, pairing_id, revoked_at).await?
-        else {
-            return finish_missing_pairing_revoke(transaction, audit, revoked_at).await;
-        };
-
-        record_revoke_audit(&mut transaction, audit, RemoteAuditOutcome::Success).await?;
-
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit remote pairing revoke: {error}")))?;
-        Ok(RemotePairingRevoked {
-            outcome,
-            revoked_at: effective_at,
-        })
-    }
-}
-
 /// Loads the pairing and decides what revoking it does, `None` when no such
 /// pairing exists.
-async fn decide_pairing_revoke_outcome_in_tx(
+///
+/// # Errors
+/// Returns [`CliError`] on SQL failure.
+pub(crate) async fn decide_pairing_revoke_outcome_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     pairing_id: &str,
     revoked_at: &str,
@@ -168,7 +124,9 @@ async fn withdraw_unclaimed_link_in_tx(
     ))
 }
 
-async fn finish_missing_pairing_revoke(
+/// # Errors
+/// Returns [`CliError`] on SQL failure.
+pub(crate) async fn finish_missing_pairing_revoke(
     mut transaction: Transaction<'_, Sqlite>,
     audit: &RemoteAuditEvent,
     revoked_at: &str,
@@ -190,7 +148,10 @@ async fn finish_missing_pairing_revoke(
 /// Recorded even when there was nothing left to revoke, because an attempt to
 /// cut off somebody else's device is worth seeing in the trail whether or not
 /// it changed anything.
-async fn record_revoke_audit(
+///
+/// # Errors
+/// Returns [`CliError`] on SQL failure.
+pub(crate) async fn record_revoke_audit(
     transaction: &mut Transaction<'_, Sqlite>,
     audit: &RemoteAuditEvent,
     outcome: RemoteAuditOutcome,

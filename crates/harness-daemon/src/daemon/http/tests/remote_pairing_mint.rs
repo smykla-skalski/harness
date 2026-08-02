@@ -5,6 +5,7 @@
 //! handler refuses a role; only this can say an unauthorized caller never
 //! reaches the handler at all.
 
+use crate::daemon::remote_identity_queries::RemoteIdentitySyncQueries;
 use axum::http::StatusCode;
 use rcgen::{CertificateParams, DistinguishedName, DnType, KeyPair};
 use serde_json::Value;

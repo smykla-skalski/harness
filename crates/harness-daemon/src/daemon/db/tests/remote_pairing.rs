@@ -4,6 +4,7 @@ use crate::daemon::remote_identity::RemoteAuditOutcome;
 use crate::daemon::remote_pairing::{
     RemotePairingClaimRequest, RemotePairingCode, RemotePairingRecord,
 };
+use crate::daemon::remote_pairing_queries::RemotePairingQueries;
 
 #[test]
 fn remote_pairing_create_claim_rejects_replay_and_audits() {
