@@ -7,7 +7,7 @@ use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::Notify;
 use tokio::task::JoinHandle;
-use tokio::time::{Duration, timeout};
+use tokio::time::timeout;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest as _;
 
 use crate::daemon::http::{
@@ -19,6 +19,7 @@ use crate::daemon::remote_auth::REMOTE_CLIENT_ID_HEADER;
 use crate::daemon::remote_identity::{
     RemoteAuditOutcome, RemoteAuditScopeDecision, RemoteClientRegistration, RemoteStoredAuditEvent,
 };
+use crate::daemon::test_liveness::LIVENESS;
 
 use super::test_http_state_with_db;
 
@@ -119,7 +120,7 @@ pub(super) async fn send_stalled_remote_body(base_url: &str) -> String {
         .await
         .expect("write stalled request");
     let mut response = Vec::new();
-    timeout(Duration::from_secs(2), stream.read_to_end(&mut response))
+    timeout(LIVENESS, stream.read_to_end(&mut response))
         .await
         .expect("stalled request response timeout")
         .expect("read stalled request response");

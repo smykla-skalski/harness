@@ -1,6 +1,7 @@
 use std::sync::Barrier;
 
 use crate::daemon::protocol::{CodexRunMode, CodexRunStatus};
+use crate::daemon::test_liveness::LIVENESS;
 
 use super::*;
 
@@ -80,7 +81,7 @@ fn duplicate_reservation_waits_for_the_persisted_snapshot() {
         .commit(control_tx, expected.clone())
         .expect("complete first startup");
     let actual = finished_rx
-        .recv_timeout(Duration::from_secs(1))
+        .recv_timeout(LIVENESS)
         .expect("duplicate was released")
         .expect("first startup succeeded");
     assert_eq!(actual.run_id, expected.run_id);

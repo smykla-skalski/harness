@@ -1,6 +1,5 @@
 use std::io::{self, Write};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
 
 use async_trait::async_trait;
 use tokio::time::timeout;
@@ -12,6 +11,7 @@ use crate::daemon::remote_acme_cleanup::RemoteAcmeCleanupTracker;
 use crate::daemon::remote_acme_issuer::{
     RemoteAcmeChallengeMaterial, RemoteAcmeChallengeProvisioner,
 };
+use crate::daemon::test_liveness::LIVENESS;
 
 #[tokio::test(flavor = "current_thread")]
 async fn background_cleanup_failure_has_accurate_redacted_log_context() {
@@ -29,7 +29,7 @@ async fn background_cleanup_failure_has_accurate_redacted_log_context() {
     leases.push(());
 
     leases.cleanup_in_background();
-    timeout(Duration::from_secs(2), tracker.wait_for_cleanup())
+    timeout(LIVENESS, tracker.wait_for_cleanup())
         .await
         .expect("background cleanup did not finish");
     let logs = wait_for_log(
@@ -70,7 +70,7 @@ async fn background_cleanup_observation_failure_is_explicit() {
 }
 
 async fn wait_for_log(output: &SharedOutput, expected: &str) -> String {
-    timeout(Duration::from_secs(2), async {
+    timeout(LIVENESS, async {
         loop {
             let logs = output.contents();
             if logs.contains(expected) {

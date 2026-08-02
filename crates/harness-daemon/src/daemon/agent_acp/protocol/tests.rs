@@ -18,6 +18,7 @@ use crate::agents::acp::supervision::{SupervisionConfig, WatchdogState};
 use crate::daemon::agent_acp::{AcpAgentManagerHandle, AcpMcpServer};
 use crate::daemon::db::DaemonDb;
 use crate::daemon::index::DiscoveredProject;
+use crate::daemon::test_liveness::LIVENESS;
 use crate::session::service as session_service;
 use crate::session::types::{ManagedAgentRef, SessionRole};
 
@@ -70,6 +71,41 @@ fn some<T>(value: Option<T>, context: &str) -> T {
         unreachable!("{context}");
     };
     value
+}
+
+/// Waits for the agent to record `count` operations.
+///
+/// Sleeping a fixed span before cancelling only works if the protocol task got
+/// scheduled inside it, which a loaded host does not guarantee: the wall clock
+/// runs out whether or not the agent did any work. Use [`session_established`]
+/// instead when the agent under test records nothing during startup.
+pub(super) async fn recorded_operations(operations: &Mutex<Vec<String>>, count: usize) {
+    settles(&format!("{count} recorded operations"), || {
+        operations.lock().expect("recorded operations").len() >= count
+    })
+    .await;
+}
+
+/// Waits for the connection to finish `session/new`.
+///
+/// The barrier for an agent that records no operation of its own: a test that
+/// only needs the connection to be live cannot count operations that never come.
+async fn session_established(supervisor: &AcpSessionSupervisor) {
+    settles("an established session", || {
+        supervisor.session_state().is_some()
+    })
+    .await;
+}
+
+async fn settles(label: &str, mut reached: impl FnMut() -> bool) {
+    let deadline = std::time::Instant::now() + LIVENESS;
+    while !reached() {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "the protocol never reached {label}"
+        );
+        tokio::time::sleep(Duration::from_millis(1)).await;
+    }
 }
 
 fn protocol_manager(runtime_name: &str, acp_id: &str, session_id: &str) -> AcpAgentManagerHandle {
@@ -237,7 +273,7 @@ async fn prompt_turn_against_sdk_cookbook_style_agent_streams_events() {
     });
 
     let notification = ok(
-        tokio::time::timeout(Duration::from_secs(2), notifications.recv()).await,
+        tokio::time::timeout(LIVENESS, notifications.recv()).await,
         "prompt turn should stream an event",
     );
     let notification = some(notification, "notification channel should stay open");
@@ -253,7 +289,7 @@ async fn prompt_turn_against_sdk_cookbook_style_agent_streams_events() {
     assert!(cancel_tx.send(()).is_ok());
     let protocol_result = ok(
         ok(
-            tokio::time::timeout(Duration::from_secs(2), protocol_task).await,
+            tokio::time::timeout(LIVENESS, protocol_task).await,
             "protocol should stop after cancel",
         ),
         "protocol task should not panic",
@@ -336,7 +372,7 @@ async fn protocol_rejects_notification_with_unknown_session_id() {
     assert!(cancel_tx.send(()).is_ok());
     let protocol_result = ok(
         ok(
-            tokio::time::timeout(Duration::from_secs(2), protocol_task).await,
+            tokio::time::timeout(LIVENESS, protocol_task).await,
             "protocol should stop after cancel",
         ),
         "protocol task should not panic",
@@ -427,11 +463,11 @@ async fn run_connection_applies_session_configuration_before_first_prompt() {
             .await
     });
 
-    tokio::time::sleep(Duration::from_millis(100)).await;
+    recorded_operations(&operations, 3).await;
     assert!(cancel_tx.send(()).is_ok());
     let protocol_result = ok(
         ok(
-            tokio::time::timeout(Duration::from_secs(2), protocol_task).await,
+            tokio::time::timeout(LIVENESS, protocol_task).await,
             "protocol should stop after cancel",
         ),
         "protocol task should not panic",

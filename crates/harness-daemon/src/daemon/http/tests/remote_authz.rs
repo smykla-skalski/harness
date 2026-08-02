@@ -8,7 +8,7 @@ use rusqlite::Connection;
 use serde_json::json;
 use tokio::net::TcpListener;
 use tokio::task::JoinHandle;
-use tokio::time::{Duration, timeout};
+use tokio::time::timeout;
 use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::tungstenite::{Error as WebSocketError, Message};
@@ -18,6 +18,7 @@ use crate::daemon::protocol::{HTTP_API_CONTRACT, HttpApiRouteContract, http_path
 use crate::daemon::remote::{RemoteAccessScope, RemoteRole};
 use crate::daemon::remote_auth::REMOTE_CLIENT_ID_HEADER;
 use crate::daemon::remote_identity::RemoteClientRegistration;
+use crate::daemon::test_liveness::LIVENESS;
 
 use super::{response_json, test_http_state_with_db};
 
@@ -418,7 +419,7 @@ where
         + Stream<Item = Result<Message, WebSocketError>>
         + Unpin,
 {
-    timeout(Duration::from_secs(5), async {
+    timeout(LIVENESS, async {
         socket
             .send(Message::Text(
                 json!({ "id": id, "method": method, "params": {} })

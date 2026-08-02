@@ -1,4 +1,5 @@
 use crate::daemon::agent_acp::{AgentTurnFailure, AgentTurnFailureCategory, AgentTurnFailureStage};
+use crate::daemon::test_liveness::LIVENESS;
 use agent_client_protocol::schema::v1::{
     AgentCapabilities, InitializeRequest, InitializeResponse, NewSessionRequest,
     NewSessionResponse, PromptRequest, PromptResponse, SessionConfigKind, SessionConfigOption,
@@ -169,7 +170,7 @@ async fn run_model_connection(
             })
             .await
     });
-    let result = tokio::time::timeout(Duration::from_secs(2), async {
+    let result = tokio::time::timeout(LIVENESS, async {
         tokio::select! {
             result = &mut protocol_task => result.expect("model protocol task must not panic"),
             prompt = prompt_rx.recv() => {

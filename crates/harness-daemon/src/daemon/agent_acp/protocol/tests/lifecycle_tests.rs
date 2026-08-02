@@ -18,6 +18,7 @@ use super::lifecycle_agents::{
     run_agent_refusing_session_load, run_agent_replaying_session_load,
 };
 use super::*;
+use crate::daemon::test_liveness::LIVENESS;
 
 mod load_tests;
 mod teardown_tests;
@@ -144,10 +145,7 @@ impl LifecycleHarness {
         assert!(self.command_tx.send(build(response_tx)).is_ok());
         ok(
             ok(
-                tokio::task::spawn_blocking(move || {
-                    response_rx.recv_timeout(Duration::from_secs(2))
-                })
-                .await,
+                tokio::task::spawn_blocking(move || response_rx.recv_timeout(LIVENESS)).await,
                 "dispatch task should not panic",
             ),
             "command response should arrive",
@@ -199,7 +197,7 @@ impl LifecycleHarness {
         assert!(self.cancel_tx.send(()).is_ok());
         let protocol_result = ok(
             ok(
-                tokio::time::timeout(Duration::from_secs(2), self.protocol_task).await,
+                tokio::time::timeout(LIVENESS, self.protocol_task).await,
                 "protocol should stop after cancel",
             ),
             "protocol task should not panic",

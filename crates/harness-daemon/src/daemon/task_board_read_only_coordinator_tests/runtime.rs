@@ -1,13 +1,13 @@
 use std::collections::{BTreeMap, VecDeque};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::time::Duration;
 
 use async_trait::async_trait;
 use tokio::sync::Semaphore;
 
 use crate::daemon::db::{AgentTurnRunSnapshot, AgentTurnRunStatus, AsyncDaemonDb};
 use crate::daemon::protocol::{CodexRunRequest, CodexRunSnapshot, CodexRunStatus};
+use crate::daemon::test_liveness::LIVENESS;
 use crate::task_board::{
     TASK_BOARD_LOCAL_ATTEMPT_RESULT_SCHEMA_VERSION, TaskBoardImplementationResult,
     TaskBoardLifecycleOutcome, TaskBoardLocalAttemptResult, TaskBoardWorkflowExecutionRecord,
@@ -179,7 +179,7 @@ impl FakeReadOnlyRuntime {
     }
 
     pub(super) async fn wait_for_report_start(&self) {
-        tokio::time::timeout(Duration::from_secs(5), self.report_entered.acquire())
+        tokio::time::timeout(LIVENESS, self.report_entered.acquire())
             .await
             .expect("timed out waiting for report entry")
             .expect("report entry semaphore")

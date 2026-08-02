@@ -3,6 +3,7 @@
 
 use super::agents::{run_agent_recording_boolean_config, run_agent_recording_initialize_contract};
 use super::*;
+use crate::daemon::test_liveness::LIVENESS;
 
 #[tokio::test]
 #[cfg(unix)]
@@ -63,11 +64,11 @@ async fn run_connection_sends_client_capabilities_and_client_info() {
             .await
     });
 
-    tokio::time::sleep(Duration::from_millis(100)).await;
+    recorded_operations(&operations, 1).await;
     assert!(cancel_tx.send(()).is_ok());
     let protocol_result = ok(
         ok(
-            tokio::time::timeout(Duration::from_secs(2), protocol_task).await,
+            tokio::time::timeout(LIVENESS, protocol_task).await,
             "protocol should stop after cancel",
         ),
         "protocol task should not panic",
@@ -159,7 +160,7 @@ async fn logout_command_sends_logout_when_capability_advertised() {
             .await
     });
 
-    tokio::time::sleep(Duration::from_millis(100)).await;
+    recorded_operations(&operations, 1).await;
     let (response_tx, response_rx) = std::sync::mpsc::sync_channel(1);
     assert!(
         command_tx
@@ -168,8 +169,7 @@ async fn logout_command_sends_logout_when_capability_advertised() {
     );
     let logout_result = ok(
         ok(
-            tokio::task::spawn_blocking(move || response_rx.recv_timeout(Duration::from_secs(2)))
-                .await,
+            tokio::task::spawn_blocking(move || response_rx.recv_timeout(LIVENESS)).await,
             "logout recv task should not panic",
         ),
         "logout response should arrive",
@@ -178,7 +178,7 @@ async fn logout_command_sends_logout_when_capability_advertised() {
     assert!(cancel_tx.send(()).is_ok());
     let protocol_result = ok(
         ok(
-            tokio::time::timeout(Duration::from_secs(2), protocol_task).await,
+            tokio::time::timeout(LIVENESS, protocol_task).await,
             "protocol should stop after cancel",
         ),
         "protocol task should not panic",
@@ -258,7 +258,8 @@ async fn logout_command_rejected_without_capability() {
             .await
     });
 
-    tokio::time::sleep(Duration::from_millis(100)).await;
+    // This agent records nothing during startup, so wait on the session instead.
+    session_established(&supervisor).await;
     let (response_tx, response_rx) = std::sync::mpsc::sync_channel(1);
     assert!(
         command_tx
@@ -267,8 +268,7 @@ async fn logout_command_rejected_without_capability() {
     );
     let logout_result = ok(
         ok(
-            tokio::task::spawn_blocking(move || response_rx.recv_timeout(Duration::from_secs(2)))
-                .await,
+            tokio::task::spawn_blocking(move || response_rx.recv_timeout(LIVENESS)).await,
             "logout recv task should not panic",
         ),
         "logout response should arrive",
@@ -283,7 +283,7 @@ async fn logout_command_rejected_without_capability() {
     assert!(cancel_tx.send(()).is_ok());
     let protocol_result = ok(
         ok(
-            tokio::time::timeout(Duration::from_secs(2), protocol_task).await,
+            tokio::time::timeout(LIVENESS, protocol_task).await,
             "protocol should stop after cancel",
         ),
         "protocol task should not panic",
@@ -408,11 +408,11 @@ async fn run_connection_applies_boolean_config_option() {
             .await
     });
 
-    tokio::time::sleep(Duration::from_millis(100)).await;
+    recorded_operations(&operations, 1).await;
     assert!(cancel_tx.send(()).is_ok());
     let protocol_result = ok(
         ok(
-            tokio::time::timeout(Duration::from_secs(2), protocol_task).await,
+            tokio::time::timeout(LIVENESS, protocol_task).await,
             "protocol should stop after cancel",
         ),
         "protocol task should not panic",

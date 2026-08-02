@@ -12,7 +12,7 @@ use hyper_util::rt::{TokioExecutor, TokioIo};
 use serde_json::Value;
 use tokio::io::AsyncReadExt as _;
 use tokio::net::TcpStream;
-use tokio::time::{Duration, timeout};
+use tokio::time::timeout;
 use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::Message;
 
@@ -21,6 +21,7 @@ use super::companion_routing_support::{
     state_with_companion,
 };
 use super::remote_limits_support::serve_remote;
+use crate::daemon::test_liveness::LIVENESS;
 
 /// The companion is the only thing that can push to a browser on this origin,
 /// and the daemon is the only thing on it, so a handshake that stopped here
@@ -39,7 +40,7 @@ async fn a_websocket_under_the_prefix_reaches_the_companion() {
     // Bounded, because a relay that establishes the socket and then carries
     // nothing is exactly the regression this covers, and an unbounded read would
     // meet it by hanging the suite rather than by failing.
-    let frame = timeout(Duration::from_secs(5), socket.next())
+    let frame = timeout(LIVENESS, socket.next())
         .await
         .expect("the relayed socket must carry a frame rather than go silent");
     let Some(Ok(Message::Text(presented))) = frame else {
@@ -102,7 +103,7 @@ async fn a_websocket_over_http2_reaches_the_companion() {
         .expect("the extended connect must yield the upgraded stream");
     let mut stream = TokioIo::new(upgraded);
     let mut buffer = vec![0_u8; 128];
-    let read = timeout(Duration::from_secs(5), stream.read(&mut buffer))
+    let read = timeout(LIVENESS, stream.read(&mut buffer))
         .await
         .expect("the relayed socket must carry a frame rather than go silent")
         .expect("read the companion's first frame");

@@ -18,6 +18,7 @@ use super::*;
 use crate::agents::acp::client::HarnessAcpClient;
 use crate::agents::acp::permission::standard_permission_options;
 use crate::daemon::agent_acp::permission_bridge::PermissionBridgeHandle;
+use crate::daemon::test_liveness::LIVENESS;
 use crate::infra::blocks::all_denied_binaries;
 
 const ACP_SESSION: &str = "acp-session-1";
@@ -129,7 +130,7 @@ async fn pending_permission_does_not_stall_other_requests() {
                 let read = connection
                     .send_request(ReadTextFileRequest::new(ACP_SESSION, readable))
                     .block_task();
-                let served = tokio::time::timeout(Duration::from_secs(2), read)
+                let served = tokio::time::timeout(LIVENESS, read)
                     .await
                     .is_ok_and(|result| result.is_ok());
                 let _ = served_tx.send(served);
@@ -141,7 +142,7 @@ async fn pending_permission_does_not_stall_other_requests() {
     });
 
     let served = ok(
-        tokio::time::timeout(Duration::from_secs(5), served_rx).await,
+        tokio::time::timeout(LIVENESS, served_rx).await,
         "read probe should report before the test deadline",
     );
     assert!(
@@ -181,7 +182,7 @@ async fn cancelled_permission_request_resolves_as_cancelled() {
                 tokio::time::sleep(Duration::from_millis(100)).await;
                 pending.cancel()?;
                 let cancelled = matches!(
-                    tokio::time::timeout(Duration::from_secs(5), pending.block_task()).await,
+                    tokio::time::timeout(LIVENESS, pending.block_task()).await,
                     Ok(Ok(response))
                         if response.outcome == RequestPermissionOutcome::Cancelled
                 );

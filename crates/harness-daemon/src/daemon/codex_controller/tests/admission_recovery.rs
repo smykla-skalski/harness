@@ -1,9 +1,8 @@
-use std::time::Duration;
-
 use tokio::sync::mpsc;
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::CodexRunStatus;
+use crate::daemon::test_liveness::LIVENESS;
 use crate::session::storage as session_storage;
 use crate::session::types::{SessionMetrics, SessionState, TaskStatus};
 use crate::task_board::dispatch::{
@@ -159,7 +158,7 @@ async fn missing_run_blocks_linked_task_and_board_without_refunding_rate_usage()
             ledger_state(&db, &intent_id, "rate").await,
             ("committed".into(), None)
         );
-        let published = tokio::time::timeout(Duration::from_secs(2), async {
+        let published = tokio::time::timeout(LIVENESS, async {
             loop {
                 let event = events.recv().await.expect("receive session recovery event");
                 if event.session_id.as_deref() == Some(SESSION_ID) {

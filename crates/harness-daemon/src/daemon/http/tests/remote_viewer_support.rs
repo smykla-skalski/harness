@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use axum::http::{HeaderValue, header::AUTHORIZATION};
 use futures_util::{SinkExt, StreamExt};
 use reqwest::StatusCode;
@@ -15,6 +13,7 @@ use crate::daemon::protocol::http_paths;
 use crate::daemon::remote::RemoteRole;
 use crate::daemon::remote_auth::REMOTE_CLIENT_ID_HEADER;
 use crate::daemon::remote_identity::RemoteClientRegistration;
+use crate::daemon::test_liveness::LIVENESS;
 
 pub(super) fn register_remote_client(
     state: &crate::daemon::http::DaemonHttpState,
@@ -90,7 +89,7 @@ where
         + Unpin,
     <S as futures_util::Sink<Message>>::Error: std::fmt::Debug,
 {
-    timeout(Duration::from_secs(5), async {
+    timeout(LIVENESS, async {
         socket
             .send(Message::Text(
                 json!({ "id": id, "method": method, "params": params })

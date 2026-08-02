@@ -8,6 +8,7 @@ use tokio::time::timeout;
 
 use super::*;
 use crate::daemon::protocol::WsRequest;
+use crate::daemon::test_liveness::LIVENESS;
 use crate::session::types::CURRENT_VERSION;
 
 mod codex;
@@ -96,7 +97,7 @@ async fn parity_concurrent_mutation_serializes_acp_start_by_session_and_agent() 
 
             drop(mutation_guard);
 
-            let response = timeout(Duration::from_secs(1), future)
+            let response = timeout(LIVENESS, future)
                 .await
                 .expect("ACP start should resume after the guard is released");
             assert!(

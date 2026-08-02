@@ -2,7 +2,7 @@ use axum::Router;
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header::AUTHORIZATION};
 use tokio::net::TcpListener;
 use tokio::task::JoinHandle;
-use tokio::time::{Duration, timeout};
+use tokio::time::timeout;
 
 use crate::daemon::http::auth::{DaemonHttpAuthMode, authorize_http_route};
 use crate::daemon::protocol::{
@@ -11,6 +11,7 @@ use crate::daemon::protocol::{
 use crate::daemon::remote::{RemoteAccessScope, RemoteRole, remote_http_scopes};
 use crate::daemon::remote_auth::REMOTE_CLIENT_ID_HEADER;
 use crate::daemon::remote_identity::RemoteClientRegistration;
+use crate::daemon::test_liveness::LIVENESS;
 
 use super::test_http_state_with_db;
 
@@ -239,7 +240,7 @@ async fn assert_sse_status(
             .header(REMOTE_CLIENT_ID_HEADER, client_id)
             .bearer_auth(remote_token(client_id));
     }
-    let response = timeout(Duration::from_secs(5), request.send())
+    let response = timeout(LIVENESS, request.send())
         .await
         .expect("SSE auth response timed out")
         .expect("send SSE request");

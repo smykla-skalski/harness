@@ -4,6 +4,7 @@ use tokio::time::timeout;
 
 use crate::daemon::agent_tui::AgentTuiStatus;
 use crate::daemon::protocol::{CodexRunStatus, ManagedAgentSnapshot};
+use crate::daemon::test_liveness::LIVENESS;
 use crate::session::types::SessionRole;
 use crate::task_board::{
     AgentMode, TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION, TaskBoardAttemptResultArtifact,
@@ -435,7 +436,7 @@ async fn worker_start_waits_for_lane_before_preflight() {
     );
 
     drop(outer_guard);
-    let error = timeout(Duration::from_secs(2), future)
+    let error = timeout(LIVENESS, future)
         .await
         .expect("worker start resumes once the lane is free")
         .expect_err("test has no dispatch claim");
@@ -496,7 +497,7 @@ async fn compensation_renews_claim_inside_worker_lane_before_stop() {
     );
 
     drop(outer_guard);
-    let error = timeout(Duration::from_secs(2), future)
+    let error = timeout(LIVENESS, future)
         .await
         .expect("compensation resumes once the lane is free")
         .expect_err("stale owner must fail before stop");

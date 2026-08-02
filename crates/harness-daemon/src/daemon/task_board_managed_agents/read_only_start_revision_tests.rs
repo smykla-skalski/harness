@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 use std::path::Path;
-use std::time::Duration;
 
 use tempfile::TempDir;
 
 use crate::daemon::db::{ClaimedTaskBoardDispatch, ReservedTaskBoardDispatch};
 use crate::daemon::http::DaemonHttpState;
 use crate::daemon::protocol::CodexRunStatus;
+use crate::daemon::test_liveness::LIVENESS;
 use crate::task_board::{
     AgentMode, SpawnGateSwitches, TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION, TaskBoardItem,
     TaskBoardPolicyLimit, TaskBoardPolicyScope, TaskBoardReadOnlyRunContext,
@@ -182,7 +182,7 @@ async fn assert_post_preflight_drift_is_fenced(drift: FinalStartDrift) {
     let pause = StartAuthorizationPause::new();
     let settlement = pause.scope(settle_claimed_task_board_worker(&state, &db, &mut claim));
     let mutate = async {
-        tokio::time::timeout(Duration::from_secs(5), pause.wait_until_reached())
+        tokio::time::timeout(LIVENESS, pause.wait_until_reached())
             .await
             .expect("worker start reached final authorization");
         match drift {

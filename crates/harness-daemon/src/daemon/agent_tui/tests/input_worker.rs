@@ -44,12 +44,10 @@ fn input_worker_replays_timed_sequences_in_order() {
         "delayed step should not replay immediately"
     );
 
-    std::thread::sleep(Duration::from_millis(60));
-    assert!(
-        !transcript_text(&process).contains("second"),
-        "delayed step should still be pending midway through the idle window"
-    );
-
+    // No midway sleep-and-peek here: it only holds if the peek lands inside the
+    // 120ms window, and the wait for "first" above already consumes an unknown
+    // slice of it. The measured elapsed check below states the same property
+    // without assuming when the peek happens.
     wait_until(WAIT_TIMEOUT, || {
         transcript_text(&process).contains("second")
     });

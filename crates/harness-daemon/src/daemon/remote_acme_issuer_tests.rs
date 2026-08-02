@@ -20,6 +20,7 @@ use super::{InstantAcmeIssuer, RemoteAcmeChallengeMaterial};
 use crate::daemon::remote::{RemoteAcmeChallenge, RemoteDaemonServeConfig, RemoteDnsProvider};
 use crate::daemon::remote_acme_cleanup::RemoteAcmeCleanupTracker;
 use crate::daemon::remote_tls::build_remote_tls_server_config;
+use crate::daemon::test_liveness::LIVENESS;
 
 const PRODUCTION_PROVIDER_CHILD_ENV: &str = "HARNESS_TEST_REMOTE_ACME_PROVIDER_CHILD";
 const PRODUCTION_PROVIDER_TEST: &str = "daemon::remote_acme_issuer::tests::production_acme_issuer_installs_rustls_provider_before_client_creation";
@@ -135,12 +136,12 @@ async fn instant_acme_issuer_cleans_challenge_when_issuance_is_cancelled() {
             .await
     });
 
-    timeout(Duration::from_secs(5), blocker.wait_until_blocked())
+    timeout(LIVENESS, blocker.wait_until_blocked())
         .await
         .expect("ACME order poll did not block");
     let cancel_started = Instant::now();
     task.abort();
-    let cancellation = timeout(Duration::from_secs(2), task)
+    let cancellation = timeout(LIVENESS, task)
         .await
         .expect("cancel ACME issuance timeout")
         .expect_err("cancelled ACME issuance should not complete");
@@ -151,7 +152,7 @@ async fn instant_acme_issuer_cleans_challenge_when_issuance_is_cancelled() {
         cancel_elapsed < Duration::from_millis(500),
         "cancelling ACME issuance blocked for {cancel_elapsed:?}"
     );
-    timeout(Duration::from_secs(2), cleanup_tracker.wait_for_cleanup())
+    timeout(LIVENESS, cleanup_tracker.wait_for_cleanup())
         .await
         .expect("cancelled ACME cleanup timeout");
     assert_eq!(provisioner.cleanup_count(), 1);
@@ -176,7 +177,7 @@ async fn instant_acme_issuer_cleanup_does_not_block_runtime() {
     })
     .await
     .expect("ACME cleanup blocked the runtime worker");
-    timeout(Duration::from_secs(2), task)
+    timeout(LIVENESS, task)
         .await
         .expect("ACME issuance cleanup timeout")
         .expect("join ACME issuance")
@@ -204,14 +205,14 @@ async fn instant_acme_issuer_returns_success_before_cleanup_visibility_confirmat
             .await
     });
 
-    timeout(Duration::from_secs(2), async {
+    timeout(LIVENESS, async {
         while !provisioner.cleanup_started() {
             tokio::task::yield_now().await;
         }
     })
     .await
     .expect("successful issuance did not start cleanup");
-    let completed_before_cleanup = timeout(Duration::from_secs(2), async {
+    let completed_before_cleanup = timeout(LIVENESS, async {
         while !task.is_finished() {
             tokio::task::yield_now().await;
         }
@@ -220,10 +221,10 @@ async fn instant_acme_issuer_returns_success_before_cleanup_visibility_confirmat
     .is_ok();
 
     cleanup_release.notify_one();
-    timeout(Duration::from_secs(2), cleanup_tracker.wait_for_cleanup())
+    timeout(LIVENESS, cleanup_tracker.wait_for_cleanup())
         .await
         .expect("tracked cleanup did not finish");
-    timeout(Duration::from_secs(2), task)
+    timeout(LIVENESS, task)
         .await
         .expect("issuance task did not finish")
         .expect("join issuance task")
@@ -249,7 +250,7 @@ async fn instant_acme_issuer_awaits_success_cleanup_without_tracker() {
         .expect("create ACME account");
     let task = tokio::spawn(async move { issuer.issue_certificate(&account, &config, None).await });
 
-    timeout(Duration::from_secs(2), async {
+    timeout(LIVENESS, async {
         while !provisioner.cleanup_started() {
             tokio::task::yield_now().await;
         }
@@ -262,7 +263,7 @@ async fn instant_acme_issuer_awaits_success_cleanup_without_tracker() {
     );
 
     cleanup_release.notify_one();
-    timeout(Duration::from_secs(2), task)
+    timeout(LIVENESS, task)
         .await
         .expect("issuance cleanup did not finish")
         .expect("join issuance task")
@@ -372,7 +373,7 @@ async fn instant_acme_issuer_awaits_cleanup_after_readiness_failure() {
         .expect("create ACME account");
     let task = tokio::spawn(async move { issuer.issue_certificate(&account, &config, None).await });
 
-    timeout(Duration::from_secs(2), async {
+    timeout(LIVENESS, async {
         while !provisioner.cleanup_started() {
             tokio::task::yield_now().await;
         }
@@ -385,7 +386,7 @@ async fn instant_acme_issuer_awaits_cleanup_after_readiness_failure() {
     );
 
     cleanup_release.notify_one();
-    let error = timeout(Duration::from_secs(2), task)
+    let error = timeout(LIVENESS, task)
         .await
         .expect("readiness cleanup timeout")
         .expect("join ACME issuance")

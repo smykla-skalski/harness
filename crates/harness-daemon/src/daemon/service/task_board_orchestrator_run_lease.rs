@@ -216,6 +216,7 @@ mod tests {
 
     use super::*;
     use crate::daemon::db::{TaskBoardAutomationRunAdmission, TaskBoardRunAcquireRequest};
+    use crate::daemon::test_liveness::LIVENESS;
     use crate::task_board::{
         TaskBoardAutomationDesiredMode, TaskBoardAutomationRunTrigger, TaskBoardAutomationScope,
     };
@@ -293,8 +294,14 @@ mod tests {
             .ensure_active()
             .await
             .expect_err("draining run must reject a new phase");
-        tokio::time::sleep(Duration::from_millis(50)).await;
-        assert_eq!(*guard.health_rx.borrow(), LeaseHealth::Draining);
+        let mut health = guard.health_rx.clone();
+        tokio::time::timeout(
+            LIVENESS,
+            health.wait_for(|health| *health == LeaseHealth::Draining),
+        )
+        .await
+        .expect("lease health should reach draining")
+        .expect("lease health channel should stay open");
 
         let shortened_expiry = Utc::now() + ChronoDuration::seconds(2);
         query(

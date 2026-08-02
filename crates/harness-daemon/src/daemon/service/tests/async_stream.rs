@@ -1,4 +1,5 @@
 use super::*;
+use crate::daemon::test_liveness::LIVENESS;
 
 #[test]
 fn global_stream_initial_events_async_include_current_session_index() {
@@ -137,7 +138,7 @@ fn typed_audit_writes_emit_global_push_events() {
         )
         .await;
 
-        let pushed = tokio::time::timeout(Duration::from_secs(1), async {
+        let pushed = tokio::time::timeout(LIVENESS, async {
             loop {
                 let event = receiver.recv().await.expect("receive audit push");
                 if event.event == "audit_event"

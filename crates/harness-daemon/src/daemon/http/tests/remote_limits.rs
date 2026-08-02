@@ -14,6 +14,7 @@ use crate::daemon::protocol::{http_paths, ws_methods};
 use crate::daemon::remote::RemoteAccessScope;
 use crate::daemon::remote_auth::REMOTE_CLIENT_ID_HEADER;
 use crate::daemon::remote_identity::{RemoteAuditOutcome, RemoteAuditScopeDecision};
+use crate::daemon::test_liveness::LIVENESS;
 
 use super::remote_limits_support::{
     BlockingRequest, assert_allowed_limit_failure, audit_for_request, remote_limit_test_router,
@@ -207,7 +208,7 @@ async fn remote_http_audits_concurrency_limit_rejections() {
         base_url.clone(),
         "limit-concurrency-first",
     ));
-    timeout(Duration::from_secs(2), started.notified())
+    timeout(LIVENESS, started.notified())
         .await
         .expect("first request reached handler");
 
@@ -277,7 +278,7 @@ async fn remote_http_audits_timeout_after_authentication() {
         base_url,
         "limit-timeout-after-auth",
     ));
-    timeout(Duration::from_secs(2), started.notified())
+    timeout(LIVENESS, started.notified())
         .await
         .expect("timed request reached handler");
 
@@ -354,7 +355,7 @@ async fn websocket_rejects_request(
     socket: &mut (impl Stream<Item = Result<Message, WebSocketError>> + Unpin),
     request_id: &str,
 ) -> bool {
-    timeout(Duration::from_secs(5), async {
+    timeout(LIVENESS, async {
         while let Some(frame) = socket.next().await {
             match frame {
                 Ok(Message::Text(text)) => {

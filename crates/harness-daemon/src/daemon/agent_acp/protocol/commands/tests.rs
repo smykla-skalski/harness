@@ -1,3 +1,4 @@
+use super::super::tests::recorded_operations;
 use super::*;
 use std::process::Command;
 use std::sync::{Arc, Mutex};
@@ -244,6 +245,7 @@ async fn attach_prompt_session_reapplies_session_config_before_prompt() {
     };
     let session_config = AcpSessionRequestConfig::from_request(&request, &descriptor);
 
+    let recorded = Arc::clone(&operations);
     let protocol_task = tokio::spawn(async move {
         Client
             .builder()
@@ -268,7 +270,9 @@ async fn attach_prompt_session_reapplies_session_config_before_prompt() {
                 )
                 .await
                 .expect("attach prompt session");
-                tokio::time::sleep(Duration::from_millis(100)).await;
+                // Cancel only once the agent has recorded the prompt, so it
+                // really does arrive while the prompt is outstanding.
+                recorded_operations(&recorded, 2).await;
                 send_cancel_notification(&connection, session_id)
             })
             .await
