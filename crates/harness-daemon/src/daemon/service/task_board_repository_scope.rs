@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::daemon::db::{AsyncDaemonDb, TaskBoardItemSnapshot};
+use crate::daemon::db::task_board::prelude::*;
 use crate::task_board::project::{TaskBoardProject, TaskBoardProjectSource};
 use crate::task_board::{
     TaskBoardItem, TaskBoardStatus, normalize_repository_slug,

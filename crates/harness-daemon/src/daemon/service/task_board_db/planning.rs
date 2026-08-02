@@ -1,4 +1,5 @@
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::protocol::{
     TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest, TaskBoardPlanRevokeRequest,
     TaskBoardPlanSubmitRequest, TaskBoardPlanningResponse,
