@@ -3,7 +3,7 @@ use tempfile::tempdir;
 
 use super::tests::{legacy_v40_fixture, legacy_v40_fixture_at};
 use super::*;
-use harness_daemon::daemon::db::{AsyncDaemonDb, DaemonDb};
+use harness_daemon::daemon::db::{AsyncDaemonDb, DaemonDb, schema_query_test_support};
 use harness_task_board::{TaskBoardExecutionHostConfig, remote_spki_pin};
 
 const LEGACY_LEAF_SHA256: &str = "1111111111111111111111111111111111111111111111111111111111111111";
@@ -336,17 +336,21 @@ async fn migrated_planning_and_reviewing_typed_loads_return_none() {
     // The base fixture seeds a planning row and a reviewing row; both migrate to
     // superseded legacy evidence and must be invisible to the typed loader.
     assert!(
-        db.task_board_remote_assignment("legacy-assignment")
-            .await
-            .expect("load migrated planning assignment")
-            .is_none(),
+        !schema_query_test_support::task_board_remote_assignment_exists(
+            &db,
+            "legacy-assignment",
+        )
+        .await
+        .expect("load migrated planning assignment"),
         "a migrated planning row must not load through the current typed path"
     );
     assert!(
-        db.task_board_remote_assignment("legacy-nullable-assignment")
-            .await
-            .expect("load migrated reviewing assignment")
-            .is_none(),
+        !schema_query_test_support::task_board_remote_assignment_exists(
+            &db,
+            "legacy-nullable-assignment",
+        )
+        .await
+        .expect("load migrated reviewing assignment"),
         "a migrated reviewing row must not load through the current typed path"
     );
 }
@@ -410,12 +414,11 @@ async fn async_quarantine_row(db: &AsyncDaemonDb) -> QuarantineRow {
 }
 
 async fn replace_hosts(db: &AsyncDaemonDb, hosts: Vec<TaskBoardExecutionHostConfig>) {
-    let mut settings = db
-        .task_board_orchestrator_settings()
+    let mut settings = schema_query_test_support::task_board_orchestrator_settings(db)
         .await
         .expect("load orchestrator settings");
     settings.execution_hosts = hosts;
-    db.replace_task_board_orchestrator_settings(&settings)
+    schema_query_test_support::replace_task_board_orchestrator_settings(db, &settings)
         .await
         .expect("replace orchestrator settings");
 }

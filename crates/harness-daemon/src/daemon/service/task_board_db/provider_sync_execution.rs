@@ -21,7 +21,6 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 use super::TaskBoardSyncRunContext;
 use super::provider_sync_context_store::ProviderSyncRunStore;
 use super::sync_audit::{SyncExecutionMetrics, TaskBoardSyncAuditTrigger};
-use crate::daemon::db::task_board::prelude::*;
 
 /// How an assembly step gives up. The two kinds must stay apart: `Failed` is
 /// the sync erroring out, while `Blocked` carries a terminal batch the caller
@@ -250,6 +249,7 @@ mod tests {
     use tempfile::tempdir;
 
     use super::*;
+    use crate::daemon::db::task_board::prelude::*;
     use crate::daemon::db::AsyncAuditQueries;
     use crate::daemon::protocol::HarnessMonitorAuditEventsRequest;
     use crate::task_board::{

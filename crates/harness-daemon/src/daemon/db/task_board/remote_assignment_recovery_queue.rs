@@ -165,7 +165,7 @@ const DUE_PAGE_THROUGH_CURSOR: &str =
      LIMIT ?3";
 
 #[derive(Debug, Clone, sqlx::FromRow)]
-pub(super) struct RawRecoveryCandidate {
+pub(crate) struct RawRecoveryCandidate {
     pub(super) assignment_id: String,
     pub(super) fencing_epoch: i64,
     pub(super) assignment_state: String,

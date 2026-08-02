@@ -89,6 +89,8 @@ mod runtime;
 mod schema;
 mod schema_migrations;
 mod schema_sql;
+#[cfg(feature = "test-support")]
+pub mod schema_query_test_support;
 #[allow(dead_code)]
 pub(crate) mod task_board;
 mod task_board_sync_coordinator;
