@@ -1,3 +1,4 @@
+use crate::daemon::db::task_board::remote_assignment_start_settlement_queries::RemoteAssignmentStartSettlementQueries;
 use crate::daemon::db::{
     AgentTurnRunSnapshot, AgentTurnRunStatus, AsyncDaemonDb, CliError, db_error,
 };
@@ -55,20 +56,10 @@ impl AsyncDaemonDb {
         offer: &RemoteOfferRequest,
         run_id: &str,
     ) -> Result<Option<TaskBoardRemoteExecutorRun>, CliError> {
-        match offer.launch.runtime.as_str() {
-            "codex" => self
-                .codex_run(run_id)
-                .await
-                .map(|run| run.map(TaskBoardRemoteExecutorRun::from)),
-            "openrouter" => self
-                .agent_turn_run(run_id)
-                .await?
-                .map(|run| TaskBoardRemoteExecutorRun::from_agent_turn(run, offer))
-                .transpose(),
-            runtime => Err(db_error(format!(
-                "unsupported remote executor runtime '{runtime}'"
-            ))),
-        }
+        <Self as RemoteAssignmentStartSettlementQueries>::task_board_remote_executor_run(
+            self, offer, run_id,
+        )
+        .await
     }
 
     pub(crate) async fn task_board_remote_runtime_provenance(
@@ -76,34 +67,68 @@ impl AsyncDaemonDb {
         execution_id: &str,
         run_id: &str,
     ) -> Result<Option<TaskBoardRemoteRuntimeProvenance>, CliError> {
-        // `started_at` reaches the controller only through a validated executor
-        // status emitted after durable run adoption. Before that proof lands,
-        // the sealed offer supplies requested provenance but actual stays unknown.
-        query_as::<_, (String, Option<String>, Option<String>)>(
-            "SELECT json_extract(request_json, '$.launch.runtime'),
-                    CASE WHEN started_at IS NULL THEN NULL
-                         ELSE json_extract(request_json, '$.launch.runtime') END,
-                    json_extract(request_json, '$.launch.model')
-             FROM task_board_remote_assignments
-             WHERE execution_id = ?1 AND idempotency_key = ?2 AND legacy_migrated = 0
-             ORDER BY offered_at DESC, assignment_id DESC
-             LIMIT 1",
+        <Self as RemoteAssignmentStartSettlementQueries>::task_board_remote_runtime_provenance(
+            self,
+            execution_id,
+            run_id,
         )
-        .bind(execution_id)
-        .bind(run_id)
-        .fetch_optional(self.pool())
         .await
-        .map(|row| {
-            row.map(|(requested_runtime, actual_runtime, requested_model)| {
-                TaskBoardRemoteRuntimeProvenance {
-                    requested_runtime,
-                    actual_runtime,
-                    requested_model,
-                }
-            })
-        })
-        .map_err(|error| db_error(format!("load remote runtime provenance: {error}")))
     }
+}
+
+pub(super) async fn task_board_remote_executor_run(
+    db: &AsyncDaemonDb,
+    offer: &RemoteOfferRequest,
+    run_id: &str,
+) -> Result<Option<TaskBoardRemoteExecutorRun>, CliError> {
+    match offer.launch.runtime.as_str() {
+        "codex" => db
+            .codex_run(run_id)
+            .await
+            .map(|run| run.map(TaskBoardRemoteExecutorRun::from)),
+        "openrouter" => db
+            .agent_turn_run(run_id)
+            .await?
+            .map(|run| TaskBoardRemoteExecutorRun::from_agent_turn(run, offer))
+            .transpose(),
+        runtime => Err(db_error(format!(
+            "unsupported remote executor runtime '{runtime}'"
+        ))),
+    }
+}
+
+pub(super) async fn task_board_remote_runtime_provenance(
+    db: &AsyncDaemonDb,
+    execution_id: &str,
+    run_id: &str,
+) -> Result<Option<TaskBoardRemoteRuntimeProvenance>, CliError> {
+    // `started_at` reaches the controller only through a validated executor
+    // status emitted after durable run adoption. Before that proof lands,
+    // the sealed offer supplies requested provenance but actual stays unknown.
+    query_as::<_, (String, Option<String>, Option<String>)>(
+        "SELECT json_extract(request_json, '$.launch.runtime'),
+                CASE WHEN started_at IS NULL THEN NULL
+                     ELSE json_extract(request_json, '$.launch.runtime') END,
+                json_extract(request_json, '$.launch.model')
+         FROM task_board_remote_assignments
+         WHERE execution_id = ?1 AND idempotency_key = ?2 AND legacy_migrated = 0
+         ORDER BY offered_at DESC, assignment_id DESC
+         LIMIT 1",
+    )
+    .bind(execution_id)
+    .bind(run_id)
+    .fetch_optional(db.pool())
+    .await
+    .map(|row| {
+        row.map(|(requested_runtime, actual_runtime, requested_model)| {
+            TaskBoardRemoteRuntimeProvenance {
+                requested_runtime,
+                actual_runtime,
+                requested_model,
+            }
+        })
+    })
+    .map_err(|error| db_error(format!("load remote runtime provenance: {error}")))
 }
 
 impl From<CodexRunSnapshot> for TaskBoardRemoteExecutorRun {

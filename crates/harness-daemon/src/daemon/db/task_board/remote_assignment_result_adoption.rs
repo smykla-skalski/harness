@@ -11,6 +11,7 @@ use super::remote_assignment_io_authority::{
     active_target_matches, has_remote_io_authority, monotonic_time,
 };
 use super::remote_assignment_model::{TaskBoardRemoteAssignmentRecord, concurrent};
+use super::remote_assignment_start_settlement_queries::RemoteAssignmentStartSettlementQueries;
 use super::remote_assignment_status_failure::settle_failed_remote_attempt_in_tx;
 use super::workflow_execution_attempts::update_attempt_in_tx;
 use super::workflow_execution_fencing::WorkflowExecutionFencing;
@@ -55,32 +56,42 @@ impl AsyncDaemonDb {
         assignment_id: &str,
         fencing_epoch: u64,
     ) -> Result<TaskBoardRemoteResultAdoptionOutcome, CliError> {
-        let mut transaction = self
-            .begin_immediate_transaction("task board remote result adoption")
-            .await?;
-        match screen_terminal_adoption_in_tx(
-            &mut transaction,
+        <Self as RemoteAssignmentStartSettlementQueries>::adopt_task_board_remote_terminal_result(
+            self,
             expected,
             assignment_id,
             fencing_epoch,
         )
+        .await
+    }
+}
+
+pub(super) async fn adopt_task_board_remote_terminal_result(
+    db: &AsyncDaemonDb,
+    expected: &TaskBoardWorkflowExecutionCas,
+    assignment_id: &str,
+    fencing_epoch: u64,
+) -> Result<TaskBoardRemoteResultAdoptionOutcome, CliError> {
+    let mut transaction = db
+        .begin_immediate_transaction("task board remote result adoption")
+        .await?;
+    match screen_terminal_adoption_in_tx(&mut transaction, expected, assignment_id, fencing_epoch)
         .await?
-        {
-            TerminalAdoptionScreen::Settled { context, outcome } => {
-                commit_adoption(transaction, context).await?;
-                Ok(*outcome)
-            }
-            TerminalAdoptionScreen::Proceed(proceed) => {
-                // The adoption write reaches the result-import evidence loaders
-                // through six nested frames, on top of the twenty the calling
-                // controller already spends, which puts the closure over the
-                // crate's recursion limit and fails the build with `E0275:
-                // overflow evaluating the requirement &sqlx::SqliteStatement:
-                // Send`. Erasing proves `Send` once for the write half.
-                let settled: SettledAdoptionFuture<'_> =
-                    Box::pin(settle_screened_adoption(transaction, proceed));
-                settled.await
-            }
+    {
+        TerminalAdoptionScreen::Settled { context, outcome } => {
+            commit_adoption(transaction, context).await?;
+            Ok(*outcome)
+        }
+        TerminalAdoptionScreen::Proceed(proceed) => {
+            // The adoption write reaches the result-import evidence loaders
+            // through six nested frames, on top of the twenty the calling
+            // controller already spends, which puts the closure over the
+            // crate's recursion limit and fails the build with `E0275:
+            // overflow evaluating the requirement &sqlx::SqliteStatement:
+            // Send`. Erasing proves `Send` once for the write half.
+            let settled: SettledAdoptionFuture<'_> =
+                Box::pin(settle_screened_adoption(transaction, proceed));
+            settled.await
         }
     }
 }

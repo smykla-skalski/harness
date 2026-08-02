@@ -97,6 +97,7 @@ mod remote_assignment_source;
 mod remote_assignment_start_authority;
 #[cfg(test)]
 mod remote_assignment_start_authority_tests;
+mod remote_assignment_start_settlement_queries;
 mod remote_assignment_status;
 mod remote_assignment_status_failure;
 mod remote_assignment_status_persistence;

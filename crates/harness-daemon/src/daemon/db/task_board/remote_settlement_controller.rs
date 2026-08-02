@@ -10,6 +10,7 @@ use super::remote_operation_trust::{
     TaskBoardRemoteOperationKind, TaskBoardRemoteOperationTrustFence,
     claim_controller_operation_trust_in_tx, consume_controller_operation_trust_in_tx,
 };
+use super::remote_assignment_start_settlement_queries::RemoteAssignmentStartSettlementQueries;
 use super::remote_settlement_receipts::{
     TaskBoardRemoteSettlementReceipt, insert_settlement_in_tx, load_settlement_collisions_in_tx,
     load_settlement_in_tx, require_current_settlement_window, require_exact_terminal_assignment,
@@ -18,10 +19,6 @@ use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::remote_wire::wire::{RemoteSettledRequest, RemoteSettledResponse};
 
 impl AsyncDaemonDb {
-    /// Claim one exact terminal assignment generation before settlement I/O.
-    ///
-    /// An adopted response is returned directly. Otherwise the exact request
-    /// owns the durable `settle` marker and may be sent or replayed.
     #[cfg(test)]
     pub(crate) async fn claim_task_board_remote_settlement_io_authority(
         &self,
@@ -29,8 +26,10 @@ impl AsyncDaemonDb {
         authenticated_principal: &str,
         authority_at: &str,
     ) -> Result<Option<RemoteSettledResponse>, CliError> {
-        self.claim_settlement_io_authority(request, authenticated_principal, authority_at, None)
-            .await
+        <Self as RemoteAssignmentStartSettlementQueries>::claim_task_board_remote_settlement_io_authority(
+            self, request, authenticated_principal, authority_at,
+        )
+        .await
     }
 
     pub(crate) async fn claim_task_board_remote_settlement_io_authority_fenced(
@@ -40,53 +39,10 @@ impl AsyncDaemonDb {
         authority_at: &str,
         trust: &TaskBoardRemoteOperationTrustFence,
     ) -> Result<Option<RemoteSettledResponse>, CliError> {
-        self.claim_settlement_io_authority(
-            request,
-            authenticated_principal,
-            authority_at,
-            Some(trust),
+        <Self as RemoteAssignmentStartSettlementQueries>::claim_task_board_remote_settlement_io_authority_fenced(
+            self, request, authenticated_principal, authority_at, trust,
         )
         .await
-    }
-
-    async fn claim_settlement_io_authority(
-        &self,
-        request: &RemoteSettledRequest,
-        authenticated_principal: &str,
-        authority_at: &str,
-        trust: Option<&TaskBoardRemoteOperationTrustFence>,
-    ) -> Result<Option<RemoteSettledResponse>, CliError> {
-        validate_inputs(request, authenticated_principal, authority_at)?;
-        let mut transaction = self
-            .begin_immediate_transaction("task board remote settlement I/O authority")
-            .await?;
-        let assignment = match screen_settlement_authority_claim_in_tx(
-            &mut transaction,
-            request,
-            authenticated_principal,
-            authority_at,
-            trust,
-        )
-        .await?
-        {
-            SettlementAuthorityScreen::Stopped(response) => {
-                commit_replay(transaction, "settlement authority").await?;
-                return Ok(*response);
-            }
-            SettlementAuthorityScreen::Ready(assignment) => assignment,
-        };
-        persist_authority_in_tx(
-            &mut transaction,
-            &assignment,
-            request,
-            authenticated_principal,
-            authority_at,
-        )
-        .await?;
-        transaction.commit().await.map_err(|error| {
-            db_error(format!("commit remote settlement I/O authority: {error}"))
-        })?;
-        Ok(None)
     }
 
     pub(crate) async fn record_task_board_remote_settlement_response(
@@ -95,38 +51,122 @@ impl AsyncDaemonDb {
         response: &RemoteSettledResponse,
         authenticated_principal: &str,
     ) -> Result<TaskBoardRemoteSettlementReceipt, CliError> {
-        validate_response_inputs(request, response, authenticated_principal)?;
-        let mut transaction = self
-            .begin_immediate_transaction("task board remote settlement response")
-            .await?;
-        // The screen and the settle path must stay boxed. Awaited inline they
-        // fold their frames into this future, which the remote controller's
-        // terminal settlement and the transport controller await transitively;
-        // that pushes both of those past the 16384-byte threshold of
-        // `clippy::large_futures`, which is denied here. `cargo check` will not
-        // tell you, because the limit is a lint rather than a compile error.
-        match Box::pin(screen_settlement_response_in_tx(
-            &mut transaction,
-            request,
-            response,
-            authenticated_principal,
-        ))
-        .await?
-        {
-            SettlementResponseScreen::Replayed(receipt) => {
-                commit_replay(transaction, "settlement response").await?;
-                Ok(*receipt)
-            }
-            SettlementResponseScreen::Settle(assignment) => {
-                Box::pin(commit_settled_response(
-                    transaction,
-                    &assignment,
-                    request,
-                    response,
-                    authenticated_principal,
-                ))
-                .await
-            }
+        <Self as RemoteAssignmentStartSettlementQueries>::record_task_board_remote_settlement_response(
+            self, request, response, authenticated_principal,
+        )
+        .await
+    }
+}
+
+/// Claim one exact terminal assignment generation before settlement I/O.
+///
+/// An adopted response is returned directly. Otherwise the exact request
+/// owns the durable `settle` marker and may be sent or replayed.
+#[cfg(test)]
+pub(super) async fn claim_task_board_remote_settlement_io_authority(
+    db: &AsyncDaemonDb,
+    request: &RemoteSettledRequest,
+    authenticated_principal: &str,
+    authority_at: &str,
+) -> Result<Option<RemoteSettledResponse>, CliError> {
+    claim_settlement_io_authority(db, request, authenticated_principal, authority_at, None).await
+}
+
+pub(super) async fn claim_task_board_remote_settlement_io_authority_fenced(
+    db: &AsyncDaemonDb,
+    request: &RemoteSettledRequest,
+    authenticated_principal: &str,
+    authority_at: &str,
+    trust: &TaskBoardRemoteOperationTrustFence,
+) -> Result<Option<RemoteSettledResponse>, CliError> {
+    claim_settlement_io_authority(
+        db,
+        request,
+        authenticated_principal,
+        authority_at,
+        Some(trust),
+    )
+    .await
+}
+
+async fn claim_settlement_io_authority(
+    db: &AsyncDaemonDb,
+    request: &RemoteSettledRequest,
+    authenticated_principal: &str,
+    authority_at: &str,
+    trust: Option<&TaskBoardRemoteOperationTrustFence>,
+) -> Result<Option<RemoteSettledResponse>, CliError> {
+    validate_inputs(request, authenticated_principal, authority_at)?;
+    let mut transaction = db
+        .begin_immediate_transaction("task board remote settlement I/O authority")
+        .await?;
+    let assignment = match screen_settlement_authority_claim_in_tx(
+        &mut transaction,
+        request,
+        authenticated_principal,
+        authority_at,
+        trust,
+    )
+    .await?
+    {
+        SettlementAuthorityScreen::Stopped(response) => {
+            commit_replay(transaction, "settlement authority").await?;
+            return Ok(*response);
+        }
+        SettlementAuthorityScreen::Ready(assignment) => assignment,
+    };
+    persist_authority_in_tx(
+        &mut transaction,
+        &assignment,
+        request,
+        authenticated_principal,
+        authority_at,
+    )
+    .await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit remote settlement I/O authority: {error}")))?;
+    Ok(None)
+}
+
+pub(super) async fn record_task_board_remote_settlement_response(
+    db: &AsyncDaemonDb,
+    request: &RemoteSettledRequest,
+    response: &RemoteSettledResponse,
+    authenticated_principal: &str,
+) -> Result<TaskBoardRemoteSettlementReceipt, CliError> {
+    validate_response_inputs(request, response, authenticated_principal)?;
+    let mut transaction = db
+        .begin_immediate_transaction("task board remote settlement response")
+        .await?;
+    // The screen and the settle path must stay boxed. Awaited inline they
+    // fold their frames into this future, which the remote controller's
+    // terminal settlement and the transport controller await transitively;
+    // that pushes both of those past the 16384-byte threshold of
+    // `clippy::large_futures`, which is denied here. `cargo check` will not
+    // tell you, because the limit is a lint rather than a compile error.
+    match Box::pin(screen_settlement_response_in_tx(
+        &mut transaction,
+        request,
+        response,
+        authenticated_principal,
+    ))
+    .await?
+    {
+        SettlementResponseScreen::Replayed(receipt) => {
+            commit_replay(transaction, "settlement response").await?;
+            Ok(*receipt)
+        }
+        SettlementResponseScreen::Settle(assignment) => {
+            Box::pin(commit_settled_response(
+                transaction,
+                &assignment,
+                request,
+                response,
+                authenticated_principal,
+            ))
+            .await
         }
     }
 }
