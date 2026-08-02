@@ -78,19 +78,29 @@ extension HarnessMonitorStore {
     _ requestGeneration: UInt64
   ) async {
     while cacheWriteSync.taskBoardRefreshCompletedGeneration < requestGeneration {
-      if let refreshTask = cacheWriteSync.taskBoardRefreshTask {
-        await refreshTask.value
-      } else {
-        await withCheckedContinuation { continuation in
-          if cacheWriteSync.taskBoardRefreshCompletedGeneration >= requestGeneration {
-            continuation.resume()
-          } else {
-            cacheWriteSync.taskBoardRefreshCompletionWaiters[requestGeneration, default: []]
-              .append(continuation)
-          }
+      await withCheckedContinuation { continuation in
+        if cacheWriteSync.taskBoardRefreshCompletedGeneration >= requestGeneration {
+          continuation.resume()
+        } else {
+          cacheWriteSync.taskBoardRefreshCompletionWaiters[requestGeneration, default: []]
+            .append(continuation)
         }
       }
     }
+  }
+
+  func cancelTaskBoardDashboardSnapshotRefresh() {
+    cacheWriteSync.taskBoardRefreshGeneration &+= 1
+    cacheWriteSync.taskBoardRefreshTask?.cancel()
+    cacheWriteSync.taskBoardRefreshTask = nil
+    cacheWriteSync.taskBoardRefreshCompletedGeneration =
+      cacheWriteSync.taskBoardRefreshRequestGeneration
+    cacheWriteSync.taskBoardRefreshRequiresImmediate = false
+    cacheWriteSync.pendingTaskBoardItemsRefresh = false
+    cacheWriteSync.pendingTaskBoardOrchestratorRefresh = false
+    cacheWriteSync.pendingTaskBoardPolicyPipelineRefresh = false
+    cacheWriteSync.pendingTaskBoardFallbackStatus = nil
+    resumeCompletedTaskBoardDashboardSnapshotRefreshWaiters()
   }
 
   func resumeCompletedTaskBoardDashboardSnapshotRefreshWaiters() {

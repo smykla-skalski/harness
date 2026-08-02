@@ -35,7 +35,9 @@ private actor MutatingTaskBoardPageSource: TaskBoardItemPageSource {
     case 2:
       throw HarnessMonitorAPIError.server(
         code: 400,
-        message: "the task-board list cursor is stale because the board changed; restart without a cursor"
+        message:
+          "the task-board list cursor is stale because the board changed; "
+          + "restart without a cursor"
       )
     case 3:
       return page(ids: ["new-1"], totalMatched: 2, changeSeq: 42, nextCursor: "new-2")

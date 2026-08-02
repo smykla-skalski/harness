@@ -40,7 +40,7 @@ extension TaskBoardItemPageSource {
     while true {
       do {
         return try await mergedTaskBoardItemPagesOnce(status: status)
-      } catch where isStaleTaskBoardCursorError(error) {
+      } catch let error where isStaleTaskBoardCursorError(error) {
         guard restartCount < taskBoardStaleCursorRestartLimit else {
           throw error
         }

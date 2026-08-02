@@ -9,6 +9,7 @@ extension RecordingHarnessClient {
 
   func taskBoardItems(status: TaskBoardStatus?) async throws -> [TaskBoardItem] {
     recordReadCall(.taskBoardItems(status))
+    try await sleepIfNeeded(configuredTaskBoardItemsDelay())
     if let error = dequeueTaskBoardItemsError() {
       throw error
     }

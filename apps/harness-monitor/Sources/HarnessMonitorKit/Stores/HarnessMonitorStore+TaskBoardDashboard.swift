@@ -210,6 +210,7 @@ extension HarnessMonitorStore {
     setTaskBoardSyncPhase(.stopping)
     do {
       _ = try await client.cancelTaskBoardSync()
+      cancelTaskBoardDashboardSnapshotRefresh()
       recordRequestSuccess()
       return true
     } catch {
