@@ -121,14 +121,38 @@ impl AcpAgentManagerHandle {
         }
     }
 
+    /// Best-effort by design. This read only enriches a settlement that would
+    /// otherwise fall back to the detachment error, and a host bridge from an
+    /// older build rejects the action outright. Failing here would turn a
+    /// settleable turn into a repeating reconciliation error, so a failure logs
+    /// and reports nothing observed.
     pub(super) fn detached_turn_state_via_bridge(
         &self,
         session_id: &str,
         acp_id: &str,
-    ) -> Result<Option<AcpAgentSessionState>, CliError> {
-        let bridge = BridgeClient::for_capability(BridgeCapability::Acp)?;
+    ) -> Option<AcpAgentSessionState> {
+        let bridge = match BridgeClient::for_capability(BridgeCapability::Acp) {
+            Ok(bridge) => bridge,
+            Err(error) => {
+                tracing::warn!(
+                    %acp_id,
+                    %error,
+                    "failed to connect to ACP host bridge; settling the detached turn without its provider outcome"
+                );
+                return None;
+            }
+        };
         self.ensure_sandbox_event_poller();
-        bridge.acp_detached_turn_state(session_id, acp_id)
+        bridge
+            .acp_detached_turn_state(session_id, acp_id)
+            .unwrap_or_else(|error| {
+                tracing::warn!(
+                    %acp_id,
+                    %error,
+                    "ACP host bridge did not report the detached turn state; settling without its provider outcome"
+                );
+                None
+            })
     }
 
     pub(super) fn get_via_bridge(&self, acp_id: &str) -> Result<AcpAgentSnapshot, CliError> {

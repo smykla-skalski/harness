@@ -304,7 +304,7 @@ impl AcpAgentManagerHandle {
         acp_id: &str,
     ) -> Result<Option<AcpAgentSessionState>, CliError> {
         if sandboxed_from_env() {
-            return self.detached_turn_state_via_bridge(session_id, acp_id);
+            return Ok(self.detached_turn_state_via_bridge(session_id, acp_id));
         }
         Ok(self
             .sessions_guard()?
