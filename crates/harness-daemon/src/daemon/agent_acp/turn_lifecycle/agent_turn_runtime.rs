@@ -4,9 +4,6 @@ use crate::agents::turn::{
     AgentTurnFailure, AgentTurnFailureCategory, AgentTurnId, AgentTurnRequest, AgentTurnResult,
     AgentTurnRuntime, AgentTurnStatus,
 };
-use crate::daemon::agent_acp::{
-    AcpSessionConfigOptionState, PROVIDER_EFFECTIVE_MODEL_CONFIG_OPTION_ID,
-};
 use crate::daemon::db::AgentTurnRunStatus;
 use harness_kernel::errors::CliError;
 
@@ -49,19 +46,10 @@ impl AgentTurnRuntime for OpenRouterAgentTurnRuntime {
         }
         let snapshot = self.inspect_turn(id)?;
         let state = snapshot.session_state.unwrap_or_default();
-        let Some(result) = state.last_turn_result else {
+        let Some(result) = state.last_turn_result.clone() else {
             return Ok(None);
         };
-        let effective_model = effective_model(&state.config_options);
-        self.persist_settlement(
-            id,
-            AgentTurnRunStatus::Completed,
-            effective_model.clone(),
-            Some(result.report.clone()),
-            Some(result.stop_reason.clone()),
-            None,
-        )
-        .await?;
+        let effective_model = self.persist_observed_settlement(id, &state).await?;
         Ok(Some(AgentTurnResult {
             correlation_id: id.clone(),
             report: result.report,
@@ -82,34 +70,10 @@ impl AgentTurnRuntime for OpenRouterAgentTurnRuntime {
         let Some(state) = self.inspect_turn(id)?.session_state else {
             return Ok(None);
         };
-        let Some(failure) = state.last_turn_failure else {
+        let Some(failure) = state.last_turn_failure.clone() else {
             return Ok(None);
         };
-        let partial_output = state.last_turn_partial_output;
-        let actual_model = effective_model(&state.config_options);
-        let (run_status, stop_reason, error) =
-            if failure.category == AgentTurnFailureCategory::Cancelled {
-                (
-                    AgentTurnRunStatus::Cancelled,
-                    Some(failure.detail.clone()),
-                    None,
-                )
-            } else {
-                (
-                    AgentTurnRunStatus::Failed,
-                    None,
-                    Some(failure.detail.clone()),
-                )
-            };
-        self.persist_settlement(
-            id,
-            run_status,
-            actual_model,
-            partial_output,
-            stop_reason,
-            error,
-        )
-        .await?;
+        self.persist_observed_settlement(id, &state).await?;
         Ok(Some(failure))
     }
 
@@ -137,11 +101,4 @@ impl AgentTurnRuntime for OpenRouterAgentTurnRuntime {
         }
         Ok(AgentTurnStatus::Cancelled)
     }
-}
-
-fn effective_model(options: &[AcpSessionConfigOptionState]) -> Option<String> {
-    options
-        .iter()
-        .find(|option| option.id == PROVIDER_EFFECTIVE_MODEL_CONFIG_OPTION_ID)
-        .map(|option| option.current_value.clone())
 }

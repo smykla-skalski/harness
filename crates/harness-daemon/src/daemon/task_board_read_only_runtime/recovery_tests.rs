@@ -128,7 +128,7 @@ async fn admission_state(db: &AsyncDaemonDb, ledger_id: &str) -> String {
     .expect("read admission state")
 }
 
-async fn seed_session(db: &AsyncDaemonDb, session_id: &str) {
+pub(super) async fn seed_session(db: &AsyncDaemonDb, session_id: &str) {
     let state = SessionState {
         schema_version: CURRENT_VERSION,
         state_version: 1,
@@ -181,7 +181,10 @@ async fn seed_session(db: &AsyncDaemonDb, session_id: &str) {
     .expect("seed session");
 }
 
-fn restarted_state(db_path: &std::path::Path, async_db: Arc<AsyncDaemonDb>) -> DaemonHttpState {
+pub(super) fn restarted_state(
+    db_path: &std::path::Path,
+    async_db: Arc<AsyncDaemonDb>,
+) -> DaemonHttpState {
     let (sender, _) = broadcast::channel::<StreamEvent>(8);
     let db = Arc::new(OnceLock::new());
     db.set(Arc::new(Mutex::new(

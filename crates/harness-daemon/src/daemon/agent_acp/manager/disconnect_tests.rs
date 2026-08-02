@@ -58,6 +58,32 @@ fn wait_until_disconnected(manager: &AcpAgentManagerHandle, acp_id: &str) -> Acp
     }
 }
 
+/// The fake agent answers `session/prompt` on its own schedule, so the recorded
+/// stop reason is the only signal that the turn actually reported.
+fn wait_until_turn_reported(manager: &AcpAgentManagerHandle, session_id: &str, acp_id: &str) {
+    let deadline = Instant::now() + ACP_CONDITION_DEADLINE;
+    loop {
+        let Ok(inspect) = manager.inspect(Some(session_id)) else {
+            unreachable!("inspect");
+        };
+        let reported = inspect.agents.iter().any(|agent| {
+            agent.acp_id == acp_id
+                && agent
+                    .session_state
+                    .as_ref()
+                    .is_some_and(|state| state.last_stop_reason.is_some())
+        });
+        if reported {
+            return;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "timed out waiting for the ACP turn to report a stop reason"
+        );
+        std::thread::sleep(Duration::from_millis(50));
+    }
+}
+
 fn count_events(
     receiver: &mut broadcast::Receiver<crate::daemon::protocol::StreamEvent>,
 ) -> (usize, usize) {
@@ -295,5 +321,64 @@ async fn poisoned_permission_bridge_lock_does_not_block_snapshot_or_stop_cleanup
         ));
         assert_eq!(process.logical_session_count(), 0);
         assert_eq!(process_count(&manager), 0);
+    });
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[cfg(unix)]
+async fn a_detached_session_still_reports_the_state_inspect_stops_showing() {
+    temp_env::with_var(feature_flags::ACP_ENV, Some("1"), || {
+        let Ok(temp) = TempDir::new() else {
+            unreachable!("temp");
+        };
+        let script = temp.path().join("fake-agent.sh");
+        write_sleeping_acp_agent(&script);
+        let request = AcpAgentStartRequest {
+            agent: "fake".to_string(),
+            project_dir: Some(temp.path().display().to_string()),
+            prompt: Some("report on the frozen head".to_string()),
+            ..AcpAgentStartRequest::default()
+        };
+        let session_id = "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc";
+        let (manager, _events) = manager_with_events();
+        let descriptor = descriptor(&script);
+        let Ok(snapshot) = manager.start_descriptor(session_id, &request, &descriptor) else {
+            unreachable!("start");
+        };
+        wait_until_turn_reported(&manager, session_id, &snapshot.acp_id);
+
+        let Ok(_) = manager.stop(&snapshot.acp_id) else {
+            unreachable!("stop");
+        };
+
+        let Ok(inspect) = manager.inspect(Some(session_id)) else {
+            unreachable!("inspect after stop");
+        };
+        assert!(
+            inspect
+                .agents
+                .iter()
+                .all(|agent| agent.acp_id != snapshot.acp_id),
+            "inspect must keep hiding a disconnected session"
+        );
+        let Ok(state) = manager.detached_turn_state(session_id, &snapshot.acp_id) else {
+            unreachable!("detached turn state");
+        };
+        let state = state.expect("the detached session keeps its last reported state");
+        assert_eq!(state.last_stop_reason.as_deref(), Some("end_turn"));
+
+        let Ok(other_session) =
+            manager.detached_turn_state("00b4a39f-719e-5418-abe8-eb3ab6ea614d", &snapshot.acp_id)
+        else {
+            unreachable!("detached turn state for another session");
+        };
+        assert!(
+            other_session.is_none(),
+            "a turn must not be readable through an unrelated session"
+        );
+        let Ok(unknown) = manager.detached_turn_state(session_id, "acp-unknown") else {
+            unreachable!("detached turn state for an unknown turn");
+        };
+        assert!(unknown.is_none());
     });
 }

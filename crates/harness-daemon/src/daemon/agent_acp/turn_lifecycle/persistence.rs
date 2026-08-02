@@ -1,4 +1,5 @@
 use crate::agents::turn::{AgentTurnId, AgentTurnRuntime, AgentTurnStatus};
+use crate::daemon::agent_acp::{AcpAgentSessionState, AgentTurnSettlement};
 use crate::daemon::db::{AgentTurnRunSnapshot, AgentTurnRunStatus};
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_workspace::workspace::utc_now;
@@ -80,16 +81,7 @@ impl OpenRouterAgentTurnRuntime {
             .iter()
             .any(|agent| agent.acp_id == runtime_turn_id);
         if !attached {
-            self.persist_settlement(
-                &id,
-                AgentTurnRunStatus::Failed,
-                None,
-                None,
-                None,
-                Some("provider turn is no longer attached to this daemon".into()),
-            )
-            .await?;
-            return Ok(());
+            return self.settle_detached_turn(&id, runtime_turn_id).await;
         }
         match self.status(&id).await? {
             AgentTurnStatus::Completed => {
@@ -109,6 +101,57 @@ impl OpenRouterAgentTurnRuntime {
             AgentTurnStatus::Queued | AgentTurnStatus::Running => {}
         }
         Ok(())
+    }
+
+    /// Persist whatever terminal outcome `state` reports, and return the
+    /// effective model it observed. A state with no terminal outcome persists
+    /// nothing.
+    pub(super) async fn persist_observed_settlement(
+        &self,
+        id: &AgentTurnId,
+        state: &AcpAgentSessionState,
+    ) -> Result<Option<String>, CliError> {
+        let Some(settlement) = AgentTurnSettlement::from_session_state(state) else {
+            return Ok(None);
+        };
+        let actual_model = settlement.actual_model.clone();
+        self.persist_settlement(
+            id,
+            settlement.status,
+            settlement.actual_model,
+            settlement.report,
+            settlement.stop_reason,
+            settlement.error,
+        )
+        .await?;
+        Ok(actual_model)
+    }
+
+    /// Settle a turn whose provider session is no longer attached.
+    ///
+    /// A turn can fail and then detach before the next probe reads it, so the
+    /// detached session's last reported state decides the outcome. Only a turn
+    /// that never reported one settles on the detachment error itself.
+    async fn settle_detached_turn(
+        &self,
+        id: &AgentTurnId,
+        runtime_turn_id: &str,
+    ) -> Result<(), CliError> {
+        let settlement = self
+            .manager
+            .detached_turn_state(&self.session_id, runtime_turn_id)?
+            .as_ref()
+            .and_then(AgentTurnSettlement::from_session_state)
+            .unwrap_or_else(AgentTurnSettlement::detached);
+        self.persist_settlement(
+            id,
+            settlement.status,
+            settlement.actual_model,
+            settlement.report,
+            settlement.stop_reason,
+            settlement.error,
+        )
+        .await
     }
 
     /// Persist an observed terminal settlement exactly once per turn.

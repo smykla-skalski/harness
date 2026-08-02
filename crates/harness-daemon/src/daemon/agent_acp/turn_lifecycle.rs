@@ -2,7 +2,9 @@ use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use crate::agents::turn::{AgentTurnId, AgentTurnRequest};
-use crate::daemon::agent_acp::{AcpAgentInspectResponse, AcpAgentSnapshot, AcpAgentStartRequest};
+use crate::daemon::agent_acp::{
+    AcpAgentInspectResponse, AcpAgentSessionState, AcpAgentSnapshot, AcpAgentStartRequest,
+};
 use crate::daemon::db::AsyncDaemonDb;
 use crate::session::types::SessionRole;
 use harness_kernel::errors::{CliError, CliErrorKind};
@@ -43,6 +45,13 @@ trait OpenRouterTurnManager: Send + Sync {
 
     fn inspect(&self, session_id: &str) -> Result<AcpAgentInspectResponse, CliError>;
 
+    /// The last state a turn reported, readable after its session detached.
+    fn detached_turn_state(
+        &self,
+        session_id: &str,
+        acp_id: &str,
+    ) -> Result<Option<AcpAgentSessionState>, CliError>;
+
     fn runtime_session_id(
         &self,
         session_id: &str,
@@ -63,6 +72,14 @@ impl OpenRouterTurnManager for AcpAgentManagerHandle {
 
     fn inspect(&self, session_id: &str) -> Result<AcpAgentInspectResponse, CliError> {
         Self::inspect(self, Some(session_id))
+    }
+
+    fn detached_turn_state(
+        &self,
+        session_id: &str,
+        acp_id: &str,
+    ) -> Result<Option<AcpAgentSessionState>, CliError> {
+        Self::detached_turn_state(self, session_id, acp_id)
     }
 
     fn runtime_session_id(

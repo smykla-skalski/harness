@@ -1,13 +1,14 @@
 use crate::daemon::agent_acp::{
-    AcpAgentInspectResponse, AcpAgentReconcileResponse, AcpAgentSnapshot, AcpAgentStartRequest,
-    AcpPermissionDecision,
+    AcpAgentInspectResponse, AcpAgentReconcileResponse, AcpAgentSessionState, AcpAgentSnapshot,
+    AcpAgentStartRequest, AcpPermissionDecision,
 };
 use harness_kernel::errors::CliError;
 use harness_protocol::managed_agents::acp::AcpRuntimeProbeResponse;
 
 use super::acp_rpc::{
-    BridgeAcpEventsRequest, BridgeAcpEventsResponse, BridgeAcpGetRequest, BridgeAcpInspectRequest,
-    BridgeAcpListRequest, BridgeAcpProbeRequest, BridgeAcpProbeResponse, BridgeAcpReconcileRequest,
+    BridgeAcpDetachedTurnStateRequest, BridgeAcpDetachedTurnStateResponse, BridgeAcpEventsRequest,
+    BridgeAcpEventsResponse, BridgeAcpGetRequest, BridgeAcpInspectRequest, BridgeAcpListRequest,
+    BridgeAcpProbeRequest, BridgeAcpProbeResponse, BridgeAcpReconcileRequest,
     BridgeAcpResolvePermissionRequest, BridgeAcpStartRequest,
 };
 use super::client::BridgeClient;
@@ -86,6 +87,28 @@ impl BridgeClient {
                 session_id: session_id.map(ToOwned::to_owned),
             },
         )
+    }
+
+    /// Read the last live state one ACP turn reported, including a session the
+    /// host has already disconnected.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when the bridge rejects the request or payload
+    /// decoding fails.
+    pub fn acp_detached_turn_state(
+        &self,
+        session_id: &str,
+        acp_id: &str,
+    ) -> Result<Option<AcpAgentSessionState>, CliError> {
+        let response: BridgeAcpDetachedTurnStateResponse = self.typed_capability_request(
+            BridgeCapability::Acp,
+            "detached_turn_state",
+            &BridgeAcpDetachedTurnStateRequest {
+                session_id: session_id.to_string(),
+                acp_id: acp_id.to_string(),
+            },
+        )?;
+        Ok(response.state)
     }
 
     /// Load a batched ACP reconcile snapshot for sandbox resync.

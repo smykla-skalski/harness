@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 
 use crate::daemon::agent_acp::{
-    AcpAgentInspectResponse, AcpAgentReconcileResponse, AcpAgentSnapshot, AcpAgentStartRequest,
-    AcpPermissionDecision,
+    AcpAgentInspectResponse, AcpAgentReconcileResponse, AcpAgentSessionState, AcpAgentSnapshot,
+    AcpAgentStartRequest, AcpPermissionDecision,
 };
 use crate::daemon::state::HostBridgeCapabilityManifest;
 use harness_kernel::errors::{CliError, CliErrorKind};
@@ -43,6 +43,18 @@ impl BridgeServer {
     ) -> Result<AcpAgentInspectResponse, CliError> {
         self.ensure_acp_capability()?;
         self.with_acp_runtime(|| self.acp_agent_manager.inspect(session_id))
+    }
+
+    pub(super) fn detached_turn_state_acp(
+        &self,
+        session_id: &str,
+        acp_id: &str,
+    ) -> Result<Option<AcpAgentSessionState>, CliError> {
+        self.ensure_acp_capability()?;
+        self.with_acp_runtime(|| {
+            self.acp_agent_manager
+                .detached_turn_state(session_id, acp_id)
+        })
     }
 
     pub(super) fn reconcile_acp(&self) -> Result<AcpAgentReconcileResponse, CliError> {

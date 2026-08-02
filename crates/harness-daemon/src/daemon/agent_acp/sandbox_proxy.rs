@@ -15,7 +15,8 @@ use crate::workspace::utc_now;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::manager::{
-    AcpAgentInspectResponse, AcpAgentManagerHandle, AcpAgentReconcileResponse, AcpAgentSnapshot,
+    AcpAgentInspectResponse, AcpAgentManagerHandle, AcpAgentReconcileResponse,
+    AcpAgentSessionState, AcpAgentSnapshot,
 };
 use super::permission_bridge::{AcpPermissionBatch, AcpPermissionDecision};
 mod incidents;
@@ -118,6 +119,16 @@ impl AcpAgentManagerHandle {
                 log_empty_inspect_with_error(&error, "failed to inspect ACP host bridge sessions")
             }
         }
+    }
+
+    pub(super) fn detached_turn_state_via_bridge(
+        &self,
+        session_id: &str,
+        acp_id: &str,
+    ) -> Result<Option<AcpAgentSessionState>, CliError> {
+        let bridge = BridgeClient::for_capability(BridgeCapability::Acp)?;
+        self.ensure_sandbox_event_poller();
+        bridge.acp_detached_turn_state(session_id, acp_id)
     }
 
     pub(super) fn get_via_bridge(&self, acp_id: &str) -> Result<AcpAgentSnapshot, CliError> {

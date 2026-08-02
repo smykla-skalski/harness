@@ -75,6 +75,10 @@ mod spawn_credential;
 // to `daemon-runtime` rather than the broader bridge-or-daemon set.
 #[cfg(feature = "daemon-runtime")]
 mod turn_lifecycle;
+// Daemon-only for the same reason as `turn_lifecycle`: it maps observed ACP
+// state onto the daemon-owned run store's terminal columns.
+#[cfg(feature = "daemon-runtime")]
+mod turn_settlement;
 
 pub use harness_protocol::managed_agents::acp::{
     AcpAgentHandshake, AcpAgentInspectResponse, AcpAgentInspectSnapshot, AcpAgentSessionState,
@@ -97,6 +101,8 @@ pub use manager::{AcpAgentManagerHandle, AcpAgentReconcileResponse};
 pub use turn_lifecycle::OpenRouterAgentTurnRuntime;
 #[cfg(feature = "daemon-runtime")]
 pub(crate) use turn_lifecycle::OpenRouterRunCorrelation;
+#[cfg(feature = "daemon-runtime")]
+pub(crate) use turn_settlement::AgentTurnSettlement;
 
 const REPORT_ONLY_REVIEW_CAPABILITY: &str = "harness.report_only_review";
 pub(crate) const PROVIDER_EFFECTIVE_MODEL_CONFIG_OPTION_ID: &str =

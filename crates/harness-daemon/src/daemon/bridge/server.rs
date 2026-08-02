@@ -18,9 +18,10 @@ use crate::workspace::utc_now;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::acp_rpc::{
-    BridgeAcpEventsRequest, BridgeAcpGetRequest, BridgeAcpInspectRequest, BridgeAcpListRequest,
-    BridgeAcpProbeRequest, BridgeAcpProbeResponse, BridgeAcpReconcileRequest,
-    BridgeAcpResolvePermissionRequest, BridgeAcpStartRequest,
+    BridgeAcpDetachedTurnStateRequest, BridgeAcpDetachedTurnStateResponse, BridgeAcpEventsRequest,
+    BridgeAcpGetRequest, BridgeAcpInspectRequest, BridgeAcpListRequest, BridgeAcpProbeRequest,
+    BridgeAcpProbeResponse, BridgeAcpReconcileRequest, BridgeAcpResolvePermissionRequest,
+    BridgeAcpStartRequest,
 };
 use super::bridge_state::{write_bridge_config, write_bridge_state};
 use super::client::{
@@ -338,6 +339,12 @@ impl BridgeServer {
             "inspect" => {
                 let request: BridgeAcpInspectRequest = parse_bridge_payload(payload)?;
                 let response = self.inspect_acp(request.session_id.as_deref())?;
+                Ok(BridgeResponse::ok_payload(&response)?.into())
+            }
+            "detached_turn_state" => {
+                let request: BridgeAcpDetachedTurnStateRequest = parse_bridge_payload(payload)?;
+                let state = self.detached_turn_state_acp(&request.session_id, &request.acp_id)?;
+                let response = BridgeAcpDetachedTurnStateResponse { state };
                 Ok(BridgeResponse::ok_payload(&response)?.into())
             }
             "reconcile" => {

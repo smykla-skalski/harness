@@ -7,12 +7,12 @@ use tokio::task::JoinHandle;
 use crate::agents::acp::supervision::WatchdogEventEmitter;
 use crate::agents::acp::supervision::WatchdogState;
 use crate::agents::kind::DisconnectReason;
-use crate::daemon::agent_acp::AcpSessionListPage;
 use crate::daemon::agent_acp::manager::{AcpAgentInspectSnapshot, AcpAgentSnapshot};
 use crate::daemon::agent_acp::permission_bridge::{
     AcpPermissionBatch, AcpPermissionDecision, PermissionBridgeHandle,
 };
 use crate::daemon::agent_acp::protocol::AcpSessionRequestConfig;
+use crate::daemon::agent_acp::{AcpAgentSessionState, AcpSessionListPage};
 use crate::session::types::AgentStatus;
 use crate::workspace::utc_now;
 
@@ -235,6 +235,13 @@ impl ActiveAcpSession {
             handshake: self.process.supervisor.handshake().cloned(),
             session_state: self.process.supervisor.session_state(),
         }
+    }
+
+    /// The last live state this session observed, whether or not its process is
+    /// still connected. `inspect_snapshot_for` reads the same state but only
+    /// reaches sessions that survived the disconnect filter.
+    pub(in crate::daemon::agent_acp) fn last_session_state(&self) -> Option<AcpAgentSessionState> {
+        self.process.supervisor.session_state()
     }
 
     pub(in crate::daemon::agent_acp) fn refresh(&self) {

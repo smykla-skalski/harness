@@ -25,6 +25,9 @@ pub(super) struct FakeManager {
     state: Mutex<AcpAgentSessionState>,
     runtime_session_id: Mutex<Option<String>>,
     attached: Mutex<bool>,
+    /// Whether the detached session is still in the registry. A live daemon
+    /// keeps it, so its last state stays readable; a restart does not.
+    session_retained: Mutex<bool>,
     available: Mutex<bool>,
     stopped: Mutex<bool>,
     stop_probe: Mutex<Option<Box<dyn FnOnce() + Send>>>,
@@ -38,6 +41,7 @@ impl Default for FakeManager {
             state: Mutex::default(),
             runtime_session_id: Mutex::new(Some("openrouter-session-1".into())),
             attached: Mutex::new(true),
+            session_retained: Mutex::new(true),
             available: Mutex::new(true),
             stopped: Mutex::default(),
             stop_probe: Mutex::default(),
@@ -74,8 +78,18 @@ impl FakeManager {
             .last_turn_partial_output = Some(partial_output.into());
     }
 
+    /// Detach the turn the way a finished or dead agent process does: `inspect`
+    /// stops reporting it while the session it left behind keeps its last state.
     pub(super) fn evict(&self) {
         *self.attached.lock().expect("attached lock") = false;
+    }
+
+    /// Drop the session with the turn, so nothing remains to read after the
+    /// detach. This is what a daemon restart leaves behind.
+    pub(super) fn forget(&self) {
+        self.evict();
+        *self.state.lock().expect("state lock") = AcpAgentSessionState::default();
+        *self.session_retained.lock().expect("retained lock") = false;
     }
 
     pub(super) fn make_unavailable(&self) {
@@ -129,6 +143,17 @@ impl OpenRouterTurnManager for FakeManager {
             available,
             issue_message: (!available).then(|| "bridge unavailable".into()),
         })
+    }
+
+    fn detached_turn_state(
+        &self,
+        _session_id: &str,
+        _acp_id: &str,
+    ) -> Result<Option<AcpAgentSessionState>, CliError> {
+        if !*self.session_retained.lock().expect("retained lock") {
+            return Ok(None);
+        }
+        Ok(Some(self.state.lock().expect("state lock").clone()))
     }
 
     fn runtime_session_id(

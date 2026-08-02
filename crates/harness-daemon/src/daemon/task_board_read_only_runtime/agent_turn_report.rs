@@ -7,7 +7,7 @@
 
 use crate::agents::turn::{AgentTurnPullRequestContext, AgentTurnRequest, AgentTurnRuntime};
 use crate::daemon::agent_acp::{
-    AgentTurnFailureCategory, OpenRouterAgentTurnRuntime, OpenRouterRunCorrelation,
+    AgentTurnSettlement, OpenRouterAgentTurnRuntime, OpenRouterRunCorrelation,
 };
 use crate::daemon::db::{AgentTurnRunSnapshot, AgentTurnRunStatus, AsyncDaemonDb};
 use crate::daemon::http::DaemonHttpState;
@@ -101,63 +101,57 @@ pub(crate) async fn load_agent_turn_report_run(
     if !inspect.available {
         return Ok(Some(run));
     }
-    let Some(agent) = inspect
+    let agent = inspect
         .agents
         .into_iter()
-        .find(|agent| agent.acp_id == runtime_turn_id)
-    else {
-        run.status = AgentTurnRunStatus::Failed;
-        run.error = Some("provider turn is no longer attached to this daemon".into());
-        run.updated_at = harness_workspace::workspace::utc_now();
-        db.save_agent_turn_run(&run).await?;
-        return db.agent_turn_run(run_id).await;
+        .find(|agent| agent.acp_id == runtime_turn_id);
+    let is_detached = agent.is_none();
+    let session = match agent {
+        Some(agent) => agent.session_state,
+        // `inspect` hides a session whose process already exited, so a turn that
+        // failed and then detached still has its provider outcome here.
+        None => state
+            .acp_agent_manager
+            .detached_turn_state(session_id, runtime_turn_id)?,
     };
-    let Some(session) = agent.session_state else {
-        return Ok(Some(run));
-    };
-    let terminal_observed =
-        session.last_turn_result.is_some() || session.last_turn_failure.is_some();
-    if !terminal_observed {
-        return Ok(Some(run));
-    }
-    run.actual_model = session
-        .config_options
-        .iter()
-        .find(|option| {
-            option.id == crate::daemon::agent_acp::PROVIDER_EFFECTIVE_MODEL_CONFIG_OPTION_ID
-        })
-        .map(|option| option.current_value.clone());
-    run.report = session
-        .last_turn_result
+    let settlement = session
         .as_ref()
-        .map(|result| result.report.clone())
-        .or_else(|| session.last_turn_partial_output.clone());
-    if let Err(detail) =
-        verify_effective_model(run.requested_model.as_deref(), run.actual_model.as_deref())
-    {
-        run.status = AgentTurnRunStatus::Failed;
-        run.error = Some(detail);
-        run.updated_at = harness_workspace::workspace::utc_now();
-        db.save_agent_turn_run(&run).await?;
-        return db.agent_turn_run(run_id).await;
-    }
-    if let Some(result) = session.last_turn_result {
-        run.status = AgentTurnRunStatus::Completed;
-        run.report = Some(result.report);
-        run.stop_reason = Some(result.stop_reason);
-    } else if let Some(failure) = session.last_turn_failure {
-        run.report = session.last_turn_partial_output;
-        run.status = if failure.category == AgentTurnFailureCategory::Cancelled {
-            AgentTurnRunStatus::Cancelled
-        } else {
-            AgentTurnRunStatus::Failed
-        };
-        if run.status == AgentTurnRunStatus::Cancelled {
-            run.stop_reason = Some(failure.detail);
-        } else {
-            run.error = Some(failure.detail);
+        .and_then(AgentTurnSettlement::from_session_state);
+    let Some(settlement) = settlement else {
+        if !is_detached {
+            return Ok(Some(run));
+        }
+        // Nothing was ever observed, so the detachment itself is the outcome.
+        // The unverified model stays untouched: there is no observation to
+        // check it against.
+        let detachment = AgentTurnSettlement::detached();
+        run.status = detachment.status;
+        run.error = detachment.error;
+        return save_and_reload(db, run, run_id).await;
+    };
+    run.actual_model = settlement.actual_model;
+    run.report = settlement.report;
+    match verify_effective_model(run.requested_model.as_deref(), run.actual_model.as_deref()) {
+        Ok(()) => {
+            run.status = settlement.status;
+            run.stop_reason = settlement.stop_reason;
+            run.error = settlement.error;
+        }
+        // A mismatch overrides the outcome but keeps whatever the provider
+        // produced, so the evidence survives the rejection.
+        Err(detail) => {
+            run.status = AgentTurnRunStatus::Failed;
+            run.error = Some(detail);
         }
     }
+    save_and_reload(db, run, run_id).await
+}
+
+async fn save_and_reload(
+    db: &AsyncDaemonDb,
+    mut run: AgentTurnRunSnapshot,
+    run_id: &str,
+) -> Result<Option<AgentTurnRunSnapshot>, CliError> {
     run.updated_at = harness_workspace::workspace::utc_now();
     db.save_agent_turn_run(&run).await?;
     db.agent_turn_run(run_id).await

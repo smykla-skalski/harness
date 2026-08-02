@@ -6,8 +6,8 @@ use std::sync::{Arc, Mutex, Weak};
 use std::time::Duration;
 
 pub(crate) use harness_protocol::managed_agents::acp::{
-    AcpAgentInspectResponse, AcpAgentInspectSnapshot, AcpAgentSnapshot, AcpAgentStartRequest,
-    AcpSessionListPage,
+    AcpAgentInspectResponse, AcpAgentInspectSnapshot, AcpAgentSessionState, AcpAgentSnapshot,
+    AcpAgentStartRequest, AcpSessionListPage,
 };
 use tokio::sync::broadcast;
 use tokio::task::spawn_blocking;
@@ -283,6 +283,34 @@ impl AcpAgentManagerHandle {
             available: true,
             issue_message: None,
         })
+    }
+
+    /// Read the last live state one ACP turn reported, including a session
+    /// whose process has already gone.
+    ///
+    /// [`inspect`](Self::inspect) drops disconnected sessions, so a turn that
+    /// failed and then detached looks indistinguishable from one that never
+    /// reported anything. Reconciliation uses this to settle the run on the
+    /// provider's own outcome instead of a generic detachment error.
+    ///
+    /// Returns `None` when no session carries that id under `session_id`, or
+    /// when it never reported any state.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when the live session registry is unavailable.
+    pub fn detached_turn_state(
+        &self,
+        session_id: &str,
+        acp_id: &str,
+    ) -> Result<Option<AcpAgentSessionState>, CliError> {
+        if sandboxed_from_env() {
+            return self.detached_turn_state_via_bridge(session_id, acp_id);
+        }
+        Ok(self
+            .sessions_guard()?
+            .get(acp_id)
+            .filter(|session| session.session_id_matches(session_id))
+            .and_then(|session| session.last_session_state()))
     }
 
     /// Load one ACP session snapshot.

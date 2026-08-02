@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::daemon::agent_acp::AcpPermissionDecision;
+use crate::daemon::agent_acp::{AcpAgentSessionState, AcpPermissionDecision};
 use crate::daemon::protocol::StreamEvent;
 use harness_protocol::managed_agents::acp::AcpRuntimeProbeResponse;
 
@@ -24,6 +24,18 @@ pub(super) struct BridgeAcpListRequest {
 pub(super) struct BridgeAcpInspectRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(super) session_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(super) struct BridgeAcpDetachedTurnStateRequest {
+    pub(super) session_id: String,
+    pub(super) acp_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(super) struct BridgeAcpDetachedTurnStateResponse {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(super) state: Option<AcpAgentSessionState>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
