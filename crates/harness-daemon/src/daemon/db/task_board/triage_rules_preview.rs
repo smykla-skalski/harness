@@ -1,4 +1,5 @@
 use super::triage_apply::triage_eligible;
+use super::triage_queries::TriageQueries;
 use super::triage_rules_bulk_load::{
     load_active_dispatch_reservation_item_ids_in_tx, load_triage_bulk_entries_in_tx,
 };
@@ -11,38 +12,49 @@ use crate::task_board::{
 
 impl AsyncDaemonDb {
     /// Evaluate `candidate` against one frozen read of the current inbox
-    /// without persisting anything, whether or not the candidate is valid --
-    /// an author previews in-progress work before ever saving or activating
-    /// it. The whole read happens in one transaction that is always rolled
-    /// back (never committed), so it is consistent with itself but never
-    /// observable as a write to any other reader. Excludes items under an
-    /// active dispatch reservation, matching what an actual activation would
-    /// skip -- otherwise a preview could promise a change activation never
-    /// applies.
+    /// without persisting anything. See
+    /// [`TriageQueries::preview_task_board_triage_rules`] for the full
+    /// contract.
     pub(crate) async fn preview_task_board_triage_rules(
         &self,
         candidate: TriageRuleSetV1,
     ) -> Result<TriageRuleSetPreviewResult, CliError> {
-        let validation = validate_triage_rule_set(&candidate);
-        if !validation.is_valid() {
-            return Ok(TriageRuleSetPreviewResult {
-                validation,
-                diff: Vec::new(),
-            });
-        }
-        let mut transaction =
-            self.pool().begin().await.map_err(|error| {
-                db_error(format!("begin task board triage rules preview: {error}"))
-            })?;
-        let entries = load_triage_bulk_entries_in_tx(&mut transaction).await?;
-        let reserved = load_active_dispatch_reservation_item_ids_in_tx(&mut transaction).await?;
-        let diff = entries
-            .into_iter()
-            .filter(|entry| triage_eligible(&entry.item) && !reserved.contains(&entry.item.id))
-            .map(|entry| diff_entry(&candidate, entry))
-            .collect();
-        Ok(TriageRuleSetPreviewResult { validation, diff })
+        <Self as TriageQueries>::preview_task_board_triage_rules(self, candidate).await
     }
+}
+
+/// Evaluate `candidate` against one frozen read of the current inbox without
+/// persisting anything, whether or not the candidate is valid -- an author
+/// previews in-progress work before ever saving or activating it. The whole
+/// read happens in one transaction that is always rolled back (never
+/// committed), so it is consistent with itself but never observable as a
+/// write to any other reader. Excludes items under an active dispatch
+/// reservation, matching what an actual activation would skip -- otherwise a
+/// preview could promise a change activation never applies.
+pub(super) async fn preview_task_board_triage_rules(
+    db: &AsyncDaemonDb,
+    candidate: TriageRuleSetV1,
+) -> Result<TriageRuleSetPreviewResult, CliError> {
+    let validation = validate_triage_rule_set(&candidate);
+    if !validation.is_valid() {
+        return Ok(TriageRuleSetPreviewResult {
+            validation,
+            diff: Vec::new(),
+        });
+    }
+    let mut transaction = db
+        .pool()
+        .begin()
+        .await
+        .map_err(|error| db_error(format!("begin task board triage rules preview: {error}")))?;
+    let entries = load_triage_bulk_entries_in_tx(&mut transaction).await?;
+    let reserved = load_active_dispatch_reservation_item_ids_in_tx(&mut transaction).await?;
+    let diff = entries
+        .into_iter()
+        .filter(|entry| triage_eligible(&entry.item) && !reserved.contains(&entry.item.id))
+        .map(|entry| diff_entry(&candidate, entry))
+        .collect();
+    Ok(TriageRuleSetPreviewResult { validation, diff })
 }
 
 fn diff_entry(

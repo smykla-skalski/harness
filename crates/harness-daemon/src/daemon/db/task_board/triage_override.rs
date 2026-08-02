@@ -8,6 +8,7 @@ use super::triage_apply::{
 };
 use super::triage_apply_rules::ensure_current_active_triage_decision_in_tx;
 use super::triage_decisions::current_triage_decision_in_tx;
+use super::triage_queries::TriageQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::{
     BUILTIN_V1_EVALUATOR_IDENTITY, TaskBoardItem, TaskBoardTriageEffectiveOutcome,
@@ -213,48 +214,60 @@ pub(crate) struct TaskBoardTriageOverrideMutationResult {
 
 impl AsyncDaemonDb {
     /// Set (or replace) a durable triage override under one item-revision
-    /// and item-list sequence CAS. Always authoritative for lane outcome,
-    /// even over a manual anchor -- a manually anchored item still moves
-    /// lanes, carrying its slot/actor/`lane_set_at` with it.
+    /// and item-list sequence CAS. See
+    /// [`TriageQueries::set_task_board_triage_override`] for the full
+    /// contract.
     pub(crate) async fn set_task_board_triage_override(
         &self,
         input: TaskBoardTriageOverrideSetInput,
     ) -> Result<TaskBoardTriageOverrideMutationResult, CliError> {
-        validate_override_actor_and_reason(&input.actor, input.reason.as_deref())?;
-        let mut transaction = self
-            .begin_immediate_transaction("task board triage override set")
-            .await?;
-        let result = apply_triage_override_set_in_tx(&mut transaction, &input).await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit task-board triage override set: {error}")))?;
-        Ok(result)
+        <Self as TriageQueries>::set_task_board_triage_override(self, input).await
     }
 
     /// Clear a durable triage override under one item-revision and
-    /// item-list sequence CAS, first refreshing stale automatic evidence
-    /// when needed and then reconciling that decision's placement. A manual
-    /// anchor still reconciles, keeping its slot/actor/`lane_set_at`.
+    /// item-list sequence CAS. See
+    /// [`TriageQueries::clear_task_board_triage_override`] for the full
+    /// contract.
     pub(crate) async fn clear_task_board_triage_override(
         &self,
         input: TaskBoardTriageOverrideClearInput,
     ) -> Result<TaskBoardTriageOverrideMutationResult, CliError> {
-        validate_override_actor_and_reason(&input.actor, None)?;
-        let mut transaction = self
-            .begin_immediate_transaction("task board triage override clear")
-            .await?;
-        let result = apply_triage_override_clear_in_tx(
-            &mut transaction,
-            &input,
-            self.triage_escalation_config(),
-        )
-        .await?;
-        transaction.commit().await.map_err(|error| {
-            db_error(format!("commit task-board triage override clear: {error}"))
-        })?;
-        Ok(result)
+        <Self as TriageQueries>::clear_task_board_triage_override(self, input).await
     }
+}
+
+pub(super) async fn set_task_board_triage_override(
+    db: &AsyncDaemonDb,
+    input: TaskBoardTriageOverrideSetInput,
+) -> Result<TaskBoardTriageOverrideMutationResult, CliError> {
+    validate_override_actor_and_reason(&input.actor, input.reason.as_deref())?;
+    let mut transaction = db
+        .begin_immediate_transaction("task board triage override set")
+        .await?;
+    let result = apply_triage_override_set_in_tx(&mut transaction, &input).await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit task-board triage override set: {error}")))?;
+    Ok(result)
+}
+
+pub(super) async fn clear_task_board_triage_override(
+    db: &AsyncDaemonDb,
+    input: TaskBoardTriageOverrideClearInput,
+) -> Result<TaskBoardTriageOverrideMutationResult, CliError> {
+    validate_override_actor_and_reason(&input.actor, None)?;
+    let mut transaction = db
+        .begin_immediate_transaction("task board triage override clear")
+        .await?;
+    let result =
+        apply_triage_override_clear_in_tx(&mut transaction, &input, db.triage_escalation_config())
+            .await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit task-board triage override clear: {error}")))?;
+    Ok(result)
 }
 
 struct ClearReconciliation {
