@@ -20,6 +20,7 @@ use crate::task_board::remote_wire::wire::RemoteOfferRequest;
 use crate::task_board::remote_wire::wire::{
     RemoteSourceBundleUploadRequest, RemoteSourceBundleUploadResponse,
 };
+use crate::daemon::db::prelude::*;
 
 pub(super) async fn exact_task_board_remote_source_bundle_upload_receipt(
     db: &AsyncDaemonDb,

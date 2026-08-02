@@ -5,6 +5,7 @@ use crate::task_board::remote_wire::wire::{
 };
 use crate::daemon::db::task_board::orchestrator_settings_queries::OrchestratorSettingsQueries;
 use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
+use crate::daemon::db::prelude::*;
 
 #[tokio::test]
 async fn rejected_host_identity_replays_after_operator_settings_restore() {

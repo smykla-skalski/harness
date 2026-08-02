@@ -3,6 +3,8 @@ use std::path::PathBuf;
 use serde::Deserialize;
 
 use super::async_pool::AsyncDaemonDb;
+use super::async_writes::AsyncSessionWriteQueries;
+use super::writes::SessionWriteQueries;
 use super::{
     CliError, DaemonDb, DiscoveredProject, SessionState, daemon_protocol, db_error,
     parse_session_status_db_label,

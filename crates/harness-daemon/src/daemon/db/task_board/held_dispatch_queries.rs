@@ -17,6 +17,7 @@ use super::{
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::infra::io;
 use crate::task_board::{TaskBoardHeldDispatchItem, TaskBoardHeldDispatchSummary};
+use crate::daemon::db::prelude::*;
 
 pub(in crate::daemon::db::task_board) async fn held_task_board_dispatch_summary(
     db: &AsyncDaemonDb,

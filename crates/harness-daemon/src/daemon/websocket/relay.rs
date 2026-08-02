@@ -12,6 +12,7 @@ use harness_kernel::errors::CliError;
 use super::broadcast::{PreparedBroadcast, ReplayBuffer, build_prepared};
 use super::connection::ConnectionState;
 use super::dispatch::ws_activity_log_level;
+use crate::daemon::db::prelude::*;
 
 pub(crate) async fn relay_broadcast(
     mut broadcast_rx: broadcast::Receiver<Arc<PreparedBroadcast>>,

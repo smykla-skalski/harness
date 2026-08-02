@@ -31,6 +31,7 @@ use super::config::{DaemonServeConfig, log_sandbox_startup};
 use super::initialize_startup_state;
 use super::legacy_migration::log_legacy_daemon_root_migration;
 use super::service::{self, SHUTDOWN_SIGNAL};
+use crate::daemon::db::prelude::*;
 
 /// Start the remote daemon HTTPS API.
 ///

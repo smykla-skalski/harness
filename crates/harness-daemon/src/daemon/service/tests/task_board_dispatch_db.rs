@@ -9,6 +9,7 @@ use crate::task_board::{
     TaskBoardWorkflowKind, build_dispatch_plans_with_policy,
 };
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db::prelude::*;
 
 struct CrashedDispatchPreparation {
     db: crate::daemon::db::AsyncDaemonDb,

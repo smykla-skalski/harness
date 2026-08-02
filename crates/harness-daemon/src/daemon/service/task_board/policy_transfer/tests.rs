@@ -10,6 +10,7 @@ use crate::task_board::policy_graph::{
 };
 
 use super::{dump_policies, import_policies};
+use crate::daemon::db::prelude::*;
 
 async fn connect() -> (TempDir, AsyncDaemonDb) {
     let dir = tempdir().expect("tempdir");

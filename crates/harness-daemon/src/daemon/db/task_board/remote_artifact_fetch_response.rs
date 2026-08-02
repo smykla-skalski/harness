@@ -12,6 +12,7 @@ use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::remote_wire::wire::{
     RemoteArtifactFetchRequest, RemoteArtifactFetchResponse,
 };
+use crate::daemon::db::prelude::*;
 
 /// Atomically adopts authenticated artifact bytes and consumes the exact
 /// current host-trust token that authorized their network fetch.

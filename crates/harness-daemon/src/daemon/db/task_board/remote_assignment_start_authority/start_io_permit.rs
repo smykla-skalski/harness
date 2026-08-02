@@ -17,6 +17,7 @@ use crate::daemon::db::task_board::remote_assignment_model::{
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardRemoteAssignmentState;
+use crate::daemon::db::prelude::*;
 
 const START_IO_PERMIT_DOMAIN: &str = "harness.task-board.remote-executor-start-io-permit.v1";
 

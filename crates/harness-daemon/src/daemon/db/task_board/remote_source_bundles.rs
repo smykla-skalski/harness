@@ -22,6 +22,7 @@ mod coordinates;
 mod row;
 pub(super) use coordinates::source_bundle_coordinates;
 use row::RemoteSourceBundleRow;
+use crate::daemon::db::prelude::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TaskBoardRemoteSourceBundle {

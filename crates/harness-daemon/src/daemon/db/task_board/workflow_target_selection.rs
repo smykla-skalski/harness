@@ -16,6 +16,7 @@ use crate::task_board::{
     validate_task_board_attempt_update, validate_task_board_execution_target_update,
     validate_task_board_workflow_execution,
 };
+use crate::daemon::db::prelude::*;
 
 pub(super) async fn select_task_board_local_execution_target(
     db: &AsyncDaemonDb,

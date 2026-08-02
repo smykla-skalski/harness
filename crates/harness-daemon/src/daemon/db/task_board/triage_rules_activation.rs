@@ -11,6 +11,7 @@ use crate::task_board::{
     TriageRuleSetValidationReport, validate_triage_rule_set,
 };
 use harness_kernel::errors::CliErrorKind;
+use crate::daemon::db::prelude::*;
 
 /// CAS-activate `candidate`, or deactivate back to the `BuiltInV1` default
 /// when `candidate` is `None`. Validates first: an invalid candidate is

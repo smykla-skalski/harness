@@ -215,13 +215,12 @@ fn assert_round_trip_smoke_reads(db: &DaemonDb, state: &SessionState) {
         .expect("load agent activity");
     assert_eq!(loaded_activity.len(), 1);
     assert_eq!(loaded_activity[0].latest_tool_name.as_deref(), Some("Read"));
-    let checkpoints = db
-        .load_task_checkpoints(&state.session_id, "task-1")
+    let checkpoints = SessionCoreQueries::load_task_checkpoints(db, &state.session_id, "task-1")
         .expect("load checkpoints");
     assert_eq!(checkpoints.len(), 1);
     assert_eq!(checkpoints[0].checkpoint_id, "checkpoint-1");
     assert_eq!(
-        db.load_session_log(&state.session_id)
+        SessionCoreQueries::load_session_log(db, &state.session_id)
             .expect("load session log")
             .len(),
         1

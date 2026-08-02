@@ -1,4 +1,5 @@
 use crate::daemon::db::imports::DaemonDbSessionResync;
+use crate::daemon::db::writes::SessionWriteQueries;
 use std::path::Path;
 
 use crate::daemon::index as daemon_index;
@@ -11,46 +12,110 @@ use super::{
     prepare_session_import_from_resolved, prepare_session_resync, u64_from_i64,
 };
 
-impl DaemonDb {
-    fn refresh_session_state_for_mutation(&self, session_id: &str) -> Result<(), CliError> {
-        let db_version = self.session_state_version(session_id)?;
-        let Some(db_version) = db_version else {
-            let prepared = match prepare_session_resync(session_id) {
-                Ok(prepared) => Some(prepared),
-                Err(error) if error.code() == "KSRCLI090" => None,
-                Err(error) => return Err(error),
-            };
-            if let Some(prepared) = prepared {
-                self.apply_prepared_session_resync(&prepared)?;
-            }
-            return Ok(());
-        };
-        let Some(project_dir) = self.project_dir_for_session(session_id)? else {
-            return Ok(());
-        };
-        let project_dir = Path::new(&project_dir);
-        let layout = session_storage::layout_from_project_dir(project_dir, session_id)?;
-        let Some(file_state) = session_storage::load_state(&layout)? else {
-            return Ok(());
-        };
-        let file_version = i64::try_from(file_state.state_version).unwrap_or(i64::MAX);
-        if db_version >= file_version {
-            return Ok(());
-        }
-        let resolved = daemon_index::ResolvedSession {
-            project: daemon_index::discovered_project_for_checkout(project_dir),
-            state: file_state,
-        };
-        let prepared = prepare_session_import_from_resolved(&resolved)?;
-        self.apply_prepared_session_resync(&prepared)?;
-        Ok(())
-    }
-
+/// Session-core reads and writes: state load/save, log entries, task
+/// checkpoints, and project lookups for a session.
+///
+/// `pub`, not `pub(crate)`: `tests/integration` links `harness` as an
+/// ordinary dependency and calls several of these directly on a seeded
+/// `DaemonDb`, the same reason several sync `db` traits stay `pub` elsewhere.
+pub trait SessionCoreQueries {
     /// Load session state by ID.
     ///
     /// # Errors
     /// Returns [`CliError`] on SQL or parse failures.
-    pub fn load_session_state(&self, session_id: &str) -> Result<Option<SessionState>, CliError> {
+    fn load_session_state(&self, session_id: &str) -> Result<Option<SessionState>, CliError>;
+
+    /// Load session log entries for a session, ordered by sequence.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on query failure.
+    fn load_session_log(&self, session_id: &str) -> Result<Vec<SessionLogEntry>, CliError>;
+
+    /// Load task checkpoints for a session and task.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on query failure.
+    fn load_task_checkpoints(
+        &self,
+        session_id: &str,
+        task_id: &str,
+    ) -> Result<Vec<TaskCheckpoint>, CliError>;
+
+    /// Load session state by ID for an in-place mutation.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL or parse failures.
+    fn load_session_state_for_mutation(
+        &self,
+        session_id: &str,
+    ) -> Result<Option<SessionState>, CliError>;
+
+    /// Persist a mutated session state back to `SQLite`. This is the
+    /// write side of the daemon-first mutation pattern after
+    /// [`SessionCoreQueries::load_session_state_for_mutation`] and an `apply_*` call.
+    ///
+    /// Delegates to `sync_session` which performs a full upsert of
+    /// the session row plus denormalized agents and tasks.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    fn save_session_state(&self, project_id: &str, state: &SessionState) -> Result<(), CliError>;
+
+    /// Insert a new session record with `is_active = 1`. Use this for
+    /// the daemon-first `start_session` path where the session is
+    /// created directly in `SQLite` without touching files.
+    ///
+    /// Delegates to `sync_session` (which is an upsert) and then
+    /// explicitly ensures the default-visible flag is set.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    fn create_session_record(&self, project_id: &str, state: &SessionState)
+    -> Result<(), CliError>;
+
+    /// Clear the active flag for a session (replaces file-based
+    /// `storage::deregister_active`).
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    fn mark_session_inactive(&self, session_id: &str) -> Result<(), CliError>;
+
+    /// Return whether a session can accept new managed agents.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    fn session_accepts_managed_agent_start(&self, session_id: &str) -> Result<bool, CliError>;
+
+    /// Return the `state_version` for a session, or `None` if the session
+    /// does not exist in the database.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    fn session_state_version(&self, session_id: &str) -> Result<Option<i64>, CliError>;
+
+    /// Look up the project that owns a session.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    fn project_id_for_session(&self, session_id: &str) -> Result<Option<String>, CliError>;
+
+    /// Look up the project directory for a session by joining sessions
+    /// and projects.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    fn project_dir_for_session(&self, session_id: &str) -> Result<Option<String>, CliError>;
+
+    /// Find the project ID for a given directory path. Matches against
+    /// `project_dir` first, then `context_root`.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] if the project is not found or on SQL failures.
+    fn ensure_project_for_dir(&self, project_dir: &str) -> Result<String, CliError>;
+}
+
+impl SessionCoreQueries for DaemonDb {
+    fn load_session_state(&self, session_id: &str) -> Result<Option<SessionState>, CliError> {
         session_storage::validate_session_id(session_id)?;
         let result = self.conn.query_row(
             "SELECT project_id, state_json FROM sessions WHERE session_id = ?1",
@@ -72,11 +137,7 @@ impl DaemonDb {
         }
     }
 
-    /// Load session log entries for a session, ordered by sequence.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on query failure.
-    pub fn load_session_log(&self, session_id: &str) -> Result<Vec<SessionLogEntry>, CliError> {
+    fn load_session_log(&self, session_id: &str) -> Result<Vec<SessionLogEntry>, CliError> {
         let mut statement = self
             .conn
             .prepare(
@@ -116,11 +177,7 @@ impl DaemonDb {
         Ok(entries)
     }
 
-    /// Load task checkpoints for a session and task.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on query failure.
-    pub fn load_task_checkpoints(
+    fn load_task_checkpoints(
         &self,
         session_id: &str,
         task_id: &str,
@@ -151,46 +208,21 @@ impl DaemonDb {
         rows.collect::<Result<Vec<_>, _>>()
             .map_err(|error| db_error(format!("read checkpoint row: {error}")))
     }
-    /// Load session state by ID for an in-place mutation.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL or parse failures.
-    pub fn load_session_state_for_mutation(
+
+    fn load_session_state_for_mutation(
         &self,
         session_id: &str,
     ) -> Result<Option<SessionState>, CliError> {
         session_storage::validate_session_id(session_id)?;
-        self.refresh_session_state_for_mutation(session_id)?;
+        refresh_session_state_for_mutation(self, session_id)?;
         self.load_session_state(session_id)
     }
 
-    /// Persist a mutated session state back to `SQLite`. This is the
-    /// write side of the daemon-first mutation pattern after
-    /// [`load_session_state_for_mutation`] and an `apply_*` call.
-    ///
-    /// Delegates to [`sync_session`] which performs a full upsert of
-    /// the session row plus denormalized agents and tasks.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL failures.
-    pub fn save_session_state(
-        &self,
-        project_id: &str,
-        state: &SessionState,
-    ) -> Result<(), CliError> {
+    fn save_session_state(&self, project_id: &str, state: &SessionState) -> Result<(), CliError> {
         self.sync_session(project_id, state)
     }
 
-    /// Insert a new session record with `is_active = 1`. Use this for
-    /// the daemon-first `start_session` path where the session is
-    /// created directly in `SQLite` without touching files.
-    ///
-    /// Delegates to [`sync_session`] (which is an upsert) and then
-    /// explicitly ensures the default-visible flag is set.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL failures.
-    pub fn create_session_record(
+    fn create_session_record(
         &self,
         project_id: &str,
         state: &SessionState,
@@ -207,12 +239,7 @@ impl DaemonDb {
         Ok(())
     }
 
-    /// Clear the active flag for a session (replaces file-based
-    /// `storage::deregister_active`).
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL failures.
-    pub fn mark_session_inactive(&self, session_id: &str) -> Result<(), CliError> {
+    fn mark_session_inactive(&self, session_id: &str) -> Result<(), CliError> {
         self.conn
             .execute(
                 "UPDATE sessions SET is_active = 0 WHERE session_id = ?1",
@@ -222,11 +249,7 @@ impl DaemonDb {
         Ok(())
     }
 
-    /// Return whether a session can accept new managed agents.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL failures.
-    pub fn session_accepts_managed_agent_start(&self, session_id: &str) -> Result<bool, CliError> {
+    fn session_accepts_managed_agent_start(&self, session_id: &str) -> Result<bool, CliError> {
         let result = self.conn.query_row(
             "SELECT is_active, archived_at FROM sessions WHERE session_id = ?1",
             [session_id],
@@ -241,12 +264,7 @@ impl DaemonDb {
         }
     }
 
-    /// Return the `state_version` for a session, or `None` if the session
-    /// does not exist in the database.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL failures.
-    pub fn session_state_version(&self, session_id: &str) -> Result<Option<i64>, CliError> {
+    fn session_state_version(&self, session_id: &str) -> Result<Option<i64>, CliError> {
         let result = self.conn.query_row(
             "SELECT state_version FROM sessions WHERE session_id = ?1",
             [session_id],
@@ -259,11 +277,7 @@ impl DaemonDb {
         }
     }
 
-    /// Look up the project that owns a session.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL failures.
-    pub fn project_id_for_session(&self, session_id: &str) -> Result<Option<String>, CliError> {
+    fn project_id_for_session(&self, session_id: &str) -> Result<Option<String>, CliError> {
         let result = self.conn.query_row(
             "SELECT project_id FROM sessions WHERE session_id = ?1",
             [session_id],
@@ -276,12 +290,7 @@ impl DaemonDb {
         }
     }
 
-    /// Look up the project directory for a session by joining sessions
-    /// and projects.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL failures.
-    pub fn project_dir_for_session(&self, session_id: &str) -> Result<Option<String>, CliError> {
+    fn project_dir_for_session(&self, session_id: &str) -> Result<Option<String>, CliError> {
         let result = self.conn.query_row(
             "SELECT p.project_dir FROM sessions s
              JOIN projects p ON s.project_id = p.project_id
@@ -296,12 +305,7 @@ impl DaemonDb {
         }
     }
 
-    /// Find the project ID for a given directory path. Matches against
-    /// `project_dir` first, then `context_root`.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] if the project is not found or on SQL failures.
-    pub fn ensure_project_for_dir(&self, project_dir: &str) -> Result<String, CliError> {
+    fn ensure_project_for_dir(&self, project_dir: &str) -> Result<String, CliError> {
         let result = self.conn.query_row(
             "SELECT project_id FROM projects
              WHERE project_dir = ?1 OR context_root = ?1
@@ -317,4 +321,38 @@ impl DaemonDb {
             Err(error) => Err(db_error(format!("ensure_project_for_dir: {error}"))),
         }
     }
+}
+
+fn refresh_session_state_for_mutation(db: &DaemonDb, session_id: &str) -> Result<(), CliError> {
+    let db_version = db.session_state_version(session_id)?;
+    let Some(db_version) = db_version else {
+        let prepared = match prepare_session_resync(session_id) {
+            Ok(prepared) => Some(prepared),
+            Err(error) if error.code() == "KSRCLI090" => None,
+            Err(error) => return Err(error),
+        };
+        if let Some(prepared) = prepared {
+            db.apply_prepared_session_resync(&prepared)?;
+        }
+        return Ok(());
+    };
+    let Some(project_dir) = db.project_dir_for_session(session_id)? else {
+        return Ok(());
+    };
+    let project_dir = Path::new(&project_dir);
+    let layout = session_storage::layout_from_project_dir(project_dir, session_id)?;
+    let Some(file_state) = session_storage::load_state(&layout)? else {
+        return Ok(());
+    };
+    let file_version = i64::try_from(file_state.state_version).unwrap_or(i64::MAX);
+    if db_version >= file_version {
+        return Ok(());
+    }
+    let resolved = daemon_index::ResolvedSession {
+        project: daemon_index::discovered_project_for_checkout(project_dir),
+        state: file_state,
+    };
+    let prepared = prepare_session_import_from_resolved(&resolved)?;
+    db.apply_prepared_session_resync(&prepared)?;
+    Ok(())
 }

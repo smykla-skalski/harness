@@ -13,6 +13,7 @@ use crate::task_board::policy_runtime::repository::{
     BeginRunOutcome, begin_run_in_document, claim_waiting_run_in_document, save_run_in_document,
 };
 use crate::task_board::policy_runtime::scheduler::timer_wait_is_due;
+use crate::daemon::db::prelude::*;
 
 /// Real implementations behind the matching [`PolicyRuntimeQueries`] methods,
 /// called from the single consolidated trait impl in

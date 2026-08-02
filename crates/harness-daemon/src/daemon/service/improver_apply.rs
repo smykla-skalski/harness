@@ -15,6 +15,7 @@ use crate::workspace::utc_now;
 use harness_kernel::errors::CliError;
 
 use super::{effective_project_dir, index, session_not_found};
+use crate::daemon::db::prelude::*;
 
 /// Apply an improver patch to a canonical skill/plugin source (sync path).
 ///

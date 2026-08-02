@@ -15,6 +15,7 @@ use crate::task_board::remote_wire::wire::{
     RemoteArtifactManifest, RemoteAssignmentWireState, RemoteAttemptBinding,
     TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
+use crate::daemon::db::prelude::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TaskBoardRemoteArtifact {

@@ -6,6 +6,7 @@ use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
 use crate::task_board::{
     TaskBoardTriageEscalationStatus, TaskBoardTriageEscalationVerdictOutcome, TriageVerdict,
 };
+use crate::daemon::db::prelude::*;
 
 /// One `pending` row claimed by the executor and moved to `running`, ready
 /// to spawn an agent for.

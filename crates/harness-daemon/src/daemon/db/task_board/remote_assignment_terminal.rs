@@ -29,6 +29,7 @@ pub(super) use offer_response::record_task_board_remote_offer_response;
 use offer_screen::{
     OfferScreen, OfferScreenLabels, screen_offer_response_in_tx, validate_offer_request,
 };
+use crate::daemon::db::prelude::*;
 
 const OFFER_RESPONSE_LABELS: OfferScreenLabels = OfferScreenLabels {
     principal: "remote assignment authenticated principal",

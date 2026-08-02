@@ -7,6 +7,7 @@ use super::{
     import_daemon_events, prepare_agent_conversation_imports_and_activity,
     prepare_runtime_transcript_resync_for_agents,
 };
+use crate::daemon::db::prelude::*;
 
 pub trait DaemonDbImports {
     /// Import all file-backed sessions and projects into the database.

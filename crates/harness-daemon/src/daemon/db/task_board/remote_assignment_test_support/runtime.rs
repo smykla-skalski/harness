@@ -8,6 +8,7 @@ use crate::daemon::db::{
 use crate::daemon::protocol::{CodexRunSnapshot, CodexRunStatus};
 use crate::daemon::db::task_board::remote_assignment_start_settlement_queries::RemoteAssignmentStartSettlementQueries;
 use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
+use crate::daemon::db::prelude::*;
 
 pub(crate) async fn authorize_and_start_executor(
     fixture: &ExecutorFixture,

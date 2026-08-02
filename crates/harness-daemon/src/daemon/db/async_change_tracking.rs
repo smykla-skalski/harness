@@ -6,12 +6,27 @@ use super::{AsyncDaemonDb, CliError, db_error};
 const CURRENT_CHANGE_SEQ_SQL: &str =
     "SELECT last_seq FROM change_tracking_state WHERE singleton = 1";
 
-impl AsyncDaemonDb {
+/// Async mirror of `change_tracking::ChangeTrackingQueries`, plus the
+/// current-sequence read, through the canonical async daemon DB.
+pub(crate) trait AsyncChangeTrackingQueries: Send + Sync {
     /// Read the current global change sequence (the singleton `last_seq`).
     ///
     /// # Errors
     /// Returns [`CliError`] on SQL failures.
-    pub(crate) async fn current_change_sequence(&self) -> Result<i64, CliError> {
+    async fn current_change_sequence(&self) -> Result<i64, CliError>;
+
+    /// Load canonical change-tracking rows newer than the provided sequence.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    async fn load_change_tracking_since(
+        &self,
+        last_change_seq: i64,
+    ) -> Result<Vec<(String, i64)>, CliError>;
+}
+
+impl AsyncChangeTrackingQueries for AsyncDaemonDb {
+    async fn current_change_sequence(&self) -> Result<i64, CliError> {
         let row: (i64,) = query_as(CURRENT_CHANGE_SEQ_SQL)
             .fetch_one(self.pool())
             .await
@@ -19,11 +34,7 @@ impl AsyncDaemonDb {
         Ok(row.0)
     }
 
-    /// Load canonical change-tracking rows newer than the provided sequence.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL failures.
-    pub(crate) async fn load_change_tracking_since(
+    async fn load_change_tracking_since(
         &self,
         last_change_seq: i64,
     ) -> Result<Vec<(String, i64)>, CliError> {

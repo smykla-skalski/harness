@@ -16,6 +16,7 @@ use super::process::{AgentTuiSnapshotContext, snapshot_from_process};
 use super::readiness::signal_readiness_ready;
 use super::support::lock_db;
 use super::{AgentTuiInput, AgentTuiInputRequest, AgentTuiKey, AgentTuiResizeRequest};
+use crate::daemon::db::prelude::*;
 
 impl AgentTuiManagerHandle {
     /// List managed TUI snapshots for a session.

@@ -18,6 +18,7 @@ use super::remote_viewer_support::{
     connect_remote_ws, get_http_json, register_remote_client, serve_http, ws_rpc,
 };
 use super::test_http_state_with_db;
+use crate::daemon::db::prelude::*;
 
 const VIEWER_ID: &str = "viewer-diagnostics";
 const ADMIN_ID: &str = "admin-diagnostics";

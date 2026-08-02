@@ -18,6 +18,7 @@ use crate::task_board::{
     TaskBoardRemoteAssignmentState, TaskBoardReviewResult, TaskBoardReviewerOutcome,
 };
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db::prelude::*;
 
 const OWNER: &str = "instance-a";
 

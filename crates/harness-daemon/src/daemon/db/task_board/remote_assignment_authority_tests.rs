@@ -14,6 +14,7 @@ use crate::daemon::db::task_board::remote_assignment_authority_queries::RemoteAs
 use crate::daemon::db::task_board::remote_assignment_start_settlement_queries::RemoteAssignmentStartSettlementQueries;
 use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::db::task_board::workflow_execution_queries::WorkflowExecutionQueries;
+use crate::daemon::db::prelude::*;
 
 #[tokio::test]
 async fn offer_authority_fences_stop_until_atomic_settlement() {

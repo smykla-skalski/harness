@@ -6,6 +6,7 @@ use super::workflow_execution_candidates::load_candidates;
 use super::workflow_execution_rows::WorkflowExecutionRow;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardWorkflowExecutionRecord;
+use crate::daemon::db::prelude::*;
 
 #[path = "workflow_recovery_selection/remote_candidates.rs"]
 mod remote_candidates;

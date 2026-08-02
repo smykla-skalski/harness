@@ -24,6 +24,7 @@ use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
 use crate::daemon::db::task_board::remote_assignment_authority_queries::RemoteAssignmentAuthorityQueries;
 use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::db::task_board::workflow_execution_queries::WorkflowExecutionQueries;
+use crate::daemon::db::prelude::*;
 
 const DIVERGED_AT: &str = "2026-07-19T10:00:30Z";
 

@@ -11,6 +11,7 @@ use super::audit::{broadcast_automation_audits, insert_automation_audit, parse_s
 use super::runs::TaskBoardAutomationRunLease;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardAutomationRunStage;
+use crate::daemon::db::prelude::*;
 
 #[derive(Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]

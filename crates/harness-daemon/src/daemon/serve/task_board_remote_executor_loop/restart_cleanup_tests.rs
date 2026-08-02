@@ -11,6 +11,7 @@ use crate::daemon::db::{
     remote_executor_fixture, remote_executor_identity,
 };
 use crate::task_board::TaskBoardRemoteAssignmentState;
+use crate::daemon::db::prelude::*;
 
 const SUCCESSOR_INSTANCE: &str = "instance-b";
 

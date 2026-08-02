@@ -36,6 +36,7 @@ use evidence::{load_completed_artifact, require_failed_artifact_set};
 #[path = "remote_assignment_result_adoption/screen.rs"]
 mod screen;
 use screen::{ProceedingAdoption, TerminalAdoptionScreen, screen_terminal_adoption_in_tx};
+use crate::daemon::db::prelude::*;
 
 type SettledAdoptionFuture<'a> = Pin<
     Box<dyn Future<Output = Result<TaskBoardRemoteResultAdoptionOutcome, CliError>> + Send + 'a>,

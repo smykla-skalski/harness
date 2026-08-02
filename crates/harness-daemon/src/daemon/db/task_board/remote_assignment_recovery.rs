@@ -13,6 +13,7 @@ use super::remote_operation_trust::abandon_controller_operation_trust_in_tx;
 use crate::daemon::db::task_board::remote_assignment_executor_lifecycle_queries::RemoteAssignmentExecutorLifecycleQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardRemoteAssignmentState;
+use crate::daemon::db::prelude::*;
 
 #[derive(sqlx::FromRow)]
 struct RecoveryRow {

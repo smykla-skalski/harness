@@ -16,6 +16,7 @@ use crate::task_board::{
     validate_lane_placement,
 };
 use harness_kernel::errors::CliErrorKind;
+use crate::daemon::db::prelude::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TaskBoardLanePositionInput {

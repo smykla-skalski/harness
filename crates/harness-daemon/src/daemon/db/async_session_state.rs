@@ -1,22 +1,41 @@
 use sqlx::query_as;
 
 use super::async_writes::sync_session_in_transaction;
-use super::{AsyncDaemonDb, CliError, SessionState, db_error};
+use super::{AsyncDaemonDb, AsyncDaemonTransactions, CliError, SessionState, db_error};
 use crate::session::storage;
 use harness_kernel::errors::CliErrorKind;
 
 const LOAD_SESSION_STATE_SQL: &str =
     "SELECT state_json, project_id FROM sessions WHERE session_id = ?1";
 
-impl AsyncDaemonDb {
+/// Session-state load and immediate-transaction mutate-and-save through the
+/// canonical async daemon DB.
+pub(crate) trait AsyncSessionStateQueries: Send + Sync {
     /// Load session state by ID, including archived sessions.
     ///
     /// # Errors
     /// Returns [`CliError`] on SQL or parse failures.
-    pub(crate) async fn load_session_state(
+    async fn load_session_state(&self, session_id: &str) -> Result<Option<SessionState>, CliError>;
+
+    /// Load, mutate, and save session state under an immediate transaction.
+    ///
+    /// This serializes async mutation writers before they read state, avoiding
+    /// lost updates when independent HTTP/WebSocket requests mutate the same
+    /// session concurrently.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL, parse, or mutation failures.
+    async fn update_session_state_immediate<F, T>(
         &self,
         session_id: &str,
-    ) -> Result<Option<SessionState>, CliError> {
+        update: F,
+    ) -> Result<T, CliError>
+    where
+        F: FnOnce(&mut SessionState) -> Result<T, CliError>;
+}
+
+impl AsyncSessionStateQueries for AsyncDaemonDb {
+    async fn load_session_state(&self, session_id: &str) -> Result<Option<SessionState>, CliError> {
         storage::validate_session_id(session_id)?;
         let row = query_as::<_, AsyncSessionStateRow>(LOAD_SESSION_STATE_SQL)
             .bind(session_id)
@@ -30,15 +49,7 @@ impl AsyncDaemonDb {
         .transpose()
     }
 
-    /// Load, mutate, and save session state under an immediate transaction.
-    ///
-    /// This serializes async mutation writers before they read state, avoiding
-    /// lost updates when independent HTTP/WebSocket requests mutate the same
-    /// session concurrently.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL, parse, or mutation failures.
-    pub(crate) async fn update_session_state_immediate<F, T>(
+    async fn update_session_state_immediate<F, T>(
         &self,
         session_id: &str,
         update: F,

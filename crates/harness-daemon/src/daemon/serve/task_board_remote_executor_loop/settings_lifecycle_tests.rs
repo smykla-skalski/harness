@@ -17,6 +17,7 @@ use crate::daemon::db::{
 use crate::daemon::protocol::CodexRunStatus;
 use crate::task_board::TaskBoardRemoteAssignmentState;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db::prelude::*;
 
 #[tokio::test]
 async fn compatible_settings_changes_reconcile_started_workers_through_terminal() {

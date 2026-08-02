@@ -17,6 +17,7 @@ use crate::task_board::{
     TaskBoardReviewerOutcome,
 };
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db::prelude::*;
 
 #[tokio::test]
 async fn running_status_after_lost_claim_response_promotes_and_commits_start_once() {

@@ -15,6 +15,7 @@ use super::task_board_workflow_test_support::{
     CREATED_AT, TestDatabase, create_execution, outcome_record, reviewers,
 };
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db::prelude::*;
 
 #[tokio::test]
 async fn reviewer_outcome_rejects_stale_head_and_preserves_exact_pr_head() {

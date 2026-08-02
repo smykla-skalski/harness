@@ -15,6 +15,7 @@ use crate::task_board::{
     TaskBoardWorkflowExecutionRecord, validate_task_board_attempt_update,
     validate_task_board_execution_attempt,
 };
+use crate::daemon::db::prelude::*;
 
 const SELECT_ATTEMPTS: &str = "SELECT * FROM task_board_execution_attempts
     WHERE execution_id = ?1 ORDER BY action_key, attempt";

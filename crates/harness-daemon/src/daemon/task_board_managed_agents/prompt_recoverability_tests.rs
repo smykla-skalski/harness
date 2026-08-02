@@ -16,6 +16,7 @@ use crate::task_board::render_triage_escalation_prompt;
 use super::super::test_support::{applied_task, codex_snapshot, seed_session, test_http_state};
 use super::super::{codex_worker_request, managed_worker_id};
 use super::{review_launch, write_launch};
+use crate::daemon::db::prelude::*;
 
 /// Persist a run the way the controller does -- prompt carried from the
 /// request, result carried in the final message -- and read it back.

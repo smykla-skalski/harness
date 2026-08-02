@@ -8,6 +8,7 @@ use super::rows::{ExternalRefRow, ItemRow};
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardItem;
 use crate::task_board::project::{ItemProjectAttribution, item_attribution};
+use crate::daemon::db::prelude::*;
 
 /// Real implementation behind
 /// [`ProjectRegistryQueries::reattribute_unattributed_task_board_items`].

@@ -12,12 +12,79 @@ use crate::session::service::{agent_status_db_label, canonicalize_persisted_sess
 use crate::session::storage;
 use crate::session::types::ManagedAgentKind;
 
-impl DaemonDb {
+/// Session and project writes: upserts, log/checkpoint appends, and the
+/// global change-tracking counter.
+///
+/// `pub`, not `pub(crate)`: `tests/integration` links `harness` as an
+/// ordinary dependency and calls `sync_project`/`sync_session` directly on a
+/// seeded `DaemonDb`, the same reason several sync `db` traits stay `pub`
+/// elsewhere.
+pub trait SessionWriteQueries {
     /// Upsert a discovered project into the database.
     ///
     /// # Errors
     /// Returns [`CliError`] on SQL failures.
-    pub fn sync_project(&self, project: &DiscoveredProject) -> Result<(), CliError> {
+    fn sync_project(&self, project: &DiscoveredProject) -> Result<(), CliError>;
+
+    /// Upsert a session and replace its agents and tasks within a single
+    /// transaction.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    fn sync_session(&self, project_id: &str, state: &SessionState) -> Result<(), CliError>;
+
+    /// Append a session log entry.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    fn append_log_entry(&self, entry: &SessionLogEntry) -> Result<(), CliError>;
+
+    /// Append a task checkpoint record.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    fn append_checkpoint(
+        &self,
+        session_id: &str,
+        checkpoint: &TaskCheckpoint,
+    ) -> Result<(), CliError>;
+
+    /// Append a daemon audit event.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    fn append_daemon_event(
+        &self,
+        recorded_at: &str,
+        level: &str,
+        message: &str,
+    ) -> Result<(), CliError>;
+
+    /// Increment the version counter for a change-tracking scope.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    fn bump_change(&self, scope: &str) -> Result<(), CliError>;
+
+    /// Delete a session row and all cascade-dependent rows.
+    ///
+    /// Relies on `ON DELETE CASCADE` foreign keys in the schema (agents, tasks,
+    /// log, signals, timeline, etc.). Returns `Ok(true)` when a row was deleted,
+    /// `Ok(false)` when no row matched.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    fn delete_session_row(&self, session_id: &str) -> Result<bool, CliError>;
+
+    /// Return the most recent change-tracking sequence value.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    fn current_change_sequence(&self) -> Result<i64, CliError>;
+}
+
+impl SessionWriteQueries for DaemonDb {
+    fn sync_project(&self, project: &DiscoveredProject) -> Result<(), CliError> {
         let now = utc_now();
         self.conn
             .execute(
@@ -61,12 +128,7 @@ impl DaemonDb {
         Ok(())
     }
 
-    /// Upsert a session and replace its agents and tasks within a single
-    /// transaction.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL failures.
-    pub fn sync_session(&self, project_id: &str, state: &SessionState) -> Result<(), CliError> {
+    fn sync_session(&self, project_id: &str, state: &SessionState) -> Result<(), CliError> {
         let now = utc_now();
         let mut canonical_state = state.clone();
         canonicalize_persisted_session_state(&mut canonical_state, &now);
@@ -160,11 +222,8 @@ impl DaemonDb {
             .map_err(|error| db_error(format!("commit session sync: {error}")))?;
         Ok(())
     }
-    /// Append a session log entry.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL failures.
-    pub fn append_log_entry(&self, entry: &SessionLogEntry) -> Result<(), CliError> {
+
+    fn append_log_entry(&self, entry: &SessionLogEntry) -> Result<(), CliError> {
         let transition_json = serde_json::to_string(&entry.transition)
             .map_err(|error| db_error(format!("serialize log transition: {error}")))?;
         let transition_kind = extract_transition_kind(&transition_json);
@@ -220,11 +279,7 @@ impl DaemonDb {
         Ok(())
     }
 
-    /// Append a task checkpoint record.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL failures.
-    pub fn append_checkpoint(
+    fn append_checkpoint(
         &self,
         session_id: &str,
         checkpoint: &TaskCheckpoint,
@@ -271,11 +326,7 @@ impl DaemonDb {
         Ok(())
     }
 
-    /// Append a daemon audit event.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL failures.
-    pub fn append_daemon_event(
+    fn append_daemon_event(
         &self,
         recorded_at: &str,
         level: &str,
@@ -291,11 +342,7 @@ impl DaemonDb {
         Ok(())
     }
 
-    /// Increment the version counter for a change-tracking scope.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL failures.
-    pub fn bump_change(&self, scope: &str) -> Result<(), CliError> {
+    fn bump_change(&self, scope: &str) -> Result<(), CliError> {
         let normalized_scope = normalize_change_scope(scope);
         let transaction = self
             .conn
@@ -333,15 +380,7 @@ impl DaemonDb {
         Ok(())
     }
 
-    /// Delete a session row and all cascade-dependent rows.
-    ///
-    /// Relies on `ON DELETE CASCADE` foreign keys in the schema (agents, tasks,
-    /// log, signals, timeline, etc.). Returns `Ok(true)` when a row was deleted,
-    /// `Ok(false)` when no row matched.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL failures.
-    pub fn delete_session_row(&self, session_id: &str) -> Result<bool, CliError> {
+    fn delete_session_row(&self, session_id: &str) -> Result<bool, CliError> {
         const DELETE_SESSION_ROW_SQL: &str = "DELETE FROM sessions WHERE session_id = ?1";
         let rows_affected = self
             .conn
@@ -351,11 +390,7 @@ impl DaemonDb {
         Ok(rows_affected > 0)
     }
 
-    /// Return the most recent change-tracking sequence value.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL failures.
-    pub fn current_change_sequence(&self) -> Result<i64, CliError> {
+    fn current_change_sequence(&self) -> Result<i64, CliError> {
         self.conn
             .query_row(
                 "SELECT last_seq FROM change_tracking_state WHERE singleton = 1",

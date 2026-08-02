@@ -24,6 +24,7 @@ use crate::task_board::remote_wire::wire::RemoteOfferRequest;
 use crate::workspace::utc_now;
 use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db::prelude::*;
 
 static START_CALLS: AtomicUsize = AtomicUsize::new(0);
 static PROVISION_CALLS: AtomicUsize = AtomicUsize::new(0);

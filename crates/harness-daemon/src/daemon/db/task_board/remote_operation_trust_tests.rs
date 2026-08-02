@@ -18,6 +18,7 @@ use crate::task_board::{
 use crate::daemon::db::task_board::orchestrator_settings_queries::OrchestratorSettingsQueries;
 use crate::daemon::db::task_board::remote_assignment_authority_queries::RemoteAssignmentAuthorityQueries;
 use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
+use crate::daemon::db::prelude::*;
 
 const STATUS_SHA256: &str = "1111111111111111111111111111111111111111111111111111111111111111";
 const CANCEL_SHA256: &str = "2222222222222222222222222222222222222222222222222222222222222222";

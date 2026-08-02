@@ -1,5 +1,6 @@
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::DaemonDb;
+use crate::daemon::db::prelude::*;
 use crate::daemon::protocol::CodexRunRequest;
 use crate::daemon::service as daemon_service;
 use crate::session::service as session_service;

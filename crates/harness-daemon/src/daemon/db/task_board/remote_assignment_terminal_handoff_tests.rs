@@ -25,6 +25,7 @@ use crate::daemon::db::task_board::remote_assignment_executor_lifecycle_queries:
 use crate::daemon::db::task_board::remote_assignment_start_settlement_queries::RemoteAssignmentStartSettlementQueries;
 use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::db::task_board::workflow_execution_queries::WorkflowExecutionQueries;
+use crate::daemon::db::prelude::*;
 
 const HANDOFF_AT: &str = "2026-07-19T10:00:19Z";
 

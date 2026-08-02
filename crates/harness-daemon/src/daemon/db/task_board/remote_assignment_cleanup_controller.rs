@@ -20,6 +20,7 @@ use crate::task_board::TaskBoardWorkflowExecutionCas;
 use crate::task_board::remote_wire::wire_cleanup::{
     RemoteCleanupObservationRequest, RemoteCleanupObservationResponse,
 };
+use crate::daemon::db::prelude::*;
 
 pub(super) async fn claim_task_board_remote_cleanup_observation_fenced(
     db: &AsyncDaemonDb,

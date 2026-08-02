@@ -3,6 +3,7 @@ use sqlx::{Sqlite, Transaction, query};
 
 use super::remote_assignment_model::canonical_time;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
+use crate::daemon::db::prelude::*;
 
 pub(super) const REMOTE_EVIDENCE_RETENTION_DAYS: i64 = 7;
 const REMOTE_EVIDENCE_PRUNE_BATCH_LIMIT: i64 = 100;

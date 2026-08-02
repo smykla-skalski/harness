@@ -13,6 +13,7 @@ use crate::task_board::{
     TaskBoardAutomationWakeCause, TaskBoardAutomationWakeEvent, TaskBoardAutomationWakePayload,
     TaskBoardAutomationWakeRequest,
 };
+use crate::daemon::db::prelude::*;
 
 const PROCESSED_WAKE_RETENTION_LIMIT: i64 = 500;
 

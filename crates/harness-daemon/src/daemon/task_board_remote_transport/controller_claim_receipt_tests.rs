@@ -15,6 +15,7 @@ use crate::task_board::remote_wire::wire::{
 };
 use crate::task_board::{TaskBoardExecutionAttemptCas, TaskBoardWorkflowExecutionCas};
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db::prelude::*;
 
 const HOST: &str = "executor-a";
 const CLAIMED_AT: &str = "2026-07-19T10:00:10Z";

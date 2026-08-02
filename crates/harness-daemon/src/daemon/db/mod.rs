@@ -44,23 +44,36 @@ pub(crate) use harness_daemon_snapshot as daemon_snapshot;
 
 pub(crate) mod activity_fold;
 mod async_agent_turn_runs;
-pub(crate) use async_agent_turn_runs::{AgentTurnRunSnapshot, AgentTurnRunStatus};
+pub(crate) use async_agent_turn_runs::{
+    AgentTurnRunSnapshot, AgentTurnRunStatus, AsyncAgentTurnRunQueries,
+};
 mod async_agents;
+pub(crate) use async_agents::AsyncAgentResolutionQueries;
 mod async_bootstrap;
 mod async_change_tracking;
+pub(crate) use async_change_tracking::AsyncChangeTrackingQueries;
 mod async_conversation;
+pub(crate) use async_conversation::AsyncConversationSyncQueries;
 mod async_detail;
+pub(crate) use async_detail::AsyncSignalReadQueries;
 mod async_diagnostics;
+pub(crate) use async_diagnostics::AsyncDiagnosticsQueries;
 mod async_pool;
 mod async_reads;
+pub(crate) use async_reads::AsyncTimelineWindowQueries;
 mod async_resolved_session;
 mod async_runtime;
+pub(crate) use async_runtime::AsyncRuntimeSnapshotQueries;
 mod async_session_state;
+pub(crate) use async_session_state::AsyncSessionStateQueries;
 mod async_signal_writes;
+pub(crate) use async_signal_writes::AsyncSignalIndexQueries;
 mod async_writes;
+pub(crate) use async_writes::{AsyncDaemonTransactions, AsyncSessionWriteQueries};
 mod audit;
 pub(crate) use audit::AsyncAuditQueries;
 mod change_tracking;
+pub(crate) use change_tracking::ChangeTrackingQueries;
 #[cfg(test)]
 pub(crate) use change_tracking::LOAD_CHANGE_TRACKING_SQL;
 pub(crate) mod conversation;
@@ -86,6 +99,7 @@ pub(crate) mod remote_pairing;
 mod review_writes;
 pub(crate) use review_writes::{AsyncTaskReviewWrites, SyncTaskReviewWrites};
 mod runtime;
+pub use runtime::RuntimeSnapshotQueries;
 mod schema;
 mod schema_migrations;
 mod schema_sql;
@@ -164,8 +178,11 @@ pub(crate) use task_board::{
     status_request as remote_controller_status_request,
 };
 mod session_data;
+pub use session_data::SessionCoreQueries;
 mod signals;
+pub use signals::SignalIndexQueries;
 mod summaries;
+pub use summaries::SessionSummaryQueries;
 mod summary_rows;
 mod task_row;
 mod task_writes;
@@ -173,6 +190,8 @@ mod telemetry;
 pub(crate) mod timeline;
 mod timeline_store;
 mod writes;
+pub use writes::SessionWriteQueries;
+pub(crate) mod prelude;
 
 #[cfg(test)]
 pub(crate) use async_bootstrap::all_migration_versions;
@@ -260,7 +279,7 @@ pub struct DaemonDb {
 // back on `harness-daemon`; this impl is the one place the two sides meet.
 impl TimelineDbSource for DaemonDb {
     fn load_session_log(&self, session_id: &str) -> Result<Vec<SessionLogEntry>, CliError> {
-        DaemonDb::load_session_log(self, session_id)
+        <Self as SessionCoreQueries>::load_session_log(self, session_id)
     }
 
     fn load_task_checkpoints(
@@ -268,7 +287,7 @@ impl TimelineDbSource for DaemonDb {
         session_id: &str,
         task_id: &str,
     ) -> Result<Vec<TaskCheckpoint>, CliError> {
-        DaemonDb::load_task_checkpoints(self, session_id, task_id)
+        <Self as SessionCoreQueries>::load_task_checkpoints(self, session_id, task_id)
     }
 
     fn load_conversation_events(

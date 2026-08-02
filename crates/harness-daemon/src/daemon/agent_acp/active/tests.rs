@@ -11,6 +11,7 @@ use crate::session::types::{
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, OnceLock};
 use tokio::sync::{broadcast, mpsc};
+use crate::daemon::db::prelude::*;
 
 #[test]
 fn process_incident_event_maps_process_exit() {

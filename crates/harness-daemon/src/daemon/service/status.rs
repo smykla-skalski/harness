@@ -11,6 +11,7 @@ use harness_daemon_acp_probe::probe_acp_agents_cached;
 use harness_kernel::redact::secrets;
 use harness_protocol::daemon::summaries::{DaemonTelemetryRequest, DaemonTelemetryResponse};
 use tokio::task::{JoinError, spawn_blocking};
+use crate::daemon::db::prelude::*;
 
 /// Build a point-in-time daemon status report.
 ///

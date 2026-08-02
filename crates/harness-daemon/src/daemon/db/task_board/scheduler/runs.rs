@@ -15,6 +15,7 @@ use crate::daemon::protocol::HarnessMonitorAuditEvent;
 use crate::task_board::{
     TaskBoardAutomationRunOutcome, TaskBoardAutomationRunTrigger, TaskBoardAutomationScope,
 };
+use crate::daemon::db::prelude::*;
 
 const RUN_LEASE_SECONDS: i64 = 30;
 

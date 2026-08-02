@@ -1,3 +1,4 @@
+use crate::daemon::db::prelude::*;
 use crate::daemon::db::{
     AsyncDaemonDb, TaskBoardAdmissionMissingRunRecovery, TaskBoardAdmissionWorkerRecovery,
 };

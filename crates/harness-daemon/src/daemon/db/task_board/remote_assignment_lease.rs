@@ -20,6 +20,7 @@ use crate::task_board::remote_wire::wire::TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION;
 use crate::task_board::remote_wire::wire::{
     RemoteAttemptBinding, RemoteClaimRequest, RemoteLeaseRenewRequest,
 };
+use crate::daemon::db::prelude::*;
 
 impl AsyncDaemonDb {
 

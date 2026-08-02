@@ -13,6 +13,7 @@ use crate::task_board::remote_wire::wire::{
 use crate::task_board::{TaskBoardExecutionPhase, TaskBoardWorkflowKind};
 use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::db::task_board::remote_source_bundle_queries::RemoteSourceBundleQueries;
+use crate::daemon::db::prelude::*;
 
 // The prior phase's own base; the bundle result revision must equal the current
 // binding's base_revision (SOURCE_REVISION) or the upload seal rejects it.

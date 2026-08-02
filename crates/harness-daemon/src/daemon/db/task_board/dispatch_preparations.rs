@@ -12,6 +12,7 @@ use crate::task_board::{
     TaskBoardReadOnlyWorkflowLaunch, TaskBoardWorkflowKind, TaskBoardWriteWorkflowLaunch,
 };
 use harness_policy_graph_store::consume_approval_grant_in_tx;
+use crate::daemon::db::prelude::*;
 
 const PREPARATION_LEASE_SECONDS: i64 = 30;
 

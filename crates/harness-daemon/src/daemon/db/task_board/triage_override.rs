@@ -18,6 +18,7 @@ use harness_kernel::errors::CliErrorKind;
 
 mod mutations;
 use mutations::{apply_triage_override_clear_in_tx, apply_triage_override_set_in_tx};
+use crate::daemon::db::prelude::*;
 
 #[derive(sqlx::FromRow)]
 struct TriageOverrideRow {

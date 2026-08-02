@@ -67,6 +67,7 @@ use manifest::persist_manifest;
 use tracing::Instrument as _;
 use tracing::field::{Empty, display};
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db::prelude::*;
 
 /// Start the daemon TCP server and service all incoming connections.
 ///

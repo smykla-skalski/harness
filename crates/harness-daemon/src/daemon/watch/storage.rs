@@ -5,7 +5,8 @@ use harness_protocol::daemon::task_board::automation_snapshot::TaskBoardAutomati
 use crate::daemon::db::imports::DaemonDbSessionResync;
 use crate::daemon::db::task_board::prelude::TaskBoardAutomationSchedulerQueries;
 use crate::daemon::db::{
-    AsyncDaemonDb, DaemonDb, PreparedRuntimeTranscriptResync, PreparedSessionResync,
+    AsyncChangeTrackingQueries, AsyncDaemonDb, ChangeTrackingQueries, DaemonDb,
+    PreparedRuntimeTranscriptResync, PreparedSessionResync, SessionWriteQueries,
     prepare_runtime_transcript_resync, prepare_session_resync,
 };
 
@@ -14,14 +15,15 @@ pub struct DaemonPreparedSessionResync(PreparedSessionResync);
 
 impl AsyncWatchStorage for AsyncDaemonDb {
     async fn current_change_sequence(&self) -> Result<i64, CliError> {
-        Self::current_change_sequence(self).await
+        <Self as AsyncChangeTrackingQueries>::current_change_sequence(self).await
     }
 
     async fn load_change_tracking_since(
         &self,
         last_change_seq: i64,
     ) -> Result<Vec<(String, i64)>, CliError> {
-        Self::load_change_tracking_since(self, last_change_seq).await
+        <Self as AsyncChangeTrackingQueries>::load_change_tracking_since(self, last_change_seq)
+            .await
     }
 
     async fn task_board_automation_snapshot(
@@ -36,14 +38,14 @@ impl WatchStorage for DaemonDb {
     type PreparedSessionResync = DaemonPreparedSessionResync;
 
     fn current_change_sequence(&self) -> Result<i64, CliError> {
-        Self::current_change_sequence(self)
+        <Self as SessionWriteQueries>::current_change_sequence(self)
     }
 
     fn load_change_tracking_since(
         &self,
         last_change_seq: i64,
     ) -> Result<Vec<(String, i64)>, CliError> {
-        Self::load_change_tracking_since(self, last_change_seq)
+        <Self as ChangeTrackingQueries>::load_change_tracking_since(self, last_change_seq)
     }
 
     fn prepare_session_resync(session_id: &str) -> Result<Self::PreparedSessionResync, CliError> {

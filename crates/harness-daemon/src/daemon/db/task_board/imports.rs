@@ -20,6 +20,7 @@ use crate::task_board::legacy_import::LegacyTaskBoardSnapshot;
 use crate::task_board::{
     TaskBoardGitRuntimeConfig, sort_task_board_items, validate_task_board_lane_order,
 };
+use crate::daemon::db::prelude::*;
 
 pub(crate) const LEGACY_GLOBAL_SOURCE: &str = "legacy_global_board";
 pub(crate) const EMPTY_DATABASE_SOURCE: &str = "empty_database";

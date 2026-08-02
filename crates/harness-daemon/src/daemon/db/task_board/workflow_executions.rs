@@ -21,6 +21,7 @@ mod cas_screen;
 mod update;
 use cas_screen::{WorkflowExecutionCasScreen, screen_workflow_execution_cas_in_tx};
 pub(super) use update::update_execution_in_tx;
+use crate::daemon::db::prelude::*;
 
 const SELECT_EXECUTION: &str = "SELECT * FROM task_board_workflow_executions
     WHERE execution_id = ?1";

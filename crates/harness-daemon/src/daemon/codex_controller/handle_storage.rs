@@ -18,6 +18,7 @@ use super::events::codex_event;
 use super::handle::{
     CodexControllerHandle, lock_db, preferred_codex_project_dir, record_snapshot_event,
 };
+use crate::daemon::db::prelude::*;
 
 impl CodexControllerHandle {
     pub(super) fn load_run(&self, run_id: &str) -> Result<CodexRunSnapshot, CliError> {

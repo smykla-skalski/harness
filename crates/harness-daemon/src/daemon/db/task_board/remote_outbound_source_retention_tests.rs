@@ -29,6 +29,7 @@ use crate::task_board::{
 use crate::daemon::db::task_board::remote_assignment_authority_queries::RemoteAssignmentAuthorityQueries;
 use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::db::task_board::remote_source_bundle_queries::RemoteSourceBundleQueries;
+use crate::daemon::db::prelude::*;
 
 const HANDOFF_AT: &str = "2026-07-19T10:00:10Z";
 const SUCCESSOR_LEASE_EXPIRES: &str = "2026-07-19T10:01:10Z";

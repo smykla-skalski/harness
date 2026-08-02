@@ -1,6 +1,7 @@
 use super::*;
 use crate::agents::runtime::signal::SignalAck;
 use std::{fs, path::PathBuf};
+use crate::daemon::db::prelude::*;
 
 #[test]
 fn send_signal_db_direct_refreshes_non_empty_signal_index() {

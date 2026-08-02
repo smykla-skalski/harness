@@ -24,6 +24,7 @@ use crate::daemon::db::task_board::remote_assignment_start_settlement_queries::R
 use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::db::task_board::remote_source_bundle_queries::RemoteSourceBundleQueries;
 use crate::daemon::db::task_board::workflow_execution_queries::WorkflowExecutionQueries;
+use crate::daemon::db::prelude::*;
 
 const SUCCESSOR_INSTANCE: &str = "instance-b";
 const UPLOADED_AT: &str = "2026-07-19T10:00:01Z";

@@ -13,6 +13,7 @@ use crate::daemon::db::task_board::prelude::*;
 mod support;
 
 use support::{finish_run, load, reconcile};
+use crate::daemon::db::prelude::*;
 
 #[tokio::test]
 async fn openrouter_reviewer_starts_and_durably_tracks_an_agent_turn() {

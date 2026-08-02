@@ -30,6 +30,7 @@ pub(crate) use liveness::{
     reconcile_active_session_liveness_background_async,
 };
 use liveness::{reconcile_active_session_liveness_for_reads, reconcile_session_liveness_for_read};
+use crate::daemon::db::prelude::*;
 
 /// List discovered projects known to the daemon.
 ///

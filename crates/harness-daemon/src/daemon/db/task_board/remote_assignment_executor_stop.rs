@@ -23,6 +23,7 @@ use super::remote_assignment_model::{
     TaskBoardRemoteMutationOutcome, canonical_time, concurrent, to_i64,
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError, TaskBoardRemoteExecutorRun, db_error};
+use crate::daemon::db::prelude::*;
 
 #[expect(
     clippy::cognitive_complexity,

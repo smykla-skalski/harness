@@ -22,6 +22,7 @@ pub(super) use operation::{
     persist_operation_trust_in_tx, require_generation_replay_trust_in_tx,
     require_pending_operation_replay_trust_in_tx,
 };
+use crate::daemon::db::prelude::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum TaskBoardRemoteOperationKind {

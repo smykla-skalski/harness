@@ -10,6 +10,7 @@ use crate::task_board::{
 };
 #[cfg(test)]
 use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
+use crate::daemon::db::prelude::*;
 
 #[derive(Debug, sqlx::FromRow)]
 struct AiReviewReportRow {

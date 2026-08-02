@@ -16,6 +16,7 @@ use crate::session::types::SessionRole;
 use crate::session::{service as session_service, storage as session_storage};
 use crate::workspace::project_context_dir;
 use harness_testkit::with_isolated_harness_env;
+use crate::daemon::db::prelude::*;
 
 fn append_project_ledger_entry(project_dir: &std::path::Path) {
     let ledger_path = project_context_dir(project_dir)

@@ -24,6 +24,7 @@ use self::test_support::{
     sample_session_state_with_codex_agent,
 };
 use harness_kernel::errors::CliError;
+use crate::daemon::db::prelude::*;
 
 const OTHER_SESSION_ID: &str = "78e20780-1723-4a72-bdd6-a66f976723b3";
 

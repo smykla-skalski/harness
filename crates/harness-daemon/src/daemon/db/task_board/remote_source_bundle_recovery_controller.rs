@@ -30,6 +30,7 @@ use operations::{
     require_upload_operation_for_abandonment, settle_abandonment_operation_if_present,
     settle_upload_operation_if_present,
 };
+use crate::daemon::db::prelude::*;
 
 pub(super) async fn adopt_verified_task_board_remote_source_bundle_receipt(
     db: &AsyncDaemonDb,

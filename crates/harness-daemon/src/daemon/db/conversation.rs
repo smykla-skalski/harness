@@ -14,6 +14,7 @@ use self::persistence::{
     conversation_timeline_rows_after, replace_session_activity, replace_session_conversation_state,
     upsert_agent_activity, upsert_changed_conversation_events,
 };
+use crate::daemon::db::prelude::*;
 
 pub(crate) trait DaemonDbConversation {
     /// Refresh runtime transcript caches from file-backed agent logs without

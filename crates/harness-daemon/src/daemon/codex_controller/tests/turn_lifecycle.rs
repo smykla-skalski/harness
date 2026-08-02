@@ -13,6 +13,7 @@ use crate::daemon::protocol::{CodexRunMode, CodexRunStatus};
 use super::test_support::{
     codex_run_snapshot, controller_with_db, with_isolated_async_harness_env,
 };
+use crate::daemon::db::prelude::*;
 
 const SESSION_ID: &str = "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc";
 const HEAD_REVISION: &str = "0123456789abcdef0123456789abcdef01234567";

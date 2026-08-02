@@ -4,6 +4,7 @@ use sqlx::{Sqlite, Transaction, query, query_as, query_scalar};
 
 use super::remote_assignment_model::canonical_time;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
+use crate::daemon::db::prelude::*;
 
 const RECOVERY_QUEUE: &str = "task_board_remote_assignments";
 const RECOVERY_BATCH_LIMIT: usize = 128;

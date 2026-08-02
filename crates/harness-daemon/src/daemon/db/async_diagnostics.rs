@@ -11,16 +11,39 @@ FROM daemon_events
 ORDER BY id DESC
 LIMIT ?1";
 
-impl AsyncDaemonDb {
-    /// Set one diagnostics cache entry through the canonical async daemon DB.
-    ///
+/// Async mirror of `diagnostics::DaemonDbDiagnostics`, through the canonical
+/// async daemon DB.
+pub(crate) trait AsyncDiagnosticsQueries: Send + Sync {
     /// # Errors
     /// Returns [`CliError`] on write failure.
-    pub(crate) async fn set_diagnostics_cache(
+    async fn set_diagnostics_cache(&self, key: &str, value: &str) -> Result<(), CliError>;
+
+    /// # Errors
+    /// Returns [`CliError`] on write failure.
+    async fn cache_startup_diagnostics(&self) -> Result<(), CliError>;
+
+    /// # Errors
+    /// Returns [`CliError`] on query failure.
+    async fn load_cached_launch_agent_status(
         &self,
-        key: &str,
-        value: &str,
-    ) -> Result<(), CliError> {
+    ) -> Result<Option<daemon_launchd::LaunchAgentStatus>, CliError>;
+
+    /// # Errors
+    /// Returns [`CliError`] on query failure.
+    async fn load_cached_workspace_diagnostics(
+        &self,
+    ) -> Result<Option<daemon_state::DaemonDiagnostics>, CliError>;
+
+    /// # Errors
+    /// Returns [`CliError`] on query failure.
+    async fn load_recent_daemon_events(
+        &self,
+        limit: u32,
+    ) -> Result<Vec<daemon_state::DaemonAuditEvent>, CliError>;
+}
+
+impl AsyncDiagnosticsQueries for AsyncDaemonDb {
+    async fn set_diagnostics_cache(&self, key: &str, value: &str) -> Result<(), CliError> {
         query(UPSERT_DIAGNOSTICS_CACHE_SQL)
             .bind(key)
             .bind(value)
@@ -30,20 +53,7 @@ impl AsyncDaemonDb {
         Ok(())
     }
 
-    async fn load_diagnostics_cache(&self, key: &str) -> Result<Option<String>, CliError> {
-        query_scalar::<_, String>(DIAGNOSTICS_CACHE_SQL)
-            .bind(key)
-            .fetch_optional(self.pool())
-            .await
-            .map_err(|error| db_error(format!("read async diagnostics cache {key}: {error}")))
-    }
-
-    /// Cache the launch agent status and workspace diagnostics at daemon
-    /// startup through the canonical async daemon DB.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on write failure.
-    pub(crate) async fn cache_startup_diagnostics(&self) -> Result<(), CliError> {
+    async fn cache_startup_diagnostics(&self) -> Result<(), CliError> {
         let launch_agent = daemon_launchd::launch_agent_status();
         let launch_agent_json = serde_json::to_string(&launch_agent).unwrap_or_default();
         self.set_diagnostics_cache("launch_agent", &launch_agent_json)
@@ -55,33 +65,21 @@ impl AsyncDaemonDb {
             .await
     }
 
-    /// Load cached launch agent status from the canonical async daemon DB.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on query failure.
-    pub(crate) async fn load_cached_launch_agent_status(
+    async fn load_cached_launch_agent_status(
         &self,
     ) -> Result<Option<daemon_launchd::LaunchAgentStatus>, CliError> {
-        let json = self.load_diagnostics_cache("launch_agent").await?;
+        let json = load_diagnostics_cache(self, "launch_agent").await?;
         Ok(json.and_then(|json| serde_json::from_str(&json).ok()))
     }
 
-    /// Load cached workspace diagnostics from the canonical async daemon DB.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on query failure.
-    pub(crate) async fn load_cached_workspace_diagnostics(
+    async fn load_cached_workspace_diagnostics(
         &self,
     ) -> Result<Option<daemon_state::DaemonDiagnostics>, CliError> {
-        let json = self.load_diagnostics_cache("workspace").await?;
+        let json = load_diagnostics_cache(self, "workspace").await?;
         Ok(json.and_then(|json| serde_json::from_str(&json).ok()))
     }
 
-    /// Load recent daemon audit events from the canonical async daemon DB.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on query failure.
-    pub(crate) async fn load_recent_daemon_events(
+    async fn load_recent_daemon_events(
         &self,
         limit: u32,
     ) -> Result<Vec<daemon_state::DaemonAuditEvent>, CliError> {
@@ -101,4 +99,15 @@ impl AsyncDaemonDb {
             )
             .collect())
     }
+}
+
+async fn load_diagnostics_cache(
+    db: &AsyncDaemonDb,
+    key: &str,
+) -> Result<Option<String>, CliError> {
+    query_scalar::<_, String>(DIAGNOSTICS_CACHE_SQL)
+        .bind(key)
+        .fetch_optional(db.pool())
+        .await
+        .map_err(|error| db_error(format!("read async diagnostics cache {key}: {error}")))
 }

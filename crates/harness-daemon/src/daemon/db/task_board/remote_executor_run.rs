@@ -4,6 +4,7 @@ use crate::daemon::db::{
 use crate::daemon::protocol::{CodexRunMode, CodexRunSnapshot, CodexRunStatus};
 use crate::task_board::remote_wire::wire::RemoteOfferRequest;
 use sqlx::query_as;
+use crate::daemon::db::prelude::*;
 
 pub(crate) struct TaskBoardRemoteRuntimeProvenance {
     pub(crate) requested_runtime: String,

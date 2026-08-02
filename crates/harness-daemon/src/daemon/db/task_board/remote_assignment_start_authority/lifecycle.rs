@@ -18,6 +18,7 @@ use super::{
     start_adoption_replays,
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
+use crate::daemon::db::prelude::*;
 
 pub(in super::super) async fn adopt_task_board_remote_executor_start(
     db: &AsyncDaemonDb,

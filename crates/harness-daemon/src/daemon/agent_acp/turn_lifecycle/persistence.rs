@@ -1,5 +1,6 @@
 use crate::agents::turn::{AgentTurnId, AgentTurnRuntime, AgentTurnStatus};
 use crate::daemon::agent_acp::{AcpAgentSessionState, AgentTurnSettlement};
+use crate::daemon::db::prelude::*;
 use crate::daemon::db::{AgentTurnRunSnapshot, AgentTurnRunStatus};
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_workspace::workspace::utc_now;

@@ -15,6 +15,7 @@ use super::{
     TriageOutcome, bump_change_in_tx, record_triage_or_lane_audit_in_tx,
     resolve_parent_update_in_tx, validate_item,
 };
+use crate::daemon::db::prelude::*;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum DispatchReservationPolicy {

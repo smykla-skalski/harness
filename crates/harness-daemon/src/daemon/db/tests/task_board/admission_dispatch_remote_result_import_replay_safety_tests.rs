@@ -1,4 +1,5 @@
 use super::*;
+use crate::daemon::db::prelude::*;
 
 #[tokio::test]
 async fn applied_import_replays_only_after_fresh_exact_git_proof() {

@@ -12,6 +12,7 @@ use crate::session::types::SessionRole;
 use crate::workspace::utc_now;
 
 use super::support::{WAIT_TIMEOUT, sample_snapshot, wait_until, with_agent_tui_home};
+use crate::daemon::db::prelude::*;
 
 #[test]
 fn refresh_local_snapshot_does_not_rewrite_unchanged_transcript() {

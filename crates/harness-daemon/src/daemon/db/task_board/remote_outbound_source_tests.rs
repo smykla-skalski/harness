@@ -17,6 +17,7 @@ use crate::task_board::remote_wire::wire::{
 use crate::task_board::{TaskBoardExecutionPhase, TaskBoardWorkflowKind};
 use crate::daemon::db::task_board::orchestrator_settings_queries::OrchestratorSettingsQueries;
 use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
+use crate::daemon::db::prelude::*;
 
 #[tokio::test]
 async fn outbound_source_is_atomic_with_assignment_and_restart_replay() {

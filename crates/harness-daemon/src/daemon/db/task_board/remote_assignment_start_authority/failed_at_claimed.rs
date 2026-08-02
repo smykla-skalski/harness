@@ -20,6 +20,7 @@ use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardFailureClass;
 use crate::task_board::TaskBoardRemoteAssignmentState;
 use crate::task_board::remote_wire::wire::RemoteStatusResponse;
+use crate::daemon::db::prelude::*;
 
 /// Canonical wire evidence for a failed fresh Codex endpoint preflight.
 pub(crate) const REMOTE_START_PREFLIGHT_ERROR_CODE: &str = "CODEX001";

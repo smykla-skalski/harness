@@ -15,6 +15,7 @@ use super::remote_operation_trust::{
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardRemoteAssignmentState;
 use crate::task_board::remote_wire::wire::{RemoteClaimRequest, RemoteClaimResponse};
+use crate::daemon::db::prelude::*;
 
 pub(super) async fn record_task_board_remote_assignment_claim(
     db: &AsyncDaemonDb,

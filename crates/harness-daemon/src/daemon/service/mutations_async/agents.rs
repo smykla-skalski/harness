@@ -7,6 +7,7 @@ use super::super::{
 };
 use super::{bump_session, persist_leave_signal_mutation, resolved_session_for_mutation};
 use tokio::task::spawn_blocking;
+use crate::daemon::db::prelude::*;
 
 /// Change an agent role through the canonical async daemon DB.
 ///

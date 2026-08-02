@@ -11,6 +11,7 @@ use crate::task_board::{
 };
 use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
 use crate::daemon::db::task_board::scheduler::queries::TaskBoardAutomationSchedulerQueries;
+use crate::daemon::db::prelude::*;
 
 #[tokio::test]
 async fn snapshot_is_consistent_bounded_and_read_only() {

@@ -2,6 +2,7 @@ use harness_workspace::workspace::utc_now;
 
 use super::{AgentTurnRunSnapshot, AgentTurnRunStatus};
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::prelude::*;
 
 async fn open_db() -> (tempfile::TempDir, AsyncDaemonDb) {
     let dir = tempfile::tempdir().expect("tempdir");

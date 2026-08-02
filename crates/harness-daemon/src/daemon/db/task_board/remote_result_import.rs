@@ -29,6 +29,7 @@ mod prepare;
 mod storage;
 use evidence::{ImportMaterials, load_import_materials};
 use prepare::{LoadedResultImport, load_result_import_target_in_tx, resolve_result_import_in_tx};
+use crate::daemon::db::prelude::*;
 
 type ManualImportFuture<'a> =
     Pin<Box<dyn Future<Output = Result<TaskBoardRemoteResultImportRecord, CliError>> + Send + 'a>>;

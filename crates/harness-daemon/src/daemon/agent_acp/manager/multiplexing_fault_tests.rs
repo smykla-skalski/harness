@@ -12,6 +12,7 @@ use crate::daemon::agent_acp::manager::test_support::{
 };
 use crate::feature_flags;
 use crate::session::types::ManagedAgentRef;
+use crate::daemon::db::prelude::*;
 
 fn manager_with_events() -> (
     AcpAgentManagerHandle,

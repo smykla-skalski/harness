@@ -94,6 +94,7 @@ mod task_review;
 mod telemetry;
 
 pub(in crate::daemon::http) use support::*;
+use crate::daemon::db::prelude::*;
 
 #[tokio::test]
 async fn map_json_maps_codex_unavailable_to_503() {

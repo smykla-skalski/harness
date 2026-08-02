@@ -10,6 +10,7 @@ use crate::daemon::agent_acp::manager::test_support::{
 };
 use crate::session::types::ManagedAgentRef;
 use tempfile::TempDir;
+use crate::daemon::db::prelude::*;
 
 fn manager() -> AcpAgentManagerHandle {
     seeded_manager()

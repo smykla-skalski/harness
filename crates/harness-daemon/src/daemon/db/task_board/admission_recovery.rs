@@ -9,6 +9,7 @@ use crate::daemon::db::{AsyncDaemonDb, CliError, SessionState, db_error, utc_now
 use crate::session::service as session_service;
 use crate::session::types::{CONTROL_PLANE_ACTOR_ID, ManagedAgentRef, TaskStatus};
 use crate::task_board::{DispatchAppliedTask, TaskBoardItem, TaskBoardWorkflowStatus};
+use crate::daemon::db::prelude::*;
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct TaskBoardAdmissionWorkerRecovery {

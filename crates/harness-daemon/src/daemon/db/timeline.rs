@@ -6,6 +6,7 @@ use super::{
 use super::{OptionalExtension, SessionTimelineStateRow, usize_from_i64};
 #[cfg(test)]
 use harness_protocol::timeline::{TimelineCursor, TimelineWindowRequest, TimelineWindowResponse};
+use crate::daemon::db::prelude::*;
 
 pub(crate) trait DaemonDbTimeline {
     #[cfg(test)]

@@ -29,6 +29,7 @@ use crate::task_board::{TaskBoardFailureClass, TaskBoardRemoteAssignmentState};
 use chrono::{Duration as ChronoDuration, SecondsFormat, Utc};
 use tokio::sync::watch;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db::prelude::*;
 
 #[path = "start_permit_state_machine_tests/shutdown.rs"]
 mod shutdown;

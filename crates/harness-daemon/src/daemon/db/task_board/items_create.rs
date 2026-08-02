@@ -14,6 +14,7 @@ use super::{
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
 use crate::task_board::TaskBoardItem;
+use crate::daemon::db::prelude::*;
 
 pub(crate) async fn create_task_board_item(
     db: &AsyncDaemonDb,

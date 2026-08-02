@@ -1,6 +1,7 @@
 use sqlx::{Sqlite, Transaction, query, query_as};
 
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
+use crate::daemon::db::prelude::*;
 
 const ACTIVE_QUEUE: &str = "task_board_remote_executor_active";
 const TERMINAL_QUEUE: &str = "task_board_remote_executor_terminal";

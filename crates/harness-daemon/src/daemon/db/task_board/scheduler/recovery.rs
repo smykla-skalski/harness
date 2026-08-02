@@ -10,6 +10,7 @@ use super::runs::run_outcome_label;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::daemon::protocol::HarnessMonitorAuditEvent;
 use crate::task_board::TaskBoardAutomationRunOutcome;
+use crate::daemon::db::prelude::*;
 
 const LEASE_EXPIRED_ERROR: &str = "coordinator lease expired before run completion";
 

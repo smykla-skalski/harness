@@ -24,6 +24,7 @@ use crate::task_board::{
     TaskBoardTriageOverride, canonicalize_labels, is_exclusion_label,
 };
 use harness_task_board_provider_sync::replace_open_sync_conflicts_in_connection;
+use crate::daemon::db::prelude::*;
 
 /// Real implementation behind [`ProviderQueries::hide_task_board_item_for_provider_exclusion`],
 /// called from the single consolidated trait impl in `provider_queries.rs`

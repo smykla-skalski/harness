@@ -24,6 +24,7 @@ use super::effort::validate_codex_effort;
 use super::queued_run::{QueuedRunIdentity, queued_run_snapshot};
 use super::transcript::codex_transcript_entries;
 use super::worker::CodexRunWorker;
+use crate::daemon::db::prelude::*;
 
 #[derive(Clone)]
 pub struct CodexControllerHandle {

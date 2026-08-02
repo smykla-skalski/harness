@@ -24,6 +24,7 @@ pub(super) use storage::{
     insert_abandonment_in_tx, load_abandonment_collisions_in_tx, load_abandonment_in_tx,
     source_offer_is_abandoned_in_tx,
 };
+use crate::daemon::db::prelude::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TaskBoardRemoteSourceBundleAbandonment {

@@ -14,6 +14,7 @@ use super::durable_run_request;
 use super::test_support::{
     codex_run_snapshot, controller_with_session_state, sample_session_state_with_open_task,
 };
+use crate::daemon::db::prelude::*;
 
 const SESSION_ID: &str = "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc";
 

@@ -3,6 +3,7 @@ use crate::daemon::protocol::{SignalAckRequest, SignalCancelRequest, SignalSendR
 use crate::session::types::{SessionRole, SessionSignalStatus};
 
 use super::*;
+use crate::daemon::db::prelude::*;
 
 async fn seed_pending_signal(
     async_db: &crate::daemon::db::AsyncDaemonDb,

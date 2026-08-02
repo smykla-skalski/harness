@@ -23,6 +23,7 @@ use crate::task_board::{
     TASK_BOARD_EXECUTION_TARGET_ATTEMPT_RESOURCE, TASK_BOARD_EXECUTION_TARGET_RESOURCE,
     TaskBoardExecutionAttemptRecord, TaskBoardItem, TaskBoardWorkflowExecutionRecord,
 };
+use crate::daemon::db::prelude::*;
 
 pub(super) async fn prepare_task_board_workflow_dispatch(
     db: &AsyncDaemonDb,

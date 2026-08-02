@@ -7,6 +7,7 @@ use crate::task_board::{
     TriageRuleSetV1, is_canonical_bounded_text, validate_triage_rule_set,
 };
 use harness_kernel::errors::CliErrorKind;
+use crate::daemon::db::prelude::*;
 
 const MAX_TRIAGE_RULE_SET_ACTOR_BYTES: usize = 256;
 pub(super) const TRIAGE_RULE_SET_LIST_MAX_LIMIT: u32 = 100;

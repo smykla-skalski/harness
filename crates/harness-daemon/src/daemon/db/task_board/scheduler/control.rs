@@ -9,6 +9,7 @@ use crate::task_board::{
     TaskBoardAutomationWakeEntityKind, TaskBoardAutomationWakePayload,
     TaskBoardAutomationWakeRequest, TaskBoardOrchestratorSettings,
 };
+use crate::daemon::db::prelude::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TaskBoardAutomationControlRecord {

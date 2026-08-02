@@ -1,6 +1,7 @@
 use crate::daemon::db::DaemonDb;
 
 use super::{CliError, SessionLogEntry, SessionTransition, session_service, utc_now};
+use crate::daemon::db::prelude::*;
 
 pub(crate) fn append_leave_signal_logs_to_db(
     db: &DaemonDb,

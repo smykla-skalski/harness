@@ -10,6 +10,7 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::TaskBoardGetItemRequest;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db::prelude::*;
 
 pub(crate) async fn get_task_board_workflow_progress_db(
     db: &AsyncDaemonDb,

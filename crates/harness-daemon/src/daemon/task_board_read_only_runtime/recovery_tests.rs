@@ -17,6 +17,7 @@ use crate::daemon::http::{
 use crate::daemon::protocol::{CodexRunMode, CodexRunSnapshot, CodexRunStatus, StreamEvent};
 use crate::daemon::websocket::ReplayBuffer;
 use crate::session::types::{CURRENT_VERSION, SessionMetrics, SessionState, SessionStatus};
+use crate::daemon::db::prelude::*;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn production_load_reconciles_unattached_active_report_after_restart() {

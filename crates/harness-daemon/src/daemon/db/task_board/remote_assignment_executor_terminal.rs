@@ -17,6 +17,7 @@ use crate::task_board::remote_wire::wire::{
     TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
 use crate::task_board::{TaskBoardExecutionPhase, TaskBoardRemoteAssignmentState};
+use crate::daemon::db::prelude::*;
 
 pub(crate) const REMOTE_RESULT_ARTIFACT_PATH: &str = "result/attempt.json";
 pub(crate) const REMOTE_RESULT_ARTIFACT_MEDIA_TYPE: &str =

@@ -15,6 +15,7 @@ use super::remote_operation_trust::{
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardRemoteAssignmentState;
 use crate::task_board::remote_wire::wire::{RemoteLeaseRenewRequest, RemoteLeaseRenewResponse};
+use crate::daemon::db::prelude::*;
 
 #[path = "remote_assignment_lease_response/replay.rs"]
 pub(super) mod replay;

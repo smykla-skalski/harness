@@ -11,6 +11,7 @@ use crate::daemon::db::task_board::remote_assignment_authority_queries::RemoteAs
 use crate::daemon::db::task_board::remote_assignment_executor_lifecycle_queries::RemoteAssignmentExecutorLifecycleQueries;
 use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::db::task_board::workflow_execution_queries::WorkflowExecutionQueries;
+use crate::daemon::db::prelude::*;
 
 #[tokio::test]
 async fn controller_cancel_response_is_fenced_and_exactly_replayed() {

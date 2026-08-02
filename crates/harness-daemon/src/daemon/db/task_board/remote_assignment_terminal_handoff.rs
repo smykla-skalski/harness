@@ -18,6 +18,7 @@ use crate::task_board::{
     TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionRecord,
     task_board_remote_execution_target,
 };
+use crate::daemon::db::prelude::*;
 
 pub(super) async fn record_task_board_remote_terminal_cleanup_handoff(
     db: &AsyncDaemonDb,

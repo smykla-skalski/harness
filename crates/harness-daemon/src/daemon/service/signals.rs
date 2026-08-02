@@ -12,6 +12,7 @@ use tokio::sync::broadcast;
 use super::super::agent_acp::AcpWakePrompt;
 use super::super::agent_tui::AgentTuiManagerHandle;
 use super::super::db::DaemonDb;
+use super::super::db::prelude::*;
 use super::super::protocol::{
     CodexSteerRequest, SessionDetail, SignalCancelRequest, SignalSendRequest, StreamEvent,
 };
@@ -26,38 +27,38 @@ impl SignalStorage for DaemonDb {
         &self,
         session_id: &str,
     ) -> Result<Option<SessionState>, CliError> {
-        DaemonDb::load_session_state_for_mutation(self, session_id)
+        <Self as SessionCoreQueries>::load_session_state_for_mutation(self, session_id)
     }
 
     fn load_session_state(&self, session_id: &str) -> Result<Option<SessionState>, CliError> {
-        DaemonDb::load_session_state(self, session_id)
+        <Self as SessionCoreQueries>::load_session_state(self, session_id)
     }
 
     fn load_session_log(&self, session_id: &str) -> Result<Vec<SessionLogEntry>, CliError> {
-        DaemonDb::load_session_log(self, session_id)
+        <Self as SessionCoreQueries>::load_session_log(self, session_id)
     }
 
     fn project_id_for_session(&self, session_id: &str) -> Result<Option<String>, CliError> {
-        DaemonDb::project_id_for_session(self, session_id)
+        <Self as SessionCoreQueries>::project_id_for_session(self, session_id)
     }
 
     fn project_dir_for_session(&self, session_id: &str) -> Result<Option<String>, CliError> {
-        DaemonDb::project_dir_for_session(self, session_id)
+        <Self as SessionCoreQueries>::project_dir_for_session(self, session_id)
     }
 
     fn save_session_state(&self, project_id: &str, state: &SessionState) -> Result<(), CliError> {
-        DaemonDb::save_session_state(self, project_id, state)
+        <Self as SessionCoreQueries>::save_session_state(self, project_id, state)
     }
 
     fn resolve_session(
         &self,
         session_id: &str,
     ) -> Result<Option<harness_session::index::ResolvedSession>, CliError> {
-        DaemonDb::resolve_session(self, session_id)
+        <Self as SessionSummaryQueries>::resolve_session(self, session_id)
     }
 
     fn load_signals(&self, session_id: &str) -> Result<Vec<SessionSignalRecord>, CliError> {
-        DaemonDb::load_signals(self, session_id)
+        <Self as SignalIndexQueries>::load_signals(self, session_id)
     }
 
     fn merge_signal_records(
@@ -65,7 +66,7 @@ impl SignalStorage for DaemonDb {
         session_id: &str,
         records: &[SessionSignalRecord],
     ) -> Result<(), CliError> {
-        DaemonDb::merge_signal_records(self, session_id, records)
+        <Self as SignalIndexQueries>::merge_signal_records(self, session_id, records)
     }
 
     fn sync_signal_index(
@@ -73,15 +74,15 @@ impl SignalStorage for DaemonDb {
         session_id: &str,
         records: &[SessionSignalRecord],
     ) -> Result<(), CliError> {
-        DaemonDb::sync_signal_index(self, session_id, records)
+        <Self as SignalIndexQueries>::sync_signal_index(self, session_id, records)
     }
 
     fn append_log_entry(&self, entry: &SessionLogEntry) -> Result<(), CliError> {
-        DaemonDb::append_log_entry(self, entry)
+        <Self as SessionWriteQueries>::append_log_entry(self, entry)
     }
 
     fn bump_change(&self, scope: &str) -> Result<(), CliError> {
-        DaemonDb::bump_change(self, scope)
+        <Self as SessionWriteQueries>::bump_change(self, scope)
     }
 
     fn session_detail(&self, session_id: &str) -> Result<SessionDetail, CliError> {
@@ -89,7 +90,7 @@ impl SignalStorage for DaemonDb {
     }
 
     fn mark_session_inactive(&self, session_id: &str) -> Result<(), CliError> {
-        DaemonDb::mark_session_inactive(self, session_id)
+        <Self as SessionCoreQueries>::mark_session_inactive(self, session_id)
     }
 
     fn load_expired_pending_signals(
@@ -97,26 +98,26 @@ impl SignalStorage for DaemonDb {
         session_id: &str,
     ) -> Result<Vec<harness_daemon_session_service::ExpiredPendingSignalIndexRecord>, CliError>
     {
-        DaemonDb::load_expired_pending_signals(self, session_id)
+        <Self as SignalIndexQueries>::load_expired_pending_signals(self, session_id)
     }
 
     fn list_project_summaries(
         &self,
     ) -> Result<Vec<harness_session::wire::ProjectSummary>, CliError> {
-        DaemonDb::list_project_summaries(self)
+        <Self as SessionSummaryQueries>::list_project_summaries(self)
     }
 
     fn list_session_summaries_full(
         &self,
     ) -> Result<Vec<harness_session::wire::SessionSummary>, CliError> {
-        DaemonDb::list_session_summaries_full(self)
+        <Self as SessionSummaryQueries>::list_session_summaries_full(self)
     }
 
     fn sync_project(
         &self,
         project: &harness_session::index::DiscoveredProject,
     ) -> Result<(), CliError> {
-        DaemonDb::sync_project(self, project)
+        <Self as SessionWriteQueries>::sync_project(self, project)
     }
 
     fn create_session_record(
@@ -124,11 +125,11 @@ impl SignalStorage for DaemonDb {
         project_id: &str,
         state: &SessionState,
     ) -> Result<(), CliError> {
-        DaemonDb::create_session_record(self, project_id, state)
+        <Self as SessionCoreQueries>::create_session_record(self, project_id, state)
     }
 
     fn delete_session_row(&self, session_id: &str) -> Result<bool, CliError> {
-        DaemonDb::delete_session_row(self, session_id)
+        <Self as SessionWriteQueries>::delete_session_row(self, session_id)
     }
 }
 

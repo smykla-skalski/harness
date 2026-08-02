@@ -17,6 +17,7 @@ use harness_kernel::errors::CliError;
 mod fixture;
 pub(crate) use fixture::{PreparedRemoteOffer, prepare_remote_offer};
 pub(super) use fixture::{prepare_remote_offer_with_policy, prepare_remote_offer_with_retry};
+use crate::daemon::db::prelude::*;
 
 #[tokio::test]
 async fn started_terminal_observation_keeps_committed_admission_and_remote_parent() {

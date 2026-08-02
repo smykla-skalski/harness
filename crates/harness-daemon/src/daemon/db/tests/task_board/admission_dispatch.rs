@@ -43,6 +43,7 @@ use crate::task_board::{
     bind_plan_approval, build_dispatch_plans_with_policy, build_planning_result,
     resolve_task_board_reviewers,
 };
+use crate::daemon::db::prelude::*;
 
 #[tokio::test]
 async fn admission_reservation_is_all_or_none_and_idempotent() {

@@ -10,6 +10,7 @@ use crate::agents::runtime::event::{ConversationEvent, ConversationEventKind};
 use crate::daemon::db::DaemonDb;
 use crate::daemon::http::DaemonHttpState;
 use crate::daemon::protocol::WsRequest;
+use crate::daemon::db::prelude::*;
 
 #[tokio::test]
 async fn dispatch_read_query_runtime_session_resolve_requires_runtime_name() {

@@ -18,6 +18,7 @@ use crate::task_board::{
     Machine, TaskBoardGitRuntimeConfig, TaskBoardOrchestratorSettings, TaskBoardOrchestratorState,
     validate_local_execution_host_config, validate_remote_execution_configuration,
 };
+use crate::daemon::db::prelude::*;
 
 pub(super) struct TaskBoardOrchestratorSettingsMutation {
     pub(super) row_revision: i64,

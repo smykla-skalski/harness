@@ -23,6 +23,7 @@ use super::{claimed_intent_identity, dispatch_item_can_be_rolled_back, lost_clai
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
 use crate::task_board::{DispatchAppliedTask, TaskBoardStatus, TaskBoardWorkflowStatus};
 use harness_policy_graph_store::restore_consumed_approval_grant_in_tx_at;
+use crate::daemon::db::prelude::*;
 
 pub(in crate::daemon::db::task_board) async fn task_board_dispatch_is_completed(
     db: &AsyncDaemonDb,

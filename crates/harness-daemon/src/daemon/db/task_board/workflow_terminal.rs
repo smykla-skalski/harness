@@ -17,6 +17,7 @@ pub(super) use in_tx::project_terminal_execution_in_tx;
 use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
 #[cfg(test)]
 use crate::daemon::db::task_board::workflow_execution_queries::WorkflowExecutionQueries;
+use crate::daemon::db::prelude::*;
 
 #[derive(Debug)]
 pub(crate) struct TaskBoardWorkflowTerminalProjection {

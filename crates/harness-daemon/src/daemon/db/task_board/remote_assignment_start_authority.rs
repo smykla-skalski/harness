@@ -25,6 +25,7 @@ pub(crate) use start_io_permit::{
     TaskBoardRemoteExecutorStartIoPermit, TaskBoardRemoteExecutorStartIoPermitOutcome,
     executor_start_io_permit,
 };
+use crate::daemon::db::prelude::*;
 
 pub(crate) const EXECUTOR_RESTARTED_BEFORE_START: &str =
     "remote executor restarted before worker start";

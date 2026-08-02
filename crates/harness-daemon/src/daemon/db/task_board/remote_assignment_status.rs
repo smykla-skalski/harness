@@ -23,6 +23,7 @@ use crate::task_board::{
 
 mod exchange;
 use exchange::{apply_status_update_in_tx, screen_status_exchange_in_tx, settle_status_exchange};
+use crate::daemon::db::prelude::*;
 
 impl AsyncDaemonDb {
     #[cfg(test)]

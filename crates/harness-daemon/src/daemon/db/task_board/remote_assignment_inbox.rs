@@ -23,6 +23,7 @@ use crate::task_board::{
     TaskBoardLocalExecutionHostConfig, TaskBoardOrchestratorSettings, remote_capability_for_phase,
     validate_local_execution_host_config,
 };
+use crate::daemon::db::prelude::*;
 
 const EXECUTOR_UNAVAILABLE: &str = "executor_unavailable";
 pub(super) const PREDECESSOR_OFFER_NOT_RECEIVED: &str = "predecessor_offer_not_received";

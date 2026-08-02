@@ -11,7 +11,7 @@ use harness_workspace::workspace::utc_now;
 use sqlx::{QueryBuilder, Sqlite, query, query_as, query_scalar};
 
 use super::task_board::release_managed_worker_admission_in_tx;
-use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
+use crate::daemon::db::{AsyncDaemonDb, AsyncDaemonTransactions, CliError, db_error};
 
 /// Bind a full run snapshot onto a prepared statement, in column order. A macro
 /// rather than a function so the concrete `sqlx` query type never has to be
@@ -151,14 +151,57 @@ const UPSERT_SQL: &str = "INSERT INTO agent_turn_runs (run_id, session_id, task_
         updated_at = excluded.updated_at \
      WHERE agent_turn_runs.status NOT IN ('completed', 'failed', 'cancelled')";
 
-impl AsyncDaemonDb {
+/// Agent turn run persistence and restart reconciliation.
+pub(crate) trait AsyncAgentTurnRunQueries: Send + Sync {
     /// Record an agent turn run at start. Idempotent by `run_id`: a repeat start
     /// leaves the stored row untouched and returns it, so a reclaimed dispatch
     /// claim never doubles the agent work.
     ///
     /// # Errors
     /// Returns [`CliError`] on SQL failures.
-    pub(crate) async fn record_agent_turn_run_started(
+    async fn record_agent_turn_run_started(
+        &self,
+        snapshot: &AgentTurnRunSnapshot,
+    ) -> Result<AgentTurnRunSnapshot, CliError>;
+
+    /// Save or update an agent turn run. A terminal status is sticky and releases
+    /// the run's task-board concurrency admission in the same transaction.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    async fn save_agent_turn_run(&self, snapshot: &AgentTurnRunSnapshot) -> Result<(), CliError>;
+
+    /// Load one agent turn run.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL or parse failures.
+    async fn agent_turn_run(&self, run_id: &str) -> Result<Option<AgentTurnRunSnapshot>, CliError>;
+
+    /// Load agent turn runs matching the supplied ids.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL or parse failures.
+    async fn agent_turn_runs_by_ids(
+        &self,
+        run_ids: &[&str],
+    ) -> Result<Vec<AgentTurnRunSnapshot>, CliError>;
+
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    async fn cancel_agent_turn_run(&self, run_id: &str) -> Result<(), CliError>;
+
+    /// Settle legacy agent turn runs that lack a provider turn identity after a
+    /// daemon restart. Correlated runs stay active so runtime reconciliation can
+    /// harvest their terminal result. Idempotent: a second sweep finds nothing
+    /// eligible and settles zero runs.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    async fn reconcile_interrupted_agent_turn_runs(&self) -> Result<usize, CliError>;
+}
+
+impl AsyncAgentTurnRunQueries for AsyncDaemonDb {
+    async fn record_agent_turn_run_started(
         &self,
         snapshot: &AgentTurnRunSnapshot,
     ) -> Result<AgentTurnRunSnapshot, CliError> {
@@ -171,15 +214,7 @@ impl AsyncDaemonDb {
             .ok_or_else(|| db_error("agent turn run vanished immediately after start"))
     }
 
-    /// Save or update an agent turn run. A terminal status is sticky and releases
-    /// the run's task-board concurrency admission in the same transaction.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL failures.
-    pub(crate) async fn save_agent_turn_run(
-        &self,
-        snapshot: &AgentTurnRunSnapshot,
-    ) -> Result<(), CliError> {
+    async fn save_agent_turn_run(&self, snapshot: &AgentTurnRunSnapshot) -> Result<(), CliError> {
         let mut transaction = self
             .begin_immediate_transaction("agent turn run save")
             .await?;
@@ -196,14 +231,7 @@ impl AsyncDaemonDb {
             .map_err(|error| db_error(format!("commit agent turn run save: {error}")))
     }
 
-    /// Load one agent turn run.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL or parse failures.
-    pub(crate) async fn agent_turn_run(
-        &self,
-        run_id: &str,
-    ) -> Result<Option<AgentTurnRunSnapshot>, CliError> {
+    async fn agent_turn_run(&self, run_id: &str) -> Result<Option<AgentTurnRunSnapshot>, CliError> {
         query_as::<_, AgentTurnRunRow>(SELECT_BY_ID_SQL)
             .bind(run_id)
             .fetch_optional(self.pool())
@@ -213,11 +241,7 @@ impl AsyncDaemonDb {
             .transpose()
     }
 
-    /// Load agent turn runs matching the supplied ids.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL or parse failures.
-    pub(crate) async fn agent_turn_runs_by_ids(
+    async fn agent_turn_runs_by_ids(
         &self,
         run_ids: &[&str],
     ) -> Result<Vec<AgentTurnRunSnapshot>, CliError> {
@@ -242,7 +266,7 @@ impl AsyncDaemonDb {
             .collect()
     }
 
-    pub(crate) async fn cancel_agent_turn_run(&self, run_id: &str) -> Result<(), CliError> {
+    async fn cancel_agent_turn_run(&self, run_id: &str) -> Result<(), CliError> {
         let Some(mut run) = self.agent_turn_run(run_id).await? else {
             return Err(db_error("cancelled agent turn run does not exist"));
         };
@@ -255,14 +279,7 @@ impl AsyncDaemonDb {
         self.save_agent_turn_run(&run).await
     }
 
-    /// Settle legacy agent turn runs that lack a provider turn identity after a
-    /// daemon restart. Correlated runs stay active so runtime reconciliation can
-    /// harvest their terminal result. Idempotent: a second sweep finds nothing
-    /// eligible and settles zero runs.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL failures.
-    pub(crate) async fn reconcile_interrupted_agent_turn_runs(&self) -> Result<usize, CliError> {
+    async fn reconcile_interrupted_agent_turn_runs(&self) -> Result<usize, CliError> {
         let active: Vec<String> = query_scalar(
             "SELECT run_id FROM agent_turn_runs \
                  WHERE status IN ('queued', 'running') AND runtime_turn_id IS NULL",
@@ -272,41 +289,45 @@ impl AsyncDaemonDb {
         .map_err(|error| db_error(format!("scan interrupted agent turn runs: {error}")))?;
         let mut settled = 0;
         for run_id in active {
-            settled += self.settle_interrupted_agent_turn_run(&run_id).await?;
+            settled += settle_interrupted_agent_turn_run(self, &run_id).await?;
         }
         if settled > 0 {
             tracing::info!(settled, "settled interrupted agent turn runs");
         }
         Ok(settled)
     }
+}
 
-    async fn settle_interrupted_agent_turn_run(&self, run_id: &str) -> Result<usize, CliError> {
-        let mut transaction = self
-            .begin_immediate_transaction("agent turn run restart reconcile")
-            .await?;
-        let changed = query(
-            "UPDATE agent_turn_runs \
-             SET status = 'failed', \
-                 error = COALESCE(error, 'agent turn was interrupted by a daemon restart'), \
-                 updated_at = ?2 \
-             WHERE run_id = ?1 \
-               AND status IN ('queued', 'running') \
-               AND runtime_turn_id IS NULL",
-        )
-        .bind(run_id)
-        .bind(utc_now())
-        .execute(transaction.as_mut())
-        .await
-        .map_err(|error| db_error(format!("settle interrupted agent turn run: {error}")))?
-        .rows_affected();
-        if changed > 0 {
-            release_managed_worker_admission_in_tx(&mut transaction, run_id).await?;
-        }
-        transaction.commit().await.map_err(|error| {
-            db_error(format!("commit interrupted agent turn run settle: {error}"))
-        })?;
-        Ok(usize::from(changed > 0))
+async fn settle_interrupted_agent_turn_run(
+    db: &AsyncDaemonDb,
+    run_id: &str,
+) -> Result<usize, CliError> {
+    let mut transaction = db
+        .begin_immediate_transaction("agent turn run restart reconcile")
+        .await?;
+    let changed = query(
+        "UPDATE agent_turn_runs \
+         SET status = 'failed', \
+             error = COALESCE(error, 'agent turn was interrupted by a daemon restart'), \
+             updated_at = ?2 \
+         WHERE run_id = ?1 \
+           AND status IN ('queued', 'running') \
+           AND runtime_turn_id IS NULL",
+    )
+    .bind(run_id)
+    .bind(utc_now())
+    .execute(transaction.as_mut())
+    .await
+    .map_err(|error| db_error(format!("settle interrupted agent turn run: {error}")))?
+    .rows_affected();
+    if changed > 0 {
+        release_managed_worker_admission_in_tx(&mut transaction, run_id).await?;
     }
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit interrupted agent turn run settle: {error}")))?;
+    Ok(usize::from(changed > 0))
 }
 
 #[derive(sqlx::FromRow)]

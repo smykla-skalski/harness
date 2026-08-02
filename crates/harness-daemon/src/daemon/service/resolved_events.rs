@@ -12,6 +12,7 @@ use super::{
     CliError, SessionUpdatedPayload, SessionsUpdatedDeltaPayload, StreamEvent, list_projects,
     list_projects_async,
 };
+use crate::daemon::db::prelude::*;
 
 /// Build a core `session_updated` event from an already-resolved session.
 pub(super) fn session_updated_core_event_from_resolved(

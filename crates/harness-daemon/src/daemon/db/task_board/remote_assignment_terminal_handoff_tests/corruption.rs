@@ -16,6 +16,7 @@ use crate::daemon::db::task_board::remote_assignment_executor_lifecycle_queries:
 use crate::daemon::db::task_board::remote_assignment_start_settlement_queries::RemoteAssignmentStartSettlementQueries;
 use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::db::task_board::workflow_execution_queries::WorkflowExecutionQueries;
+use crate::daemon::db::prelude::*;
 
 #[tokio::test]
 async fn same_target_superseded_generation_cannot_record_a_cleanup_handoff() {

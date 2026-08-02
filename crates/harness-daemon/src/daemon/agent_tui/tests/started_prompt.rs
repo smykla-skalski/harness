@@ -14,6 +14,7 @@ use crate::session::types::SessionRole;
 use crate::workspace::utc_now;
 
 use super::support::with_agent_tui_home;
+use crate::daemon::db::prelude::*;
 
 const SESSION_ID: &str = "0d1f9b0e-4b25-5f37-9b0f-9a1a6a4c9e21";
 

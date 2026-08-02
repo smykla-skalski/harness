@@ -19,6 +19,7 @@ use crate::task_board::{
     TaskBoardRemoteAssignmentState,
 };
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db::prelude::*;
 
 #[test]
 fn default_task_implementation_cross_daemon_lifecycle_imports_and_cleans_up() {

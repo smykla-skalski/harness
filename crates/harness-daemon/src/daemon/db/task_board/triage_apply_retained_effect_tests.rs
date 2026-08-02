@@ -4,6 +4,7 @@ use super::{
 };
 use crate::task_board::{BUILTIN_V1_EVALUATOR_IDENTITY, TaskBoardLaneOrigin, TaskBoardStatus};
 use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
+use crate::daemon::db::prelude::*;
 
 #[tokio::test]
 async fn same_evidence_with_missing_builtin_placement_reapplies_and_reports_retained_effect() {

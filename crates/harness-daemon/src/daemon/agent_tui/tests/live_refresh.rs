@@ -11,6 +11,7 @@ use crate::session::types::SessionRole;
 use crate::workspace::utc_now;
 
 use super::support::{WAIT_TIMEOUT, sample_snapshot, wait_until, with_agent_tui_home};
+use crate::daemon::db::prelude::*;
 
 #[test]
 fn manager_publishes_terminal_output_without_manual_refresh() {

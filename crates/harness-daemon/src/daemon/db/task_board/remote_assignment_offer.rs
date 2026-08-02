@@ -42,6 +42,7 @@ use screen::{
 };
 pub(crate) use types::TaskBoardRemoteOfferWindow;
 use types::{OfferPreparation, OfferTimes};
+use crate::daemon::db::prelude::*;
 
 impl AsyncDaemonDb {
 

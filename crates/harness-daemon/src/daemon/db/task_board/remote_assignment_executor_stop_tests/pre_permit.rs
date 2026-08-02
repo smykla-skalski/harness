@@ -1,6 +1,7 @@
 use super::*;
 use crate::daemon::db::task_board::remote_assignment_executor_lifecycle_queries::RemoteAssignmentExecutorLifecycleQueries;
 use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
+use crate::daemon::db::prelude::*;
 
 #[tokio::test]
 async fn pre_permit_invalid_run_stops_and_settles_under_the_start_authority() {

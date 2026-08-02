@@ -45,6 +45,7 @@ use validation::{
     replacement_parent, require_preclaim_predecessor, validate_reassignment_input,
     validate_replacement,
 };
+use crate::daemon::db::prelude::*;
 
 pub(crate) struct TaskBoardRemoteSourceOfferReassignment<'a> {
     pub(crate) expected_execution: &'a TaskBoardWorkflowExecutionCas,

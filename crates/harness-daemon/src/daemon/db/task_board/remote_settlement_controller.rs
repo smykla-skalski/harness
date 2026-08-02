@@ -16,6 +16,7 @@ use super::remote_settlement_receipts::{
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::remote_wire::wire::{RemoteSettledRequest, RemoteSettledResponse};
+use crate::daemon::db::prelude::*;
 
 /// Claim one exact terminal assignment generation before settlement I/O.
 ///

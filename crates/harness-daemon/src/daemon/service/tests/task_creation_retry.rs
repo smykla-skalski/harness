@@ -2,6 +2,7 @@ use crate::session::types::SessionTransition;
 
 use super::super::mutations_async::create_task_with_id_async;
 use super::*;
+use crate::daemon::db::prelude::*;
 
 const SESSION_ID: &str = "d87e3324-3234-5ab8-a4ad-4f630139e242";
 const TASK_ID: &str = "task-board-reserved-retry";

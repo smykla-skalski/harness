@@ -23,6 +23,7 @@ use harness_kernel::errors::CliErrorKind;
 #[path = "remote_host_sync.rs"]
 mod sync;
 pub(super) use sync::sync_remote_hosts_in_tx;
+use crate::daemon::db::prelude::*;
 
 pub(crate) const REMOTE_HOST_CHANGE_SCOPE: &str = "task_board:remote_hosts";
 

@@ -31,6 +31,7 @@ use tokio::task::spawn_blocking;
 use super::index;
 use super::{build_log_entry, effective_project_dir, session_not_found};
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db::prelude::*;
 
 /// Evaluate linked task-board items against their session work-item state.
 ///

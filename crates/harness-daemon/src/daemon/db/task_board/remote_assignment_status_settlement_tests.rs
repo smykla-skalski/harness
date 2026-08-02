@@ -18,6 +18,7 @@ use crate::task_board::{
 use crate::daemon::db::task_board::remote_assignment_authority_queries::RemoteAssignmentAuthorityQueries;
 use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::db::task_board::workflow_execution_queries::WorkflowExecutionQueries;
+use crate::daemon::db::prelude::*;
 
 #[tokio::test]
 async fn terminal_failure_is_provisional_and_immutable_across_restart() {

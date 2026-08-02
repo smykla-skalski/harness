@@ -14,6 +14,7 @@ use super::async_mutations::{
     init_git_project, start_async_http_session, test_http_state_with_empty_async_db,
 };
 use super::*;
+use crate::daemon::db::prelude::*;
 
 async fn join_http_worker(
     state: &DaemonHttpState,

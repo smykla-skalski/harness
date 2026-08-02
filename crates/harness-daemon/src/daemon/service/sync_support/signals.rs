@@ -2,6 +2,7 @@ use crate::daemon::db::DaemonDb;
 
 use super::context::session_not_found;
 use super::{AckResult, CliError, Path, snapshot};
+use crate::daemon::db::prelude::*;
 
 pub(crate) fn record_signal_ack(
     session_id: &str,

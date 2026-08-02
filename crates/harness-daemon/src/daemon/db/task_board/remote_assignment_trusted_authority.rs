@@ -15,6 +15,7 @@ use crate::task_board::TaskBoardRemoteAssignmentState;
 use crate::task_board::remote_wire::wire::{
     RemoteCancelRequest, RemoteClaimRequest, RemoteLeaseRenewRequest, RemoteOfferRequest,
 };
+use crate::daemon::db::prelude::*;
 
 pub(super) async fn claim_task_board_remote_offer_io_authority_fenced(
     db: &AsyncDaemonDb,

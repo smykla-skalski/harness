@@ -14,6 +14,7 @@ use crate::task_board::{
 };
 use harness_kernel::errors::CliError;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db::prelude::*;
 
 #[tokio::test]
 async fn detached_completed_or_failed_return_before_any_terminal_client_operation() {

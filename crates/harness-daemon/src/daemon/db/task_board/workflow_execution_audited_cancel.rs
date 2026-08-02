@@ -15,6 +15,7 @@ use crate::task_board::{
     TaskBoardAutomationCancelTarget, TaskBoardExecutionAttemptCas, TaskBoardExecutionAttemptRecord,
     TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionRecord,
 };
+use crate::daemon::db::prelude::*;
 
 pub(crate) struct AuditedRemoteCancelCasOutcome {
     pub(crate) record: Option<TaskBoardWorkflowExecutionRecord>,

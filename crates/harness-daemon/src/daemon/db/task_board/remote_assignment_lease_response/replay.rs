@@ -15,6 +15,7 @@ use crate::daemon::db::task_board::remote_operation_trust::{
 use crate::daemon::db::{AsyncDaemonDb, CliError, TaskBoardRemoteHostTrustFence, db_error};
 use crate::task_board::TaskBoardRemoteAssignmentState;
 use crate::task_board::remote_wire::wire::{RemoteLeaseRenewRequest, RemoteLeaseRenewResponse};
+use crate::daemon::db::prelude::*;
 
 pub(in super::super) async fn record_pending_task_board_remote_assignment_lease_renewal_replay(
     db: &AsyncDaemonDb,

@@ -23,12 +23,77 @@ use crate::session::service::{agent_status_db_label, canonicalize_persisted_sess
 use crate::session::storage;
 use crate::session::types::ManagedAgentKind;
 
-impl AsyncDaemonDb {
-    /// Upsert a discovered project through the canonical async daemon DB.
-    ///
+/// Transaction handle for the canonical async daemon DB. Split out of
+/// `AsyncSessionWriteQueries` since every other async `db` file that opens a
+/// transaction needs only this one method, not the session-write surface.
+pub(crate) trait AsyncDaemonTransactions: Send + Sync {
+    /// # Errors
+    /// Returns [`CliError`] when the transaction cannot be started.
+    async fn begin_immediate_transaction(
+        &self,
+        context: &str,
+    ) -> Result<Transaction<'_, Sqlite>, CliError>;
+}
+
+impl AsyncDaemonTransactions for AsyncDaemonDb {
+    async fn begin_immediate_transaction(
+        &self,
+        context: &str,
+    ) -> Result<Transaction<'_, Sqlite>, CliError> {
+        self.pool()
+            .begin_with("BEGIN IMMEDIATE")
+            .await
+            .map_err(|error| db_error(format!("begin {context} transaction: {error}")))
+    }
+}
+
+/// Async mirror of `writes::SessionWriteQueries`: session and project
+/// writes, log/checkpoint appends, and the global change-tracking counter,
+/// through the canonical async daemon DB.
+pub(crate) trait AsyncSessionWriteQueries: Send + Sync {
     /// # Errors
     /// Returns [`CliError`] on SQL failures.
-    pub(crate) async fn sync_project(&self, project: &DiscoveredProject) -> Result<(), CliError> {
+    async fn sync_project(&self, project: &DiscoveredProject) -> Result<(), CliError>;
+
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    async fn save_session_state(
+        &self,
+        project_id: &str,
+        state: &SessionState,
+    ) -> Result<(), CliError>;
+
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    async fn create_session_record(
+        &self,
+        project_id: &str,
+        state: &SessionState,
+    ) -> Result<(), CliError>;
+
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    async fn append_log_entry(&self, entry: &SessionLogEntry) -> Result<(), CliError>;
+
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    async fn append_checkpoint(
+        &self,
+        session_id: &str,
+        checkpoint: &TaskCheckpoint,
+    ) -> Result<(), CliError>;
+
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    async fn delete_session_row(&self, session_id: &str) -> Result<bool, CliError>;
+
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    async fn bump_change(&self, scope: &str) -> Result<(), CliError>;
+}
+
+impl AsyncSessionWriteQueries for AsyncDaemonDb {
+    async fn sync_project(&self, project: &DiscoveredProject) -> Result<(), CliError> {
         let now = utc_now();
         query(UPSERT_PROJECT_SQL)
             .bind(&project.project_id)
@@ -58,28 +123,20 @@ impl AsyncDaemonDb {
         Ok(())
     }
 
-    /// Upsert a session state through the canonical async daemon DB.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL failures.
-    pub(crate) async fn save_session_state(
+    async fn save_session_state(
         &self,
         project_id: &str,
         state: &SessionState,
     ) -> Result<(), CliError> {
-        self.sync_session(project_id, state).await
+        sync_session(self, project_id, state).await
     }
 
-    /// Insert a new session record and mark it active.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL failures.
-    pub(crate) async fn create_session_record(
+    async fn create_session_record(
         &self,
         project_id: &str,
         state: &SessionState,
     ) -> Result<(), CliError> {
-        self.sync_session(project_id, state).await?;
+        sync_session(self, project_id, state).await?;
         query(MARK_SESSION_ACTIVE_SQL)
             .bind(&state.session_id)
             .execute(self.pool())
@@ -88,11 +145,7 @@ impl AsyncDaemonDb {
         Ok(())
     }
 
-    /// Append a session log entry and keep the canonical timeline ledger in sync.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL failures.
-    pub(crate) async fn append_log_entry(&self, entry: &SessionLogEntry) -> Result<(), CliError> {
+    async fn append_log_entry(&self, entry: &SessionLogEntry) -> Result<(), CliError> {
         let transition_json = serde_json::to_string(&entry.transition)
             .map_err(|error| db_error(format!("serialize async log transition: {error}")))?;
         let transition_kind = extract_transition_kind(&transition_json);
@@ -117,11 +170,7 @@ impl AsyncDaemonDb {
         Ok(())
     }
 
-    /// Append a task checkpoint and keep the canonical timeline ledger in sync.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL failures.
-    pub(crate) async fn append_checkpoint(
+    async fn append_checkpoint(
         &self,
         session_id: &str,
         checkpoint: &TaskCheckpoint,
@@ -169,13 +218,8 @@ impl AsyncDaemonDb {
         })?;
         Ok(())
     }
-    /// Delete a session row and all cascade-dependent rows through the async DB.
-    ///
-    /// Returns `Ok(true)` when a row was deleted, `Ok(false)` when none matched.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL failures.
-    pub(crate) async fn delete_session_row(&self, session_id: &str) -> Result<bool, CliError> {
+
+    async fn delete_session_row(&self, session_id: &str) -> Result<bool, CliError> {
         let result = query(DELETE_SESSION_ROW_SQL)
             .bind(session_id)
             .execute(self.pool())
@@ -184,11 +228,7 @@ impl AsyncDaemonDb {
         Ok(result.rows_affected() > 0)
     }
 
-    /// Increment one change-tracking scope through the canonical async daemon DB.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL failures.
-    pub(crate) async fn bump_change(&self, scope: &str) -> Result<(), CliError> {
+    async fn bump_change(&self, scope: &str) -> Result<(), CliError> {
         let normalized_scope = normalize_change_scope(scope);
         let mut transaction = self
             .begin_immediate_transaction("async change bump")
@@ -214,27 +254,20 @@ impl AsyncDaemonDb {
             .map_err(|error| db_error(format!("commit async change bump transaction: {error}")))?;
         Ok(())
     }
-    async fn sync_session(&self, project_id: &str, state: &SessionState) -> Result<(), CliError> {
-        let mut transaction = self
-            .begin_immediate_transaction("async session sync")
-            .await?;
-        sync_session_in_transaction(&mut transaction, project_id, state).await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit async session sync: {error}")))?;
-        Ok(())
-    }
+}
 
-    pub(super) async fn begin_immediate_transaction(
-        &self,
-        context: &str,
-    ) -> Result<Transaction<'_, Sqlite>, CliError> {
-        self.pool()
-            .begin_with("BEGIN IMMEDIATE")
-            .await
-            .map_err(|error| db_error(format!("begin {context} transaction: {error}")))
-    }
+async fn sync_session(
+    db: &AsyncDaemonDb,
+    project_id: &str,
+    state: &SessionState,
+) -> Result<(), CliError> {
+    let mut transaction = db.begin_immediate_transaction("async session sync").await?;
+    sync_session_in_transaction(&mut transaction, project_id, state).await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit async session sync: {error}")))?;
+    Ok(())
 }
 
 pub(in crate::daemon::db) async fn sync_session_in_transaction(

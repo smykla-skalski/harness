@@ -16,6 +16,7 @@ use crate::infra::io;
 use crate::task_board::TaskBoardItem;
 use crate::task_board::dispatch::DispatchLifecycle;
 use crate::task_board::{DispatchAppliedTask, TaskBoardStatus, TaskBoardWorkflowStatus};
+use crate::daemon::db::prelude::*;
 
 const CLAIM_LEASE_SECONDS: i64 = 30;
 
