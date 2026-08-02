@@ -344,7 +344,6 @@ impl AcpAgentManagerHandle {
             CliErrorKind::workflow_io(format!("ACP logout for '{acp_id}': {error}")).into()
         })
     }
-
 }
 
 #[cfg(all(test, feature = "daemon-runtime"))]
