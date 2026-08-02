@@ -152,10 +152,10 @@ gallery_path="$output_directory/index.html"
     '  <style>' \
     '    :root { color-scheme: dark; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }' \
     '    body { margin: 0; padding: 32px; background: #151515; color: #f5f5f5; }' \
-    '    header { max-width: 1100px; margin: 0 auto 24px; }' \
+    '    header { margin: 0 0 24px; }' \
     '    h1 { margin: 0 0 8px; font-size: 24px; text-transform: capitalize; }' \
     '    p { margin: 0; color: #aaa; }' \
-    '    main { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr)); gap: 20px; max-width: 1400px; margin: 0 auto; }' \
+    '    main { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr)); gap: 20px; }' \
     '    figure { margin: 0; padding: 16px; overflow: auto; background: #202020; border: 1px solid #353535; border-radius: 12px; }' \
     '    figcaption { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 12px; font-size: 14px; font-weight: 600; }' \
     '    .name { text-transform: capitalize; }' \
