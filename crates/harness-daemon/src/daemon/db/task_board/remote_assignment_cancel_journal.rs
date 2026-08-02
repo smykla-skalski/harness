@@ -2,6 +2,7 @@
 
 use sqlx::{Sqlite, Transaction, query};
 
+use super::remote_assignment_executor_lifecycle_queries::RemoteAssignmentExecutorLifecycleQueries;
 use super::remote_assignment_io_authority::active_target_matches;
 use super::remote_assignment_io_authority::monotonic_time;
 use super::remote_assignment_model::{
@@ -25,30 +26,41 @@ impl AsyncDaemonDb {
         &self,
         assignment_id: &str,
     ) -> Result<Option<RemoteCancelRequest>, CliError> {
-        let mut transaction = self
-            .pool()
-            .begin()
-            .await
-            .map_err(|error| db_error(format!("begin remote cancel intent read: {error}")))?;
-        let Some(assignment) =
-            super::remote_assignment_model::load_assignment_in_tx(&mut transaction, assignment_id)
-                .await?
-        else {
-            transaction.commit().await.map_err(|error| {
-                db_error(format!("commit missing remote cancel intent read: {error}"))
-            })?;
-            return Ok(None);
-        };
-        let parent = load_execution_in_tx(&mut transaction, &assignment.execution_id)
-            .await?
-            .ok_or_else(|| concurrent("remote cancel intent parent disappeared"))?;
-        let request = cancel_intent_request_for_record(&parent, &assignment)?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit remote cancel intent read: {error}")))?;
-        Ok(request)
+        <Self as RemoteAssignmentExecutorLifecycleQueries>::task_board_remote_cancel_intent(
+            self,
+            assignment_id,
+        )
+        .await
     }
+}
+
+pub(super) async fn task_board_remote_cancel_intent(
+    db: &AsyncDaemonDb,
+    assignment_id: &str,
+) -> Result<Option<RemoteCancelRequest>, CliError> {
+    let mut transaction = db
+        .pool()
+        .begin()
+        .await
+        .map_err(|error| db_error(format!("begin remote cancel intent read: {error}")))?;
+    let Some(assignment) =
+        super::remote_assignment_model::load_assignment_in_tx(&mut transaction, assignment_id)
+            .await?
+    else {
+        transaction.commit().await.map_err(|error| {
+            db_error(format!("commit missing remote cancel intent read: {error}"))
+        })?;
+        return Ok(None);
+    };
+    let parent = load_execution_in_tx(&mut transaction, &assignment.execution_id)
+        .await?
+        .ok_or_else(|| concurrent("remote cancel intent parent disappeared"))?;
+    let request = cancel_intent_request_for_record(&parent, &assignment)?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit remote cancel intent read: {error}")))?;
+    Ok(request)
 }
 
 pub(super) fn cancel_intent_request_for_record(

@@ -1,5 +1,6 @@
 use sqlx::{Sqlite, Transaction, query, query_as};
 
+use super::remote_assignment_executor_lifecycle_queries::RemoteAssignmentExecutorLifecycleQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 
 const ACTIVE_QUEUE: &str = "task_board_remote_executor_active";
@@ -45,20 +46,29 @@ impl AsyncDaemonDb {
     pub(crate) async fn scan_task_board_remote_executor_assignments(
         &self,
     ) -> Result<TaskBoardRemoteExecutorScan, CliError> {
-        let mut transaction = self
-            .begin_immediate_transaction("remote executor assignment scan")
-            .await?;
-        let active = scan_class_page(&mut transaction, ScanClass::Active).await?;
-        let terminal = scan_class_page(&mut transaction, ScanClass::Terminal).await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit remote executor scan: {error}")))?;
-        Ok(TaskBoardRemoteExecutorScan {
-            active_assignment_ids: assignment_ids(active),
-            terminal_assignment_ids: assignment_ids(terminal),
-        })
+        <Self as RemoteAssignmentExecutorLifecycleQueries>::scan_task_board_remote_executor_assignments(
+            self,
+        )
+        .await
     }
+}
+
+pub(super) async fn scan_task_board_remote_executor_assignments(
+    db: &AsyncDaemonDb,
+) -> Result<TaskBoardRemoteExecutorScan, CliError> {
+    let mut transaction = db
+        .begin_immediate_transaction("remote executor assignment scan")
+        .await?;
+    let active = scan_class_page(&mut transaction, ScanClass::Active).await?;
+    let terminal = scan_class_page(&mut transaction, ScanClass::Terminal).await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit remote executor scan: {error}")))?;
+    Ok(TaskBoardRemoteExecutorScan {
+        active_assignment_ids: assignment_ids(active),
+        terminal_assignment_ids: assignment_ids(terminal),
+    })
 }
 
 #[expect(

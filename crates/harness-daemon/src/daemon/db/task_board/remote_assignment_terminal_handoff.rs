@@ -6,6 +6,7 @@ use super::remote_assignment_active_fence::{
     TaskBoardRemoteControllerHandoffKind, controller_handoff_matches_in_tx,
     record_controller_handoff_in_tx,
 };
+use super::remote_assignment_executor_lifecycle_queries::RemoteAssignmentExecutorLifecycleQueries;
 use super::remote_assignment_lease::{commit_noop, finish_mutation, require_assignment};
 use super::remote_assignment_model::{
     TaskBoardRemoteAssignmentRecord, TaskBoardRemoteMutationOutcome, canonical_time, concurrent,
@@ -26,37 +27,11 @@ impl AsyncDaemonDb {
         expected_parent: &TaskBoardWorkflowExecutionCas,
         handed_off_at: &str,
     ) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
-        canonical_time(handed_off_at, "remote terminal cleanup handoff time")?;
-        let mut transaction = self
-            .begin_immediate_transaction("task board remote terminal cleanup handoff")
-            .await?;
-        let (assignment, parent) = match screen_terminal_cleanup_handoff_in_tx(
-            &mut transaction,
+        <Self as RemoteAssignmentExecutorLifecycleQueries>::record_task_board_remote_terminal_cleanup_handoff(
+            self,
             expected_assignment,
             expected_parent,
-        )
-        .await?
-        {
-            TerminalCleanupHandoffScreen::Stopped(reason, outcome) => {
-                commit_noop(transaction, reason).await?;
-                return Ok(*outcome);
-            }
-            TerminalCleanupHandoffScreen::Ready(assignment, parent) => (assignment, parent),
-        };
-        require_terminal_cleanup_candidate(&assignment, &parent)?;
-        record_controller_handoff_in_tx(
-            &mut transaction,
-            &assignment,
-            assignment.state,
-            TaskBoardRemoteControllerHandoffKind::TerminalCleanup,
-            &parent,
             handed_off_at,
-        )
-        .await?;
-        finish_mutation(
-            transaction,
-            &assignment.assignment_id,
-            "terminal cleanup handoff",
         )
         .await
     }
@@ -66,21 +41,76 @@ impl AsyncDaemonDb {
         assignment_id: &str,
         fencing_epoch: u64,
     ) -> Result<bool, CliError> {
-        let mut transaction =
-            self.pool().begin().await.map_err(|error| {
-                db_error(format!("begin remote settlement handoff read: {error}"))
-            })?;
-        let assignment = require_assignment(&mut transaction, assignment_id).await?;
-        let recorded = assignment.fencing_epoch == fencing_epoch
-            && terminal_handoff_digest_in_tx(&mut transaction, &assignment)
-                .await?
-                .is_some();
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit remote settlement handoff read: {error}")))?;
-        Ok(recorded)
+        <Self as RemoteAssignmentExecutorLifecycleQueries>::task_board_remote_assignment_has_settlement_handoff(
+            self,
+            assignment_id,
+            fencing_epoch,
+        )
+        .await
     }
+}
+
+pub(super) async fn record_task_board_remote_terminal_cleanup_handoff(
+    db: &AsyncDaemonDb,
+    expected_assignment: &TaskBoardRemoteAssignmentRecord,
+    expected_parent: &TaskBoardWorkflowExecutionCas,
+    handed_off_at: &str,
+) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
+    canonical_time(handed_off_at, "remote terminal cleanup handoff time")?;
+    let mut transaction = db
+        .begin_immediate_transaction("task board remote terminal cleanup handoff")
+        .await?;
+    let (assignment, parent) = match screen_terminal_cleanup_handoff_in_tx(
+        &mut transaction,
+        expected_assignment,
+        expected_parent,
+    )
+    .await?
+    {
+        TerminalCleanupHandoffScreen::Stopped(reason, outcome) => {
+            commit_noop(transaction, reason).await?;
+            return Ok(*outcome);
+        }
+        TerminalCleanupHandoffScreen::Ready(assignment, parent) => (assignment, parent),
+    };
+    require_terminal_cleanup_candidate(&assignment, &parent)?;
+    record_controller_handoff_in_tx(
+        &mut transaction,
+        &assignment,
+        assignment.state,
+        TaskBoardRemoteControllerHandoffKind::TerminalCleanup,
+        &parent,
+        handed_off_at,
+    )
+    .await?;
+    finish_mutation(
+        transaction,
+        &assignment.assignment_id,
+        "terminal cleanup handoff",
+    )
+    .await
+}
+
+pub(super) async fn task_board_remote_assignment_has_settlement_handoff(
+    db: &AsyncDaemonDb,
+    assignment_id: &str,
+    fencing_epoch: u64,
+) -> Result<bool, CliError> {
+    let mut transaction = db
+        .pool()
+        .begin()
+        .await
+        .map_err(|error| db_error(format!("begin remote settlement handoff read: {error}")))?;
+    let assignment = require_assignment(&mut transaction, assignment_id).await?;
+    let recorded = assignment.fencing_epoch == fencing_epoch
+        && terminal_handoff_digest_in_tx(&mut transaction, &assignment)
+            .await?
+            .is_some();
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit remote settlement handoff read: {error}")))?;
+    Ok(recorded)
 }
 
 /// Either the handoff is already settled against a stale identity or a stale

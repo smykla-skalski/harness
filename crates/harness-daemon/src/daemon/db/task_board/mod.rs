@@ -61,6 +61,7 @@ mod remote_assignment_controller_scan;
 mod remote_assignment_controller_scan_tests;
 #[cfg(test)]
 mod remote_assignment_controller_tests;
+mod remote_assignment_executor_lifecycle_queries;
 mod remote_assignment_executor_scan;
 #[cfg(test)]
 mod remote_assignment_executor_scan_tests;

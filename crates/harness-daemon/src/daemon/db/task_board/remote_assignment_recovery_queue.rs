@@ -2,6 +2,7 @@ use chrono::{Duration, SecondsFormat};
 use sha2::{Digest, Sha256};
 use sqlx::{Sqlite, Transaction, query, query_as, query_scalar};
 
+use super::remote_assignment_executor_lifecycle_queries::RemoteAssignmentExecutorLifecycleQueries;
 use super::remote_assignment_model::canonical_time;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 
@@ -181,15 +182,27 @@ impl AsyncDaemonDb {
         now: &str,
         error: &CliError,
     ) -> Result<(), CliError> {
-        let mut transaction = self
-            .begin_immediate_transaction("remote recovery quarantine")
-            .await?;
-        quarantine_remote_recovery_failure_in_tx(&mut transaction, candidate, now, error.code())
-            .await?;
-        transaction.commit().await.map_err(|commit_error| {
-            db_error(format!("commit remote recovery quarantine: {commit_error}"))
-        })
+        <Self as RemoteAssignmentExecutorLifecycleQueries>::quarantine_remote_recovery_failure(
+            self, candidate, now, error,
+        )
+        .await
     }
+}
+
+pub(super) async fn quarantine_remote_recovery_failure(
+    db: &AsyncDaemonDb,
+    candidate: &RawRecoveryCandidate,
+    now: &str,
+    error: &CliError,
+) -> Result<(), CliError> {
+    let mut transaction = db
+        .begin_immediate_transaction("remote recovery quarantine")
+        .await?;
+    quarantine_remote_recovery_failure_in_tx(&mut transaction, candidate, now, error.code())
+        .await?;
+    transaction.commit().await.map_err(|commit_error| {
+        db_error(format!("commit remote recovery quarantine: {commit_error}"))
+    })
 }
 
 pub(super) async fn quarantine_remote_recovery_failure_in_tx(

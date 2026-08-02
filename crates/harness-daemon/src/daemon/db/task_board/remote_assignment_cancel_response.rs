@@ -4,6 +4,7 @@ use super::remote_assignment_active_fence::{
     TaskBoardRemoteControllerHandoffKind, controller_handoff_matches_in_tx,
 };
 use super::remote_assignment_authority_settlement::settle_cancel_io_authority_in_tx;
+use super::remote_assignment_executor_lifecycle_queries::RemoteAssignmentExecutorLifecycleQueries;
 use super::remote_assignment_lease::{
     commit_noop, exact_mutation_replay, finish_mutation, mutation_binding_matches,
     require_assignment,
@@ -41,28 +42,45 @@ impl AsyncDaemonDb {
         authenticated_principal: &str,
         recorded_at: &str,
     ) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
-        validate_cancel_exchange(request, response, authenticated_principal, recorded_at)?;
-        let mut transaction = self
-            .begin_immediate_transaction("task board remote cancel response")
-            .await?;
-        let record = require_assignment(&mut transaction, &request.binding.assignment_id).await?;
-        if cancel_response_replayed(&record, request, response, authenticated_principal) {
-            return settle_replayed_cancel_in_tx(transaction, record).await;
-        }
-        if !cancellable(&record)
-            || !mutation_binding_matches(
-                &record,
-                &request.binding,
-                authenticated_principal,
-                &request.lease_id,
-            )
-            || !cancel_evidence_matches(&record, response)
-        {
-            commit_noop(transaction, "stale remote cancel response").await?;
-            return Ok(TaskBoardRemoteMutationOutcome::Stale(record));
-        }
-        settle_cancel_response_in_tx(transaction, &record, request, response, recorded_at).await
+        <Self as RemoteAssignmentExecutorLifecycleQueries>::record_task_board_remote_assignment_cancel(
+            self,
+            request,
+            response,
+            authenticated_principal,
+            recorded_at,
+        )
+        .await
     }
+}
+
+pub(super) async fn record_task_board_remote_assignment_cancel(
+    db: &AsyncDaemonDb,
+    request: &RemoteCancelRequest,
+    response: &RemoteCancelResponse,
+    authenticated_principal: &str,
+    recorded_at: &str,
+) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
+    validate_cancel_exchange(request, response, authenticated_principal, recorded_at)?;
+    let mut transaction = db
+        .begin_immediate_transaction("task board remote cancel response")
+        .await?;
+    let record = require_assignment(&mut transaction, &request.binding.assignment_id).await?;
+    if cancel_response_replayed(&record, request, response, authenticated_principal) {
+        return settle_replayed_cancel_in_tx(transaction, record).await;
+    }
+    if !cancellable(&record)
+        || !mutation_binding_matches(
+            &record,
+            &request.binding,
+            authenticated_principal,
+            &request.lease_id,
+        )
+        || !cancel_evidence_matches(&record, response)
+    {
+        commit_noop(transaction, "stale remote cancel response").await?;
+        return Ok(TaskBoardRemoteMutationOutcome::Stale(record));
+    }
+    settle_cancel_response_in_tx(transaction, &record, request, response, recorded_at).await
 }
 
 fn validate_cancel_exchange(
