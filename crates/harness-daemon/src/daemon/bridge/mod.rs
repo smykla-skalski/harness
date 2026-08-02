@@ -3,6 +3,7 @@ mod acp_probe_refresh;
 mod acp_rpc;
 mod agent_acp;
 mod agent_tui;
+mod agent_tui_launch;
 mod audit;
 mod bridge_state;
 mod capability_lifecycle;
