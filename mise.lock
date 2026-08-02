@@ -193,38 +193,38 @@ url = "https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellche
 url_api = "https://api.github.com/repos/koalaman/shellcheck/releases/assets/279056944"
 
 [[tools.tuist]]
-version = "4.202.6"
+version = "4.203.1"
 backend = "aqua:tuist/tuist"
 
 [tools.tuist."platforms.linux-arm64"]
-checksum = "sha256:3414aff24903be70cbefb248134402533f520707bf143f6893a94ddd0e0f34c1"
-url = "https://github.com/tuist/tuist/releases/download/4.202.6/tuist-linux-aarch64.tar.gz"
-url_api = "https://api.github.com/repos/tuist/tuist/releases/assets/485076234"
+checksum = "sha256:9687776f91b91e7fc64854686dd0950d99aa9a765eca44c02651543784c1617e"
+url = "https://github.com/tuist/tuist/releases/download/4.203.1/tuist-linux-aarch64.tar.gz"
+url_api = "https://api.github.com/repos/tuist/tuist/releases/assets/496275645"
 
 [tools.tuist."platforms.linux-arm64-musl"]
-checksum = "sha256:3414aff24903be70cbefb248134402533f520707bf143f6893a94ddd0e0f34c1"
-url = "https://github.com/tuist/tuist/releases/download/4.202.6/tuist-linux-aarch64.tar.gz"
-url_api = "https://api.github.com/repos/tuist/tuist/releases/assets/485076234"
+checksum = "sha256:9687776f91b91e7fc64854686dd0950d99aa9a765eca44c02651543784c1617e"
+url = "https://github.com/tuist/tuist/releases/download/4.203.1/tuist-linux-aarch64.tar.gz"
+url_api = "https://api.github.com/repos/tuist/tuist/releases/assets/496275645"
 
 [tools.tuist."platforms.linux-x64"]
-checksum = "sha256:662c3df87d46ab42532d12f9d7a1c9416cd25509f517a6b560fe0a0ca420f695"
-url = "https://github.com/tuist/tuist/releases/download/4.202.6/tuist-linux-x86_64.tar.gz"
-url_api = "https://api.github.com/repos/tuist/tuist/releases/assets/485076225"
+checksum = "sha256:83003d39cc18a258a496456f0c8cd491dedd194d587066a9b40d0763f388f1ec"
+url = "https://github.com/tuist/tuist/releases/download/4.203.1/tuist-linux-x86_64.tar.gz"
+url_api = "https://api.github.com/repos/tuist/tuist/releases/assets/496275650"
 
 [tools.tuist."platforms.linux-x64-musl"]
-checksum = "sha256:662c3df87d46ab42532d12f9d7a1c9416cd25509f517a6b560fe0a0ca420f695"
-url = "https://github.com/tuist/tuist/releases/download/4.202.6/tuist-linux-x86_64.tar.gz"
-url_api = "https://api.github.com/repos/tuist/tuist/releases/assets/485076225"
+checksum = "sha256:83003d39cc18a258a496456f0c8cd491dedd194d587066a9b40d0763f388f1ec"
+url = "https://github.com/tuist/tuist/releases/download/4.203.1/tuist-linux-x86_64.tar.gz"
+url_api = "https://api.github.com/repos/tuist/tuist/releases/assets/496275650"
 
 [tools.tuist."platforms.macos-arm64"]
-checksum = "sha256:f28569258cb92f92965884f86b74935332dbc5d6a3ed8b8a41d17b69782056de"
-url = "https://github.com/tuist/tuist/releases/download/4.202.6/tuist.zip"
-url_api = "https://api.github.com/repos/tuist/tuist/releases/assets/485076227"
+checksum = "sha256:7af01272af69a460729f82de71d68cd34a35bb3b21622cfd12c0c7b74e1a1b3b"
+url = "https://github.com/tuist/tuist/releases/download/4.203.1/tuist.zip"
+url_api = "https://api.github.com/repos/tuist/tuist/releases/assets/496275652"
 
 [tools.tuist."platforms.macos-x64"]
-checksum = "sha256:f28569258cb92f92965884f86b74935332dbc5d6a3ed8b8a41d17b69782056de"
-url = "https://github.com/tuist/tuist/releases/download/4.202.6/tuist.zip"
-url_api = "https://api.github.com/repos/tuist/tuist/releases/assets/485076227"
+checksum = "sha256:7af01272af69a460729f82de71d68cd34a35bb3b21622cfd12c0c7b74e1a1b3b"
+url = "https://github.com/tuist/tuist/releases/download/4.203.1/tuist.zip"
+url_api = "https://api.github.com/repos/tuist/tuist/releases/assets/496275652"
 
 [[tools.xcbeautify]]
 version = "3.2.1"
