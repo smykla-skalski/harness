@@ -26,6 +26,7 @@ extension HarnessMonitorStore {
     /// equality for a `.task(id:)` key.
     public private(set) var taskBoardSnapshotRevision: UInt64 = 0
     public var taskBoardItems: [TaskBoardItem] = []
+    public var taskBoardItemsSnapshotAvailable = false
     public var taskBoardOrchestratorStatus: TaskBoardOrchestratorStatus?
     public var taskBoardAutomationSnapshot: TaskBoardAutomationSnapshot?
     public var taskBoardSyncSummary: TaskBoardSyncSummary?
@@ -51,6 +52,10 @@ extension HarnessMonitorStore {
       Self.assign(&auditEvents, state.auditEvents)
       Self.assign(&auditHasOlder, state.auditHasOlder)
       let didChangeTaskBoardItems = Self.assign(&taskBoardItems, state.taskBoardItems)
+      Self.assign(
+        &taskBoardItemsSnapshotAvailable,
+        state.taskBoardItemsSnapshotAvailable
+      )
       let didChangeTaskBoardOrchestratorStatus = Self.assign(
         &taskBoardOrchestratorStatus,
         state.taskBoardOrchestratorStatus

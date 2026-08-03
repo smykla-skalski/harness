@@ -5,6 +5,7 @@ extension EnvironmentValues {
   /// takes its opaque fallback instead of `.glassEffect`, so a setting can turn
   /// off a surface's translucency without forcing system reduce-transparency
   @Entry public var harnessFloatingGlassTransparencyEnabled: Bool = true
+  @Entry var harnessControlPillTransparencyEnabled: Bool = true
 }
 
 private struct HarnessMonitorFloatingGlassModifier: ViewModifier {
@@ -113,11 +114,13 @@ private struct HarnessMonitorControlPillGlassModifier: ViewModifier {
   let tint: Color
   @Environment(\.accessibilityReduceTransparency)
   private var reduceTransparency
+  @Environment(\.harnessControlPillTransparencyEnabled)
+  private var transparencyEnabled
   @Environment(\.colorSchemeContrast)
   private var colorSchemeContrast
 
   private var fallbackFillOpacity: Double {
-    if reduceTransparency {
+    if reduceTransparency || !transparencyEnabled {
       return colorSchemeContrast == .increased ? 0.4 : 0.3
     }
     return colorSchemeContrast == .increased ? 0.26 : 0.16
@@ -132,7 +135,7 @@ private struct HarnessMonitorControlPillGlassModifier: ViewModifier {
   }
 
   func body(content: Content) -> some View {
-    if reduceTransparency {
+    if reduceTransparency || !transparencyEnabled {
       content
         .background {
           Capsule()

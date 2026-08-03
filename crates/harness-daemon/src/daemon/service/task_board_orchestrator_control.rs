@@ -147,7 +147,12 @@ async fn status_from_state(
     let settings = db.task_board_orchestrator_settings().await?;
     let held_dispatches = db.held_task_board_dispatch_summary().await?;
     let machine = task_board_host_local_db(db).await.ok();
-    let items = db.list_task_board_items(None).await?;
+    let repository_scope =
+        super::task_board_repository_scope::TaskBoardRepositoryScope::load_with_settings(
+            db, &settings,
+        )
+        .await?;
+    let items = repository_scope.filter_items(db.list_task_board_items(None).await?);
     let items = items.iter().filter(|item| {
         machine
             .as_ref()
@@ -242,6 +247,69 @@ mod tests {
                 .await
                 .expect("count durable control rows");
         assert_eq!(durable_rows, 0);
+    }
+
+    #[tokio::test]
+    async fn status_workflow_counts_follow_configured_repository_scope() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let db = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
+            .await
+            .expect("open database");
+        let mut settings = TaskBoardOrchestratorSettings::default();
+        settings.github_inbox.repositories = vec!["smykla-skalski/harness".into()];
+        db.replace_task_board_orchestrator_settings(&settings)
+            .await
+            .expect("save repository scope");
+
+        for (id, repository, workflow_status) in [
+            (
+                "allowed",
+                Some("smykla-skalski/harness"),
+                TaskBoardWorkflowStatus::Idle,
+            ),
+            (
+                "disabled",
+                Some("example/disabled"),
+                TaskBoardWorkflowStatus::Paused,
+            ),
+            ("local", None, TaskBoardWorkflowStatus::Paused),
+        ] {
+            let mut item = crate::task_board::TaskBoardItem::new(
+                id.into(),
+                id.into(),
+                String::new(),
+                "2026-08-03T10:00:00Z".into(),
+            );
+            item.execution_repository = repository.map(Into::into);
+            item.workflow.status = workflow_status;
+            db.create_task_board_item(item)
+                .await
+                .expect("seed workflow item");
+        }
+
+        let status = status_from_state(
+            &db,
+            db.task_board_orchestrator_state()
+                .await
+                .expect("load orchestrator state"),
+            false,
+        )
+        .await
+        .expect("load orchestrator status");
+
+        assert_eq!(
+            status.workflow_execution_counts,
+            [
+                TaskBoardWorkflowExecutionCount {
+                    status: TaskBoardWorkflowStatus::Idle,
+                    count: 1,
+                },
+                TaskBoardWorkflowExecutionCount {
+                    status: TaskBoardWorkflowStatus::Paused,
+                    count: 1,
+                },
+            ]
+        );
     }
 
     #[tokio::test]

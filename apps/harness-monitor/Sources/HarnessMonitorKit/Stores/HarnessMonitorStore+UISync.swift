@@ -253,6 +253,7 @@ extension HarnessMonitorStore {
         auditEvents: applicationAuditEvents,
         auditHasOlder: applicationAuditHasOlder,
         taskBoardItems: globalTaskBoardItems,
+        taskBoardItemsSnapshotAvailable: globalTaskBoardItemsSnapshotAvailable,
         taskBoardOrchestratorStatus: globalTaskBoardOrchestratorStatus?
           .withoutAutomationSnapshot,
         taskBoardAutomationSnapshot: globalTaskBoardAutomationSnapshot,

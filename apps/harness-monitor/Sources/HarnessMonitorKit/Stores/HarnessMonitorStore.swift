@@ -66,7 +66,10 @@ public final class HarnessMonitorStore {
   public internal(set) var supervisorLiveTickRefreshTick: Int = 0
   public internal(set) var supervisorRuntimeState: SupervisorRuntimeState = .stopped
   public var globalTaskBoardItems: [TaskBoardItem] = [] {
-    didSet { if oldValue != globalTaskBoardItems { scheduleUISync([.contentDashboard]) } }
+    didSet { taskBoardItemsDidChange(from: oldValue) }
+  }
+  public internal(set) var globalTaskBoardItemsSnapshotAvailable = false {
+    didSet { syncDashboardIfChanged(oldValue, globalTaskBoardItemsSnapshotAvailable) }
   }
   public var globalTaskBoardOrchestratorStatus: TaskBoardOrchestratorStatus? {
     didSet { syncDashboardIfChanged(oldValue, globalTaskBoardOrchestratorStatus) }
@@ -396,6 +399,14 @@ public final class HarnessMonitorStore {
 }
 
 extension HarnessMonitorStore {
+  fileprivate func taskBoardItemsDidChange(from previous: [TaskBoardItem]) {
+    guard previous != globalTaskBoardItems else { return }
+    if !globalTaskBoardItems.isEmpty {
+      globalTaskBoardItemsSnapshotAvailable = true
+    }
+    scheduleUISync([.contentDashboard])
+  }
+
   fileprivate func syncDashboardIfChanged<Value: Equatable>(
     _ previous: Value,
     _ current: Value

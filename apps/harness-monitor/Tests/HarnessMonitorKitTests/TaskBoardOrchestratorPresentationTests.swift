@@ -205,24 +205,26 @@ struct TaskBoardOrchestratorPresentationTests {
     let standalone = TaskBoardEvaluationSummary(total: 2, evaluated: 2)
     let presentation = TaskBoardOrchestratorPresentation(
       status: orchestratorStatus(lastRun: lastRun),
-      taskBoardItems: []
+      taskBoardItems: [],
+      latestEvaluation: standalone,
+      latestEvaluationBaselineRunID: "run-current"
     )
 
-    let currentSource = presentation.summarySource(
-      latestEvaluation: standalone,
-      baselineRunID: "run-current"
-    )
+    let currentSource = presentation.summarySource
     guard case .standaloneEvaluation(let visibleEvaluation) = currentSource else {
       Issue.record("Expected the standalone evaluation for the current baseline run")
       return
     }
-    #expect(visibleEvaluation == standalone)
+    #expect(visibleEvaluation.total == standalone.total)
+    #expect(visibleEvaluation.evaluated == standalone.evaluated)
 
-    let supersedingSource = presentation.summarySource(
+    let supersedingSource = TaskBoardOrchestratorPresentation(
+      status: orchestratorStatus(lastRun: lastRun),
+      taskBoardItems: [],
       latestEvaluation: standalone,
-      baselineRunID: "run-previous"
-    )
-    guard case .lastRun(let visibleRun) = supersedingSource else {
+      latestEvaluationBaselineRunID: "run-previous"
+    ).summarySource
+    guard case .lastRun(let visibleRun, _, _) = supersedingSource else {
       Issue.record("Expected a changed run ID to supersede the standalone evaluation")
       return
     }
@@ -248,26 +250,31 @@ struct TaskBoardOrchestratorPresentationTests {
 
     let refreshedSource = TaskBoardOrchestratorPresentation(
       status: refreshedStatus,
-      taskBoardItems: []
-    ).summarySource(latestEvaluation: evaluation, baselineRunID: baselineRunID)
+      taskBoardItems: [],
+      latestEvaluation: evaluation,
+      latestEvaluationBaselineRunID: baselineRunID
+    ).summarySource
     guard case .standaloneEvaluation(let visibleEvaluation) = refreshedSource else {
       Issue.record("Expected the evaluation to remain visible after the initial status refresh")
       return
     }
-    #expect(visibleEvaluation == evaluation)
+    #expect(visibleEvaluation.total == evaluation.total)
+    #expect(visibleEvaluation.evaluated == evaluation.evaluated)
 
     let laterSource = TaskBoardOrchestratorPresentation(
       status: orchestratorStatus(lastRun: orchestratorRun(runID: "run-2")),
-      taskBoardItems: []
-    ).summarySource(latestEvaluation: evaluation, baselineRunID: baselineRunID)
-    guard case .lastRun(let visibleRun) = laterSource else {
+      taskBoardItems: [],
+      latestEvaluation: evaluation,
+      latestEvaluationBaselineRunID: baselineRunID
+    ).summarySource
+    guard case .lastRun(let visibleRun, _, _) = laterSource else {
       Issue.record("Expected a later orchestrator run to supersede the evaluation")
       return
     }
     #expect(visibleRun.runId == "run-2")
   }
 
-  private func orchestratorStatus(
+  func orchestratorStatus(
     enabled: Bool = true,
     running: Bool = false,
     stepMode: Bool = false,
@@ -284,7 +291,7 @@ struct TaskBoardOrchestratorPresentationTests {
     )
   }
 
-  private func orchestratorRun(
+  func orchestratorRun(
     runID: String = "run-1",
     status: TaskBoardOrchestratorRunStatus = .completed,
     dispatch: TaskBoardOrchestratorDispatchOutcome? = nil,
@@ -305,7 +312,7 @@ struct TaskBoardOrchestratorPresentationTests {
     )
   }
 
-  private func taskBoardItem(
+  func taskBoardItem(
     id: String,
     status: TaskBoardStatus,
     workflowStatus: TaskBoardWorkflowStatus? = nil,

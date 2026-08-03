@@ -52,6 +52,10 @@ extension HarnessMonitorStore {
         adoptManifestURL(from: measuredDiagnostics.value.workspace.manifestPath)
       }
       globalTaskBoardItems = resolvedTaskBoardSnapshot.items
+      globalTaskBoardItemsSnapshotAvailable =
+        globalTaskBoardItemsSnapshotAvailable
+        || refreshSnapshot.taskBoardItems.measured != nil
+        || !resolvedTaskBoardSnapshot.items.isEmpty
       globalTaskBoardOrchestratorStatus = resolvedTaskBoardSnapshot.orchestratorStatus
       globalTaskBoardProjects = refreshSnapshot.taskBoardProjects.value ?? globalTaskBoardProjects
       mergeTaskBoardAutomationSnapshot(measuredAutomationSnapshot)

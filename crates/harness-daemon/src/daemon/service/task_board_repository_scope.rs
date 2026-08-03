@@ -4,7 +4,7 @@ use crate::daemon::db::{AsyncDaemonDb, TaskBoardItemSnapshot};
 use crate::daemon::db::task_board::prelude::*;
 use crate::task_board::project::{TaskBoardProject, TaskBoardProjectSource};
 use crate::task_board::{
-    TaskBoardItem, TaskBoardStatus, normalize_repository_slug,
+    TaskBoardItem, TaskBoardOrchestratorSettings, TaskBoardStatus, normalize_repository_slug,
     task_board_read_only_execution_repository,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
@@ -17,6 +17,13 @@ pub(crate) struct TaskBoardRepositoryScope {
 impl TaskBoardRepositoryScope {
     pub(crate) async fn load(db: &AsyncDaemonDb) -> Result<Self, CliError> {
         let settings = db.task_board_orchestrator_settings().await?;
+        Self::load_with_settings(db, &settings).await
+    }
+
+    pub(crate) async fn load_with_settings(
+        db: &AsyncDaemonDb,
+        settings: &TaskBoardOrchestratorSettings,
+    ) -> Result<Self, CliError> {
         let repositories = settings
             .github_inbox
             .repositories

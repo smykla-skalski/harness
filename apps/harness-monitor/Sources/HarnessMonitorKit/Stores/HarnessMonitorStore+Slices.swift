@@ -307,6 +307,7 @@ extension HarnessMonitorStore {
     public var auditEvents: [HarnessMonitorAuditEvent] = []
     public var auditHasOlder = false
     public var taskBoardItems: [TaskBoardItem] = []
+    public var taskBoardItemsSnapshotAvailable = false
     public var taskBoardOrchestratorStatus: TaskBoardOrchestratorStatus?
     public var taskBoardAutomationSnapshot: TaskBoardAutomationSnapshot?
     public var taskBoardSyncSummary: TaskBoardSyncSummary?

@@ -7,6 +7,12 @@ struct TaskBoardOverviewPresentationInput: Equatable, Sendable {
   let taskBoardItems: [TaskBoardItem]
   let decisionItems: [DecisionPresentationItem]
   let scopeSessionID: String?
+  let configuredRepositories: [String]?
+  let taskBoardItemsSnapshotAvailable: Bool
+  let orchestratorStatus: TaskBoardOrchestratorStatus?
+  let latestEvaluation: TaskBoardEvaluationSummary?
+  let latestEvaluationBaselineRunID: String?
+  let localHostProjectTypes: [String]?
   /// The registered project catalog every card resolves its name through.
   let taskBoardProjects: [TaskBoardProjectSummary]
   let filters: TaskBoardFilterState
@@ -21,6 +27,12 @@ struct TaskBoardOverviewPresentationInput: Equatable, Sendable {
     taskBoardItems: [TaskBoardItem],
     decisionItems: [DecisionPresentationItem],
     scopeSessionID: String?,
+    configuredRepositories: [String]? = nil,
+    taskBoardItemsSnapshotAvailable: Bool = true,
+    orchestratorStatus: TaskBoardOrchestratorStatus? = nil,
+    latestEvaluation: TaskBoardEvaluationSummary? = nil,
+    latestEvaluationBaselineRunID: String? = nil,
+    localHostProjectTypes: [String]? = nil,
     taskBoardProjects: [TaskBoardProjectSummary],
     filters: TaskBoardFilterState = TaskBoardFilterState(),
     searchText: String = ""
@@ -29,6 +41,12 @@ struct TaskBoardOverviewPresentationInput: Equatable, Sendable {
     self.taskBoardItems = taskBoardItems
     self.decisionItems = decisionItems
     self.scopeSessionID = scopeSessionID
+    self.configuredRepositories = configuredRepositories
+    self.taskBoardItemsSnapshotAvailable = taskBoardItemsSnapshotAvailable
+    self.orchestratorStatus = orchestratorStatus
+    self.latestEvaluation = latestEvaluation
+    self.latestEvaluationBaselineRunID = latestEvaluationBaselineRunID
+    self.localHostProjectTypes = localHostProjectTypes
     self.taskBoardProjects = taskBoardProjects
     self.filters = filters
     self.searchText = searchText
@@ -47,6 +65,7 @@ struct TaskBoardOverviewPresentation: Equatable, Sendable {
     apiCardPresentationsByLane: [:],
     inboxCardPresentationsByLane: [:],
     decisionIDsByLane: [:],
+    orchestratorPresentation: nil,
     aggregateNeedsYouCount: 0,
     aggregateOpenCount: 0,
     aggregateReviewCount: 0,
@@ -69,6 +88,7 @@ struct TaskBoardOverviewPresentation: Equatable, Sendable {
   let inboxCardPresentationsByLane:
     [TaskBoardInboxLane: [TaskBoardCardID: TaskBoardCardPresentation]]
   let decisionIDsByLane: [TaskBoardInboxLane: [String]]
+  private(set) var orchestratorPresentation: TaskBoardOrchestratorPresentation?
   let aggregateNeedsYouCount: Int
   let aggregateOpenCount: Int
   let aggregateReviewCount: Int
@@ -133,6 +153,14 @@ struct TaskBoardOverviewPresentation: Equatable, Sendable {
     in lane: TaskBoardInboxLane
   ) -> [TaskBoardCardID: TaskBoardCardPresentation] {
     inboxCardPresentationsByLane[lane] ?? [:]
+  }
+
+  func replacingOrchestratorPresentation(
+    _ presentation: TaskBoardOrchestratorPresentation?
+  ) -> Self {
+    var copy = self
+    copy.orchestratorPresentation = presentation
+    return copy
   }
 
   /// Projects the store's synchronous optimistic move into the rendered lane
@@ -210,6 +238,7 @@ struct TaskBoardOverviewPresentation: Equatable, Sendable {
       apiCardPresentationsByLane: nextCardPresentationsByLane,
       inboxCardPresentationsByLane: inboxCardPresentationsByLane,
       decisionIDsByLane: decisionIDsByLane,
+      orchestratorPresentation: orchestratorPresentation,
       aggregateNeedsYouCount: aggregateNeedsYouCount - priorNeedsYouCount
         + nextNeedsYouCount,
       aggregateOpenCount: aggregateOpenCount - priorOpenCount + nextOpenCount,

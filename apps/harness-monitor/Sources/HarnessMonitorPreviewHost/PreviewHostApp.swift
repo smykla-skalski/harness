@@ -21,6 +21,10 @@ struct PreviewHostApp: App {
       ),
       ("HARNESS_TASK_BOARD_FILTERS_PREVIEW_DUMP", TaskBoardFilterPreviewRenderer.dump),
       (
+        "HARNESS_TASK_BOARD_REPOSITORY_SCOPE_PREVIEW_DUMP",
+        TaskBoardRepositoryScopePreviewRenderer.dump
+      ),
+      (
         "HARNESS_SETTINGS_REPOSITORY_SCOPE_PREVIEW_DUMP",
         SettingsRepositoryTaskBoardScopePreviewRenderer.dump
       ),

@@ -115,6 +115,10 @@ extension HarnessMonitorStore {
       // Explicit task-board refreshes may clear an authoritative empty result, but
       // unavailable endpoints must not erase the last visible board snapshot.
       globalTaskBoardItems = resolvedItems
+      globalTaskBoardItemsSnapshotAvailable =
+        globalTaskBoardItemsSnapshotAvailable
+        || snapshot.items.measured != nil
+        || !resolvedItems.isEmpty
       globalTaskBoardOrchestratorStatus = resolvedStatus
       globalTaskBoardProjects = snapshot.projects.value ?? globalTaskBoardProjects
       mergeTaskBoardAutomationSnapshot(measuredAutomationSnapshot)

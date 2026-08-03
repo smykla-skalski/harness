@@ -268,6 +268,14 @@ public struct TaskBoardOverviewView: View {
       taskBoardItems: taskBoardItems,
       decisionItems: decisionItems,
       scopeSessionID: taskBoardSessionID,
+      configuredRepositories: orchestratorStatus?.settings.githubInbox.repositories,
+      taskBoardItemsSnapshotAvailable: store?.contentUI.dashboard
+        .taskBoardItemsSnapshotAvailable == true || !taskBoardItems.isEmpty,
+      orchestratorStatus: orchestratorStatus,
+      latestEvaluation: evaluationSummary,
+      latestEvaluationBaselineRunID: store?.contentUI.dashboard
+        .taskBoardEvaluationBaselineRunID,
+      localHostProjectTypes: localHostRoutingStateValue.projectTypes,
       taskBoardProjects: store?.globalTaskBoardProjects ?? [],
       filters: boardFilters,
       searchText: boardSearchText

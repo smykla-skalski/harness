@@ -10,6 +10,7 @@ extension TaskBoardOverviewView {
             status: orchestratorStatus,
             taskBoardItems: currentPresentation.taskBoardItems,
             localHostProjectTypes: localHostRoutingStateValue.projectTypes,
+            presentation: currentPresentation.orchestratorPresentation,
             latestEvaluation: evaluationSummary,
             latestEvaluationBaselineRunID: store?.contentUI.dashboard
               .taskBoardEvaluationBaselineRunID,

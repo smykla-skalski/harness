@@ -3,6 +3,39 @@ import HarnessMonitorKit
 import OSLog
 
 actor TaskBoardOverviewPresentationWorker {
+  private struct BoardInput: Equatable {
+    let snapshot: TaskBoardInboxSnapshot
+    let taskBoardItems: [TaskBoardItem]
+    let decisionItems: [DecisionPresentationItem]
+    let scopeSessionID: String?
+    let configuredRepositories: [String]?
+    let taskBoardProjects: [TaskBoardProjectSummary]
+    let filters: TaskBoardFilterState
+    let searchText: String
+
+    init(_ input: TaskBoardOverviewPresentationInput) {
+      snapshot = input.snapshot
+      taskBoardItems = input.taskBoardItems
+      decisionItems = input.decisionItems
+      scopeSessionID = input.scopeSessionID
+      configuredRepositories = input.configuredRepositories
+      taskBoardProjects = input.taskBoardProjects
+      filters = input.filters
+      searchText = input.searchText
+    }
+  }
+
+  private struct BoardPresentationResolution {
+    let presentation: TaskBoardOverviewPresentation
+    let repositoryScopedItems: [TaskBoardItem]
+  }
+
+  private struct FilteredBoardResolution {
+    let board: TaskBoardFilteredBoard
+    let projectLabelResolver: TaskBoardProjectLabelResolver
+    let repositoryScopedItems: [TaskBoardItem]
+  }
+
   private static let signposter = OSSignposter(
     subsystem: "io.harnessmonitor",
     category: "perf"
@@ -10,41 +43,71 @@ actor TaskBoardOverviewPresentationWorker {
 
   private var cachedInput: TaskBoardOverviewPresentationInput?
   private var cachedOutput = TaskBoardOverviewPresentation.empty
+  private var cachedBoardInput: BoardInput?
+  private var cachedBoardPresentation = TaskBoardOverviewPresentation.empty
+  private var cachedRepositoryScopedItems: [TaskBoardItem] = []
+  private var boardRebuildCount: UInt64 = 0
 
   func compute(input: TaskBoardOverviewPresentationInput) -> TaskBoardOverviewPresentation {
     guard input != cachedInput else {
       return cachedOutput
     }
 
-    let signpostID = Self.signposter.makeSignpostID()
-    let interval = Self.signposter.beginInterval(
-      "task_board_overview.presentation.compute",
-      id: signpostID,
-      """
-      api=\(input.taskBoardItems.count, privacy: .public) \
-      inbox=\(input.snapshot.items.count, privacy: .public) \
-      decisions=\(input.decisionItems.count, privacy: .public)
-      """
-    )
-    defer {
+    let boardInput = BoardInput(input)
+    if boardInput != cachedBoardInput {
+      let signpostID = Self.signposter.makeSignpostID()
+      let interval = Self.signposter.beginInterval(
+        "task_board_overview.presentation.compute",
+        id: signpostID,
+        """
+        api=\(input.taskBoardItems.count, privacy: .public) \
+        inbox=\(input.snapshot.items.count, privacy: .public) \
+        decisions=\(input.decisionItems.count, privacy: .public)
+        """
+      )
+      let resolution = Self.presentation(from: input)
+      cachedBoardInput = boardInput
+      cachedBoardPresentation = resolution.presentation
+      cachedRepositoryScopedItems = resolution.repositoryScopedItems
+      boardRebuildCount &+= 1
       Self.signposter.endInterval(
         "task_board_overview.presentation.compute",
         interval,
-        "api_visible=\(self.cachedOutput.taskBoardItems.count, privacy: .public)"
+        "api_visible=\(resolution.presentation.taskBoardItems.count, privacy: .public)"
       )
     }
 
     cachedInput = input
-    cachedOutput = Self.presentation(from: input)
+    let orchestratorPresentation = input.orchestratorStatus.map { status in
+      TaskBoardOrchestratorPresentation(
+        status: status,
+        taskBoardItems: cachedRepositoryScopedItems,
+        localHostProjectTypes: input.localHostProjectTypes,
+        latestEvaluation: input.latestEvaluation,
+        latestEvaluationBaselineRunID: input.latestEvaluationBaselineRunID,
+        repositoryScopeIsKnown: input.configuredRepositories != nil
+          && input.taskBoardItemsSnapshotAvailable
+      )
+    }
+    cachedOutput = cachedBoardPresentation.replacingOrchestratorPresentation(
+      orchestratorPresentation
+    )
     return cachedOutput
   }
 
   func waitForIdle() async {}
 
+  func boardRebuildCountForTesting() -> UInt64 {
+    boardRebuildCount
+  }
+
   private static func presentation(
     from input: TaskBoardOverviewPresentationInput
-  ) -> TaskBoardOverviewPresentation {
-    let (filtered, projectLabelResolver) = filteredBoard(from: input)
+  ) -> BoardPresentationResolution {
+    let resolution = filteredBoard(from: input)
+    let filtered = resolution.board
+    let projectLabelResolver = resolution.projectLabelResolver
+    let repositoryScopedItems = resolution.repositoryScopedItems
     let taskBoardItems = filtered.items
     let apiItemsByLane = Dictionary(grouping: taskBoardItems) { item in
       TaskBoardInboxLane(taskBoardItem: item) ?? .inbox
@@ -74,7 +137,7 @@ actor TaskBoardOverviewPresentationWorker {
     // One parser (and its 3 formatters) for the whole snapshot, not one per card.
     let dateParser = TaskBoardCardDateParser()
 
-    return TaskBoardOverviewPresentation(
+    let presentation = TaskBoardOverviewPresentation(
       taskBoardItems: taskBoardItems,
       taskBoardItemsByID: Dictionary(uniqueKeysWithValues: taskBoardItems.map { ($0.id, $0) }),
       projectLabelResolver: projectLabelResolver,
@@ -110,6 +173,7 @@ actor TaskBoardOverviewPresentationWorker {
         )
       },
       decisionIDsByLane: decisionIDsByLane,
+      orchestratorPresentation: nil,
       aggregateNeedsYouCount: taskBoardNeedsYouCount
         + (inboxItemsByLane[.humanRequired]?.count ?? 0)
         + decisionIDs.count,
@@ -127,18 +191,26 @@ actor TaskBoardOverviewPresentationWorker {
       hasUnfilteredContent: filtered.hasUnfilteredContent,
       responsibleNarrowingCauses: filtered.responsibleCauses
     )
+    return BoardPresentationResolution(
+      presentation: presentation,
+      repositoryScopedItems: repositoryScopedItems
+    )
   }
 
   private static func filteredBoard(
     from input: TaskBoardOverviewPresentationInput
-  ) -> (TaskBoardFilteredBoard, TaskBoardProjectLabelResolver) {
+  ) -> FilteredBoardResolution {
     let scopedTaskBoardItems =
       if let scopeSessionID = input.scopeSessionID {
         input.taskBoardItems.filter { $0.sessionId == scopeSessionID }
       } else {
         input.taskBoardItems
       }
-    let visibleItems = TaskBoardVisibleItems.visibleItemsPreservingOrder(scopedTaskBoardItems)
+    let repositoryScopedItems = TaskBoardConfiguredRepositoryScope(
+      repositories: input.configuredRepositories,
+      projects: input.taskBoardProjects
+    ).filter(scopedTaskBoardItems)
+    let visibleItems = TaskBoardVisibleItems.visibleItemsPreservingOrder(repositoryScopedItems)
     // Resolved before the filter narrows anything: which repository names are
     // ambiguous is a property of the whole board, not of the current view of it.
     let projectLabelResolver = TaskBoardProjectLabelResolver(
@@ -146,7 +218,7 @@ actor TaskBoardOverviewPresentationWorker {
       projectIDs: visibleItems.compactMap(\.taskBoardRepositoryIdentity)
     )
     let filtered = TaskBoardFilteredBoard(
-      scopedItems: scopedTaskBoardItems,
+      scopedItems: repositoryScopedItems,
       visibleItems: visibleItems,
       inboxItems: uniqueInboxItems(input.snapshot.items),
       decisions: sortedOpenDecisions(input.decisionItems),
@@ -154,7 +226,11 @@ actor TaskBoardOverviewPresentationWorker {
       filters: input.filters,
       search: TaskBoardSearchQuery(input.searchText)
     )
-    return (filtered, projectLabelResolver)
+    return FilteredBoardResolution(
+      board: filtered,
+      projectLabelResolver: projectLabelResolver,
+      repositoryScopedItems: repositoryScopedItems
+    )
   }
 
   private static let reviewLanes: Set<TaskBoardInboxLane> = [

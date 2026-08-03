@@ -161,6 +161,7 @@ extension HarnessMonitorStore {
         canApplyTaskBoardItems(positionMutationGeneration: positionMutationGeneration)
       {
         globalTaskBoardItems = cached.items
+        globalTaskBoardItemsSnapshotAvailable = true
       }
       if shouldRestoreStatus, globalTaskBoardOrchestratorStatus == nil {
         globalTaskBoardOrchestratorStatus = cached.orchestratorStatus
