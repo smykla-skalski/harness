@@ -282,14 +282,12 @@ struct DashboardReviewFilesModeDetailPane: View {
     let interval = ReviewFilesPerf.beginSelectedFileFirstRows(path: file.path)
     await store.preparePatchPreviews(
       forPullRequest: item.pullRequestID,
-      paths: [file.path],
-      largeDiffStrategy: preferences.snapshot.filesLargeDiffStrategy
+      paths: [file.path]
     )
     ReviewFilesPerf.end(interval)
     await store.preparePatches(
       forPullRequest: item.pullRequestID,
-      paths: [file.path],
-      largeDiffStrategy: preferences.snapshot.filesLargeDiffStrategy
+      paths: [file.path]
     )
   }
 

@@ -12,7 +12,6 @@ mod parity;
 mod queries;
 mod relay;
 mod reviews;
-mod reviews_local_clones;
 mod reviews_resolve;
 #[cfg(test)]
 mod session_start_tests;

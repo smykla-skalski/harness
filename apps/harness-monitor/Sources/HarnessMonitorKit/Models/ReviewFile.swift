@@ -81,8 +81,6 @@ public enum ReviewFileViewedState: String, Codable, Equatable, Sendable, CaseIte
 /// Provenance tag on a patch so the UI can label which path served it.
 public enum ReviewFileServedBy: String, Codable, Equatable, Sendable, CaseIterable {
   case githubRest = "github_rest"
-  case localClone = "local_clone"
-  case githubRestFallback = "github_rest_fallback"
 }
 
 /// Outcome of a mark-viewed flip. Mirrors the daemon enum.
@@ -90,31 +88,6 @@ public enum ReviewFileViewedOutcome: String, Codable, Equatable, Sendable, CaseI
   case updated
   case drifted
   case failed
-}
-
-/// Settings choice for substantial-PR strategy. Mirrors the daemon enum.
-public enum FilesLargeDiffStrategy: String, Codable, Equatable, Sendable, CaseIterable {
-  case autoLocalClone = "auto_local_clone"
-  case forceGitHubRest = "force_github_rest"
-
-  public init(from decoder: Decoder) throws {
-    let container = try decoder.singleValueContainer()
-    let rawValue = try container.decode(String.self)
-    switch rawValue {
-    case "auto_local_clone": self = .autoLocalClone
-    case "force_github_rest", "force_git_hub_rest": self = .forceGitHubRest
-    default:
-      throw DecodingError.dataCorruptedError(
-        in: container,
-        debugDescription: "Unknown large-diff strategy: \(rawValue)"
-      )
-    }
-  }
-
-  public func encode(to encoder: Encoder) throws {
-    var container = encoder.singleValueContainer()
-    try container.encode(rawValue)
-  }
 }
 
 /// Per-file metadata returned by the daemon's `files_list` endpoint.
@@ -169,30 +142,3 @@ public struct ReviewsRateLimitSnapshot: Codable, Equatable, Sendable {
   }
 }
 
-/// One local clone the daemon is maintaining.
-public struct ReviewLocalCloneEntry: Codable, Equatable, Sendable, Identifiable {
-  public let repoFullName: String
-  public let repoKeySegment: String
-  public let sizeBytes: UInt64
-  public let createdAt: String
-  public let lastUsedAt: String
-  public let lastFetchedAt: String
-
-  public var id: String { repoFullName }
-
-  public init(
-    repoFullName: String,
-    repoKeySegment: String,
-    sizeBytes: UInt64,
-    createdAt: String,
-    lastUsedAt: String,
-    lastFetchedAt: String
-  ) {
-    self.repoFullName = repoFullName
-    self.repoKeySegment = repoKeySegment
-    self.sizeBytes = sizeBytes
-    self.createdAt = createdAt
-    self.lastUsedAt = lastUsedAt
-    self.lastFetchedAt = lastFetchedAt
-  }
-}

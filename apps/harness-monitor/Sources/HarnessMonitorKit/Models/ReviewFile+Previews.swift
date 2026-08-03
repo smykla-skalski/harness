@@ -10,7 +10,6 @@ public struct ReviewsFilesPreviewRequest: Codable, Equatable, Sendable {
   public let baseRefOidExpected: String?
   public let headRefName: String?
   public let baseRefName: String?
-  public let largeDiffStrategy: FilesLargeDiffStrategy?
   public let lineLimit: UInt32
 
   public init(
@@ -22,7 +21,6 @@ public struct ReviewsFilesPreviewRequest: Codable, Equatable, Sendable {
     baseRefOidExpected: String? = nil,
     headRefName: String? = nil,
     baseRefName: String? = nil,
-    largeDiffStrategy: FilesLargeDiffStrategy? = nil,
     lineLimit: UInt32 = ReviewFilePreview.defaultLineLimit
   ) {
     self.pullRequestID = pullRequestID
@@ -33,7 +31,6 @@ public struct ReviewsFilesPreviewRequest: Codable, Equatable, Sendable {
     self.baseRefOidExpected = baseRefOidExpected
     self.headRefName = headRefName
     self.baseRefName = baseRefName
-    self.largeDiffStrategy = largeDiffStrategy
     self.lineLimit = lineLimit
   }
 
@@ -46,7 +43,6 @@ public struct ReviewsFilesPreviewRequest: Codable, Equatable, Sendable {
     case baseRefOidExpected
     case headRefName
     case baseRefName
-    case largeDiffStrategy
     case lineLimit
   }
 }

@@ -15,7 +15,7 @@ pub use crate::reviews::timeline::{
     TimelinePageInfo as ReviewTimelinePageInfo, UnknownEntry as ReviewUnknownTimelineEntry,
 };
 pub use crate::reviews::{
-    FilesLargeDiffStrategy, HarnessCodeLanguage, LocalCloneListEntry, PullRequestReview,
+    HarnessCodeLanguage, PullRequestReview,
     ReviewActionKind, ReviewActionOutcome, ReviewActionPreviewKind, ReviewActionPreviewTarget,
     ReviewActionResult, ReviewCheck, ReviewCheckConclusion, ReviewCheckRunStatus,
     ReviewCheckStatus, ReviewFile, ReviewFileChangeType, ReviewFilePatch, ReviewFilePreview,

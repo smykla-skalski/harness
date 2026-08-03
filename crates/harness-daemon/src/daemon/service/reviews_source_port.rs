@@ -63,19 +63,15 @@ pub(crate) async fn immutable_pull_request_content(
         )
         .into());
     }
-    let exact_diff = super::reviews_files::exact_patch_review_files(&ReviewsFilesPatchRequest {
+    let patches_response = super::reviews_files::patch_review_files(&ReviewsFilesPatchRequest {
         pull_request_id: pull_request.pull_request_id.clone(),
         head_ref_oid_expected: expected_head.to_string(),
         paths: files.files.iter().map(|file| file.path.clone()).collect(),
         number: Some(number),
         repository_full_name: Some(repository.to_string()),
-        base_ref_oid_expected: files.base_ref_oid.clone(),
-        head_ref_name: files.head_ref_name.clone(),
-        base_ref_name: files.base_ref_name.clone(),
-        large_diff_strategy: None,
     })
     .await?;
-    let patches = &exact_diff.response;
+    let patches = &patches_response;
     if patches.drifted || patches.current_head_ref_oid != expected_head {
         return Err(source_changed(expected_head, &patches.current_head_ref_oid));
     }
@@ -85,7 +81,6 @@ pub(crate) async fn immutable_pull_request_content(
                 && patch.status == file.change_type
                 && patch.additions == file.additions
                 && patch.deletions == file.deletions
-                && !patch.truncated
                 && patch.head_ref_oid == expected_head
                 && !patch.patch.trim().is_empty()
         })
@@ -104,7 +99,6 @@ pub(crate) async fn immutable_pull_request_content(
     let content = serde_json::to_string(&serde_json::json!({
         "pull_request": pull_request,
         "description": description.body,
-        "merge_base_oid": exact_diff.merge_base_oid,
         "files": files.files,
         "patches": patches.patches,
     }))

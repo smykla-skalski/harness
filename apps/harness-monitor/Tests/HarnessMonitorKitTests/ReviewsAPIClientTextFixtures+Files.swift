@@ -313,16 +313,4 @@ let sampleReviewsFilesBlobResponseText =
   }
   """
 
-let sampleReviewsLocalClonesText =
-  """
-  [
-    {
-      "repo_full_name": "kumahq/kuma",
-      "repo_key_segment": "kumahq-kuma",
-      "size_bytes": 20480,
-      "created_at": "2026-05-20T09:00:00Z",
-      "last_used_at": "2026-05-22T10:00:00Z",
-      "last_fetched_at": "2026-05-22T09:30:00Z"
-    }
-  ]
-  """
+

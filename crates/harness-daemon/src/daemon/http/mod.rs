@@ -24,8 +24,7 @@ use crate::daemon::db::{AsyncDaemonDb, DaemonDb, canonical_db_unavailable};
 use crate::daemon::remote_pairing::{RemotePairingRateLimiter, RemotePairingStatusRateLimiter};
 use crate::daemon::server_state;
 use crate::daemon::service::{
-    WakeDispatch, register_local_clone_progress_sender,
-    register_task_board_working_copy_progress_sender, run_local_clone_gc,
+    WakeDispatch, register_task_board_working_copy_progress_sender,
     run_task_board_working_copy_gc,
 };
 use crate::telemetry::{apply_parent_context_from_headers, current_trace_id, with_active_baggage};
@@ -236,37 +235,13 @@ where
     L::Addr: Debug,
     for<'a> DaemonConnectInfo: Connected<IncomingStream<'a, L>>,
 {
-    // Hand the broadcast sender to the reviews files module so
-    // local-clone progress events surface on the same WS push channel.
-    register_local_clone_progress_sender(state.sender.clone());
-
-    // Kick off a best-effort local-clone garbage-collection pass in the
-    // background. Drops stale + over-budget bare clones per the plan's
-    // §A.5 policy. Failures are logged and don't block daemon startup.
-    tokio::spawn(async {
-        match run_local_clone_gc().await {
-            Ok(report) => {
-                if report.targets > 0 {
-                    tracing::info!(
-                        target = "harness::daemon::startup",
-                        targets = report.targets,
-                        removed = report.removed,
-                        bytes_freed = report.bytes_freed,
-                        "local-clone gc finished"
-                    );
-                }
-            }
-            Err(error) => tracing::warn!(
-                target = "harness::daemon::startup",
-                error = %error,
-                "local-clone gc failed at daemon startup"
-            ),
-        }
-    });
-
-    // Same wiring for task-board working copies: progress on the shared WS
-    // channel plus a best-effort startup GC to bound checkout disk use.
+    // Hand the broadcast sender to the task-board working-copies module so
+    // working-copy progress events surface on the same WS push channel.
     register_task_board_working_copy_progress_sender(state.sender.clone());
+
+    // Kick off a best-effort working-copy garbage-collection pass in the
+    // background. Drops stale + over-budget checkouts. Failures are logged
+    // and don't block daemon startup.
     tokio::spawn(async {
         match run_task_board_working_copy_gc().await {
             Ok(report) => {

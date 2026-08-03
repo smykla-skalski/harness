@@ -35,11 +35,7 @@ public struct ReviewsFilesListResponse: Codable, Equatable, Sendable {
   public let headRefOid: String
   /// PR's source branch name (`refs/heads/<x>` qualifier dropped).
   /// Optional for back-compat with older daemons that don't emit it.
-  public let headRefName: String?
-  /// Merge-base OID for the PR. Required for the local-clone diff path
-  /// to compute `base..head` patches; missing on older daemons.
-  public let baseRefOid: String?
-  public let baseRefName: String?
+
   /// `owner/name` of the repository the PR lives in.
   public let repositoryFullName: String?
   public let viewerCanMarkViewed: Bool
@@ -52,9 +48,6 @@ public struct ReviewsFilesListResponse: Codable, Equatable, Sendable {
     pullRequestID: String,
     number: UInt64? = nil,
     headRefOid: String,
-    headRefName: String? = nil,
-    baseRefOid: String? = nil,
-    baseRefName: String? = nil,
     repositoryFullName: String? = nil,
     viewerCanMarkViewed: Bool,
     files: [ReviewFile],
@@ -65,9 +58,6 @@ public struct ReviewsFilesListResponse: Codable, Equatable, Sendable {
     self.pullRequestID = pullRequestID
     self.number = number
     self.headRefOid = headRefOid
-    self.headRefName = headRefName
-    self.baseRefOid = baseRefOid
-    self.baseRefName = baseRefName
     self.repositoryFullName = repositoryFullName
     self.viewerCanMarkViewed = viewerCanMarkViewed
     self.files = files
@@ -80,9 +70,6 @@ public struct ReviewsFilesListResponse: Codable, Equatable, Sendable {
     case pullRequestID = "pullRequestId"
     case number
     case headRefOid
-    case headRefName
-    case baseRefOid
-    case baseRefName
     case repositoryFullName
     case viewerCanMarkViewed
     case files
@@ -96,9 +83,6 @@ public struct ReviewsFilesListResponse: Codable, Equatable, Sendable {
     pullRequestID = try container.decode(String.self, forKey: .pullRequestID)
     number = try container.decodeIfPresent(UInt64.self, forKey: .number)
     headRefOid = try container.decode(String.self, forKey: .headRefOid)
-    headRefName = try container.decodeIfPresent(String.self, forKey: .headRefName)
-    baseRefOid = try container.decodeIfPresent(String.self, forKey: .baseRefOid)
-    baseRefName = try container.decodeIfPresent(String.self, forKey: .baseRefName)
     repositoryFullName = try container.decodeIfPresent(String.self, forKey: .repositoryFullName)
     viewerCanMarkViewed = try container.decode(Bool.self, forKey: .viewerCanMarkViewed)
     files = try container.decode([ReviewFile].self, forKey: .files)
@@ -122,38 +106,19 @@ public struct ReviewsFilesPatchRequest: Codable, Equatable, Sendable {
   /// `owner/name` of the repository. Enables the daemon's local-clone
   /// dispatch path. Optional only for back-compat with older callers.
   public let repositoryFullName: String?
-  /// Merge-base OID against which to compute the diff.
-  public let baseRefOidExpected: String?
-  /// PR's source branch name. Lets the local-clone path fetch the
-  /// actual PR ref instead of falling back to `refs/heads/main`.
-  public let headRefName: String?
-  /// PR base branch name. Lets the daemon fetch the base ref before diffing.
-  public let baseRefName: String?
-  /// User's `filesLargeDiffStrategy` choice from Settings. Daemon honors
-  /// `.forceGitHubRest` by skipping the local-clone runtime entirely;
-  /// `.autoLocalClone` keeps the default behavior.
-  public let largeDiffStrategy: FilesLargeDiffStrategy?
 
   public init(
     pullRequestID: String,
     headRefOidExpected: String,
     paths: [String],
     number: UInt64? = nil,
-    repositoryFullName: String? = nil,
-    baseRefOidExpected: String? = nil,
-    headRefName: String? = nil,
-    baseRefName: String? = nil,
-    largeDiffStrategy: FilesLargeDiffStrategy? = nil
+    repositoryFullName: String? = nil
   ) {
     self.pullRequestID = pullRequestID
     self.headRefOidExpected = headRefOidExpected
     self.paths = paths
     self.number = number
     self.repositoryFullName = repositoryFullName
-    self.baseRefOidExpected = baseRefOidExpected
-    self.headRefName = headRefName
-    self.baseRefName = baseRefName
-    self.largeDiffStrategy = largeDiffStrategy
   }
 
   enum CodingKeys: String, CodingKey {
@@ -162,24 +127,6 @@ public struct ReviewsFilesPatchRequest: Codable, Equatable, Sendable {
     case paths
     case number
     case repositoryFullName
-    case baseRefOidExpected
-    case headRefName
-    case baseRefName
-    case largeDiffStrategy
-  }
-
-  public init(from decoder: Decoder) throws {
-    let container = try decoder.container(keyedBy: CodingKeys.self)
-    pullRequestID = try container.decode(String.self, forKey: .pullRequestID)
-    headRefOidExpected = try container.decode(String.self, forKey: .headRefOidExpected)
-    paths = try container.decode([String].self, forKey: .paths)
-    number = try container.decodeIfPresent(UInt64.self, forKey: .number)
-    repositoryFullName = try container.decodeIfPresent(String.self, forKey: .repositoryFullName)
-    baseRefOidExpected = try container.decodeIfPresent(String.self, forKey: .baseRefOidExpected)
-    headRefName = try container.decodeIfPresent(String.self, forKey: .headRefName)
-    baseRefName = try container.decodeIfPresent(String.self, forKey: .baseRefName)
-    largeDiffStrategy = try container.decodeIfPresent(
-      FilesLargeDiffStrategy.self, forKey: .largeDiffStrategy)
   }
 }
 

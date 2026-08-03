@@ -170,13 +170,4 @@ extension PreviewHarnessClient {
     return await state.fetchReviewFileBlob(request: request)
   }
 
-  public func listReviewLocalClones() async throws -> [ReviewLocalCloneEntry] {
-    try await performActionDelay()
-    return await state.listReviewLocalClones()
-  }
-
-  public func deleteReviewLocalClone(repoKeySegment: String) async throws {
-    try await performActionDelay()
-    await state.deleteReviewLocalClone(repoKeySegment: repoKeySegment)
-  }
 }

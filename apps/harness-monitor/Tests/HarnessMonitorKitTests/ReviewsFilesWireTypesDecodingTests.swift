@@ -92,30 +92,6 @@ struct ReviewsFilesWireTypesDecodingTests {
     #expect(response.rateLimitSnapshot == nil)
   }
 
-  @Test("decodes the large-diff strategy and a local clone list entry")
-  func decodesLargeDiffStrategyAndClonesEntry() throws {
-    // The public wire name treats GitHub as one word.
-    #expect(
-      try decoder.decode(FilesLargeDiffStrategyWire.self, from: Data("\"force_github_rest\"".utf8))
-        == .forceGitHubRest
-    )
-    #expect(
-      try decoder.decode(FilesLargeDiffStrategyWire.self, from: Data("\"force_git_hub_rest\"".utf8))
-        == .forceGitHubRest
-    )
-
-    let json = #"""
-      {"repo_full_name":"o/r","repo_key_segment":"abcd1234","size_bytes":4096,
-      "created_at":"2026-06-15T00:00:00Z","last_used_at":"2026-06-15T01:00:00Z",
-      "last_fetched_at":"2026-06-15T02:00:00Z"}
-      """#
-    let entry = try decoder.decode(LocalCloneListEntryWire.self, from: Data(json.utf8))
-
-    #expect(entry.repoFullName == "o/r")
-    #expect(entry.sizeBytes == 4096)
-    #expect(entry.lastFetchedAt == "2026-06-15T02:00:00Z")
-  }
-
   @Test("defaults an omitted served_by to the default enum variant")
   func decodesPreviewRowDefaultingServedBy() throws {
     // served_by carries #[serde(default)] over the Default-deriving

@@ -297,9 +297,8 @@ pub(crate) use reviews::{
     start_reviews_policy_run_with_audit_db,
 };
 pub use reviews_files::{
-    GcReport, delete_review_local_clone, fetch_review_file_blob, list_review_files,
-    list_review_local_clones, mark_review_files_viewed, patch_review_files, preview_review_files,
-    register_local_clone_progress_sender, run_local_clone_gc,
+    fetch_review_file_blob, list_review_files,
+    mark_review_files_viewed, patch_review_files, preview_review_files,
 };
 pub use reviews_thread_resolve::set_review_thread_resolved;
 pub use reviews_timeline::{clear_reviews_caches_with_timeline, fetch_review_timeline};

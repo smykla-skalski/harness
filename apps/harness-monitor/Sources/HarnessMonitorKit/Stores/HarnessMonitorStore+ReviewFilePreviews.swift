@@ -31,7 +31,6 @@ private struct ReviewFilesPreviewPrewarmPlan: Sendable {
   let visiblePaths: [String]
   let backgroundPaths: [String]
   let lineLimit: UInt32
-  let largeDiffStrategy: FilesLargeDiffStrategy?
 }
 
 extension HarnessMonitorStore {
@@ -39,15 +38,13 @@ extension HarnessMonitorStore {
   public func startPatchPreviewPrewarm(
     forPullRequest pullRequestID: String,
     paths: [String],
-    lineLimit: UInt32 = ReviewFilePreview.defaultLineLimit,
-    largeDiffStrategy: FilesLargeDiffStrategy? = nil
+    lineLimit: UInt32 = ReviewFilePreview.defaultLineLimit
   ) {
     startPatchPreviewPrewarm(
       forPullRequest: pullRequestID,
       visiblePaths: paths,
       backgroundPaths: [],
-      lineLimit: lineLimit,
-      largeDiffStrategy: largeDiffStrategy
+      lineLimit: lineLimit
     )
   }
 
@@ -58,8 +55,7 @@ extension HarnessMonitorStore {
     forPullRequest pullRequestID: String,
     visiblePaths: [String],
     backgroundPaths: [String],
-    lineLimit: UInt32 = ReviewFilePreview.defaultLineLimit,
-    largeDiffStrategy: FilesLargeDiffStrategy? = nil
+    lineLimit: UInt32 = ReviewFilePreview.defaultLineLimit
   ) {
     let visible = dedupePaths(visiblePaths)
     let visibleSet = Set(visible)
@@ -81,8 +77,7 @@ extension HarnessMonitorStore {
       generation: generation,
       visiblePaths: visible,
       backgroundPaths: background,
-      lineLimit: lineLimit,
-      largeDiffStrategy: largeDiffStrategy
+      lineLimit: lineLimit
     )
     reviewFilesPreviewWarmState.tasks[pullRequestID] = Task { [weak self] in
       await self?.runPatchPreviewPrewarm(plan)
@@ -95,8 +90,7 @@ extension HarnessMonitorStore {
   public func preparePatchPreviews(
     forPullRequest pullRequestID: String,
     paths: [String],
-    lineLimit: UInt32 = ReviewFilePreview.defaultLineLimit,
-    largeDiffStrategy: FilesLargeDiffStrategy? = nil
+    lineLimit: UInt32 = ReviewFilePreview.defaultLineLimit
   ) async {
     let viewModel = self.viewModel(forPullRequest: pullRequestID)
     let candidatePaths = candidatePreviewPaths(
@@ -130,10 +124,6 @@ extension HarnessMonitorStore {
       paths: pendingPaths,
       number: viewModel.number,
       repositoryFullName: viewModel.repositoryFullName,
-      baseRefOidExpected: viewModel.baseRefOid,
-      headRefName: viewModel.headRefName,
-      baseRefName: viewModel.baseRefName,
-      largeDiffStrategy: largeDiffStrategy,
       lineLimit: lineLimit
     )
     let interval = ReviewFilesPerf.beginPreviewFetch(
@@ -173,31 +163,27 @@ extension HarnessMonitorStore {
     await warmPreviewBatches(
       pullRequestID: plan.pullRequestID,
       paths: plan.visiblePaths,
-      lineLimit: plan.lineLimit,
-      largeDiffStrategy: plan.largeDiffStrategy
+      lineLimit: plan.lineLimit
     )
     guard !Task.isCancelled else { return }
     await warmPreviewBatches(
       pullRequestID: plan.pullRequestID,
       paths: plan.backgroundPaths,
-      lineLimit: plan.lineLimit,
-      largeDiffStrategy: plan.largeDiffStrategy
+      lineLimit: plan.lineLimit
     )
   }
 
   private func warmPreviewBatches(
     pullRequestID: String,
     paths: [String],
-    lineLimit: UInt32,
-    largeDiffStrategy: FilesLargeDiffStrategy?
+    lineLimit: UInt32
   ) async {
     for batch in paths.chunked(into: 24) {
       guard !Task.isCancelled else { return }
       await preparePatchPreviews(
         forPullRequest: pullRequestID,
         paths: batch,
-        lineLimit: lineLimit,
-        largeDiffStrategy: largeDiffStrategy
+        lineLimit: lineLimit
       )
     }
   }

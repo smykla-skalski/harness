@@ -1033,14 +1033,10 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "ReviewFileViewedOutcome",
     "ReviewFilesViewedResult",
     "ReviewsFilesViewedResponse",
-    // reviews files preview + local-clone facade: the preview request/response and
-    // the two cross-wire facade types. FilesLargeDiffStrategy is referenced by the
-    // preview/patch requests; LocalCloneListEntry is the Settings clones row.
+    // reviews files preview: the preview request/response types.
     "ReviewsFilesPreviewRequest",
     "ReviewFilePreview",
     "ReviewsFilesPreviewResponse",
-    "FilesLargeDiffStrategy",
-    "LocalCloneListEntry",
     // reviews timeline (timeline/types.rs + mod.rs): wire/model split, generated
     // generate-only (decode contract test, no hand mapping). Actor -> ActorWire
     // dodges the Swift `actor` keyword; ReviewTimelineEntry is an internally
@@ -1306,8 +1302,6 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "AcpProcessIncidentPayload",
     "AcpBridgeResyncIncidentPayload",
     "AcpAgentsReconciledPayload",
-    // reviews local-clone progress push payload: internally-tagged enum the Swift hand flattens.
-    "LocalCloneProgressEventPayload",
     // task-board working-copy obtain progress push payload: same shape, same treatment - the
     // Swift hand TaskBoardWorkingCopyProgress flattens it.
     "WorkingCopyProgressEventPayload",
@@ -1426,14 +1420,6 @@ const SKIP_TYPES: &[&str] = &[
     "SessionMutationResponse",
     "AgentRuntimeSessionRegistrationRequest",
     "AgentRuntimeSessionRegistrationResponse",
-    // reviews files service.rs/local_clone.rs: daemon-internal serde types behind
-    // the FilesLargeDiffStrategy / LocalCloneListEntry facade. StrategyConfig is
-    // daemon config; RepoKey/RegistryEntry/LocalCloneRegistry are the on-disk
-    // clones registry. None cross the wire to Swift.
-    "StrategyConfig",
-    "RepoKey",
-    "RegistryEntry",
-    "LocalCloneRegistry",
     "BlobTextProjection",
     // websocket probe/inspect push payloads still pending: WsRuntimeProbeUpdate wraps the
     // now-generated AcpRuntimeProbeResponse but has no decode reroute yet, and WsAcpInspect
@@ -2659,18 +2645,7 @@ const REVIEWS_FILE_COMMENT_SOURCE: &str =
     include_str!("../crates/harness-protocol/src/daemon/reviews/file_comment.rs");
 const REVIEWS_THREAD_RESOLVE_SOURCE: &str =
     include_str!("../crates/harness-protocol/src/daemon/reviews/review_thread_resolve.rs");
-// reviews files-core: the file list/patch/preview/blob/viewed surface plus the
-// two cross-wire facade types from service.rs/local_clone.rs. The former
-// mod.rs/preview.rs/service.rs trio now live combined in one `files.rs` (the
-// preview default fn/const and the FilesLargeDiffStrategy enum moved into it
-// too), so REVIEWS_FILES_MOD_SOURCE alone covers what those three used to;
-// `HarnessCodeLanguage` deliberately stayed out of that merge (its own
-// `files/language.rs`, still unreferenced here) so it keeps being
-// referenced-not-defined rather than newly generated. local_clone.rs's
-// daemon-internal serde types (RepoKey, RegistryEntry, LocalCloneRegistry)
-// stayed behind in harness-reviews, so REVIEWS_FILES_LOCAL_CLONE_SOURCE now
-// only carries the LocalCloneListEntry wire type; still a SKIP_TYPES-free
-// source.
+// reviews files-core: the file list/patch/preview/blob/viewed surface.
 const REVIEWS_FILES_MOD_SOURCE: &str =
     include_str!("../crates/harness-protocol/src/daemon/reviews/files.rs");
 const REVIEWS_FILES_BLOB_SOURCE: &str =
@@ -3400,15 +3375,6 @@ const ACP_INCIDENT_EMIT_ONLY: &[&str] = &[
     "AcpBridgeResyncIncidentPayload",
     "AcpAgentsReconciledPayload",
 ];
-const LOCAL_CLONE_PROGRESS_SOURCE: &str =
-    include_str!("../crates/harness-reviews/src/files/local_clone_progress_event.rs");
-const LOCAL_CLONE_PROGRESS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/ReviewLocalCloneProgressWireTypes.generated.swift";
-// The reviews local-clone progress push payload: an internally-tagged enum (tag = "kind") with
-// struct variants the Swift hand ReviewLocalCloneProgress flattens. The operation rides the
-// string-serialized LocalCloneOperationWire (clone/fetch); the map projects the enum to the flat
-// hand struct.
-const LOCAL_CLONE_PROGRESS_EMIT_ONLY: &[&str] =
-    &["LocalCloneProgressEventPayload", "LocalCloneOperationWire"];
 const WORKING_COPY_PROGRESS_SOURCE: &str =
     include_str!("../crates/harness-task-board/src/working_copy/progress.rs");
 const WORKING_COPY_PROGRESS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardWorkingCopyProgressWireTypes.generated.swift";

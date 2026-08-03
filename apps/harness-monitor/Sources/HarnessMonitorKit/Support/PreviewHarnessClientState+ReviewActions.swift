@@ -316,9 +316,4 @@ extension PreviewHarnessClientState {
     )
   }
 
-  func listReviewLocalClones() -> [ReviewLocalCloneEntry] {
-    []
-  }
-
-  func deleteReviewLocalClone(repoKeySegment _: String) {}
 }

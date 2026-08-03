@@ -211,22 +211,6 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
-        path: http_paths::REVIEWS_FILES_LOCAL_CLONES,
-        parity: HttpRouteParity::Rpc {
-            ws_method: ws_methods::REVIEWS_FILES_LOCAL_CLONES_LIST,
-        },
-        swift_client_exposed: true,
-    },
-    HttpApiRouteContract {
-        method: HttpRouteMethod::Post,
-        path: http_paths::REVIEWS_FILES_LOCAL_CLONES_DELETE,
-        parity: HttpRouteParity::Rpc {
-            ws_method: ws_methods::REVIEWS_FILES_LOCAL_CLONES_DELETE,
-        },
-        swift_client_exposed: true,
-    },
-    HttpApiRouteContract {
-        method: HttpRouteMethod::Post,
         path: http_paths::REVIEWS_AVATAR,
         parity: HttpRouteParity::Rpc {
             ws_method: ws_methods::REVIEWS_AVATAR,
