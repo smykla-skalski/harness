@@ -92,30 +92,41 @@ extension HarnessMonitorUITestAccessibilityRegistryMoreTests {
       )
     )
     #expect(dashboardToolbar.contains("struct DashboardWindowToolbar: ToolbarContent"))
-    #expect(dashboardToolbar.contains("ToolbarItem(placement: .primaryAction)"))
+    #expect(
+      dashboardToolbar.contains(
+        "ToolbarItem(id: \"dashboard.new-session\", placement: .primaryAction)"
+      )
+    )
+    #expect(
+      dashboardToolbar.contains(
+        "ToolbarItem(id: \"dashboard.open-folder\", placement: .primaryAction)"
+      )
+    )
     #expect(dashboardToolbar.contains("ToolbarSpacer(.fixed, placement: .primaryAction)"))
     #expect(!dashboardToolbar.contains("ToolbarItemGroup(placement: .secondaryAction)"))
     #expect(dashboardToolbar.contains(".sharedBackgroundVisibility(.hidden)"))
     #expect(!dashboardToolbar.contains("Divider()"))
     #expect(
       dashboardWindow.contains(
-        "showsTaskBoardOperationsInspectorToggle: route == .taskBoard"
+        "inspector: route.inspectorToolbarPresentation"
       )
     )
+    #expect(dashboardToolbar.contains("var inspectorToolbarPresentation:"))
     #expect(
       dashboardToolbar.contains(
-        "GlobalPolicyEnforcementToolbarGroup(store: store)\n\n    if showsTaskBoardOperationsInspectorToggle"
+        "GlobalPolicyEnforcementToolbarGroup(store: store)\n\n    if let inspector"
       )
     )
     #expect(
       dashboardToolbar.contains(
         """
-        ToolbarItem(placement: .primaryAction) {
-                TaskBoardOperationsInspectorToolbarButton()
+        ToolbarItem(id: "dashboard.inspector", placement: .primaryAction) {
+                DashboardInspectorToolbarButton(presentation: inspector)
               }
         """
       )
     )
+    #expect(dashboardToolbar.contains("switch presentation"))
     #expect(dashboardToolbar.contains("@FocusedValue(\\.harnessTaskBoardCommandFocus)"))
     #expect(dashboardToolbar.contains("Image(systemName: \"sidebar.trailing\")"))
     #expect(dashboardToolbar.contains("\"Hide Task Board Operations\""))

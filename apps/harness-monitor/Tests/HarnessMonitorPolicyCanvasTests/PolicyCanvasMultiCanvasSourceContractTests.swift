@@ -565,17 +565,19 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
     XCTAssertTrue(
       dashboardToolbarSource.contains(
         """
-        ToolbarItem(placement: .primaryAction) {
-                PolicyCanvasInspectorToolbarButton()
+        ToolbarItem(id: "dashboard.inspector", placement: .primaryAction) {
+                DashboardInspectorToolbarButton(presentation: inspector)
         """
+      )
+    )
+    XCTAssertTrue(
+      dashboardToolbarSource.contains(
+        "case .policyCanvas:\n      PolicyCanvasInspectorToolbarButton()"
       )
     )
     XCTAssertFalse(
       dashboardToolbarSource.contains(
-        """
-        ToolbarItem(placement: .automatic) {
-                PolicyCanvasInspectorToolbarButton()
-        """
+        "ToolbarItem(id: \"dashboard.inspector\", placement: .automatic)"
       )
     )
     XCTAssertFalse(dashboardToolbarSource.contains("Text(policyCanvasInspectorButtonTitle)"))

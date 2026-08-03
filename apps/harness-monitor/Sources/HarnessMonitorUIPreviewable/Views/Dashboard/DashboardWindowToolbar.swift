@@ -6,8 +6,7 @@ struct DashboardWindowToolbar: ToolbarContent {
   let store: HarnessMonitorStore
   let navigation: WindowNavigationState
   let showsQuickActions: Bool
-  let showsTaskBoardOperationsInspectorToggle: Bool
-  let showsPolicyInspectorToggle: Bool
+  let inspector: DashboardInspectorToolbarPresentation?
   let sleepPreventionPresentation: SleepPreventionToolbarPresentation
 
   @ToolbarContentBuilder var body: some ToolbarContent {
@@ -19,11 +18,11 @@ struct DashboardWindowToolbar: ToolbarContent {
     )
 
     if showsQuickActions {
-      ToolbarItem(placement: .primaryAction) {
+      ToolbarItem(id: "dashboard.new-session", placement: .primaryAction) {
         newSessionButton
       }
       ToolbarSpacer(.fixed, placement: .primaryAction)
-      ToolbarItem(placement: .primaryAction) {
+      ToolbarItem(id: "dashboard.open-folder", placement: .primaryAction) {
         openFolderButton
       }
       ToolbarSpacer(.fixed, placement: .primaryAction)
@@ -40,21 +39,43 @@ struct DashboardWindowToolbar: ToolbarContent {
 
     GlobalPolicyEnforcementToolbarGroup(store: store)
 
-    if showsTaskBoardOperationsInspectorToggle {
+    if let inspector {
       ToolbarSpacer(.fixed, placement: .primaryAction)
         .sharedBackgroundVisibility(.hidden)
-      ToolbarItem(placement: .primaryAction) {
-        TaskBoardOperationsInspectorToolbarButton()
+      ToolbarItem(id: "dashboard.inspector", placement: .primaryAction) {
+        DashboardInspectorToolbarButton(presentation: inspector)
       }
-    } else if showsPolicyInspectorToggle {
-      // Sits to the right of the kill switch as its own platter: the hidden
-      // spacer breaks the shared glass background so the inspector toggle reads
-      // as a separate group, not part of the enforcement control.
-      ToolbarSpacer(.fixed, placement: .primaryAction)
-        .sharedBackgroundVisibility(.hidden)
-      ToolbarItem(placement: .primaryAction) {
-        PolicyCanvasInspectorToolbarButton()
-      }
+    }
+  }
+}
+
+enum DashboardInspectorToolbarPresentation: Equatable {
+  case taskBoard
+  case policyCanvas
+}
+
+extension DashboardWindowRoute {
+  var inspectorToolbarPresentation: DashboardInspectorToolbarPresentation? {
+    switch self {
+    case .taskBoard:
+      .taskBoard
+    case .policyCanvas:
+      .policyCanvas
+    default:
+      nil
+    }
+  }
+}
+
+private struct DashboardInspectorToolbarButton: View {
+  let presentation: DashboardInspectorToolbarPresentation
+
+  @ViewBuilder var body: some View {
+    switch presentation {
+    case .taskBoard:
+      TaskBoardOperationsInspectorToolbarButton()
+    case .policyCanvas:
+      PolicyCanvasInspectorToolbarButton()
     }
   }
 }
