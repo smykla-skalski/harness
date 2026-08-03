@@ -13,6 +13,7 @@ public struct DashboardDecisionAttributionInput: Equatable, Sendable {
   public let taskID: String?
   public let managedAgentID: String?
   public let workspace: DashboardAgentWorkspace?
+  public let suggestedActions: [SuggestedAction]
 
   public init(
     id: String,
@@ -24,7 +25,8 @@ public struct DashboardDecisionAttributionInput: Equatable, Sendable {
     sessionAgentID: String?,
     taskID: String?,
     managedAgentID: String?,
-    workspace: DashboardAgentWorkspace?
+    workspace: DashboardAgentWorkspace?,
+    suggestedActions: [SuggestedAction] = []
   ) {
     self.id = id
     self.ruleID = ruleID
@@ -36,6 +38,7 @@ public struct DashboardDecisionAttributionInput: Equatable, Sendable {
     self.taskID = taskID
     self.managedAgentID = managedAgentID
     self.workspace = workspace
+    self.suggestedActions = suggestedActions
   }
 }
 
@@ -153,7 +156,8 @@ public enum DashboardDecisionAttributor {
       summary: input.summary,
       createdAt: input.createdAt,
       target: target,
-      workspace: workspace
+      workspace: workspace,
+      suggestedActions: input.suggestedActions
     )
   }
 

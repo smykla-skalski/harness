@@ -23,18 +23,6 @@ extension HarnessMonitorStore {
     await supervisorDecisionActionHandler().resolve(decisionID: decisionID, outcome: outcome)
   }
 
-  /// The suggested actions persisted on an open decision, decoded for the Dashboard resolution
-  /// controls. Empty when the row carries none or is not currently open.
-  public func dashboardDecisionSuggestedActions(for decisionID: String) -> [SuggestedAction] {
-    guard let json = supervisorOpenDecisionsByID[decisionID]?.suggestedActionsJSON,
-      let data = json.data(using: .utf8),
-      let actions = try? JSONDecoder().decode([SuggestedAction].self, from: data)
-    else {
-      return []
-    }
-    return actions
-  }
-
   func dashboardDecisionAttributionInput(
     for decision: Decision
   ) -> DashboardDecisionAttributionInput {
@@ -51,8 +39,20 @@ extension HarnessMonitorStore {
       sessionAgentID: decision.agentID,
       taskID: decision.taskID,
       managedAgentID: dashboardDecisionManagedAgentID(for: decision),
-      workspace: workspace
+      workspace: workspace,
+      suggestedActions: Self.dashboardDecisionSuggestedActions(from: decision)
     )
+  }
+
+  private static func dashboardDecisionSuggestedActions(
+    from decision: Decision
+  ) -> [SuggestedAction] {
+    guard let data = decision.suggestedActionsJSON.data(using: .utf8),
+      let actions = try? JSONDecoder().decode([SuggestedAction].self, from: data)
+    else {
+      return []
+    }
+    return actions
   }
 
   /// The daemon-managed agent handle for an ACP permission decision. Prefers the live sync cache and

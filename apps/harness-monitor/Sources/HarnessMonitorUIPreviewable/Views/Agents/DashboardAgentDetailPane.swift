@@ -4,6 +4,7 @@ import SwiftUI
 struct DashboardAgentDetailPane: View {
   let store: HarnessMonitorStore
   let agent: DashboardAgentSummary?
+  let decisions: [DashboardDecisionItem]
   let loadsTerminalDetailAutomatically: Bool
   let loadsAcpDetailAutomatically: Bool
   let loadsCodexDetailAutomatically: Bool
@@ -15,6 +16,7 @@ struct DashboardAgentDetailPane: View {
   init(
     store: HarnessMonitorStore,
     agent: DashboardAgentSummary?,
+    decisions: [DashboardDecisionItem] = [],
     loadsTerminalDetailAutomatically: Bool = true,
     loadsAcpDetailAutomatically: Bool = true,
     loadsCodexDetailAutomatically: Bool = true,
@@ -25,6 +27,7 @@ struct DashboardAgentDetailPane: View {
   ) {
     self.store = store
     self.agent = agent
+    self.decisions = decisions
     self.loadsTerminalDetailAutomatically = loadsTerminalDetailAutomatically
     self.loadsAcpDetailAutomatically = loadsAcpDetailAutomatically
     self.loadsCodexDetailAutomatically = loadsCodexDetailAutomatically
@@ -39,6 +42,10 @@ struct DashboardAgentDetailPane: View {
     _codexState = State(initialValue: DashboardCodexAgentDetailState(detail: initialCodexDetail))
   }
 
+  private var teamDecisions: [DashboardDecisionItem] {
+    decisions.filter(\.isTeamDecision)
+  }
+
   var body: some View {
     Group {
       if let agent {
@@ -47,6 +54,7 @@ struct DashboardAgentDetailPane: View {
             store: store,
             agent: agent,
             state: terminalState,
+            teamDecisions: teamDecisions,
             loadsAutomatically: loadsTerminalDetailAutomatically,
             onMembershipRemoved: onTerminalMembershipRemoved
           )
@@ -55,6 +63,7 @@ struct DashboardAgentDetailPane: View {
             store: store,
             agent: agent,
             state: acpState,
+            teamDecisions: teamDecisions,
             loadsAutomatically: loadsAcpDetailAutomatically
           )
         } else if agent.runtimeKind == .codex {
@@ -62,6 +71,7 @@ struct DashboardAgentDetailPane: View {
             store: store,
             agent: agent,
             state: codexState,
+            teamDecisions: teamDecisions,
             loadsAutomatically: loadsCodexDetailAutomatically
           )
         } else {
@@ -81,6 +91,7 @@ struct DashboardAgentDetailPane: View {
     ScrollView {
       VStack(alignment: .leading, spacing: 20) {
         DashboardAgentDetailHeader(agent: agent)
+        DashboardAgentDecisionsSection(store: store, items: teamDecisions)
         DashboardAgentCurrentSummary(agent: agent)
         DashboardAgentIdentityCard(agent: agent)
       }

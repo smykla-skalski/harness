@@ -22,6 +22,21 @@ public struct DashboardAgentWorkspaceIdentity: Codable, Hashable, Sendable {
     self.projectID = projectID
     self.checkoutID = checkoutID
   }
+
+  public var selectionRawValue: String {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys]
+    guard let data = try? encoder.encode(self) else { return "" }
+    return data.base64EncodedString()
+  }
+
+  public init?(selectionRawValue: String) {
+    guard
+      let data = Data(base64Encoded: selectionRawValue),
+      let decoded = try? JSONDecoder().decode(Self.self, from: data)
+    else { return nil }
+    self = decoded
+  }
 }
 
 public struct DashboardAgentIdentity: Codable, Hashable, Identifiable, Sendable {

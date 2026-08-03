@@ -45,23 +45,57 @@ struct DashboardAgentsRouteView: View {
     _state = State(initialValue: DashboardAgentsRouteState(viewState: initialState))
   }
 
-  private var selectedIdentity: DashboardAgentIdentity? {
-    DashboardAgentIdentity(selectionRawValue: persistedSelectionRaw)
+  private var currentSelection: DashboardAgentsSelection? {
+    DashboardAgentsSelection(rawValue: persistedSelectionRaw)
   }
 
-  private var selectedAgent: DashboardAgentSummary? {
-    guard let selectedIdentity else { return nil }
-    return state.viewState.agents.first { $0.identity == selectedIdentity }
+  @ViewBuilder
+  private func detailPane(_ resolution: DashboardDecisionResolution) -> some View {
+    switch currentSelection {
+    case .workspaceDecisions(let workspaceID):
+      if let bucket = resolution.workspaceBuckets.first(where: {
+        $0.workspace.identity == workspaceID
+      }) {
+        DashboardWorkspaceDecisionsDetail(store: store, bucket: bucket)
+      } else {
+        agentDetail(nil, decisions: [])
+      }
+    case .agent(let identity):
+      agentDetail(
+        state.viewState.agents.first { $0.identity == identity },
+        decisions: resolution.itemsByAgent[identity] ?? []
+      )
+    case nil:
+      agentDetail(nil, decisions: [])
+    }
   }
 
-  private var selectionBinding: Binding<DashboardAgentIdentity?> {
+  private func agentDetail(
+    _ agent: DashboardAgentSummary?,
+    decisions: [DashboardDecisionItem]
+  ) -> some View {
+    DashboardAgentDetailPane(
+      store: store,
+      agent: agent,
+      decisions: decisions,
+      loadsTerminalDetailAutomatically: refreshesAutomatically,
+      loadsAcpDetailAutomatically: refreshesAutomatically,
+      loadsCodexDetailAutomatically: refreshesAutomatically,
+      initialTerminalDetail: initialTerminalDetail,
+      initialAcpDetail: initialAcpDetail,
+      initialCodexDetail: initialCodexDetail,
+      onTerminalMembershipRemoved: { requestRefresh(force: true) }
+    )
+  }
+
+  private var selectionBinding: Binding<DashboardAgentsSelection?> {
     Binding(
-      get: { selectedIdentity },
-      set: { identity in
-        let rawValue = identity?.selectionRawValue ?? ""
+      get: { currentSelection },
+      set: { selection in
+        let rawValue = selection?.rawValue ?? ""
         guard persistedSelectionRaw != rawValue else { return }
         persistedSelectionRaw = rawValue
-        if let identity {
+        if let identity = selection?.agentIdentity {
           history.recordDashboardAgentSelection(identity)
         }
       }
@@ -77,13 +111,16 @@ struct DashboardAgentsRouteView: View {
   }
 
   var body: some View {
+    let resolution = store.dashboardDecisionResolution(agents: state.viewState.agents)
     VStack(spacing: 0) {
       header
       Divider()
       if state.viewState.presentsAsFullWidthState {
         DashboardAgentsListPane(
           state: state.viewState,
-          selection: selectionBinding
+          selection: selectionBinding,
+          decisionSummaries: resolution.summaryByAgent,
+          workspaceBuckets: resolution.workspaceBuckets
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
       } else {
@@ -91,22 +128,14 @@ struct DashboardAgentsRouteView: View {
         HSplitView {
           DashboardAgentsListPane(
             state: state.viewState,
-            selection: selectionBinding
+            selection: selectionBinding,
+            decisionSummaries: resolution.summaryByAgent,
+            workspaceBuckets: resolution.workspaceBuckets
           )
           .frame(minWidth: 250, idealWidth: 310, maxWidth: 390)
 
-          DashboardAgentDetailPane(
-            store: store,
-            agent: selectedAgent,
-            loadsTerminalDetailAutomatically: refreshesAutomatically,
-            loadsAcpDetailAutomatically: refreshesAutomatically,
-            loadsCodexDetailAutomatically: refreshesAutomatically,
-            initialTerminalDetail: initialTerminalDetail,
-            initialAcpDetail: initialAcpDetail,
-            initialCodexDetail: initialCodexDetail,
-            onTerminalMembershipRemoved: { requestRefresh(force: true) }
-          )
-          .frame(minWidth: 380, maxWidth: .infinity, maxHeight: .infinity)
+          detailPane(resolution)
+            .frame(minWidth: 380, maxWidth: .infinity, maxHeight: .infinity)
         }
       }
     }
@@ -307,12 +336,19 @@ struct DashboardAgentsRouteView: View {
 
   private func reconcileSelection() {
     let agents = state.viewState.agents
-    guard !agents.isEmpty else { return }
-    if let selectedIdentity, agents.contains(where: { $0.identity == selectedIdentity }) {
+    switch currentSelection {
+    case .agent(let identity):
+      if agents.contains(where: { $0.identity == identity }) { return }
+    case .workspaceDecisions:
+      // A bucket selection stays put across agent updates; the detail pane falls back on its own
+      // if the bucket clears, without stealing focus back to an agent.
       return
+    case nil:
+      break
     }
-    persistedSelectionRaw = agents[0].identity.selectionRawValue
-    history.recordDashboardAgentSelection(agents[0].identity)
+    guard let first = agents.first else { return }
+    persistedSelectionRaw = first.identity.selectionRawValue
+    history.recordDashboardAgentSelection(first.identity)
   }
 
   private func applyPendingHistoryRestoreIfNeeded() {

@@ -5,12 +5,14 @@ struct DashboardCodexAgentDetailView: View {
   let store: HarnessMonitorStore
   let agent: DashboardAgentSummary
   @Bindable var state: DashboardCodexAgentDetailState
+  var teamDecisions: [DashboardDecisionItem] = []
   let loadsAutomatically: Bool
 
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 20) {
         DashboardAgentDetailHeader(agent: agent)
+        DashboardAgentDecisionsSection(store: store, items: teamDecisions)
         if state.isLoading, state.detail == nil {
           ProgressView("Loading Codex agent")
             .frame(maxWidth: .infinity, minHeight: 180)

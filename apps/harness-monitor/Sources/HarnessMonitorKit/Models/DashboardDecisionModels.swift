@@ -56,6 +56,7 @@ public struct DashboardDecisionItem: Equatable, Identifiable, Sendable {
   public let createdAt: Date
   public let target: DashboardDecisionTarget
   public let workspace: DashboardAgentWorkspace?
+  public let suggestedActions: [SuggestedAction]
 
   public init(
     id: String,
@@ -65,7 +66,8 @@ public struct DashboardDecisionItem: Equatable, Identifiable, Sendable {
     summary: String,
     createdAt: Date,
     target: DashboardDecisionTarget,
-    workspace: DashboardAgentWorkspace?
+    workspace: DashboardAgentWorkspace?,
+    suggestedActions: [SuggestedAction] = []
   ) {
     self.id = id
     self.ruleID = ruleID
@@ -75,6 +77,14 @@ public struct DashboardDecisionItem: Equatable, Identifiable, Sendable {
     self.createdAt = createdAt
     self.target = target
     self.workspace = workspace
+    self.suggestedActions = suggestedActions
+  }
+
+  /// Decisions with no native runtime surface — supervisor rules and manual rows — that Dashboard
+  /// renders in its own "Team decisions" section. ACP permissions and Codex approvals keep their
+  /// richer runtime-specific panels instead.
+  public var isTeamDecision: Bool {
+    kind == .supervisor || kind == .manual
   }
 }
 
