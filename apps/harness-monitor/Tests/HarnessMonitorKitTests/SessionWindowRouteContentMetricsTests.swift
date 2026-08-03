@@ -235,7 +235,7 @@ struct SessionWindowRouteContentMetricsTests {
         "Label(\"Sync Live\", systemImage: \"arrow.clockwise\")"
       )
     )
-    #expect(managementActionsSource.contains("Run Once Live"))
+    #expect(managementActionsSource.contains("Label(\"Run Once\""))
     #expect(managementActionsSource.contains("Evaluate Item Live"))
     #expect(overviewSource.contains("boardAccessoryRow"))
     #expect(overviewSource.contains("headerActionButtons"))

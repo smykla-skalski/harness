@@ -8,6 +8,7 @@ struct TaskBoardOrchestratorSummaryView: View {
   let latestEvaluation: TaskBoardEvaluationSummary?
   let latestEvaluationBaselineRunID: String?
   let isActionInFlight: Bool
+  let isRunOnceInFlight: Bool
   let actions: TaskBoardOverviewActions
   @Binding var pendingLiveOperation: TaskBoardOverviewLiveOperation?
   @Environment(\.fontScale)
@@ -39,6 +40,7 @@ struct TaskBoardOrchestratorSummaryView: View {
     latestEvaluation: TaskBoardEvaluationSummary? = nil,
     latestEvaluationBaselineRunID: String? = nil,
     isActionInFlight: Bool = false,
+    isRunOnceInFlight: Bool = false,
     actions: TaskBoardOverviewActions,
     pendingLiveOperation: Binding<TaskBoardOverviewLiveOperation?>
   ) {
@@ -48,6 +50,7 @@ struct TaskBoardOrchestratorSummaryView: View {
     self.latestEvaluation = latestEvaluation
     self.latestEvaluationBaselineRunID = latestEvaluationBaselineRunID
     self.isActionInFlight = isActionInFlight
+    self.isRunOnceInFlight = isRunOnceInFlight
     self.actions = actions
     _pendingLiveOperation = pendingLiveOperation
   }
@@ -120,106 +123,13 @@ struct TaskBoardOrchestratorSummaryView: View {
   }
 
   private var controls: some View {
-    HStack(spacing: HarnessMonitorTheme.spacingSM) {
-      controlButtons
-    }
-    .fixedSize(horizontal: true, vertical: false)
-  }
-
-  @ViewBuilder private var controlButtons: some View {
-    if actions.canSetStepMode {
-      Toggle(
-        "Step Mode",
-        isOn: Binding(
-          get: { status.stepMode },
-          set: { enabled in actions.setTaskBoardStepMode(enabled) }
-        )
-      )
-      .toggleStyle(.switch)
-      .controlSize(HarnessMonitorControlMetrics.compactControlSize)
-      .disabled(isActionInFlight)
-      .help("Pause the continuous loop and expose manual task-board stages")
-      .accessibilityIdentifier("harness.task-board.orchestrator.step-mode")
-    }
-
-    if actions.canSetDryRun {
-      Toggle(
-        "Dry Run",
-        isOn: Binding(
-          get: { status.settings.dryRunDefault },
-          set: { enabled in actions.setTaskBoardDryRun(enabled) }
-        )
-      )
-      .toggleStyle(.switch)
-      .controlSize(HarnessMonitorControlMetrics.compactControlSize)
-      .disabled(isActionInFlight)
-      .help("Preview task-board runs and evaluations without applying changes")
-      .accessibilityIdentifier("harness.task-board.orchestrator.dry-run")
-    }
-
-    if status.running {
-      if actions.canStopOrchestrator {
-        Button {
-          actions.stopTaskBoardOrchestrator()
-        } label: {
-          Label("Stop", systemImage: "stop.circle")
-            .font(captionSemibold)
-        }
-        .frame(minHeight: metrics.controlMinHeight)
-        .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.danger)
-        .controlSize(HarnessMonitorControlMetrics.compactControlSize)
-        .disabled(isActionInFlight)
-        .help("Stop task-board orchestrator")
-        .accessibilityIdentifier("harness.task-board.orchestrator.stop")
-      }
-    } else if actions.canStartOrchestrator {
-      Button {
-        triggerStart()
-      } label: {
-        Label("Start", systemImage: "play.circle")
-          .font(captionSemibold)
-      }
-      .frame(minHeight: metrics.controlMinHeight)
-      .harnessActionButtonStyle(variant: .prominent, tint: HarnessMonitorTheme.accent)
-      .controlSize(HarnessMonitorControlMetrics.compactControlSize)
-      .disabled(isActionInFlight)
-      .help("Start task-board orchestrator")
-      .accessibilityIdentifier("harness.task-board.orchestrator.start")
-    }
-
-    if actions.canRunOrchestratorOnce {
-      Button {
-        triggerRunOnce()
-      } label: {
-        Label(runOnceTitle, systemImage: "playpause")
-          .font(captionSemibold)
-      }
-      .frame(minHeight: metrics.controlMinHeight)
-      .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
-      .controlSize(HarnessMonitorControlMetrics.compactControlSize)
-      .disabled(isActionInFlight)
-      .help(runOnceHelp)
-      .accessibilityIdentifier("harness.task-board.orchestrator.run-once")
-    }
-  }
-
-  private func triggerStart() {
-    guard !status.settings.dryRunDefault else {
-      actions.startTaskBoardOrchestrator()
-      return
-    }
-    pendingLiveOperation = .start(status.settings.scheduling)
-  }
-
-  /// Mirrors `TaskBoardOverviewView.requestRunOnce`: dry runs apply directly,
-  /// live runs route through the shared confirmation dialog.
-  private func triggerRunOnce() {
-    let request = TaskBoardOrchestratorRunOnceRequest(dryRun: status.settings.dryRunDefault)
-    guard request.dryRun != true else {
-      actions.runTaskBoardOrchestratorOnce(request)
-      return
-    }
-    pendingLiveOperation = .runOnce(request)
+    TaskBoardOrchestratorControls(
+      status: status,
+      isActionInFlight: isActionInFlight,
+      isRunOnceInFlight: isRunOnceInFlight,
+      actions: actions,
+      pendingLiveOperation: $pendingLiveOperation
+    )
   }
 
   @ViewBuilder
@@ -305,16 +215,6 @@ struct TaskBoardOrchestratorSummaryView: View {
       return HarnessMonitorTheme.accent
     }
     return HarnessMonitorTheme.caution
-  }
-
-  private var runOnceTitle: String {
-    status.settings.dryRunDefault ? "Preview Run Once" : "Run Once Live"
-  }
-
-  private var runOnceHelp: String {
-    status.settings.dryRunDefault
-      ? "Preview one orchestrator cycle without applying changes"
-      : "Run one live orchestrator cycle and apply changes"
   }
 
   private func lastRunTitle(for run: TaskBoardOrchestratorRunSummary) -> String {

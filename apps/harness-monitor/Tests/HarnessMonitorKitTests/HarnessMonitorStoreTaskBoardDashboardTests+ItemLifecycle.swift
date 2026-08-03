@@ -193,6 +193,24 @@ extension HarnessMonitorStoreTaskBoardDashboardTests {
     #expect(store.currentSuccessFeedbackMessage == "Ran task board")
   }
 
+  @Test("A user-cancelled run once does not report a failure toast")
+  func cancelledRunOnceDoesNotReportFailure() async {
+    let client = RecordingHarnessClient()
+    client.configureTaskBoardRunOnceError(
+      HarnessMonitorAPIError.semanticServer(
+        code: 409,
+        semanticCode: "KSRCLI092",
+        message: "session agent conflict: task-board automation is stopping"
+      )
+    )
+    let store = await makeBootstrappedStore(client: client)
+
+    let success = await store.runTaskBoardOrchestratorOnce()
+
+    #expect(!success)
+    #expect(store.currentFailureFeedbackMessage == nil)
+  }
+
   @Test("Start and stop orchestrator update dashboard status")
   func startAndStopOrchestratorUpdateDashboardStatus() async {
     let client = RecordingHarnessClient()

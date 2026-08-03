@@ -62,6 +62,11 @@ public struct TaskBoardOverviewActions: Equatable {
   var canApprovePlan: Bool { hasStore }
   var canRevokePlan: Bool { hasStore }
   var canRunOrchestratorOnce: Bool { hasStore }
+  var canCancelOrchestratorRun: Bool { hasStore }
+
+  @MainActor var isRunOnceInFlight: Bool {
+    store?.contentUI.dashboard.isTaskBoardRunOnceInFlight == true
+  }
 
   // MARK: - Navigation
 

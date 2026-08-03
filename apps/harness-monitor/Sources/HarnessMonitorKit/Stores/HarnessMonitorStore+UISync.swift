@@ -270,6 +270,7 @@ extension HarnessMonitorStore {
       )
     )
     contentUI.dashboard.applyTaskBoardBusy(isTaskBoardBusy)
+    contentUI.dashboard.applyTaskBoardRunOnceInFlight(isTaskBoardRunOnceInFlight)
     contentUI.dashboard.applyTaskBoardSyncPhase(taskBoardSyncPhase)
   }
 

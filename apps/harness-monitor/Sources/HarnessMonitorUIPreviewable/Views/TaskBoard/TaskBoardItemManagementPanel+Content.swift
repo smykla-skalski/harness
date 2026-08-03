@@ -198,6 +198,7 @@ extension TaskBoardItemManagementPanel {
           metrics: metrics,
           captionFont: captionSemibold,
           isActionInFlight: isActionInFlight,
+          isRunOnceInFlight: actions.isRunOnceInFlight,
           runOnceDryRun: runOnceDryRun,
           evaluateDryRun: evaluateDryRun,
           actions: actions,

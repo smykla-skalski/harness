@@ -31,6 +31,8 @@ struct TaskBoardRuntimeState {
   var positionMutation = TaskBoardPositionMutationState()
   var syncPhase = TaskBoardSyncPhase.idle
   var actionCount = 0
+  var pendingRunOnceReservations: Set<UUID> = []
+  var activeRunOnceReservations: Set<UUID> = []
 }
 
 struct TaskBoardOrchestratorSettingsMutationState {

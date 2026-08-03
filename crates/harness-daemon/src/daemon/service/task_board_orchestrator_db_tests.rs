@@ -1,4 +1,7 @@
-use super::{github_discovery_request, prepare_run, run_dispatch_phase, should_sync_github_tasks};
+use super::{
+    github_discovery_request, prepare_run, run_dispatch_phase, run_evaluation_phase,
+    run_publish_phase, should_sync_github_tasks,
+};
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::TaskBoardOrchestratorRunOnceRequest;
 use crate::task_board::github::GitHubAutomation;
@@ -312,4 +315,64 @@ async fn stop_fences_dispatch_before_another_item_can_start() {
         .await
         .expect("finalize cancelled run");
     assert_eq!(outcome, TaskBoardAutomationRunOutcome::Cancelled);
+}
+
+#[tokio::test]
+async fn stop_fences_evaluation_and_publication() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let db = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
+        .await
+        .expect("open database");
+    db.start_task_board_automation(
+        TaskBoardAutomationDesiredMode::Continuous,
+        chrono::Utc::now(),
+    )
+    .await
+    .expect("start automation");
+    let start = super::super::TaskBoardAutomationRunSession::acquire(
+        &db,
+        TaskBoardAutomationRunTrigger::Manual,
+        Some("operator".into()),
+        false,
+        TaskBoardAutomationScope::default(),
+    )
+    .await
+    .expect("acquire run");
+    let super::super::TaskBoardAutomationRunStart::Acquired(session) = start else {
+        panic!("manual run should be acquired");
+    };
+    let settings = settings_without_a_source();
+    db.create_task_board_item(crate::task_board::TaskBoardItem::new(
+        "stop-fenced-item".into(),
+        "Stop-fenced item".into(),
+        "This item must not be evaluated or published after Stop".into(),
+        "2026-08-02T10:05:00Z".into(),
+    ))
+    .await
+    .expect("create item");
+    let prepared = prepare_run(
+        &db,
+        &TaskBoardOrchestratorRunOnceRequest {
+            status: Some(TaskBoardStatus::Todo),
+            dry_run: Some(false),
+            ..TaskBoardOrchestratorRunOnceRequest::default()
+        },
+        &settings,
+        Some(session.run_id()),
+    )
+    .await
+    .expect("prepare run");
+
+    db.stop_task_board_automation(chrono::Utc::now())
+        .await
+        .expect("stop automation");
+    let evaluation_error = run_evaluation_phase(&db, &prepared, Some(&session))
+        .await
+        .expect_err("Stop must fence evaluation");
+    let publish_error = run_publish_phase(&db, &settings, &prepared, Some(&session))
+        .await
+        .expect_err("Stop must fence publication");
+
+    assert_eq!(evaluation_error.code(), "KSRCLI092");
+    assert_eq!(publish_error.code(), "KSRCLI092");
 }

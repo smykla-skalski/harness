@@ -185,7 +185,7 @@ final class TaskBoardAutomationInspectorState {
   func beginAction(
     _ action: TaskBoardAutomationInspectorAction
   ) -> TaskBoardAutomationActionRequest? {
-    guard activeAction == nil else { return nil }
+    guard canBeginAction(action) else { return nil }
     actionGeneration &+= 1
     activeAction = action
     return TaskBoardAutomationActionRequest(generation: actionGeneration, action: action)
@@ -199,6 +199,11 @@ final class TaskBoardAutomationInspectorState {
 
   func isCurrentAction(_ request: TaskBoardAutomationActionRequest) -> Bool {
     request.generation == actionGeneration && activeAction == request.action
+  }
+
+  private func canBeginAction(_ action: TaskBoardAutomationInspectorAction) -> Bool {
+    activeAction == nil
+      || (activeAction == .runOnce && (action == .stop || action == .forceCancel))
   }
 
   private static func uniqueRuns(

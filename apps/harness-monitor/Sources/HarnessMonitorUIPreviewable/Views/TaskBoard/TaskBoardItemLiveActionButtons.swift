@@ -6,6 +6,7 @@ struct TaskBoardItemLiveActionButtons: View {
   let metrics: TaskBoardOverviewMetrics
   let captionFont: Font
   let isActionInFlight: Bool
+  let isRunOnceInFlight: Bool
   let runOnceDryRun: Bool
   let evaluateDryRun: Bool
   let actions: TaskBoardOverviewActions
@@ -24,7 +25,11 @@ struct TaskBoardItemLiveActionButtons: View {
       lineSpacing: HarnessMonitorTheme.spacingSM
     ) {
       openSpawnedTaskButton
-      runOnceButton
+      if isRunOnceInFlight {
+        stopRunOnceButton
+      } else {
+        runOnceButton
+      }
       evaluateButton
     }
     .confirmationDialog(
@@ -69,7 +74,7 @@ struct TaskBoardItemLiveActionButtons: View {
         pendingAction = .runOnce
       }
     } label: {
-      Label(runOnceDryRun ? "Preview Run Once" : "Run Once Live", systemImage: "play.circle")
+      Label("Run Once", systemImage: "play.circle")
         .font(captionFont)
     }
     .frame(minHeight: metrics.controlMinHeight)
@@ -81,6 +86,21 @@ struct TaskBoardItemLiveActionButtons: View {
         ? "Preview one orchestrator run without applying changes"
         : "Run one live orchestrator tick after confirmation"
     )
+  }
+
+  private var stopRunOnceButton: some View {
+    Button {
+      actions.cancelTaskBoardOrchestratorRun()
+    } label: {
+      Label("Stop", systemImage: "stop.circle")
+        .font(captionFont)
+    }
+    .frame(minHeight: metrics.controlMinHeight)
+    .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.danger)
+    .controlSize(HarnessMonitorControlMetrics.compactControlSize)
+    .disabled(!actions.canCancelOrchestratorRun)
+    .help("Cancel the active task-board run")
+    .accessibilityIdentifier("harness.task-board.manage-item.stop-run-once")
   }
 
   private var evaluateButton: some View {
@@ -149,7 +169,7 @@ extension TaskBoardItemLiveActionButtons {
     var actionTitle: String {
       switch self {
       case .runOnce:
-        "Run Once Live"
+        "Run Once"
       case .evaluate:
         "Evaluate Live"
       }

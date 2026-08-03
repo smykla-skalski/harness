@@ -109,6 +109,19 @@ struct TaskBoardAutomationInspectorActions: Equatable {
     else {
       return
     }
+    let runOnceReservation: TaskBoardRunOnceReservation?
+    if action == .runOnce {
+      guard let reservation = store.reserveTaskBoardRunOnceAction() else {
+        _ = state.completeAction(request)
+        return
+      }
+      runOnceReservation = reservation
+    } else {
+      runOnceReservation = nil
+    }
+    if action == .stop {
+      store.cancelPendingTaskBoardRunOnceActions()
+    }
 
     let state = state
     HarnessMonitorAsyncWorkQueue.shared.submit(
@@ -117,7 +130,8 @@ struct TaskBoardAutomationInspectorActions: Equatable {
           let succeeded = await performCurrentTaskBoardAutomationControl(
             store: store,
             state: state,
-            request: request
+            request: request,
+            runOnceReservation: runOnceReservation
           )
         else {
           return
@@ -175,6 +189,7 @@ struct TaskBoardAutomationInspectorActions: Equatable {
       store.presentFailureFeedback("Another automation action is in progress")
       return
     }
+    store.cancelPendingTaskBoardRunOnceActions()
 
     let state = state
     HarnessMonitorAsyncWorkQueue.shared.submit(
@@ -252,7 +267,9 @@ struct TaskBoardAutomationInspectorActions: Equatable {
     ) {
       return "Cancellation target changed. Refresh and try again."
     }
-    return state.activeAction == nil ? nil : "Another automation action is in progress"
+    return state.activeAction == nil || state.activeAction == .runOnce
+      ? nil
+      : "Another automation action is in progress"
   }
 }
 
@@ -260,16 +277,23 @@ struct TaskBoardAutomationInspectorActions: Equatable {
 private func performCurrentTaskBoardAutomationControl(
   store: HarnessMonitorStore,
   state: TaskBoardAutomationInspectorState,
-  request: TaskBoardAutomationActionRequest
+  request: TaskBoardAutomationActionRequest,
+  runOnceReservation: TaskBoardRunOnceReservation?
 ) async -> Bool? {
-  guard state.isCurrentAction(request) else { return nil }
+  guard state.isCurrentAction(request) else {
+    if let runOnceReservation {
+      store.cancelTaskBoardRunOnceReservation(runOnceReservation)
+    }
+    return nil
+  }
   switch request.action {
   case .start:
     return await store.startTaskBoardOrchestrator()
   case .stop:
     return await store.stopTaskBoardOrchestrator()
   case .runOnce:
-    return await store.runTaskBoardOrchestratorOnce()
+    guard let runOnceReservation else { return false }
+    return await store.runTaskBoardOrchestratorOnce(reservation: runOnceReservation)
   case .forceCancel:
     return nil
   }

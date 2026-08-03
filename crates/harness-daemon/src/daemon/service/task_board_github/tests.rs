@@ -20,6 +20,8 @@ mod fake_client;
 use fake_client::FakeGitHubClient;
 #[path = "tests/write_publication.rs"]
 mod write_publication;
+#[path = "tests/cancellation.rs"]
+mod cancellation;
 
 #[tokio::test]
 async fn automation_opens_reviews_and_merges_prs() {
@@ -97,6 +99,7 @@ async fn automation_opens_reviews_and_merges_prs() {
         merge_calls: std::sync::Mutex::new(0),
         ready_error: std::sync::Mutex::new(None),
         parent_interleaving: std::sync::Mutex::new(None),
+        stop_automation_on_fresh_evidence: None,
     };
 
     let workflow = automate_item_with_database_policy(DatabaseAutomationRequest {
@@ -108,8 +111,10 @@ async fn automation_opens_reviews_and_merges_prs() {
         client: &client,
         host_id: TEST_HOST_ID,
         expected_parent: None,
+        session: None,
     })
-    .await;
+    .await
+    .expect("run GitHub automation");
 
     assert_eq!(workflow.branch.as_deref(), Some(expected_branch.as_str()));
     assert_eq!(workflow.pr_number, Some(42));
@@ -206,6 +211,7 @@ async fn automation_waits_for_review_when_merge_evidence_is_not_approved() {
         merge_calls: std::sync::Mutex::new(0),
         ready_error: std::sync::Mutex::new(None),
         parent_interleaving: std::sync::Mutex::new(None),
+        stop_automation_on_fresh_evidence: None,
     };
 
     let workflow = automate_item_with_database_policy(DatabaseAutomationRequest {
@@ -217,8 +223,10 @@ async fn automation_waits_for_review_when_merge_evidence_is_not_approved() {
         client: &client,
         host_id: TEST_HOST_ID,
         expected_parent: None,
+        session: None,
     })
-    .await;
+    .await
+    .expect("run GitHub automation");
 
     assert_eq!(
         workflow.current_step_id.as_deref(),
@@ -300,6 +308,7 @@ async fn automation_waits_for_commits_before_opening_a_pull_request() {
         merge_calls: std::sync::Mutex::new(0),
         ready_error: std::sync::Mutex::new(None),
         parent_interleaving: std::sync::Mutex::new(None),
+        stop_automation_on_fresh_evidence: None,
     };
 
     let workflow = automate_item_with_database_policy(DatabaseAutomationRequest {
@@ -311,8 +320,10 @@ async fn automation_waits_for_commits_before_opening_a_pull_request() {
         client: &client,
         host_id: TEST_HOST_ID,
         expected_parent: None,
+        session: None,
     })
-    .await;
+    .await
+    .expect("run GitHub automation");
 
     assert_eq!(
         workflow.current_step_id.as_deref(),

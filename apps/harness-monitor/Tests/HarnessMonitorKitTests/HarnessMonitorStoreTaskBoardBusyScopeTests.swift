@@ -68,6 +68,48 @@ struct HarnessMonitorStoreTaskBoardBusyScopeTests {
     #expect(store.contentUI.dashboard.isTaskBoardBusy == false)
   }
 
+  @Test("Run Once publishes a dedicated cancellable state until completion")
+  func runOncePublishesCancellableState() async {
+    let client = RecordingHarnessClient()
+    client.configureTaskBoardRunOnceDelay(.milliseconds(250))
+    let store = await makeBootstrappedStore(client: client)
+    store.stopGlobalStream()
+
+    let run = Task { @MainActor in
+      await store.runTaskBoardOrchestratorOnce()
+    }
+
+    let observed = await waitUntil {
+      store.contentUI.dashboard.isTaskBoardRunOnceInFlight
+    }
+    #expect(observed)
+    #expect(store.isTaskBoardRunOnceInFlight)
+
+    _ = await run.value
+
+    #expect(!store.isTaskBoardRunOnceInFlight)
+    #expect(!store.contentUI.dashboard.isTaskBoardRunOnceInFlight)
+  }
+
+  @Test("Cancelling a queued Run Once reservation prevents daemon execution")
+  func cancellingQueuedRunOnceReservationPreventsExecution() async throws {
+    let client = RecordingHarnessClient()
+    let store = await makeBootstrappedStore(client: client)
+    store.stopGlobalStream()
+    let reservation = try #require(store.reserveTaskBoardRunOnceAction())
+
+    #expect(store.cancelTaskBoardRunOnceReservation(reservation))
+    #expect(!store.isTaskBoardRunOnceInFlight)
+    let succeeded = await store.runTaskBoardOrchestratorOnce(reservation: reservation)
+    #expect(!succeeded)
+
+    let runOnceCalls = client.recordedCalls().filter {
+      if case .runTaskBoardOrchestratorOnce = $0 { return true }
+      return false
+    }
+    #expect(runOnceCalls.isEmpty)
+  }
+
   @Test("Deleting a task board item flips isTaskBoardBusy on then off")
   func taskBoardDeletionFlipsTaskBoardBusy() async {
     let client = RecordingHarnessClient()

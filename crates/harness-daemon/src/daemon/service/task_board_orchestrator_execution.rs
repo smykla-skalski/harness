@@ -42,7 +42,9 @@ pub(super) async fn run_dispatch_phase(
 pub(super) async fn run_evaluation_phase(
     db: &AsyncDaemonDb,
     prepared: &TaskBoardOrchestratorPreparedRun,
+    session: Option<&TaskBoardAutomationRunSession>,
 ) -> Result<TaskBoardEvaluationSummary, CliError> {
+    ensure_active(session).await?;
     record_tick(
         db,
         &prepared.run_id,
@@ -53,6 +55,7 @@ pub(super) async fn run_evaluation_phase(
     .await?;
     let mut combined = TaskBoardEvaluationSummary::default();
     for item_id in &prepared.candidate_item_ids {
+        ensure_active(session).await?;
         let summary = evaluate_task_board_async(
             &TaskBoardEvaluateRequest {
                 item_id: Some(item_id.clone()),
@@ -73,13 +76,15 @@ pub(super) async fn run_publish_phase(
     db: &AsyncDaemonDb,
     settings: &TaskBoardOrchestratorSettings,
     prepared: &TaskBoardOrchestratorPreparedRun,
+    session: Option<&TaskBoardAutomationRunSession>,
 ) -> Result<(), CliError> {
-    let mut items = load_candidate_items(db, &prepared.candidate_item_ids).await?;
+    ensure_active(session).await?;
+    let mut items = load_candidate_items(db, &prepared.candidate_item_ids, session).await?;
     items.retain(|item| {
         !(matches!(item.workflow_kind, TaskBoardWorkflowKind::Review)
             || item.workflow_kind.is_read_only_review())
     });
-    run_task_board_github_automation_async(settings, &prepared.input, &items, db).await
+    run_task_board_github_automation_async(settings, &prepared.input, &items, db, session).await
 }
 
 fn merge_evaluation(
@@ -95,12 +100,23 @@ fn merge_evaluation(
 async fn load_candidate_items(
     db: &AsyncDaemonDb,
     item_ids: &[String],
+    session: Option<&TaskBoardAutomationRunSession>,
 ) -> Result<Vec<TaskBoardItem>, CliError> {
     let mut items = Vec::with_capacity(item_ids.len());
     for item_id in item_ids {
+        ensure_active(session).await?;
         items.push(
             super::task_board_repository_scope::scoped_task_board_item_db(db, item_id).await?,
         );
     }
     Ok(items)
+}
+
+async fn ensure_active(
+    session: Option<&TaskBoardAutomationRunSession>,
+) -> Result<(), CliError> {
+    if let Some(session) = session {
+        session.ensure_active().await?;
+    }
+    Ok(())
 }

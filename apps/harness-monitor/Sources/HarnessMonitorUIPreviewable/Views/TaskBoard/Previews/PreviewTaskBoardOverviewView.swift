@@ -27,7 +27,11 @@ private struct TaskBoardOrchestratorControlsPreview: View {
 
   var body: some View {
     TaskBoardOrchestratorSummaryView(
-      status: TaskBoardPreviewFixtures.orchestratorStatus(dryRunDefault: true),
+      status: TaskBoardPreviewFixtures.orchestratorStatus(
+        dryRunDefault: true
+      ),
+      isActionInFlight: true,
+      isRunOnceInFlight: true,
       actions: TaskBoardOverviewActions(
         store: TaskBoardPreviewFixtures.store,
         scope: .dashboard
@@ -36,6 +40,31 @@ private struct TaskBoardOrchestratorControlsPreview: View {
     )
     .padding(24)
     .frame(width: 1_120, height: 180)
+    .background(Color(nsColor: .windowBackgroundColor))
+  }
+}
+
+private struct TaskBoardItemRunOnceControlsPreview: View {
+  @Environment(\.fontScale)
+  private var fontScale
+
+  var body: some View {
+    TaskBoardItemLiveActionButtons(
+      item: TaskBoardPreviewFixtures.runOnceItem,
+      metrics: TaskBoardOverviewMetrics(fontScale: fontScale),
+      captionFont: HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale),
+      isActionInFlight: true,
+      isRunOnceInFlight: true,
+      runOnceDryRun: true,
+      evaluateDryRun: true,
+      actions: TaskBoardOverviewActions(
+        store: TaskBoardPreviewFixtures.store,
+        scope: .dashboard
+      ),
+      evaluatePreviewState: TaskBoardEvaluatePreviewState()
+    )
+    .padding(24)
+    .frame(width: 520, height: 96, alignment: .leading)
     .background(Color(nsColor: .windowBackgroundColor))
   }
 }
@@ -52,9 +81,19 @@ private enum TaskBoardPreviewFixtures {
     blocked: 1
   )
 
+  @MainActor static var runOnceItem: TaskBoardItem {
+    guard let item = store.globalTaskBoardItems.first else {
+      preconditionFailure("task-board preview requires one item")
+    }
+    return item
+  }
+
   static let orchestratorStatus = orchestratorStatus(dryRunDefault: false)
 
-  static func orchestratorStatus(dryRunDefault: Bool) -> TaskBoardOrchestratorStatus {
+  static func orchestratorStatus(
+    dryRunDefault: Bool,
+    automation: TaskBoardAutomationSnapshot? = nil
+  ) -> TaskBoardOrchestratorStatus {
     TaskBoardOrchestratorStatus(
       enabled: true,
       running: false,
@@ -62,6 +101,7 @@ private enum TaskBoardPreviewFixtures {
         TaskBoardWorkflowExecutionCount(status: .running, count: 1),
         TaskBoardWorkflowExecutionCount(status: .paused, count: 1),
       ],
+      automation: automation,
       settings: TaskBoardOrchestratorSettings(
         enabledWorkflows: [.defaultTask, .prReview],
         dryRunDefault: dryRunDefault,
@@ -175,6 +215,48 @@ public enum TaskBoardOrchestratorControlsPreviewRenderer {
         textSizeIndex: HarnessMonitorTextSize.scales.count - 1,
         directory: directory
       )
+      && renderItemControls(
+        name: "item-run-once-controls-default",
+        textSizeIndex: HarnessMonitorTextSize.defaultIndex,
+        directory: directory
+      )
+      && renderItemControls(
+        name: "item-run-once-controls-largest-text",
+        textSizeIndex: HarnessMonitorTextSize.scales.count - 1,
+        directory: directory
+      )
+  }
+
+  private static func renderItemControls(
+    name: String,
+    textSizeIndex: Int,
+    directory: String
+  ) -> Bool {
+    let content = TaskBoardItemRunOnceControlsPreview()
+      .harnessPreviewSceneAppearance(textSizeIndex: textSizeIndex)
+    let view = NSHostingView(rootView: content)
+    view.setFrameSize(NSSize(width: 520, height: 96))
+    view.layoutSubtreeIfNeeded()
+
+    guard let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) else {
+      return false
+    }
+    view.cacheDisplay(in: view.bounds, to: bitmap)
+    guard let data = bitmap.representation(using: .png, properties: [:]), !data.isEmpty else {
+      return false
+    }
+
+    do {
+      try data.write(
+        to: URL(fileURLWithPath: directory)
+          .appendingPathComponent(name)
+          .appendingPathExtension("png"),
+        options: .atomic
+      )
+      return true
+    } catch {
+      return false
+    }
   }
 
   private static func render(

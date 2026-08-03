@@ -272,6 +272,18 @@ extension RecordingHarnessClient {
     }
   }
 
+  func configureTaskBoardRunOnceError(_ error: (any Error)?) {
+    lock.withLock {
+      taskBoardRunOnceError = error
+    }
+  }
+
+  func configureTaskBoardRunOnceDelay(_ delay: Duration?) {
+    lock.withLock {
+      taskBoardRunOnceDelay = delay
+    }
+  }
+
   func configureTaskBoardGitHubTokensSyncError(_ error: (any Error)?) {
     lock.withLock {
       taskBoardGitHubTokensSyncError = error

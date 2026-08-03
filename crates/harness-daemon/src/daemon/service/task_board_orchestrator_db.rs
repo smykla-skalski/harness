@@ -140,12 +140,12 @@ async fn execute_run(
     progress.0 = Some(dispatch.clone());
 
     begin_stage(session, 4, "evaluation").await?;
-    let evaluation = run_evaluation_phase(db, prepared).await;
+    let evaluation = run_evaluation_phase(db, prepared, session).await;
     let evaluation = finish_stage(session, 4, "evaluation", evaluation).await?;
     progress.1 = Some(evaluation.clone());
 
     begin_stage(session, 5, "publish").await?;
-    let publish = run_publish_phase(db, settings, prepared).await;
+    let publish = run_publish_phase(db, settings, prepared, session).await;
     finish_stage(session, 5, "publish", publish).await?;
     Ok((dispatch, evaluation))
 }

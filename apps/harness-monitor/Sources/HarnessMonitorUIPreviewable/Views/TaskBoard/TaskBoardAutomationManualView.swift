@@ -56,7 +56,7 @@ struct TaskBoardAutomationManualView: View {
             accessibilityIdentifier: "harness.task-board.automation.stop",
             help: "Stop task-board automation after current work drains"
           ),
-          blockedReason: controlBlockedReason
+          blockedReason: stopBlockedReason
         )
         controlButton(
           action: .runOnce,
@@ -93,6 +93,11 @@ struct TaskBoardAutomationManualView: View {
   private var forceCancelBlockedReason: String? {
     guard isPresentationCurrent else { return "Automation status is updating" }
     return presentation.controlAvailability.forceCancelBlockedReason
+  }
+
+  private var stopBlockedReason: String? {
+    guard isPresentationCurrent else { return "Automation status is updating" }
+    return presentation.controlAvailability.stopBlockedReason
   }
 
   private func requestForceCancel(_ target: TaskBoardAutomationCancelTarget) {
@@ -136,7 +141,7 @@ struct TaskBoardAutomationManualView: View {
     )
     .harnessNativeFormControl()
     .controlSize(HarnessMonitorControlMetrics.compactControlSize)
-    .disabled(blockedReason != nil || activeAction != nil)
+    .disabled(blockedReason != nil || activeActionBlocks(action))
     .help(blockedReason ?? descriptor.help)
     .accessibilityLabel(
       activeAction == action
@@ -144,5 +149,10 @@ struct TaskBoardAutomationManualView: View {
         : descriptor.title
     )
     .accessibilityIdentifier(descriptor.accessibilityIdentifier)
+  }
+
+  private func activeActionBlocks(_ action: TaskBoardAutomationInspectorAction) -> Bool {
+    guard let activeAction else { return false }
+    return !(activeAction == .runOnce && action == .stop)
   }
 }

@@ -73,7 +73,7 @@ struct TaskBoardAutomationPresentationTests {
     #expect(presentation.controlAvailability.controlBlockedReason == nil)
   }
 
-  @Test("Controls require fresh status, connectivity, write access, and an idle daemon")
+  @Test("Cancellation remains available while another daemon action is active")
   func controlGatingUsesIndependentContract() async {
     let missing = await availability(snapshot: nil)
     let offline = await availability(snapshot: snapshot(), isOnline: false)
@@ -86,7 +86,8 @@ struct TaskBoardAutomationPresentationTests {
     #expect(operatorOnly.controlBlockedReason == nil)
     #expect(operatorOnly.forceCancelBlockedReason == "Force cancel requires admin access")
     #expect(busy.controlBlockedReason != nil)
-    #expect(busy.forceCancelBlockedReason != nil)
+    #expect(busy.stopBlockedReason == nil)
+    #expect(busy.forceCancelBlockedReason == nil)
 
     let stale = await availability(
       snapshot: snapshot(
@@ -106,6 +107,20 @@ struct TaskBoardAutomationPresentationTests {
     #expect(available.controlBlockedReason == nil)
     #expect(!available.isSnapshotStale)
     #expect(available.forceCancelBlockedReason == nil)
+  }
+
+  @MainActor
+  @Test("Stop supersedes an in-flight run-once action")
+  func stopSupersedesRunOnce() throws {
+    let state = TaskBoardAutomationInspectorState()
+    let runOnce = try #require(state.beginAction(.runOnce))
+    let stop = try #require(state.beginAction(.stop))
+
+    #expect(!state.isCurrentAction(runOnce))
+    #expect(state.isCurrentAction(stop))
+    #expect(!state.completeAction(runOnce))
+    #expect(state.activeAction == .stop)
+    #expect(state.completeAction(stop))
   }
 
   @Test("Force-cancel presentation preserves every exact target and truncation warning")

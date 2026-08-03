@@ -26,7 +26,7 @@ use pull_request::prepare_pull_request_state;
 
 pub(super) async fn automate_item_with_database_policy(
     request: DatabaseAutomationRequest<'_>,
-) -> TaskBoardWorkflowState {
+) -> Result<TaskBoardWorkflowState, CliError> {
     let context = AutomationContext {
         policy: request.policy,
         config: request.config,
@@ -34,10 +34,12 @@ pub(super) async fn automate_item_with_database_policy(
         client: request.client,
         host_id: request.host_id,
         expected_parent: request.expected_parent,
+        session: request.session,
     };
+    context.ensure_active().await?;
     let mut prepared = match prepare_item(&context, request.dry_run, request.session_worktrees) {
         AutomationFlow::Continue(prepared) => prepared,
-        AutomationFlow::Done(workflow) => return *workflow,
+        AutomationFlow::Done(workflow) => return Ok(*workflow),
     };
     continue_automation(&context, &mut prepared).await
 }
@@ -45,15 +47,17 @@ pub(super) async fn automate_item_with_database_policy(
 async fn continue_automation(
     context: &AutomationContext<'_>,
     prepared: &mut PreparedItem,
-) -> TaskBoardWorkflowState {
-    if let AutomationFlow::Done(workflow) = publish_branch(context, prepared).await {
-        return *workflow;
+) -> Result<TaskBoardWorkflowState, CliError> {
+    if let AutomationFlow::Done(workflow) = publish_branch(context, prepared).await? {
+        return Ok(*workflow);
     }
-    let pull_request_state = match prepare_pull_request_state(context, prepared).await {
+    context.ensure_active().await?;
+    let pull_request_state = match prepare_pull_request_state(context, prepared).await? {
         AutomationFlow::Continue(Some(pull_request_state)) => pull_request_state,
-        AutomationFlow::Continue(None) => return prepared.workflow.clone(),
-        AutomationFlow::Done(workflow) => return *workflow,
+        AutomationFlow::Continue(None) => return Ok(prepared.workflow.clone()),
+        AutomationFlow::Done(workflow) => return Ok(*workflow),
     };
+    context.ensure_active().await?;
     if context.item.status != TaskBoardStatus::Done {
         return sync_labels_for_context(
             context,
@@ -78,7 +82,7 @@ async fn sync_labels_for_context(
     prepared: &mut PreparedItem,
     pr_number: u64,
     desired_labels: BTreeSet<String>,
-) -> TaskBoardWorkflowState {
+) -> Result<TaskBoardWorkflowState, CliError> {
     let decision = action_policy(
         context.policy,
         context.item,
@@ -88,16 +92,21 @@ async fn sync_labels_for_context(
         None,
     );
     if !decision.is_allow() {
-        return policy_blocked(&mut prepared.workflow, PolicyAction::Triage, &decision);
+        return Ok(policy_blocked(
+            &mut prepared.workflow,
+            PolicyAction::Triage,
+            &decision,
+        ));
     }
-    sync_labels(
+    context.ensure_active().await?;
+    Ok(sync_labels(
         context.config,
         context.client,
         pr_number,
         desired_labels,
         &mut prepared.workflow,
     )
-    .await
+    .await)
 }
 
 struct AutomationContext<'a> {
@@ -107,6 +116,16 @@ struct AutomationContext<'a> {
     client: &'a dyn GitHubAutomationClient,
     host_id: &'a str,
     expected_parent: Option<&'a str>,
+    session: Option<&'a super::super::TaskBoardAutomationRunSession>,
+}
+
+impl AutomationContext<'_> {
+    async fn ensure_active(&self) -> Result<(), CliError> {
+        if let Some(session) = self.session {
+            session.ensure_active().await?;
+        }
+        Ok(())
+    }
 }
 
 struct PreparedItem {
@@ -177,7 +196,7 @@ fn prepare_item(
 async fn publish_branch(
     context: &AutomationContext<'_>,
     prepared: &mut PreparedItem,
-) -> AutomationFlow<()> {
+) -> Result<AutomationFlow<()>, CliError> {
     let publication = match branch_publication_async(
         context.client,
         prepared.worktree.clone(),
@@ -189,21 +208,22 @@ async fn publish_branch(
     {
         Ok(publication) => publication,
         Err(error) => {
-            return AutomationFlow::Done(Box::new(failure(
+            return Ok(AutomationFlow::Done(Box::new(failure(
                 &mut prepared.workflow,
                 STEP_PUSH_FAILED,
                 &error,
-            )));
+            ))));
         }
     };
+    context.ensure_active().await?;
     if prepared.workflow.pr_number.is_none() && publication.waiting_for_commits {
-        return AutomationFlow::Done(Box::new(waiting(
+        return Ok(AutomationFlow::Done(Box::new(waiting(
             &mut prepared.workflow,
             STEP_WAITING_FOR_COMMITS,
-        )));
+        ))));
     }
     if !publication.needs_push {
-        return AutomationFlow::Continue(());
+        return Ok(AutomationFlow::Continue(()));
     }
     let decision = action_policy(
         context.policy,
@@ -214,12 +234,13 @@ async fn publish_branch(
         None,
     );
     if !decision.is_allow() {
-        return AutomationFlow::Done(Box::new(policy_blocked(
+        return Ok(AutomationFlow::Done(Box::new(policy_blocked(
             &mut prepared.workflow,
             PolicyAction::PushBranch,
             &decision,
-        )));
+        ))));
     }
+    context.ensure_active().await?;
     if let Err(error) = push_branch_async(
         context.client,
         context.config,
@@ -229,18 +250,19 @@ async fn publish_branch(
     )
     .await
     {
-        return AutomationFlow::Done(Box::new(failure(
+        return Ok(AutomationFlow::Done(Box::new(failure(
             &mut prepared.workflow,
             STEP_PUSH_FAILED,
             &error,
-        )));
+        ))));
     }
+    context.ensure_active().await?;
     step(&mut prepared.workflow, STEP_BRANCH_PUSHED);
     prepared
         .workflow
         .policy_trace_ids
         .push(new_policy_trace_id());
-    AutomationFlow::Continue(())
+    Ok(AutomationFlow::Continue(()))
 }
 
 async fn finish_done_item(
@@ -249,7 +271,7 @@ async fn finish_done_item(
     pr_number: u64,
     pull_request: &GitHubPullRequestHandle,
     desired_labels: BTreeSet<String>,
-) -> TaskBoardWorkflowState {
+) -> Result<TaskBoardWorkflowState, CliError> {
     let watch_checks = context
         .config
         .enabled_automations
@@ -267,10 +289,16 @@ async fn finish_done_item(
         .await
     {
         Ok(evidence) => evidence,
+        Err(error) if error.code() == "KSRCLI092" => return Err(error),
         Err(error) => {
-            return failure(&mut prepared.workflow, STEP_EVIDENCE_FAILED, &error);
+            return Ok(failure(
+                &mut prepared.workflow,
+                STEP_EVIDENCE_FAILED,
+                &error,
+            ));
         }
     };
+    context.ensure_active().await?;
     if auto_merge {
         return auto_merge_item(
             context,
@@ -292,7 +320,7 @@ async fn auto_merge_item(
     pull_request: &GitHubPullRequestHandle,
     evidence: GitHubMergeEvidence,
     mut desired_labels: BTreeSet<String>,
-) -> TaskBoardWorkflowState {
+) -> Result<TaskBoardWorkflowState, CliError> {
     desired_labels.insert(context.config.labels.auto_merge.clone());
     let decision = action_policy(
         context.policy,
@@ -323,7 +351,7 @@ async fn perform_auto_merge(
     pr_number: u64,
     pull_request: &GitHubPullRequestHandle,
     mut desired_labels: BTreeSet<String>,
-) -> TaskBoardWorkflowState {
+) -> Result<TaskBoardWorkflowState, CliError> {
     match fresh_merge_gate(context, pr_number, &pull_request.head_sha).await {
         Ok(MergeGate::Proceed) => {}
         Ok(MergeGate::WaitForChecks) => {
@@ -346,10 +374,16 @@ async fn perform_auto_merge(
                 .push(new_policy_trace_id());
             return sync_labels_for_context(context, prepared, pr_number, desired_labels).await;
         }
+        Err(error) if error.code() == "KSRCLI092" => return Err(error),
         Err(error) => {
-            return failure(&mut prepared.workflow, STEP_EVIDENCE_FAILED, &error);
+            return Ok(failure(
+                &mut prepared.workflow,
+                STEP_EVIDENCE_FAILED,
+                &error,
+            ));
         }
     }
+    context.ensure_active().await?;
     if let Err(error) = context
         .client
         .merge_pull_request(
@@ -360,14 +394,14 @@ async fn perform_auto_merge(
         )
         .await
     {
-        return failure(&mut prepared.workflow, STEP_PR_FAILED, &error);
+        return Ok(failure(&mut prepared.workflow, STEP_PR_FAILED, &error));
     }
     waiting(&mut prepared.workflow, STEP_MERGED);
     prepared
         .workflow
         .policy_trace_ids
         .push(new_policy_trace_id());
-    prepared.workflow.clone()
+    Ok(prepared.workflow.clone())
 }
 
 /// What a fresh pre-merge evidence read means for a managed auto-merge.
@@ -392,6 +426,7 @@ async fn fresh_merge_gate(
         .client
         .read_pull_request_evidence(context.config, pr_number)
         .await?;
+    context.ensure_active().await?;
     match evaluate_action_gates(
         &read,
         verified_head,
@@ -467,7 +502,7 @@ async fn wait_for_merge_evidence(
     pr_number: u64,
     evidence: &GitHubMergeEvidence,
     mut desired_labels: BTreeSet<String>,
-) -> TaskBoardWorkflowState {
+) -> Result<TaskBoardWorkflowState, CliError> {
     if !evidence.checks_green() {
         waiting(&mut prepared.workflow, STEP_WAITING_FOR_CHECKS);
     } else if !evidence.reviewer_verdict_approved() || evidence.unresolved_requested_changes() > 0 {

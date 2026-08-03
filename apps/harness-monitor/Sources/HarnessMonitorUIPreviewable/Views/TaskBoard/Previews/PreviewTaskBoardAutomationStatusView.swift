@@ -85,6 +85,7 @@ private enum TaskBoardAutomationStatusPreviewFixture {
     cancelTargetsTruncated: false,
     controlAvailability: TaskBoardAutomationControlAvailability(
       controlBlockedReason: nil,
+      stopBlockedReason: nil,
       forceCancelBlockedReason: nil,
       isSnapshotStale: false
     ),

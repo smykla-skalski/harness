@@ -136,9 +136,23 @@ extension HarnessMonitorStore {
 
   @discardableResult
   public func runTaskBoardOrchestratorOnce(
-    request: TaskBoardOrchestratorRunOnceRequest = TaskBoardOrchestratorRunOnceRequest()
+    request: TaskBoardOrchestratorRunOnceRequest = TaskBoardOrchestratorRunOnceRequest(),
+    reservation: TaskBoardRunOnceReservation? = nil
   ) async -> Bool {
-    await mutateTaskBoardOrchestrator(actionName: "Ran task board") { client in
+    let acquiredReservation: TaskBoardRunOnceReservation
+    if let suppliedReservation = reservation {
+      acquiredReservation = suppliedReservation
+    } else if let newReservation = reserveTaskBoardRunOnceAction() {
+      acquiredReservation = newReservation
+    } else {
+      return false
+    }
+    guard claimTaskBoardRunOnceAction(acquiredReservation) else { return false }
+    defer { endTaskBoardRunOnceAction(acquiredReservation) }
+    return await mutateTaskBoardOrchestrator(
+      actionName: "Ran task board",
+      suppressExpectedCancellation: true
+    ) { client in
       try await client.runTaskBoardOrchestratorOnce(request: request)
     }
   }

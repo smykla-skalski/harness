@@ -19,6 +19,7 @@ extension HarnessMonitorStore {
     /// separately from `apply(_:)` via `applyTaskBoardBusy(_:)` since it is
     /// derived from store-internal counter state, not `ContentDashboardState`.
     public private(set) var isTaskBoardBusy = false
+    public private(set) var isTaskBoardRunOnceInFlight = false
     public private(set) var taskBoardSyncPhase = TaskBoardSyncPhase.idle
     /// Bumps only when `taskBoardItems` or `taskBoardOrchestratorStatus`
     /// actually changed during `apply(_:)`. Cheaper than whole-array
@@ -79,6 +80,10 @@ extension HarnessMonitorStore {
     /// `ContentDashboardState`.
     internal func applyTaskBoardBusy(_ value: Bool) {
       Self.assign(&isTaskBoardBusy, value)
+    }
+
+    internal func applyTaskBoardRunOnceInFlight(_ value: Bool) {
+      Self.assign(&isTaskBoardRunOnceInFlight, value)
     }
 
     internal func applyTaskBoardSyncPhase(_ value: TaskBoardSyncPhase) {

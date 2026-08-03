@@ -42,6 +42,7 @@ extension HarnessMonitorStore {
 
   func mutateTaskBoardOrchestrator(
     actionName: String,
+    suppressExpectedCancellation: Bool = false,
     mutation:
       @escaping @Sendable (any HarnessMonitorClientProtocol) async throws
       -> TaskBoardOrchestratorStatus
@@ -67,9 +68,22 @@ extension HarnessMonitorStore {
       presentSuccessFeedback(actionName)
       return true
     } catch {
+      if suppressExpectedCancellation && Self.isTaskBoardRunCancellation(error) {
+        await refreshTaskBoardDashboardSnapshot(using: client)
+        return false
+      }
       presentFailureFeedback(error.localizedDescription)
       return false
     }
+  }
+
+  nonisolated private static func isTaskBoardRunCancellation(_ error: Error) -> Bool {
+    guard let apiError = error as? HarnessMonitorAPIError,
+      apiError.serverSemanticCode == "KSRCLI092"
+    else {
+      return false
+    }
+    return apiError.serverMessage?.hasSuffix("task-board automation is stopping") == true
   }
 
   func applyTaskBoardDashboardSnapshot(

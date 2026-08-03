@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 import Testing
 
@@ -39,6 +40,27 @@ struct HarnessMonitorAsyncWorkQueueTests {
     #expect(snapshot.maximumActive <= workerCount)
   }
 
+  @Test("queued work never starts on the main thread")
+  func queuedWorkNeverStartsOnTheMainThread() async {
+    let queue = HarnessMonitorAsyncWorkQueue(workerCount: 1)
+    let recorder = AsyncWorkQueueThreadRecorder()
+
+    await queue.enqueue(
+      HarnessMonitorAsyncWorkQueue.WorkItem(title: "thread check") {
+        await recorder.record(isMainThread: pthread_main_np() == 1)
+      }
+    )
+
+    var recorded = await recorder.value()
+    var attempts = 0
+    while recorded == nil && attempts < 200 {
+      try? await Task.sleep(for: .milliseconds(10))
+      recorded = await recorder.value()
+      attempts += 1
+    }
+    #expect(recorded == false)
+  }
+
   private func waitForQueueSnapshot(
     tracker: AsyncWorkQueueConcurrencyTracker,
     expectedCompletions: Int
@@ -51,6 +73,18 @@ struct HarnessMonitorAsyncWorkQueueTests {
       attempts += 1
     }
     return snapshot
+  }
+}
+
+private actor AsyncWorkQueueThreadRecorder {
+  private var isMainThread: Bool?
+
+  func record(isMainThread: Bool) {
+    self.isMainThread = isMainThread
+  }
+
+  func value() -> Bool? {
+    isMainThread
   }
 }
 

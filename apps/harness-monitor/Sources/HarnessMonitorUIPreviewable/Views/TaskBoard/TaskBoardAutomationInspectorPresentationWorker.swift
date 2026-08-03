@@ -303,28 +303,32 @@ actor TaskBoardAutomationInspectorPresentationWorker {
     _ input: TaskBoardAutomationPresentationInput
   ) -> TaskBoardAutomationControlAvailability {
     let isStale = snapshotIsStale(input)
-    let sharedBlockedReason: String?
+    let connectionBlockedReason: String?
     if !input.isOnline {
-      sharedBlockedReason = "Connect to the Harness daemon to control automation"
+      connectionBlockedReason = "Connect to the Harness daemon to control automation"
     } else if input.snapshot == nil {
-      sharedBlockedReason = "Waiting for the pushed automation status"
-    } else if isStale {
-      sharedBlockedReason = "Automation status is stale; wait for a fresh push update"
-    } else if input.isGloballyBusy {
-      sharedBlockedReason = "Another daemon action is in progress"
+      connectionBlockedReason = "Waiting for the pushed automation status"
     } else {
-      sharedBlockedReason = nil
+      connectionBlockedReason = nil
     }
 
+    let freshnessBlockedReason =
+      connectionBlockedReason
+      ?? (isStale ? "Automation status is stale; wait for a fresh push update" : nil)
     let controlBlockedReason =
-      sharedBlockedReason
+      freshnessBlockedReason
+      ?? (input.isGloballyBusy ? "Another daemon action is in progress" : nil)
+      ?? (input.isWriteAuthorized ? nil : "This daemon connection lacks write access")
+    let stopBlockedReason =
+      connectionBlockedReason
       ?? (input.isWriteAuthorized ? nil : "This daemon connection lacks write access")
     let forceCancelBlockedReason =
-      sharedBlockedReason
+      freshnessBlockedReason
       ?? (input.isAdminAuthorized ? nil : "Force cancel requires admin access")
 
     return TaskBoardAutomationControlAvailability(
       controlBlockedReason: controlBlockedReason,
+      stopBlockedReason: stopBlockedReason,
       forceCancelBlockedReason: forceCancelBlockedReason,
       isSnapshotStale: isStale
     )

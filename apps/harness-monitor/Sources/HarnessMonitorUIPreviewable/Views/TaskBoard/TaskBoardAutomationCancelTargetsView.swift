@@ -113,7 +113,7 @@ struct TaskBoardAutomationCancelTargetsView: View {
     if target.cancelPending {
       return "Cancellation is already pending"
     }
-    if activeAction != nil {
+    if activeAction != nil, activeAction != .runOnce {
       return "Another automation action is in progress"
     }
     return blockedReason

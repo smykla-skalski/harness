@@ -41,6 +41,7 @@ pub(super) struct DatabaseAutomationRequest<'a> {
     pub client: &'a dyn GitHubAutomationClient,
     pub host_id: &'a str,
     pub expected_parent: Option<&'a str>,
+    pub session: Option<&'a super::TaskBoardAutomationRunSession>,
 }
 
 pub(crate) async fn run_task_board_github_automation_async(
@@ -48,17 +49,21 @@ pub(crate) async fn run_task_board_github_automation_async(
     input: &TaskBoardOrchestratorDispatchInput,
     items: &[TaskBoardItem],
     async_db: &AsyncDaemonDb,
+    session: Option<&super::TaskBoardAutomationRunSession>,
 ) -> Result<(), CliError> {
+    ensure_active(session).await?;
     let Some(defaults) = automation_config(settings) else {
         return Ok(());
     };
     let prepared = prepare_github_automation(items, async_db).await?;
+    ensure_active(session).await?;
     let policy = prepared.workspace.as_ref().and_then(|workspace| {
         workspace
             .active_live_canvas()
             .map(|(canvas, document)| (canvas.id.as_str(), document))
     });
     for (repository, grouped) in group_items_by_repository(items) {
+        ensure_active(session).await?;
         run_repository_github_automation(RepositoryGitHubAutomationRequest {
             settings,
             defaults: &defaults,
@@ -70,6 +75,7 @@ pub(crate) async fn run_task_board_github_automation_async(
             session_worktrees: &prepared.session_worktrees,
             runtime_config: &prepared.runtime_config,
             host_id: prepared.host_id.as_str(),
+            session,
         })
         .await?;
     }
@@ -116,6 +122,7 @@ struct RepositoryGitHubAutomationRequest<'a> {
     session_worktrees: &'a BTreeMap<String, String>,
     runtime_config: &'a TaskBoardGitRuntimeConfig,
     host_id: &'a str,
+    session: Option<&'a super::TaskBoardAutomationRunSession>,
 }
 
 /// Publish one repository's items, dropping the repository (`Ok(())`) rather
@@ -135,7 +142,9 @@ async fn run_repository_github_automation(
         session_worktrees,
         runtime_config,
         host_id,
+        session,
     } = request;
+    ensure_active(session).await?;
     let Some(token) = github_token_for_repository(Some(repository)) else {
         log_missing_github_token(repository);
         return Ok(());
@@ -150,6 +159,7 @@ async fn run_repository_github_automation(
     else {
         return Ok(());
     };
+    ensure_active(session).await?;
     let config =
         repository_conventions(settings, defaults, repository).for_repository(owner, repo, branch);
     run_task_board_github_automation_with_database_client(
@@ -161,6 +171,7 @@ async fn run_repository_github_automation(
         session_worktrees,
         &client,
         host_id,
+        session,
     )
     .await
 }
@@ -322,8 +333,10 @@ async fn run_task_board_github_automation_with_database_client(
     session_worktrees: &BTreeMap<String, String>,
     client: &dyn GitHubAutomationClient,
     host_id: &str,
+    session: Option<&super::TaskBoardAutomationRunSession>,
 ) -> Result<(), CliError> {
     for item in items {
+        ensure_active(session).await?;
         let workflow = automate_item_with_database_policy(DatabaseAutomationRequest {
             policy,
             config,
@@ -333,8 +346,9 @@ async fn run_task_board_github_automation_with_database_client(
             client,
             host_id,
             expected_parent: None,
+            session,
         })
-        .await;
+        .await?;
         if !input.dry_run && workflow != item.workflow {
             db.update_task_board_item(&item.id, |current| {
                 current.workflow.clone_from(&workflow);
@@ -342,6 +356,15 @@ async fn run_task_board_github_automation_with_database_client(
             })
             .await?;
         }
+    }
+    Ok(())
+}
+
+async fn ensure_active(
+    session: Option<&super::TaskBoardAutomationRunSession>,
+) -> Result<(), CliError> {
+    if let Some(session) = session {
+        session.ensure_active().await?;
     }
     Ok(())
 }

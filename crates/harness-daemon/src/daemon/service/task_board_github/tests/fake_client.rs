@@ -9,6 +9,9 @@ use crate::task_board::github::{
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
 
+use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::task_board::prelude::*;
+
 use super::{git_ref, git_ref_exists, git_tree, remote_repo_path, run_git};
 
 pub(super) struct FakeGitHubClient {
@@ -25,6 +28,7 @@ pub(super) struct FakeGitHubClient {
     pub(super) merge_calls: Mutex<usize>,
     pub(super) ready_error: Mutex<Option<String>>,
     pub(super) parent_interleaving: Mutex<Option<String>>,
+    pub(super) stop_automation_on_fresh_evidence: Option<AsyncDaemonDb>,
 }
 
 #[async_trait::async_trait]
@@ -104,6 +108,9 @@ impl GitHubAutomationClient for FakeGitHubClient {
         config: &GitHubProjectConfig,
         pull_request_number: u64,
     ) -> Result<PullRequestEvidenceRead, CliError> {
+        if let Some(db) = &self.stop_automation_on_fresh_evidence {
+            db.stop_task_board_automation(chrono::Utc::now()).await?;
+        }
         let lifecycle = if self.pull_request.merged {
             PullRequestLifecycle::Merged
         } else if self.pull_request.open {

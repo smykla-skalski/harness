@@ -103,6 +103,7 @@ struct TaskBoardAutomationCancelTargetPresentation: Identifiable, Equatable, Sen
 
 struct TaskBoardAutomationControlAvailability: Equatable, Sendable {
   let controlBlockedReason: String?
+  let stopBlockedReason: String?
   let forceCancelBlockedReason: String?
   let isSnapshotStale: Bool
 }
@@ -158,6 +159,7 @@ struct TaskBoardAutomationPresentation: Equatable, Sendable {
     cancelTargetsTruncated: false,
     controlAvailability: TaskBoardAutomationControlAvailability(
       controlBlockedReason: "Waiting for automation status",
+      stopBlockedReason: "Waiting for automation status",
       forceCancelBlockedReason: "Waiting for automation status",
       isSnapshotStale: true
     ),

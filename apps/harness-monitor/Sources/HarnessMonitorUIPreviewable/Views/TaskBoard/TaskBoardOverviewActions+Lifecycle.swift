@@ -164,8 +164,10 @@ extension TaskBoardOverviewActions {
     )
   }
 
+  @MainActor
   func stopTaskBoardOrchestrator() {
     guard canStopOrchestrator, let store else { return }
+    store.cancelPendingTaskBoardRunOnceActions()
     HarnessMonitorAsyncWorkQueue.shared.submit(
       .init(title: "Stopping task board orchestrator") {
         await store.stopTaskBoardOrchestrator()
@@ -173,13 +175,26 @@ extension TaskBoardOverviewActions {
     )
   }
 
-  func runTaskBoardOrchestratorOnce(_ request: TaskBoardOrchestratorRunOnceRequest) {
-    guard let store else { return }
+  @MainActor
+  func cancelTaskBoardOrchestratorRun() {
+    guard canCancelOrchestratorRun, let store else { return }
+    store.cancelPendingTaskBoardRunOnceActions()
     HarnessMonitorAsyncWorkQueue.shared.submit(
-      .init(
-        title: request.dryRun == true ? "Previewing task board run" : "Running task board once"
-      ) {
-        await store.runTaskBoardOrchestratorOnce(request: request)
+      .init(title: "Stopping task board run") {
+        await store.stopTaskBoardOrchestrator()
+      }
+    )
+  }
+
+  @MainActor
+  func runTaskBoardOrchestratorOnce(_ request: TaskBoardOrchestratorRunOnceRequest) {
+    guard let store, let reservation = store.reserveTaskBoardRunOnceAction() else { return }
+    HarnessMonitorAsyncWorkQueue.shared.submit(
+      .init(title: "Running task board once") {
+        await store.runTaskBoardOrchestratorOnce(
+          request: request,
+          reservation: reservation
+        )
       }
     )
   }

@@ -128,8 +128,10 @@ async fn default_publication_rejects_same_tree_parent_drift_before_noop() {
         client: &client,
         host_id: HOST_ID,
         expected_parent: Some(&fixture.base),
+        session: None,
     })
-    .await;
+    .await
+    .expect("run GitHub automation");
 
     let error = workflow.last_error.as_deref().expect("parent drift error");
     assert!(error.contains("publication parent changed"), "{error}");
@@ -165,8 +167,10 @@ async fn default_publication_uses_canonical_repository_and_frozen_worktree() {
         client: &client,
         host_id: HOST_ID,
         expected_parent: Some(&fixture.base),
+        session: None,
     })
-    .await;
+    .await
+    .expect("run GitHub automation");
 
     assert!(workflow.last_error.is_none(), "{:?}", workflow.last_error);
     assert_eq!(
@@ -204,8 +208,10 @@ async fn post_create_metadata_failure_keeps_authoritative_identity() {
         client: &client,
         host_id: HOST_ID,
         expected_parent: Some(&fixture.base),
+        session: None,
     })
-    .await;
+    .await
+    .expect("run GitHub automation");
 
     assert!(workflow.last_error.is_some());
     assert_eq!(workflow.pr_number, Some(42));
@@ -322,6 +328,7 @@ impl PublicationFixture {
             merge_calls: Mutex::new(0),
             ready_error: Mutex::new(None),
             parent_interleaving: Mutex::new(None),
+            stop_automation_on_fresh_evidence: None,
         }
     }
 

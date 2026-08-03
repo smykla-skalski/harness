@@ -24,7 +24,7 @@ enum TaskBoardOverviewLiveOperation {
     case .start:
       "Start Live"
     case .runOnce:
-      "Run Once Live"
+      "Run Once"
     }
   }
 

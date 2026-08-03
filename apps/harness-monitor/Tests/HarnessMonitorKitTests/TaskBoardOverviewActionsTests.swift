@@ -7,6 +7,52 @@ import Testing
 @MainActor
 @Suite("Task board overview actions")
 struct TaskBoardOverviewActionsTests {
+  @Test("Run Once reserves control state before queue execution")
+  func runOnceReservesBeforeQueueExecution() async {
+    let client = RecordingHarnessClient()
+    client.configureTaskBoardRunOnceDelay(.milliseconds(250))
+    let store = await makeBootstrappedStore(client: client)
+    store.stopGlobalStream()
+    let actions = TaskBoardOverviewActions(store: store, scope: .dashboard)
+    let request = TaskBoardOrchestratorRunOnceRequest(dryRun: true)
+
+    actions.runTaskBoardOrchestratorOnce(request)
+
+    #expect(store.isTaskBoardRunOnceInFlight)
+    #expect(store.contentUI.dashboard.isTaskBoardRunOnceInFlight)
+
+    actions.runTaskBoardOrchestratorOnce(request)
+
+    let completed = await waitUntil(timeout: .seconds(2)) {
+      !store.isTaskBoardRunOnceInFlight
+    }
+    let runOnceCalls = client.recordedCalls().filter {
+      if case .runTaskBoardOrchestratorOnce = $0 { return true }
+      return false
+    }
+
+    #expect(completed)
+    #expect(runOnceCalls.count == 1)
+  }
+
+  @Test("Run cancellation is available from dashboard and session task-board surfaces")
+  func runCancellationCapabilityFollowsStorePresence() {
+    let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .empty)
+
+    #expect(
+      TaskBoardOverviewActions(store: store, scope: .dashboard).canCancelOrchestratorRun
+    )
+    #expect(
+      TaskBoardOverviewActions(
+        store: store,
+        scope: .session(sessionID: "session-a")
+      ).canCancelOrchestratorRun
+    )
+    #expect(
+      !TaskBoardOverviewActions(store: nil, scope: .dashboard).canCancelOrchestratorRun
+    )
+  }
+
   @Test("Stale api move is rejected")
   func staleAPIMoveRejected() {
     let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .empty)

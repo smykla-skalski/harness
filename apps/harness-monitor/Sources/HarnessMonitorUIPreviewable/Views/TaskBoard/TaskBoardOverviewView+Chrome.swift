@@ -14,6 +14,7 @@ extension TaskBoardOverviewView {
             latestEvaluationBaselineRunID: store?.contentUI.dashboard
               .taskBoardEvaluationBaselineRunID,
             isActionInFlight: isActionInFlight,
+            isRunOnceInFlight: actions.isRunOnceInFlight,
             actions: actions,
             pendingLiveOperation: pendingLiveOperationBinding
           )

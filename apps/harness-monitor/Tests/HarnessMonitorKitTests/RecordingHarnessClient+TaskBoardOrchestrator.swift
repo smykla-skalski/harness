@@ -321,6 +321,10 @@ extension RecordingHarnessClient {
         projectDir: request.projectDir
       )
     )
+    try await sleepIfNeeded(lock.withLock { taskBoardRunOnceDelay })
+    if let error = lock.withLock({ taskBoardRunOnceError }) {
+      throw error
+    }
     return sampleTaskBoardOrchestratorStatus()
   }
 

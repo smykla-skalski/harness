@@ -253,8 +253,9 @@ async fn publish_default_task(
         client: &publication.client,
         host_id: WRITE_PUBLICATION_HOST,
         expected_parent: Some(&preflight.expected_parent),
+        session: None,
     })
-    .await;
+    .await?;
     default_publication_result(
         &workflow,
         execution

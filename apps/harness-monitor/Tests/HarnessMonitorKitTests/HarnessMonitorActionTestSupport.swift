@@ -93,6 +93,8 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var taskUpdateError: (any Error)?
   var taskBoardRuntimeConfigError: (any Error)?
   var taskBoardOrchestratorSettingsError: (any Error)?
+  var taskBoardRunOnceError: (any Error)?
+  var taskBoardRunOnceDelay: Duration?
   var taskBoardOrchestratorSettingsResponse: TaskBoardOrchestratorSettings?
   let orchestratorSettingsMutationGate =
     RecordingTaskBoardOrchestratorSettingsMutationGate()
