@@ -45,8 +45,6 @@ struct ReviewsFilesRerouteContractTests {
     #expect(response.pullRequestID == "PR_kwReview1")
     #expect(response.number == 42)
     #expect(response.headRefOid == "abc123")
-    #expect(response.headRefName == "feature/x")
-    #expect(response.baseRefOid == "def456")
     #expect(response.viewerCanMarkViewed)
     #expect(response.fetchedAt == "2026-05-22T10:00:00Z")
     #expect(response.paginationComplete)
@@ -111,7 +109,7 @@ struct ReviewsFilesRerouteContractTests {
     let patch = response.patches.first
     #expect(patch?.path == "src/main.rs")
     #expect(patch?.status == .modified)
-    #expect(patch?.servedBy == .localClone)
+    #expect(patch?.servedBy == .githubRest)
     #expect(patch?.additions == 1)
     #expect(patch?.deletions == 1)
     #expect(patch?.etag == "abc-etag")
@@ -190,7 +188,7 @@ struct ReviewsFilesRerouteContractTests {
     let preview = response.previews.first
     #expect(preview?.path == "src/lib.rs")
     #expect(preview?.status == .modified)
-    #expect(preview?.servedBy == .localClone)
+    #expect(preview?.servedBy == .githubRest)
     #expect(preview?.lineCount == 3)
     #expect(preview?.lineLimit == 1000)
     #expect(preview?.hasMore == false)

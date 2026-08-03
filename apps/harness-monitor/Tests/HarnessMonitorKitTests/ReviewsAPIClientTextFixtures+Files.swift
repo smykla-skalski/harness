@@ -26,7 +26,6 @@ let sampleReviewsCommentResponseText =
     ]
   }
   """
-
 let sampleReviewsTimelineResponseText =
   """
   {
@@ -186,9 +185,6 @@ let sampleReviewsFilesListResponseText =
     "pull_request_id": "PR_kwReview1",
     "number": 42,
     "head_ref_oid": "abc123",
-    "head_ref_name": "feature/x",
-    "base_ref_oid": "def456",
-    "base_ref_name": "main",
     "repository_full_name": "example/harness",
     "viewer_can_mark_viewed": true,
     "files": [
@@ -228,7 +224,7 @@ let sampleReviewsFilesPatchResponseText =
         "deletions": 1,
         "truncated": false,
         "etag": "abc-etag",
-        "served_by": "local_clone",
+        "served_by": "github_rest",
         "fetched_at": "2026-05-22T10:00:00Z",
         "head_ref_oid": "abc123"
       }
@@ -258,7 +254,7 @@ let sampleReviewsFilesPreviewResponseText =
         "deletions": 1,
         "truncated": false,
         "etag": "preview-etag",
-        "served_by": "local_clone",
+        "served_by": "github_rest",
         "fetched_at": "2026-05-22T10:00:00Z",
         "head_ref_oid": "abc123",
         "line_count": 3,
@@ -312,5 +308,3 @@ let sampleReviewsFilesBlobResponseText =
     }
   }
   """
-
-

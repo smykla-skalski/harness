@@ -2652,8 +2652,6 @@ const REVIEWS_FILES_BLOB_SOURCE: &str =
     include_str!("../crates/harness-protocol/src/daemon/reviews/files/blob.rs");
 const REVIEWS_FILES_VIEWED_SOURCE: &str =
     include_str!("../crates/harness-protocol/src/daemon/reviews/files/viewed.rs");
-const REVIEWS_FILES_LOCAL_CLONE_SOURCE: &str =
-    include_str!("../crates/harness-protocol/src/daemon/reviews/files/local_clone.rs");
 // reviews timeline: the PR timeline entries. ReviewTimelineEntry is internally
 // tagged (tag="kind") wrapping newtype entry structs (the generator re-inlines
 // the payload alongside the tag); the entries carry chrono DateTime, a boxed
@@ -3500,13 +3498,12 @@ fn modules() -> Vec<GeneratedModule> {
         },
         GeneratedModule {
             output: "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/ReviewsFilesWireTypes.generated.swift",
-            description: "the Rust reviews file list, patch, preview, blob, viewed and local-clone types",
+            description: "the Rust reviews file list, patch, preview, blob and viewed types",
             defaults: &[REVIEWS_FILES_MOD_SOURCE],
             sources: &[
                 REVIEWS_FILES_MOD_SOURCE,
                 REVIEWS_FILES_BLOB_SOURCE,
                 REVIEWS_FILES_VIEWED_SOURCE,
-                REVIEWS_FILES_LOCAL_CLONE_SOURCE,
             ],
         },
         GeneratedModule {
@@ -3859,12 +3856,6 @@ fn modules() -> Vec<GeneratedModule> {
             ],
         },
         GeneratedModule {
-            output: LOCAL_CLONE_PROGRESS_OUTPUT,
-            description: "the Rust reviews local-clone progress push payload",
-            defaults: &[],
-            sources: &[LOCAL_CLONE_PROGRESS_SOURCE],
-        },
-        GeneratedModule {
             output: WORKING_COPY_PROGRESS_OUTPUT,
             description: "the Rust task-board working-copy obtain progress push payload",
             defaults: &[],
@@ -3939,7 +3930,6 @@ fn generate_module(module: &GeneratedModule) -> String {
         GIT_SIGNING_VERIFY_OUTPUT => GIT_SIGNING_VERIFY_EMIT_ONLY,
         ACP_EVENT_BATCH_OUTPUT => ACP_EVENT_BATCH_EMIT_ONLY,
         ACP_INCIDENT_OUTPUT => ACP_INCIDENT_EMIT_ONLY,
-        LOCAL_CLONE_PROGRESS_OUTPUT => LOCAL_CLONE_PROGRESS_EMIT_ONLY,
         WORKING_COPY_PROGRESS_OUTPUT => WORKING_COPY_PROGRESS_EMIT_ONLY,
         _ => &[],
     };

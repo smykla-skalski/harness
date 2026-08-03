@@ -33,9 +33,6 @@ public struct ReviewsFilesListResponse: Codable, Equatable, Sendable {
   public let pullRequestID: String
   public let number: UInt64?
   public let headRefOid: String
-  /// PR's source branch name (`refs/heads/<x>` qualifier dropped).
-  /// Optional for back-compat with older daemons that don't emit it.
-
   /// `owner/name` of the repository the PR lives in.
   public let repositoryFullName: String?
   public let viewerCanMarkViewed: Bool
@@ -100,11 +97,9 @@ public struct ReviewsFilesPatchRequest: Codable, Equatable, Sendable {
   public let pullRequestID: String
   public let headRefOidExpected: String
   public let paths: [String]
-  /// Pull request number. Enables the daemon to fetch GitHub's synthetic
-  /// `refs/pull/<number>/head` ref, which works for forks and same-repo PRs.
+  /// Pull request number used by the GitHub REST files endpoint.
   public let number: UInt64?
-  /// `owner/name` of the repository. Enables the daemon's local-clone
-  /// dispatch path. Optional only for back-compat with older callers.
+  /// `owner/name` of the repository used by the GitHub REST files endpoint.
   public let repositoryFullName: String?
 
   public init(

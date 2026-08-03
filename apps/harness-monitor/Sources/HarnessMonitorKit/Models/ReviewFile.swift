@@ -40,7 +40,6 @@ public enum HarnessReviewFileLanguage: String, Codable, Equatable, Sendable, Cas
   case xml
   case yaml
 }
-
 /// Image MIME types the Files section previews inline.
 public enum HarnessReviewImageMime: String, Codable, Equatable, Sendable {
   case png
@@ -141,4 +140,3 @@ public struct ReviewsRateLimitSnapshot: Codable, Equatable, Sendable {
     self.cost = cost
   }
 }
-

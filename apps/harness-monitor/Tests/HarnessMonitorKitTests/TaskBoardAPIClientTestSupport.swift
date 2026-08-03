@@ -204,5 +204,5 @@ private let taskBoardRPCResponses: [WebSocketRPCMethod: JSONValue] = [
   .reviewsFilesPreview: fixtureJSONValue(sampleReviewsFilesPreviewResponseText),
   .reviewsFilesViewed: fixtureJSONValue(sampleReviewsFilesViewedResponseText),
   .reviewsFilesBlob: fixtureJSONValue(sampleReviewsFilesBlobResponseText),
-.reviewsTimeline: fixtureJSONValue(sampleReviewsTimelineResponseText),
+  .reviewsTimeline: fixtureJSONValue(sampleReviewsTimelineResponseText),
 ]

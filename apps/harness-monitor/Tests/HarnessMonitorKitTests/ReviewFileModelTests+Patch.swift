@@ -4,25 +4,19 @@ import XCTest
 @testable import HarnessMonitorKit
 
 final class ReviewFileModelPatchTests: XCTestCase {
-  func testFilesPatchRequestCarriesLocalCloneContext() throws {
+  func testFilesPatchRequestCarriesGitHubRestContext() throws {
     let request = ReviewsFilesPatchRequest(
       pullRequestID: "PR_1",
       headRefOidExpected: "head",
       paths: ["src/lib.rs"],
       number: 42,
-      repositoryFullName: "owner/repo",
-      baseRefOidExpected: "base",
-      headRefName: "renovate/foo",
-      baseRefName: "main"
+      repositoryFullName: "owner/repo"
     )
     let data = try JSONEncoder().encode(request)
     let parsed = try JSONDecoder().decode(
       ReviewsFilesPatchRequest.self, from: data)
     XCTAssertEqual(parsed.number, 42)
     XCTAssertEqual(parsed.repositoryFullName, "owner/repo")
-    XCTAssertEqual(parsed.baseRefOidExpected, "base")
-    XCTAssertEqual(parsed.headRefName, "renovate/foo")
-    XCTAssertEqual(parsed.baseRefName, "main")
   }
 
   func testFilesViewedRoundTrips() throws {
@@ -62,7 +56,7 @@ final class ReviewFileModelPatchTests: XCTestCase {
   }
 
   func testServedByValueRoundTripsSnakeCase() throws {
-    let encoded = try JSONEncoder().encode(ReviewFileServedBy.githubRestFallback)
-    XCTAssertEqual(String(bytes: encoded, encoding: .utf8), "\"github_rest_fallback\"")
+    let encoded = try JSONEncoder().encode(ReviewFileServedBy.githubRest)
+    XCTAssertEqual(String(bytes: encoded, encoding: .utf8), "\"github_rest\"")
   }
 }

@@ -37,6 +37,7 @@ mod auth_audit;
 pub mod companion;
 mod core;
 mod improver;
+mod legacy_reviews_cleanup;
 mod managed_agents;
 pub mod openapi;
 mod openrouter_models;
@@ -235,6 +236,19 @@ where
     L::Addr: Debug,
     for<'a> DaemonConnectInfo: Connected<IncomingStream<'a, L>>,
 {
+    match legacy_reviews_cleanup::remove_legacy_reviews_clones().await {
+        Ok(true) => tracing::info!(
+            target = "harness::daemon::startup",
+            "removed legacy reviews clone data"
+        ),
+        Ok(false) => {}
+        Err(error) => tracing::warn!(
+            target = "harness::daemon::startup",
+            error = %error,
+            "failed to remove legacy reviews clone data"
+        ),
+    }
+
     // Hand the broadcast sender to the task-board working-copies module so
     // working-copy progress events surface on the same WS push channel.
     register_task_board_working_copy_progress_sender(state.sender.clone());
