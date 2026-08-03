@@ -1,10 +1,10 @@
 import HarnessMonitorKit
 import SwiftUI
 
-public struct SettingsView: View {
+public struct SettingsView<MobilePairingContent: View>: View {
   let store: HarnessMonitorStore
   let notifications: HarnessMonitorUserNotificationController
-  let mobilePairingContent: (@MainActor @Sendable () -> AnyView)?
+  let mobilePairingContent: (@MainActor @Sendable () -> MobilePairingContent)?
   @Binding var themeMode: HarnessMonitorThemeMode
   @Binding var selectedSection: SettingsSection
   @Binding var navigationRequest: SettingsNavigationRequest?
@@ -14,7 +14,7 @@ public struct SettingsView: View {
   public init(
     store: HarnessMonitorStore,
     notifications: HarnessMonitorUserNotificationController,
-    mobilePairingContent: (@MainActor @Sendable () -> AnyView)? = nil,
+    mobilePairingContent: (@MainActor @Sendable () -> MobilePairingContent)?,
     themeMode: Binding<HarnessMonitorThemeMode>,
     selectedSection: Binding<SettingsSection>,
     navigationRequest: Binding<SettingsNavigationRequest?> = .constant(nil)
@@ -101,5 +101,24 @@ public struct SettingsView: View {
       }
       .sharedBackgroundVisibility(.hidden)
     }
+  }
+}
+
+extension SettingsView where MobilePairingContent == EmptyView {
+  public init(
+    store: HarnessMonitorStore,
+    notifications: HarnessMonitorUserNotificationController,
+    themeMode: Binding<HarnessMonitorThemeMode>,
+    selectedSection: Binding<SettingsSection>,
+    navigationRequest: Binding<SettingsNavigationRequest?> = .constant(nil)
+  ) {
+    self.init(
+      store: store,
+      notifications: notifications,
+      mobilePairingContent: nil,
+      themeMode: themeMode,
+      selectedSection: selectedSection,
+      navigationRequest: navigationRequest
+    )
   }
 }

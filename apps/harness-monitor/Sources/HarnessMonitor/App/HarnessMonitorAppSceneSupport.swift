@@ -353,12 +353,12 @@ struct HarnessMonitorSettingsRootView: View {
     HarnessMonitorBackgroundSelection.decode(backgroundImageRawValue)
   }
 
-  var mobilePairingContent: (@MainActor @Sendable () -> AnyView)? {
+  var mobilePairingContent: (@MainActor @Sendable () -> MobileRelayPairingSettingsPanel)? {
     guard let mobileRelayRuntime else {
       return nil
     }
     return { @MainActor @Sendable in
-      AnyView(MobileRelayPairingSettingsPanel(runtime: mobileRelayRuntime))
+      MobileRelayPairingSettingsPanel(runtime: mobileRelayRuntime)
     }
   }
 

@@ -1,11 +1,11 @@
 import SwiftUI
 
-public struct SettingsMobileSection: View {
-  public let pairingContent: (@MainActor @Sendable () -> AnyView)?
+public struct SettingsMobileSection<PairingContent: View>: View {
+  public let pairingContent: (@MainActor @Sendable () -> PairingContent)?
   public let isActive: Bool
 
   public init(
-    pairingContent: (@MainActor @Sendable () -> AnyView)? = nil,
+    pairingContent: (@MainActor @Sendable () -> PairingContent)?,
     isActive: Bool = true
   ) {
     self.pairingContent = pairingContent

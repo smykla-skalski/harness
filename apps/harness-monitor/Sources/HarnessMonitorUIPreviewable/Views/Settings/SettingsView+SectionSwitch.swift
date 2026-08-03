@@ -16,10 +16,10 @@ import SwiftUI
 ///
 /// Trade-off: sections with `.task { await refresh() }` only refresh on first
 /// visit per Settings session.
-struct SettingsDetailSwitch: View {
+struct SettingsDetailSwitch<MobilePairingContent: View>: View {
   let store: HarnessMonitorStore
   let notifications: HarnessMonitorUserNotificationController
-  let mobilePairingContent: (@MainActor @Sendable () -> AnyView)?
+  let mobilePairingContent: (@MainActor @Sendable () -> MobilePairingContent)?
   @Binding var themeMode: HarnessMonitorThemeMode
   let selectedSection: SettingsSection
   @Binding var navigationRequest: SettingsNavigationRequest?
