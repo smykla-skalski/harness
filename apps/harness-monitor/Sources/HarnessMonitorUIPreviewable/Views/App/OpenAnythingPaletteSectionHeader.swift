@@ -43,7 +43,7 @@ struct OpenAnythingPaletteSectionHeader: View {
       }
       .contentShape(Rectangle())
     }
-    .harnessPlainButtonStyle()
+    .harnessPlainButtonStyle()  // monitor-perf: plain-button open-anything-section-collapse
     .accessibilityLabel(accessibilityLabelText)
     .accessibilityHint(isCollapsed ? "Expand section" : "Collapse section")
   }
@@ -76,7 +76,7 @@ struct OpenAnythingPaletteSectionHeader: View {
           .scaledFont(.caption2)
           .foregroundStyle(Color.accentColor)
       }
-      .harnessPlainButtonStyle()
+      .harnessPlainButtonStyle()  // monitor-perf: plain-button open-anything-section-expand
       .accessibilityHint(
         isExpanded
           ? "Collapse this section back to the default cap"

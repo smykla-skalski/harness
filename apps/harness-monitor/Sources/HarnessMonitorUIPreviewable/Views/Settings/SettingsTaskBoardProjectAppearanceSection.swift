@@ -145,7 +145,7 @@ private struct SettingsTaskBoardProjectColorPopover: View {
             )
         }
     }
-    .harnessPlainButtonStyle()
+    .harnessPlainButtonStyle()  // monitor-perf: plain-button task-board-project-color-swatch
     .help(color.title)
     // The checkmark is the visible "selected", but it rides on the swatch
     // rather than beside a name, so the trait has to be set for VoiceOver.

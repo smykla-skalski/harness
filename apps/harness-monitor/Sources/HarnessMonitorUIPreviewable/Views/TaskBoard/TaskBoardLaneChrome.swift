@@ -34,7 +34,7 @@ struct TaskBoardLaneHeader: View {
         .padding(.bottom, metrics.headerBottomPadding)
         .contentShape(Rectangle())
     }
-    .harnessPlainButtonStyle()
+    .harnessPlainButtonStyle()  // monitor-perf: plain-button task-board-lane-header
     .frame(maxWidth: .infinity, alignment: .leading)
     .taskBoardLaneHeaderFade(lane: lane, cornerRadius: metrics.cardCornerRadius)
     .help("Collapse \(lane.title) board")

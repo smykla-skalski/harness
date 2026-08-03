@@ -29,7 +29,7 @@ struct DashboardReviewBackportMetadataPill: View {
         help: "Backport of \(copyValue)"
       )
     }
-    .harnessPlainButtonStyle()
+    .harnessPlainButtonStyle()  // monitor-perf: plain-button review-backport-pill
     .contextMenu {
       DashboardReviewCopyableLinkContextMenu(
         valueTitle: "Copy Backported PR",

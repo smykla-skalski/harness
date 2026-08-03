@@ -25,6 +25,10 @@ struct PreviewHostApp: App {
         SettingsRepositoryTaskBoardScopePreviewRenderer.dump
       ),
       ("HARNESS_DASHBOARD_AGENTS_PREVIEW_DUMP", DashboardAgentsPreviewRenderer.dump),
+      (
+        "HARNESS_DASHBOARD_REVIEWS_TIMEOUT_PREVIEW_DUMP",
+        DashboardReviewsRefreshTimeoutPreviewRenderer.dump
+      ),
       ("HARNESS_TASK_BOARD_QUICK_ADD_DUMP", TaskBoardLaneQuickAddPreviewRenderer.dump),
       ("HARNESS_SECRET_MIGRATION_CONSENT_DUMP", SecretMigrationConsentPreviewRenderer.dump),
       ("HARNESS_DIFF_LAB_DUMP", Self.dumpDiffLab),

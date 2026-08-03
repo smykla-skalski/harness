@@ -51,7 +51,7 @@ struct DashboardReviewCommentRetryStrip: View {
         Image(systemName: "xmark.circle.fill")
           .foregroundStyle(.secondary)
       }
-      .harnessPlainButtonStyle()
+      .harnessPlainButtonStyle()  // monitor-perf: plain-button review-comment-error-dismiss
       .accessibilityLabel(Text("Dismiss error"))
     }
     .padding(.vertical, 4)

@@ -169,7 +169,7 @@ struct DashboardReviewDetailHeader<Actions: View>: View {
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
           }
-          .harnessPlainButtonStyle()
+          .harnessPlainButtonStyle()  // monitor-perf: plain-button review-detail-title-link
           .contextMenu {
             DashboardReviewCopyableLinkContextMenu(
               valueTitle: "Copy Title",

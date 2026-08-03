@@ -247,7 +247,7 @@ private struct DashboardReviewsToolbarSearchModifier: ViewModifier {
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
           }
-          .harnessPlainButtonStyle()
+          .harnessPlainButtonStyle()  // monitor-perf: plain-button review-search-suggestion
         }
       }
       .searchFocused($isSearchFocused)

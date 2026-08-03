@@ -193,7 +193,7 @@ public struct OpenAnythingPaletteView: View {
           Image(systemName: "xmark.circle.fill")
             .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
         }
-        .harnessPlainButtonStyle()
+        .harnessPlainButtonStyle()  // monitor-perf: plain-button open-anything-query-clear
         .accessibilityLabel("Clear query")
       }
     }

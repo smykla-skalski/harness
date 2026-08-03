@@ -10,6 +10,7 @@ Usage:
 Suites:
   dashboard-agents
   dashboard-diff-lab
+  dashboard-reviews-timeout
   task-board-lane-alignment
   task-board-inspector
   task-board-review-report
@@ -24,6 +25,7 @@ if [[ "${1:-}" == "--list" ]]; then
   printf '%s\n' \
     dashboard-agents \
     dashboard-diff-lab \
+    dashboard-reviews-timeout \
     task-board-lane-alignment \
     task-board-inspector \
     task-board-review-report \
@@ -41,7 +43,7 @@ if [[ -z "$suite" ]]; then
 fi
 
 case "$suite" in
-  dashboard-agents|dashboard-diff-lab|task-board-lane-alignment|task-board-inspector|task-board-review-report|task-board-workflow-progress|task-board-filters|settings-repository-scope|secret-migration-consent) ;;
+  dashboard-agents|dashboard-diff-lab|dashboard-reviews-timeout|task-board-lane-alignment|task-board-inspector|task-board-review-report|task-board-workflow-progress|task-board-filters|settings-repository-scope|secret-migration-consent) ;;
   *)
     printf 'error: unknown preview suite: %s\n' "$suite" >&2
     usage >&2
@@ -94,6 +96,9 @@ case "$suite" in
     ;;
   dashboard-diff-lab)
     HARNESS_DIFF_LAB_DUMP="$staging_directory" "$host"
+    ;;
+  dashboard-reviews-timeout)
+    HARNESS_DASHBOARD_REVIEWS_TIMEOUT_PREVIEW_DUMP="$staging_directory" "$host"
     ;;
   task-board-lane-alignment)
     HARNESS_TASK_BOARD_LANE_ALIGNMENT_PREVIEW_DUMP="$staging_directory" "$host"

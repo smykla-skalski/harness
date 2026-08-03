@@ -39,7 +39,7 @@ struct OpenAnythingPaletteRow: View {
       .padding(.vertical, OpenAnythingPaletteConstants.rowVerticalPadding)
       .contentShape(Rectangle())
     }
-    .harnessPlainButtonStyle()
+    .harnessPlainButtonStyle()  // monitor-perf: plain-button open-anything-row
     .background(rowBackground)
     .foregroundStyle(.primary)
     .onHover { hovering in

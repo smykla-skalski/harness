@@ -110,7 +110,7 @@ struct DashboardReviewInlineThreadCard: View {
         .padding(.vertical, 2)
         .contentShape(.rect)
     }
-    .harnessPlainButtonStyle()
+    .harnessPlainButtonStyle()  // monitor-perf: plain-button review-inline-thread-collapse
     .help(isCollapsed ? "Expand conversation" : "Collapse conversation")
     .accessibilityLabel(Text(isCollapsed ? "Expand conversation" : "Collapse conversation"))
   }

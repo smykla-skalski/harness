@@ -79,7 +79,7 @@ struct TaskBoardLaneQuickAddRow: View {
       .padding(.vertical, metrics.laneSpacing)
       .contentShape(Rectangle())
     }
-    .harnessPlainButtonStyle()
+    .harnessPlainButtonStyle()  // monitor-perf: plain-button task-board-lane-quick-add
     .taskBoardLaneToggleFeedback(lane: lane, cornerRadius: metrics.cardCornerRadius)
     .help("Add a task to \(lane.title)")
     .accessibilityLabel("Add a task to \(lane.title)")
@@ -112,7 +112,7 @@ struct TaskBoardLaneQuickAddRow: View {
           .frame(width: 24, height: 24)
           .contentShape(Rectangle())
       }
-      .harnessPlainButtonStyle()
+      .harnessPlainButtonStyle()  // monitor-perf: plain-button task-board-lane-quick-add-dismiss
       .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
       .help("Discard this task")
       .accessibilityLabel("Discard this task")

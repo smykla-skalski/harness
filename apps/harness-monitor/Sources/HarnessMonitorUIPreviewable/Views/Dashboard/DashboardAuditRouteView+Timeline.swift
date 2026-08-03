@@ -276,7 +276,7 @@ private struct DashboardAuditLoadMoreButton: View {
         .lineLimit(1)
         .fixedSize(horizontal: true, vertical: false)
       }
-      .harnessPlainButtonStyle()
+      .harnessPlainButtonStyle()  // monitor-perf: plain-button audit-timeline-load-more
       .help("Load more audit events")
       line
     }
@@ -326,7 +326,7 @@ private struct DashboardAuditTimelineRowView: View {
       .background(isSelected ? Color.accentColor.opacity(0.16) : Color.clear)
       .contentShape(Rectangle())
     }
-    .harnessPlainButtonStyle()
+    .harnessPlainButtonStyle()  // monitor-perf: plain-button audit-timeline-row
     .accessibilityLabel(row.accessibilityLabel)
     .accessibilityAction(named: Text("Copy Event")) {
       copyEvent(row.event)

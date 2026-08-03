@@ -63,7 +63,7 @@ struct TaskBoardCollapsedLane: View {
       .contentShape(Rectangle())
       .clipped()
     }
-    .harnessPlainButtonStyle()
+    .harnessPlainButtonStyle()  // monitor-perf: plain-button task-board-collapsed-lane
     .taskBoardLaneToggleFeedback(lane: lane, cornerRadius: metrics.cardCornerRadius)
     .help("Expand \(lane.title) board")
     .accessibilityLabel("Expand \(lane.title) board")

@@ -30,7 +30,7 @@ struct DashboardReviewCheckRow: View {
       } label: {
         rowContent
       }
-      .harnessPlainButtonStyle()
+      .harnessPlainButtonStyle()  // monitor-perf: plain-button review-check-row-link
     } else {
       rowContent
     }
@@ -88,7 +88,7 @@ struct DashboardReviewCheckRow: View {
           .frame(width: 22, height: 22)
           .contentShape(.rect)
       }
-      .harnessPlainButtonStyle()
+      .harnessPlainButtonStyle()  // monitor-perf: plain-button review-check-rerun
       .disabled(!check.isRerunnable)
       .help(
         check.isRerunnable
@@ -105,7 +105,7 @@ struct DashboardReviewCheckRow: View {
             .frame(width: 22, height: 22)
             .contentShape(.rect)
         }
-        .harnessPlainButtonStyle()
+        .harnessPlainButtonStyle()  // monitor-perf: plain-button review-check-copy-url
         .help("Copy check URL")
         .accessibilityLabel("Copy URL for \(check.name)")
       }

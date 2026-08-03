@@ -49,7 +49,7 @@ private struct TreeRow: View {
         Button(action: handleTap) {
           Text(node.name).lineLimit(1)
         }
-        .harnessPlainButtonStyle()
+        .harnessPlainButtonStyle()  // monitor-perf: plain-button review-files-tree-node
       }
       .padding(.leading, CGFloat(depth) * 12)
       if !node.children.isEmpty && expandedPaths.contains(node.fullPath) {

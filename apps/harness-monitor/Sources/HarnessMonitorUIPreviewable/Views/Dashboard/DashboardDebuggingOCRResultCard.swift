@@ -51,7 +51,7 @@ struct DashboardOCRResultCard: View {
             .strokeBorder(HarnessMonitorTheme.controlBorder.opacity(0.32), lineWidth: 1)
         }
     }
-    .harnessPlainButtonStyle()
+    .harnessPlainButtonStyle()  // monitor-perf: plain-button ocr-result-preview
     .help("Preview full size")
     .accessibilityLabel("Preview \(item.sourceName)")
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDebuggingOCRResultPreviewButton)
