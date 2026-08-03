@@ -302,7 +302,8 @@ impl TimelineDbSource for DaemonDb {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct AgentTuiLiveRefreshState {
+#[doc(hidden)]
+pub struct AgentTuiLiveRefreshState {
     pub(crate) status: AgentTuiStatus,
     pub(crate) updated_at: String,
 }
