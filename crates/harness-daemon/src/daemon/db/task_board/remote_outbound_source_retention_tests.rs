@@ -27,7 +27,10 @@ use crate::task_board::{
     TaskBoardWorkflowExecutionCas,
 };
 use crate::daemon::db::task_board::remote_assignment_authority_queries::RemoteAssignmentAuthorityQueries;
+use crate::daemon::db::task_board::remote_assignment_offer::RemoteAssignmentOfferQueries;
+use crate::daemon::db::task_board::remote_assignment_terminal::RemoteAssignmentTerminalQueries;
 use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
+use crate::daemon::db::task_board::remote_outbound_sources::RemoteOutboundSourceQueries;
 use crate::daemon::db::task_board::remote_source_bundle_queries::RemoteSourceBundleQueries;
 use crate::daemon::db::prelude::*;
 

@@ -54,8 +54,34 @@ pub(crate) use model::{
 };
 use storage::{load_import_in_tx, require_import};
 
-impl AsyncDaemonDb {
-    pub(crate) async fn prepare_task_board_remote_result_import(
+pub(crate) trait RemoteResultImportQueries: Send + Sync {
+    async fn prepare_task_board_remote_result_import(
+        &self,
+        expected: &TaskBoardWorkflowExecutionCas,
+        request: &TaskBoardRemoteResultImportRequest,
+    ) -> Result<TaskBoardRemoteResultImportWork, CliError>;
+
+    async fn record_task_board_remote_result_import_applied(
+        &self,
+        assignment_id: &str,
+        fencing_epoch: u64,
+        import_sha256: &str,
+        git: &GitBundleImportEvidence,
+        applied_at: &str,
+    ) -> Result<TaskBoardRemoteResultImportRecord, CliError>;
+
+    async fn mark_task_board_remote_result_import_manual_required(
+        &self,
+        assignment_id: &str,
+        fencing_epoch: u64,
+        import_sha256: &str,
+        detail: &str,
+        failed_at: &str,
+    ) -> Result<TaskBoardRemoteResultImportRecord, CliError>;
+}
+
+impl RemoteResultImportQueries for AsyncDaemonDb {
+    async fn prepare_task_board_remote_result_import(
         &self,
         expected: &TaskBoardWorkflowExecutionCas,
         request: &TaskBoardRemoteResultImportRequest,
@@ -92,7 +118,7 @@ impl AsyncDaemonDb {
         })
     }
 
-    pub(crate) async fn record_task_board_remote_result_import_applied(
+    async fn record_task_board_remote_result_import_applied(
         &self,
         assignment_id: &str,
         fencing_epoch: u64,
@@ -151,7 +177,7 @@ impl AsyncDaemonDb {
         Ok(updated)
     }
 
-    pub(crate) async fn mark_task_board_remote_result_import_manual_required(
+    async fn mark_task_board_remote_result_import_manual_required(
         &self,
         assignment_id: &str,
         fencing_epoch: u64,

@@ -13,6 +13,7 @@ use crate::task_board::{
     TaskBoardLocalAttemptResult, TaskBoardPhaseVerdict, TaskBoardReviewResult,
     TaskBoardReviewerOutcome,
 };
+use crate::daemon::db::task_board::remote_assignment_terminal::RemoteAssignmentTerminalQueries;
 use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::db::task_board::remote_source_bundle_queries::RemoteSourceBundleQueries;
 

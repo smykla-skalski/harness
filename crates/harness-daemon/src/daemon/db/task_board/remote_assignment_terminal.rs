@@ -49,8 +49,39 @@ const PREDECESSOR_ACCEPTANCE_LABELS: OfferScreenLabels = OfferScreenLabels {
     conflict: "recovered offer acceptance conflicts with immutable receipt evidence",
 };
 
-impl AsyncDaemonDb {
-    pub(crate) async fn record_task_board_remote_predecessor_offer_acceptance(
+pub(crate) trait RemoteAssignmentTerminalQueries: Send + Sync {
+    async fn record_task_board_remote_predecessor_offer_acceptance(
+        &self,
+        response: &RemoteOfferResponse,
+        authenticated_principal: &str,
+        trust: &TaskBoardRemoteOperationTrustFence,
+        observed_at: &str,
+    ) -> Result<TaskBoardRemoteMutationOutcome, CliError>;
+
+    async fn cancel_task_board_remote_assignment(
+        &self,
+        request: &RemoteCancelRequest,
+        authenticated_principal: &str,
+        cancelled_at: &str,
+    ) -> Result<TaskBoardRemoteMutationOutcome, CliError>;
+
+    async fn mark_task_board_remote_assignment_unknown(
+        &self,
+        binding: &RemoteAttemptBinding,
+        reason: &str,
+        observed_at: &str,
+    ) -> Result<TaskBoardRemoteMutationOutcome, CliError>;
+
+    async fn supersede_unclaimed_task_board_remote_assignment(
+        &self,
+        binding: &RemoteAttemptBinding,
+        reason: &str,
+        superseded_at: &str,
+    ) -> Result<TaskBoardRemoteMutationOutcome, CliError>;
+}
+
+impl RemoteAssignmentTerminalQueries for AsyncDaemonDb {
+    async fn record_task_board_remote_predecessor_offer_acceptance(
         &self,
         response: &RemoteOfferResponse,
         authenticated_principal: &str,
@@ -106,7 +137,7 @@ impl AsyncDaemonDb {
         ))
         .await
     }
-    pub(crate) async fn cancel_task_board_remote_assignment(
+    async fn cancel_task_board_remote_assignment(
         &self,
         request: &RemoteCancelRequest,
         authenticated_principal: &str,
@@ -166,7 +197,7 @@ impl AsyncDaemonDb {
         }
         finish_mutation(transaction, &record.assignment_id, "cancellation").await
     }
-    pub(crate) async fn mark_task_board_remote_assignment_unknown(
+    async fn mark_task_board_remote_assignment_unknown(
         &self,
         binding: &RemoteAttemptBinding,
         reason: &str,
@@ -203,7 +234,7 @@ impl AsyncDaemonDb {
         finish_mutation(transaction, &record.assignment_id, "unknown outcome").await
     }
 
-    pub(crate) async fn supersede_unclaimed_task_board_remote_assignment(
+    async fn supersede_unclaimed_task_board_remote_assignment(
         &self,
         binding: &RemoteAttemptBinding,
         reason: &str,

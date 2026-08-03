@@ -25,58 +25,77 @@ mod exchange;
 use exchange::{apply_status_update_in_tx, screen_status_exchange_in_tx, settle_status_exchange};
 use crate::daemon::db::prelude::*;
 
-impl AsyncDaemonDb {
+pub(crate) trait RemoteAssignmentStatusQueries: Send + Sync {
     #[cfg(test)]
-    pub(crate) async fn claim_task_board_remote_status_io_authority(
+    async fn claim_task_board_remote_status_io_authority(
+        &self,
+        request: &RemoteStatusRequest,
+        authenticated_principal: &str,
+    ) -> Result<bool, CliError>;
+
+    async fn claim_task_board_remote_status_io_authority_fenced(
+        &self,
+        request: &RemoteStatusRequest,
+        authenticated_principal: &str,
+        trust: &TaskBoardRemoteOperationTrustFence,
+    ) -> Result<bool, CliError>;
+}
+
+impl RemoteAssignmentStatusQueries for AsyncDaemonDb {
+    #[cfg(test)]
+    async fn claim_task_board_remote_status_io_authority(
         &self,
         request: &RemoteStatusRequest,
         authenticated_principal: &str,
     ) -> Result<bool, CliError> {
-        self.claim_status_io_authority(request, authenticated_principal, None)
-            .await
+        claim_status_io_authority(self, request, authenticated_principal, None).await
     }
 
-    pub(crate) async fn claim_task_board_remote_status_io_authority_fenced(
+    async fn claim_task_board_remote_status_io_authority_fenced(
         &self,
         request: &RemoteStatusRequest,
         authenticated_principal: &str,
         trust: &TaskBoardRemoteOperationTrustFence,
     ) -> Result<bool, CliError> {
-        Box::pin(self.claim_status_io_authority(request, authenticated_principal, Some(trust)))
-            .await
-    }
-
-    async fn claim_status_io_authority(
-        &self,
-        request: &RemoteStatusRequest,
-        authenticated_principal: &str,
-        trust: Option<&TaskBoardRemoteOperationTrustFence>,
-    ) -> Result<bool, CliError> {
-        request
-            .validate()
-            .map_err(|error| db_error(format!("validate remote status I/O authority: {error}")))?;
-        nonblank(authenticated_principal, "remote status I/O principal")?;
-        let mut transaction = self
-            .begin_immediate_transaction("task board remote status I/O authority")
-            .await?;
-        let record = require_assignment(&mut transaction, &request.binding.assignment_id).await?;
-        if !status_authority_generation_matches(&record, request, authenticated_principal)? {
-            commit_noop(transaction, "stale remote status authority").await?;
-            return Ok(false);
-        }
-        // Awaiting this inline makes the future 25304 bytes, past the
-        // 16384-byte threshold of `clippy::large_futures`, which is denied
-        // here. `cargo check` will not tell you, because the limit is a lint
-        // rather than a compile error.
-        Box::pin(claim_verified_status_authority(
-            transaction,
-            record,
+        Box::pin(claim_status_io_authority(
+            self,
             request,
-            trust,
+            authenticated_principal,
+            Some(trust),
         ))
         .await
     }
+}
 
+async fn claim_status_io_authority(
+    db: &AsyncDaemonDb,
+    request: &RemoteStatusRequest,
+    authenticated_principal: &str,
+    trust: Option<&TaskBoardRemoteOperationTrustFence>,
+) -> Result<bool, CliError> {
+    request
+        .validate()
+        .map_err(|error| db_error(format!("validate remote status I/O authority: {error}")))?;
+    nonblank(authenticated_principal, "remote status I/O principal")?;
+    let mut transaction = db
+        .begin_immediate_transaction("task board remote status I/O authority")
+        .await?;
+    let record = require_assignment(&mut transaction, &request.binding.assignment_id).await?;
+    if !status_authority_generation_matches(&record, request, authenticated_principal)? {
+        commit_noop(transaction, "stale remote status authority").await?;
+        return Ok(false);
+    }
+    // Awaiting this inline makes the future 25304 bytes, past the
+    // 16384-byte threshold of `clippy::large_futures`, which is denied
+    // here. `cargo check` will not tell you, because the limit is a lint
+    // rather than a compile error.
+    Box::pin(claim_verified_status_authority(
+        transaction,
+        record,
+        request,
+        trust,
+    ))
+    .await
 }
 
 pub(super) async fn record_task_board_remote_assignment_status(

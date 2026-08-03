@@ -15,6 +15,7 @@ use crate::task_board::{
     TaskBoardWorkflowKind,
 };
 use crate::daemon::db::task_board::orchestrator_settings_queries::OrchestratorSettingsQueries;
+use crate::daemon::db::task_board::remote_assignment_terminal::RemoteAssignmentTerminalQueries;
 use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::db::prelude::*;
 

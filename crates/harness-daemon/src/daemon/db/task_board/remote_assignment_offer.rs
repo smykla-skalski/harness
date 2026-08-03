@@ -44,9 +44,20 @@ pub(crate) use types::TaskBoardRemoteOfferWindow;
 use types::{OfferPreparation, OfferTimes};
 use crate::daemon::db::prelude::*;
 
-impl AsyncDaemonDb {
+pub(crate) trait RemoteAssignmentOfferQueries: Send + Sync {
+    async fn offer_task_board_remote_assignment_with_source(
+        &self,
+        expected_execution: &TaskBoardWorkflowExecutionCas,
+        expected_attempt: &TaskBoardExecutionAttemptCas,
+        request: &RemoteOfferRequest,
+        source_content: Option<&[u8]>,
+        authenticated_principal: &str,
+        window: TaskBoardRemoteOfferWindow<'_>,
+    ) -> Result<TaskBoardRemoteOfferOutcome, CliError>;
+}
 
-    pub(crate) async fn offer_task_board_remote_assignment_with_source(
+impl RemoteAssignmentOfferQueries for AsyncDaemonDb {
+    async fn offer_task_board_remote_assignment_with_source(
         &self,
         expected_execution: &TaskBoardWorkflowExecutionCas,
         expected_attempt: &TaskBoardExecutionAttemptCas,

@@ -1,5 +1,7 @@
 use super::*;
 use crate::daemon::db::task_board::remote_assignment_executor_lifecycle_queries::RemoteAssignmentExecutorLifecycleQueries;
+use crate::daemon::db::task_board::remote_assignment_lease::RemoteAssignmentLeaseQueries;
+use crate::daemon::db::task_board::remote_assignment_terminal::RemoteAssignmentTerminalQueries;
 use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::db::prelude::*;
 

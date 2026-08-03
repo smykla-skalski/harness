@@ -44,13 +44,21 @@ pub(super) struct ExecutorLifecycleOwnerEvidence {
     pub(super) sha256: Option<String>,
 }
 
-impl AsyncDaemonDb {
+pub(crate) trait RemoteAssignmentLifecycleOwnerQueries: Send + Sync {
+    async fn claim_task_board_remote_executor_lifecycle_owner_with_settings(
+        &self,
+        assignment_id: &str,
+        owner_instance_id: &str,
+        acquired_at: &str,
+    ) -> Result<Option<TaskBoardRemoteExecutorLifecycleClaim>, CliError>;
+}
 
+impl RemoteAssignmentLifecycleOwnerQueries for AsyncDaemonDb {
     #[expect(
         clippy::cognitive_complexity,
         reason = "fenced transaction guard chain; each guard settles the transaction before returning"
     )]
-    pub(crate) async fn claim_task_board_remote_executor_lifecycle_owner_with_settings(
+    async fn claim_task_board_remote_executor_lifecycle_owner_with_settings(
         &self,
         assignment_id: &str,
         owner_instance_id: &str,

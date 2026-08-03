@@ -22,9 +22,29 @@ use crate::task_board::remote_wire::wire::{
 };
 use crate::daemon::db::prelude::*;
 
-impl AsyncDaemonDb {
+pub(crate) trait RemoteAssignmentLeaseQueries: Send + Sync {
+    async fn mark_task_board_remote_assignment_running(
+        &self,
+        assignment_id: &str,
+        owner: &TaskBoardRemoteExecutorLifecycleOwner,
+        running_at: &str,
+    ) -> Result<TaskBoardRemoteMutationOutcome, CliError>;
 
-    pub(crate) async fn mark_task_board_remote_assignment_running(
+    async fn renew_task_board_remote_assignment_lease(
+        &self,
+        request: &RemoteLeaseRenewRequest,
+        authenticated_principal: &str,
+        renewed_at: &str,
+    ) -> Result<TaskBoardRemoteMutationOutcome, CliError>;
+
+    async fn build_task_board_remote_renew_request(
+        &self,
+        assignment_id: &str,
+    ) -> Result<Option<RemoteLeaseRenewRequest>, CliError>;
+}
+
+impl RemoteAssignmentLeaseQueries for AsyncDaemonDb {
+    async fn mark_task_board_remote_assignment_running(
         &self,
         assignment_id: &str,
         owner: &TaskBoardRemoteExecutorLifecycleOwner,
@@ -44,7 +64,7 @@ impl AsyncDaemonDb {
         finish_mutation(transaction, assignment_id, "running").await
     }
 
-    pub(crate) async fn renew_task_board_remote_assignment_lease(
+    async fn renew_task_board_remote_assignment_lease(
         &self,
         request: &RemoteLeaseRenewRequest,
         authenticated_principal: &str,
@@ -104,7 +124,7 @@ impl AsyncDaemonDb {
         finish_mutation(transaction, &record.assignment_id, "renewal").await
     }
 
-    pub(crate) async fn build_task_board_remote_renew_request(
+    async fn build_task_board_remote_renew_request(
         &self,
         assignment_id: &str,
     ) -> Result<Option<RemoteLeaseRenewRequest>, CliError> {

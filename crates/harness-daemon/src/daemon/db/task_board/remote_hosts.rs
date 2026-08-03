@@ -44,22 +44,63 @@ pub struct TaskBoardRemoteHostTrustFence {
     pub configuration_revision: u64,
 }
 
-impl AsyncDaemonDb {
+pub(crate) trait RemoteHostQueries: Send + Sync {
     #[cfg(test)]
-    pub(crate) async fn task_board_remote_host_active_assignment_count_for_test(
+    async fn task_board_remote_host_active_assignment_count_for_test(
+        &self,
+        host_id: &str,
+    ) -> Result<u32, CliError>;
+
+    async fn record_task_board_execution_host_observation_fenced(
+        &self,
+        advertisement: &TaskBoardExecutionHostAdvertisement,
+        received_at: &str,
+        expected: &TaskBoardRemoteHostTrustFence,
+    ) -> Result<TaskBoardRemoteHostSelection, CliError>;
+
+    #[cfg(test)]
+    async fn record_task_board_execution_host_observation_state_for_test(
+        &self,
+        advertisement: &TaskBoardExecutionHostAdvertisement,
+        received_at: &str,
+        expected: &TaskBoardRemoteHostTrustFence,
+        state: TaskBoardRemoteHostState,
+    ) -> Result<TaskBoardRemoteHostSelection, CliError>;
+
+    #[cfg(test)]
+    async fn record_task_board_execution_host_observation(
+        &self,
+        advertisement: &TaskBoardExecutionHostAdvertisement,
+        received_at: &str,
+    ) -> Result<TaskBoardRemoteHostSelection, CliError>;
+
+    async fn resolve_task_board_remote_host(
+        &self,
+        execution: &TaskBoardWorkflowExecutionRecord,
+        source_repository: &str,
+        phase: TaskBoardExecutionPhase,
+        runtime: &str,
+        now: &str,
+    ) -> Result<Option<TaskBoardRemoteHostSelection>, CliError>;
+}
+
+impl RemoteHostQueries for AsyncDaemonDb {
+    #[cfg(test)]
+    async fn task_board_remote_host_active_assignment_count_for_test(
         &self,
         host_id: &str,
     ) -> Result<u32, CliError> {
         active_assignment_count(self, host_id).await
     }
 
-    pub(crate) async fn record_task_board_execution_host_observation_fenced(
+    async fn record_task_board_execution_host_observation_fenced(
         &self,
         advertisement: &TaskBoardExecutionHostAdvertisement,
         received_at: &str,
         expected: &TaskBoardRemoteHostTrustFence,
     ) -> Result<TaskBoardRemoteHostSelection, CliError> {
-        self.record_task_board_execution_host_observation_state_fenced(
+        record_task_board_execution_host_observation_state_fenced(
+            self,
             advertisement,
             received_at,
             expected,
@@ -69,14 +110,15 @@ impl AsyncDaemonDb {
     }
 
     #[cfg(test)]
-    pub(crate) async fn record_task_board_execution_host_observation_state_for_test(
+    async fn record_task_board_execution_host_observation_state_for_test(
         &self,
         advertisement: &TaskBoardExecutionHostAdvertisement,
         received_at: &str,
         expected: &TaskBoardRemoteHostTrustFence,
         state: TaskBoardRemoteHostState,
     ) -> Result<TaskBoardRemoteHostSelection, CliError> {
-        self.record_task_board_execution_host_observation_state_fenced(
+        record_task_board_execution_host_observation_state_fenced(
+            self,
             advertisement,
             received_at,
             expected,
@@ -85,94 +127,8 @@ impl AsyncDaemonDb {
         .await
     }
 
-    async fn record_task_board_execution_host_observation_state_fenced(
-        &self,
-        advertisement: &TaskBoardExecutionHostAdvertisement,
-        received_at: &str,
-        expected: &TaskBoardRemoteHostTrustFence,
-        state: TaskBoardRemoteHostState,
-    ) -> Result<TaskBoardRemoteHostSelection, CliError> {
-        validate_execution_host_advertisement(advertisement)?;
-        if advertisement.host_id != expected.config.host_id || !expected.config.enabled {
-            return Err(permission_denied(&advertisement.host_id));
-        }
-        let state = observed_state_label(state)?;
-        let received_at = canonical_time(received_at, "host observation receipt")?;
-        if !advertisement.heartbeat_is_fresh_at(received_at) {
-            return Err(parse_error(
-                "remote host heartbeat is expired or later than its receipt time",
-            ));
-        }
-        let mut transaction = self
-            .begin_immediate_transaction("task board remote host observation")
-            .await?;
-        let received_at = received_at.to_rfc3339_opts(SecondsFormat::AutoSi, true);
-        validate_execution_host_observation(&expected.config, advertisement)?;
-        let selection = TaskBoardRemoteHostSelection {
-            config: expected.config.clone(),
-            advertisement: advertisement.clone(),
-            configuration_revision: expected.configuration_revision,
-            received_at: received_at.clone(),
-        };
-        let changed = query(
-            "UPDATE task_board_execution_hosts SET
-             observed_host_instance_id = ?2, observed_protocol_version = ?3,
-             observed_capabilities_json = ?4, observed_repositories_json = ?5,
-             observed_runtimes_json = ?6, observed_capacity = ?7,
-             observed_active_assignments = ?8, observed_state = ?9,
-             observed_received_at = ?10, observed_heartbeat_at = ?11,
-             advertisement_sha256 = ?12, updated_at = ?10
-             WHERE host_id = ?1 AND host_role = 'controller_remote'
-               AND configuration_revision = ?13 AND enabled = ?14
-               AND configured_endpoint = ?15 AND configured_leaf_sha256 = ?16
-               AND configured_credential_reference = ?17",
-        )
-        .bind(&advertisement.host_id)
-        .bind(&advertisement.host_instance_id)
-        .bind(i64::from(advertisement.protocol_version))
-        .bind(to_json(
-            &advertisement.capabilities,
-            "remote host capabilities",
-        )?)
-        .bind(to_json(
-            &advertisement.repositories,
-            "remote host repositories",
-        )?)
-        .bind(to_json(&advertisement.runtimes, "remote host runtimes")?)
-        .bind(i64::from(advertisement.capacity))
-        .bind(i64::from(advertisement.active_assignments))
-        .bind(state)
-        .bind(&received_at)
-        .bind(&advertisement.heartbeat_at)
-        .bind(advertisement_digest(advertisement)?)
-        .bind(
-            i64::try_from(expected.configuration_revision)
-                .map_err(|_| db_error("remote host configuration revision is out of range"))?,
-        )
-        .bind(expected.config.enabled)
-        .bind(&expected.config.endpoint)
-        .bind(&expected.config.certificate_fingerprint)
-        .bind(&expected.config.credential_reference)
-        .execute(transaction.as_mut())
-        .await
-        .map_err(|error| db_error(format!("record remote host observation: {error}")))?
-        .rows_affected();
-        if changed != 1 {
-            return Err(CliErrorKind::concurrent_modification(
-                "remote host trust configuration changed before observation storage",
-            )
-            .into());
-        }
-        bump_change_in_tx(&mut transaction, REMOTE_HOST_CHANGE_SCOPE).await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit remote host observation: {error}")))?;
-        Ok(selection)
-    }
-
     #[cfg(test)]
-    pub(crate) async fn record_task_board_execution_host_observation(
+    async fn record_task_board_execution_host_observation(
         &self,
         advertisement: &TaskBoardExecutionHostAdvertisement,
         received_at: &str,
@@ -188,7 +144,7 @@ impl AsyncDaemonDb {
         .await
     }
 
-    pub(crate) async fn resolve_task_board_remote_host(
+    async fn resolve_task_board_remote_host(
         &self,
         execution: &TaskBoardWorkflowExecutionRecord,
         source_repository: &str,
@@ -270,6 +226,92 @@ impl AsyncDaemonDb {
         });
         Ok(eligible.into_iter().next().map(|(host, _)| host))
     }
+}
+
+async fn record_task_board_execution_host_observation_state_fenced(
+    db: &AsyncDaemonDb,
+    advertisement: &TaskBoardExecutionHostAdvertisement,
+    received_at: &str,
+    expected: &TaskBoardRemoteHostTrustFence,
+    state: TaskBoardRemoteHostState,
+) -> Result<TaskBoardRemoteHostSelection, CliError> {
+    validate_execution_host_advertisement(advertisement)?;
+    if advertisement.host_id != expected.config.host_id || !expected.config.enabled {
+        return Err(permission_denied(&advertisement.host_id));
+    }
+    let state = observed_state_label(state)?;
+    let received_at = canonical_time(received_at, "host observation receipt")?;
+    if !advertisement.heartbeat_is_fresh_at(received_at) {
+        return Err(parse_error(
+            "remote host heartbeat is expired or later than its receipt time",
+        ));
+    }
+    let mut transaction = db
+        .begin_immediate_transaction("task board remote host observation")
+        .await?;
+    let received_at = received_at.to_rfc3339_opts(SecondsFormat::AutoSi, true);
+    validate_execution_host_observation(&expected.config, advertisement)?;
+    let selection = TaskBoardRemoteHostSelection {
+        config: expected.config.clone(),
+        advertisement: advertisement.clone(),
+        configuration_revision: expected.configuration_revision,
+        received_at: received_at.clone(),
+    };
+    let changed = query(
+        "UPDATE task_board_execution_hosts SET
+         observed_host_instance_id = ?2, observed_protocol_version = ?3,
+         observed_capabilities_json = ?4, observed_repositories_json = ?5,
+         observed_runtimes_json = ?6, observed_capacity = ?7,
+         observed_active_assignments = ?8, observed_state = ?9,
+         observed_received_at = ?10, observed_heartbeat_at = ?11,
+         advertisement_sha256 = ?12, updated_at = ?10
+         WHERE host_id = ?1 AND host_role = 'controller_remote'
+           AND configuration_revision = ?13 AND enabled = ?14
+           AND configured_endpoint = ?15 AND configured_leaf_sha256 = ?16
+           AND configured_credential_reference = ?17",
+    )
+    .bind(&advertisement.host_id)
+    .bind(&advertisement.host_instance_id)
+    .bind(i64::from(advertisement.protocol_version))
+    .bind(to_json(
+        &advertisement.capabilities,
+        "remote host capabilities",
+    )?)
+    .bind(to_json(
+        &advertisement.repositories,
+        "remote host repositories",
+    )?)
+    .bind(to_json(&advertisement.runtimes, "remote host runtimes")?)
+    .bind(i64::from(advertisement.capacity))
+    .bind(i64::from(advertisement.active_assignments))
+    .bind(state)
+    .bind(&received_at)
+    .bind(&advertisement.heartbeat_at)
+    .bind(advertisement_digest(advertisement)?)
+    .bind(
+        i64::try_from(expected.configuration_revision)
+            .map_err(|_| db_error("remote host configuration revision is out of range"))?,
+    )
+    .bind(expected.config.enabled)
+    .bind(&expected.config.endpoint)
+    .bind(&expected.config.certificate_fingerprint)
+    .bind(&expected.config.credential_reference)
+    .execute(transaction.as_mut())
+    .await
+    .map_err(|error| db_error(format!("record remote host observation: {error}")))?
+    .rows_affected();
+    if changed != 1 {
+        return Err(CliErrorKind::concurrent_modification(
+            "remote host trust configuration changed before observation storage",
+        )
+        .into());
+    }
+    bump_change_in_tx(&mut transaction, REMOTE_HOST_CHANGE_SCOPE).await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit remote host observation: {error}")))?;
+    Ok(selection)
 }
 
 pub(super) async fn task_board_remote_host_trust_fence(

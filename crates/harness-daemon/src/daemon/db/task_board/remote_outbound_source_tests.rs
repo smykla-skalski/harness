@@ -17,6 +17,7 @@ use crate::task_board::remote_wire::wire::{
 use crate::task_board::{TaskBoardExecutionPhase, TaskBoardWorkflowKind};
 use crate::daemon::db::task_board::orchestrator_settings_queries::OrchestratorSettingsQueries;
 use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
+use crate::daemon::db::task_board::remote_outbound_sources::RemoteOutboundSourceQueries;
 use crate::daemon::db::prelude::*;
 
 #[tokio::test]

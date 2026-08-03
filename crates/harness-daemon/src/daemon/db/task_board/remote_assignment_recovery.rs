@@ -37,9 +37,19 @@ pub(crate) struct TaskBoardRemoteRecoveryBatch {
     pub(crate) incomplete: bool,
 }
 
-impl AsyncDaemonDb {
+pub(crate) trait RemoteAssignmentRecoveryQueries: Send + Sync {
+    async fn task_board_remote_assignment_recovery_deadline(&self)
+    -> Result<Option<String>, CliError>;
 
-    pub(crate) async fn task_board_remote_assignment_recovery_deadline(
+    async fn recover_one_remote_assignment(
+        &self,
+        candidate: &RawRecoveryCandidate,
+        now: &str,
+    ) -> Result<Option<TaskBoardRemoteAssignmentRecord>, CliError>;
+}
+
+impl RemoteAssignmentRecoveryQueries for AsyncDaemonDb {
+    async fn task_board_remote_assignment_recovery_deadline(
         &self,
     ) -> Result<Option<String>, CliError> {
         const STATEMENT: &str =
@@ -126,7 +136,7 @@ impl AsyncDaemonDb {
             .map_err(|error| db_error(format!("load remote assignment recovery deadline: {error}")))
     }
 
-    pub(super) async fn recover_one_remote_assignment(
+    async fn recover_one_remote_assignment(
         &self,
         candidate: &RawRecoveryCandidate,
         now: &str,
