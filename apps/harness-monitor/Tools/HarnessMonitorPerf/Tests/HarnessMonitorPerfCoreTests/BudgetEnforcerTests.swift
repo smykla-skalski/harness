@@ -103,6 +103,7 @@ final class BudgetEnforcerTests: XCTestCase {
             Set(Budgets.launchByScenario.keys),
             [
                 "open-recent-window",
+                "open-anything-search",
                 "open-session-window",
                 "open-session-window-visual-options-disabled",
                 "policy-canvas",
