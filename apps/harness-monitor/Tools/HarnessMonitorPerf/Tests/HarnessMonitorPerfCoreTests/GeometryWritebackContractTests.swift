@@ -68,6 +68,54 @@ final class GeometryWritebackContractTests: XCTestCase {
             expectedCount: 2,
             rationale: "two threshold-gated horizontal-fit flags for agent-detail bands"
         ),
+        // Terminal detail mirrors its viewport into local state only when the
+        // size changes. The resulting task is keyed by that value, sleeps for
+        // the terminal debounce interval, and the resize coordinator folds
+        // duplicate requests before reaching the PTY.
+        .init(
+            relativePath:
+                "Sources/HarnessMonitorUIPreviewable/Views/Agents/DashboardTerminalAgentDetailComponents.swift",
+            expectedCount: 1,
+            rationale: "size-gated local viewport state feeding a debounced PTY resize task"
+        ),
+        // Open Anything chooses its two-pane layout from a view-local width.
+        // `updateAvailableWidth` rejects invalid measurements and changes
+        // smaller than half a point, preventing fractional layout jitter from
+        // feeding back into the next pass.
+        .init(
+            relativePath:
+                "Sources/HarnessMonitorUIPreviewable/Views/App/OpenAnythingPaletteView.swift",
+            expectedCount: 1,
+            rationale: "half-point-gated local width for the palette pane threshold"
+        ),
+        // The collapsed conversation gap forwards its scroll-space position
+        // to the parent, which stores only finite changes above a quarter point.
+        // During explicit expansion/collapse, compensation is limited to three
+        // progressively closer passes.
+        .init(
+            relativePath:
+                "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewConversationCollapsedGapDivider.swift",
+            expectedCount: 1,
+            rationale: "quarter-point-gated scroll anchor with bounded compensation passes"
+        ),
+        // The SwiftUI thread-card stack reports its height to an AppKit host.
+        // `handleCardHeight` clamps it and rejects changes at or below half a
+        // point before resizing the canvas or repositioning following rows.
+        .init(
+            relativePath:
+                "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewInlineThreadCardStack.swift",
+            expectedCount: 1,
+            rationale: "half-point-gated AppKit diff-gap height synchronization"
+        ),
+        // Repository settings switches between wide and compact columns at one
+        // explicit width boundary. The action writes its local boolean only
+        // when the threshold result changes.
+        .init(
+            relativePath:
+                "Sources/HarnessMonitorUIPreviewable/Views/Settings/SettingsRepositoriesSection+Table.swift",
+            expectedCount: 1,
+            rationale: "threshold-gated local width flag for repository columns"
+        ),
         // Session agent lane mirrors the visible TUI viewport size to the
         // PTY-resize side car via a `Task { @MainActor in await syncTerminalSize }`.
         // The handler hops off the layout pass before it touches the terminal,
@@ -89,13 +137,14 @@ final class GeometryWritebackContractTests: XCTestCase {
             expectedCount: 1,
             rationale: "rounded-height threshold drives dynamic timeline page size"
         ),
-        // Task board overview uses one width threshold to choose compact vs
-        // horizontal layout. The handler writes a view-local boolean only when
-        // the threshold result changes.
+        // Task-board evaluation summary uses one width threshold to choose
+        // stacked or horizontal content. The handler writes a view-local
+        // boolean only when the threshold result changes.
         .init(
-            relativePath: "Sources/HarnessMonitorUIPreviewable/Views/TaskBoard/TaskBoardOverviewView.swift",
+            relativePath:
+                "Sources/HarnessMonitorUIPreviewable/Views/TaskBoard/TaskBoardOverviewView+EvaluationSummary.swift",
             expectedCount: 1,
-            rationale: "threshold-gated view-local width flag for task-board overview"
+            rationale: "threshold-gated local width flag for the evaluation summary"
         ),
         // Orchestrator summary uses one explicit width gate. The write is a
         // view-local boolean guarded by `!= next`.
@@ -104,6 +153,33 @@ final class GeometryWritebackContractTests: XCTestCase {
                 "Sources/HarnessMonitorUIPreviewable/Views/TaskBoard/TaskBoardOrchestratorSummaryView.swift",
             expectedCount: 1,
             rationale: "threshold-gated view-local width flag for orchestrator summary"
+        ),
+        // Review text measures the full and line-limited variants in local
+        // state to decide whether disclosure is needed. Both actions reject
+        // changes at or below half a point before recomputing truncation.
+        .init(
+            relativePath:
+                "Sources/HarnessMonitorUIPreviewable/Views/TaskBoard/TaskBoardReviewTextSection.swift",
+            expectedCount: 2,
+            rationale: "half-point-gated local text heights for truncation disclosure"
+        ),
+        // The search field measures its bounds so the suggestion popover can
+        // align to the native field. It writes only a changed `CGSize` into
+        // view-local state.
+        .init(
+            relativePath:
+                "Sources/HarnessMonitorUIPreviewable/Views/TaskBoard/TaskBoardSearchField.swift",
+            expectedCount: 1,
+            rationale: "equality-gated local field size for suggestion placement"
+        ),
+        // The step rail drops its labels below one explicit width boundary.
+        // The callback writes the local boolean only when that threshold result
+        // changes.
+        .init(
+            relativePath:
+                "Sources/HarnessMonitorUIPreviewable/Views/TaskBoard/TaskBoardStepRailView.swift",
+            expectedCount: 1,
+            rationale: "threshold-gated local width flag for step-rail titles"
         ),
     ]
 

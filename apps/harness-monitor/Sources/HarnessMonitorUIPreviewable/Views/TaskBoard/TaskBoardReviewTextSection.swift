@@ -72,16 +72,14 @@ struct TaskBoardReviewTextSection: View {
               .onGeometryChange(for: CGFloat.self) { proxy in
                 proxy.size.height
               } action: { fullHeight in
-                fullTextHeight = fullHeight
-                updateTruncation()
+                updateFullTextHeight(fullHeight)
               }
           }
         }
         .onGeometryChange(for: CGFloat.self) { proxy in
           proxy.size.height
         } action: { visibleHeight in
-          visibleTextHeight = visibleHeight
-          updateTruncation()
+          updateVisibleTextHeight(visibleHeight)
         }
     }
   }
@@ -109,6 +107,20 @@ struct TaskBoardReviewTextSection: View {
 
   private func updateTruncation() {
     guard fullTextHeight > 0, visibleTextHeight > 0 else { return }
-    isTruncated = fullTextHeight > visibleTextHeight + 0.5
+    let next = fullTextHeight > visibleTextHeight + 0.5
+    guard isTruncated != next else { return }
+    isTruncated = next
+  }
+
+  private func updateFullTextHeight(_ height: CGFloat) {
+    guard abs(fullTextHeight - height) > 0.5 else { return }
+    fullTextHeight = height
+    updateTruncation()
+  }
+
+  private func updateVisibleTextHeight(_ height: CGFloat) {
+    guard abs(visibleTextHeight - height) > 0.5 else { return }
+    visibleTextHeight = height
+    updateTruncation()
   }
 }
