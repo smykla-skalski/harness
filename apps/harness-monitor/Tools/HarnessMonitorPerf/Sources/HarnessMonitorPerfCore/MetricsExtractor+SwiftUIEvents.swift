@@ -24,12 +24,13 @@ extension MetricsExtractor {
     /// falls back to label counts (some xctrace schemas emit only narrative text).
     public static func parseEventTable(
         _ document: XctraceQueryDocument,
-        maximumValidDurationNs: Int? = nil
+        maximumValidDurationNs: Int? = nil,
+        measurementWindow: XctraceTimeWindow? = nil
     ) -> EventTable {
         var durations: [Int] = []
         var labels: [String: Int] = [:]
 
-        for row in document.rows {
+        for row in document.rows(in: measurementWindow) {
             let record = document.record(for: row)
             if let duration = parseDurationNs(
                 record["duration"],

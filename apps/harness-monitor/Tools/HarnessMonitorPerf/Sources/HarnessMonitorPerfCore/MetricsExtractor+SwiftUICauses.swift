@@ -35,7 +35,10 @@ extension MetricsExtractor {
         public var topCauses: [Cause]
     }
 
-    public static func parseSwiftUICauses(_ document: XctraceQueryDocument) -> Causes {
+    public static func parseSwiftUICauses(
+        _ document: XctraceQueryDocument,
+        measurementWindow: XctraceTimeWindow? = nil
+    ) -> Causes {
         var labelCounts: [String: Int] = [:]
         var sourceCounts: [String: Int] = [:]
         var destinationCounts: [String: Int] = [:]
@@ -43,7 +46,7 @@ extension MetricsExtractor {
         var propertyCounts: [String: Int] = [:]
         var causeCounts: [CauseKey: Int] = [:]
 
-        for row in document.rows {
+        for row in document.rows(in: measurementWindow) {
             let record = document.record(for: row)
             let label = normalize(record["label"])
             let source = normalize(record["source-node"])

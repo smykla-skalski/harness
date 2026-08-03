@@ -77,6 +77,11 @@ public struct XctraceQueryDocument {
         return record
     }
 
+    public func rows(in measurementWindow: XctraceTimeWindow?) -> [XMLElement] {
+        guard let measurementWindow else { return rows }
+        return rows.filter { measurementWindow.intersects(record: record(for: $0)) }
+    }
+
     /// Resolve `<element ref="N"/>` chains to their backing element, then
     /// return that element's text content, `fmt` attribute, or the resolved
     /// single-child text.
@@ -110,6 +115,40 @@ public struct XctraceQueryDocument {
         }
         return target
     }
+}
+
+public struct XctraceTimeWindow: Equatable {
+    public let startNs: Int
+    public let durationNs: Int
+
+    public var endNs: Int { startNs + durationNs }
+
+    public init?(startNs: Int, durationNs: Int) {
+        guard startNs >= 0, durationNs > 0, startNs <= Int.max - durationNs else {
+            return nil
+        }
+        self.startNs = startNs
+        self.durationNs = durationNs
+    }
+
+    func intersects(record: [String: String]) -> Bool {
+        guard
+            let rowStartNs = Self.timestampKeys.lazy.compactMap({ key in
+                MetricsExtractor.parseInt(record[key])
+            }).first
+        else {
+            return false
+        }
+        guard rowStartNs < endNs else { return false }
+        guard let rowDurationNs = MetricsExtractor.parseInt(record["duration"]), rowDurationNs > 0
+        else {
+            return rowStartNs >= startNs
+        }
+        let rowEndNs = rowStartNs.addingReportingOverflow(rowDurationNs)
+        return rowEndNs.overflow || rowEndNs.partialValue > startNs
+    }
+
+    private static let timestampKeys = ["start", "timestamp", "time", "sample-time"]
 }
 
 /// Schema/track discovery against a xctrace TOC payload. Kept on the legacy

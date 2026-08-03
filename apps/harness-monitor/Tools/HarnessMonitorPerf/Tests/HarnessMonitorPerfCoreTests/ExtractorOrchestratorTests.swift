@@ -23,6 +23,25 @@ final class ExtractorOrchestratorTests: XCTestCase {
         return try Data(contentsOf: url)
     }
 
+    private func queryData(columns: [String], rows: [[String]]) -> Data {
+        let schema = columns.map { "<col><mnemonic>\($0)</mnemonic></col>" }.joined()
+        let encodedRows = rows.map { values in
+            let values = values.map { "<value>\($0)</value>" }.joined()
+            return "<row>\(values)</row>"
+        }.joined()
+        return Data("""
+        <?xml version="1.0"?>
+        <trace-query-result><node><schema>\(schema)</schema>\(encodedRows)</node></trace-query-result>
+        """.utf8)
+    }
+
+    private func signpostIntervalData(name: String) -> Data {
+        queryData(
+            columns: ["start", "duration", "name", "category", "subsystem"],
+            rows: [["2000000000", "1000000000", name, "perf", "io.harnessmonitor"]]
+        )
+    }
+
     /// Routes xctrace requests to the bundled XML fixtures so the orchestrator runs without
     /// hitting Instruments.
     final class FixtureExporter: ExtractorOrchestrator.XctraceExporting {
@@ -99,6 +118,87 @@ final class ExtractorOrchestratorTests: XCTestCase {
 
         XCTAssertTrue(FileManager.default.fileExists(atPath: runDir.appendingPathComponent("summary.json").path))
         XCTAssertTrue(FileManager.default.fileExists(atPath: runDir.appendingPathComponent("summary.csv").path))
+    }
+
+    func testExtractFiltersSwiftUIMetricsToScenarioSignpostInterval() throws {
+        let manifest = """
+        {
+          "label": "perf",
+          "created_at_utc": "2026-04-25T00:00:00Z",
+          "captures": [
+            {"scenario": "session-search-full", "template": "SwiftUI", "trace_relpath": "traces/search.trace", "duration_seconds": 5, "exit_status": 0, "end_reason": "completed"}
+          ]
+        }
+        """
+        try Data(manifest.utf8).write(
+            to: runDir.appendingPathComponent("manifest.json"),
+            options: .atomic
+        )
+
+        let updates = queryData(
+            columns: [
+                "start", "duration", "allocations", "update-type", "severity", "category",
+                "description", "module", "view-name",
+            ],
+            rows: [
+                ["1000000000", "100", "1", "body", "info", "render", "before", "App", "Before"],
+                ["2500000000", "200", "2", "body", "info", "render", "inside", "App", "Inside"],
+                ["3500000000", "300", "3", "body", "info", "render", "after", "App", "After"],
+            ]
+        )
+        let hitches = queryData(
+            columns: ["start", "duration", "narrative-description"],
+            rows: [
+                ["1250000000", "700000000", "bootstrap"],
+                ["2600000000", "100000000", "inside"],
+                ["3200000000", "100000000", "after"],
+            ]
+        )
+        let exporter = FixtureExporter(
+            toc: try fixtureData("toc-minimal"),
+            swiftUIQueries: [
+                "os-signpost-interval": signpostIntervalData(name: "session-search-full"),
+                "swiftui-updates": updates,
+                "hitches": hitches,
+            ]
+        )
+
+        _ = try ExtractorOrchestrator.extract(runDir: runDir, exporter: exporter)
+        let metrics = try JSONValue.fromFile(
+            runDir.appendingPathComponent("metrics/session-search-full/swiftui.json")
+        )
+
+        XCTAssertEqual(metrics["swiftui_updates"]?["total_count"], .int(1))
+        XCTAssertEqual(metrics["swiftui_updates"]?["duration_ns_total"], .int(200))
+        XCTAssertEqual(metrics["hitches"]?["count"], .int(1))
+        XCTAssertEqual(metrics["measurement_window"]?["start_ns"], .int(2_000_000_000))
+        XCTAssertEqual(metrics["measurement_window"]?["end_ns"], .int(3_000_000_000))
+    }
+
+    func testExtractRejectsMissingScenarioSignpostInterval() throws {
+        let manifest = """
+        {
+          "label": "perf",
+          "created_at_utc": "2026-04-25T00:00:00Z",
+          "captures": [
+            {"scenario": "session-search-full", "template": "SwiftUI", "trace_relpath": "traces/search.trace", "duration_seconds": 5, "exit_status": 0, "end_reason": "completed"}
+          ]
+        }
+        """
+        try Data(manifest.utf8).write(
+            to: runDir.appendingPathComponent("manifest.json"),
+            options: .atomic
+        )
+        let exporter = FixtureExporter(toc: try fixtureData("toc-minimal"))
+
+        XCTAssertThrowsError(
+            try ExtractorOrchestrator.extract(runDir: runDir, exporter: exporter)
+        ) { error in
+            XCTAssertEqual(
+                String(describing: error),
+                "Expected one io.harnessmonitor/perf interval named session-search-full, found 0"
+            )
+        }
     }
 
     func testExtractRetainsDebugQueryExports() throws {
@@ -181,6 +281,7 @@ final class ExtractorOrchestratorTests: XCTestCase {
         let exporter = FixtureExporter(
             toc: try fixtureData("toc-minimal"),
             swiftUIQueries: [
+                "os-signpost-interval": signpostIntervalData(name: "session-search-full"),
                 "swiftui-updates": try fixtureData("swiftui-updates-minimal"),
                 "swiftui-update-groups": try fixtureData("swiftui-update-groups-minimal"),
                 "swiftui-causes": try fixtureData("swiftui-causes-minimal"),

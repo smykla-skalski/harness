@@ -13,7 +13,8 @@ final class MetricsExtractorTests: XCTestCase {
     func testTOCExposesSchemasAndAllocationDetails() throws {
         let toc = try XctraceTOC(path: try fixtureURL("toc-minimal"))
         XCTAssertEqual(toc.availableSchemas(), [
-            "swiftui-updates", "swiftui-update-groups", "hitches", "potential-hangs", "time-profile",
+            "swiftui-updates", "swiftui-update-groups", "os-signpost-interval", "hitches",
+            "potential-hangs", "time-profile",
         ])
         XCTAssertEqual(toc.availableAllocationDetails(), ["Statistics"])
     }
@@ -66,6 +67,22 @@ final class MetricsExtractorTests: XCTestCase {
         XCTAssertEqual(result.topOffenders[0].allocations, 8)
         XCTAssertEqual(result.topOffenders[1].description, "SidebarRow")
         XCTAssertEqual(result.topOffenders[1].durationNs, 150_000)
+    }
+
+    func testTimeWindowRecognizesEverySwiftUITimestampField() throws {
+        let window = try XCTUnwrap(XctraceTimeWindow(
+            startNs: 2_000_000_000,
+            durationNs: 1_000_000_000
+        ))
+
+        for key in ["start", "timestamp", "time", "sample-time"] {
+            XCTAssertTrue(window.intersects(record: [key: "2500000000"]))
+        }
+        XCTAssertFalse(window.intersects(record: ["start": "1000000000"]))
+        XCTAssertFalse(window.intersects(record: ["start": "3000000000"]))
+        XCTAssertTrue(window.intersects(record: [
+            "start": "1900000000", "duration": "200000000",
+        ]))
     }
 
     func testParseIntStripsCommasAndIgnoresBlanks() {

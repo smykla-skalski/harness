@@ -37,13 +37,14 @@ extension MetricsExtractor {
 
     public static func parseSwiftUIUpdateGroups(
         _ document: XctraceQueryDocument,
-        maximumValidDurationNs: Int? = nil
+        maximumValidDurationNs: Int? = nil,
+        measurementWindow: XctraceTimeWindow? = nil
     ) -> UpdateGroups {
         var durations: [Int] = []
         var labelCounts: [String: Int] = [:]
         var labelTotals: [String: (count: Int, durationNs: Int)] = [:]
 
-        for row in document.rows {
+        for row in document.rows(in: measurementWindow) {
             let record = document.record(for: row)
             let label = normalize(record["label"])
             let durationNs = parseDurationNs(
@@ -87,11 +88,15 @@ extension MetricsExtractor {
 
     public static func deriveSwiftUIFindings(
         updateGroupsDocument: XctraceQueryDocument?,
-        causes: Causes?
+        causes: Causes?,
+        measurementWindow: XctraceTimeWindow? = nil
     ) -> [CaptureFinding] {
         var findings: [CaptureFinding] = []
         if let updateGroupsDocument {
-            findings.append(contentsOf: parseUpdateGroupFindings(updateGroupsDocument))
+            findings.append(contentsOf: parseUpdateGroupFindings(
+                updateGroupsDocument,
+                measurementWindow: measurementWindow
+            ))
         }
         if let causes {
             findings.append(contentsOf: parseCauseFindings(causes))
@@ -101,7 +106,8 @@ extension MetricsExtractor {
 
     public static func parseUpdateGroupFindings(
         _ document: XctraceQueryDocument,
-        maximumValidDurationNs: Int? = nil
+        maximumValidDurationNs: Int? = nil,
+        measurementWindow: XctraceTimeWindow? = nil
     ) -> [CaptureFinding] {
         struct Aggregate {
             var key: String
@@ -113,7 +119,7 @@ extension MetricsExtractor {
         }
 
         var aggregates: [String: Aggregate] = [:]
-        for row in document.rows {
+        for row in document.rows(in: measurementWindow) {
             let record = document.record(for: row)
             let label = normalize(record["label"])
             guard

@@ -4,6 +4,7 @@
     <data>
       <table schema="swiftui-updates"/>
       <table schema="swiftui-update-groups"/>
+      <table schema="os-signpost-interval"/>
       <table schema="hitches"/>
       <table schema="potential-hangs"/>
       <table schema="time-profile"/>

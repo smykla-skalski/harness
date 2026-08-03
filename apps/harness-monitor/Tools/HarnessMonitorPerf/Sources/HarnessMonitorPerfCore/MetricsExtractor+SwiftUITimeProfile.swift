@@ -23,12 +23,15 @@ extension MetricsExtractor {
 
     /// Walks each row's `<backtrace>` looking for the first symbolic frame, preferring frames
     /// whose binary path contains "Harness Monitor.app" / "Harness Monitor UI Testing.app".
-    public static func parseTimeProfile(_ document: XctraceQueryDocument) -> TimeProfile {
+    public static func parseTimeProfile(
+        _ document: XctraceQueryDocument,
+        measurementWindow: XctraceTimeWindow? = nil
+    ) -> TimeProfile {
         var appOwned: [String: Int] = [:]
         var symbolic: [String: Int] = [:]
         var sampleCount = 0
 
-        for row in document.rows {
+        for row in document.rows(in: measurementWindow) {
             sampleCount += 1
             guard let backtrace = resolveBacktrace(in: row, document: document) else { continue }
             var firstSymbolic: String?

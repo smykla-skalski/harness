@@ -53,7 +53,8 @@ public enum MetricsExtractor {
 
     public static func parseSwiftUIUpdates(
         _ document: XctraceQueryDocument,
-        maximumValidDurationNs: Int? = nil
+        maximumValidDurationNs: Int? = nil,
+        measurementWindow: XctraceTimeWindow? = nil
     ) -> SwiftUIUpdates {
         var durationsNs: [Int] = []
         var updateTypeCounts: [String: Int] = [:]
@@ -62,7 +63,7 @@ public enum MetricsExtractor {
         var bodyUpdateCount = 0
         var totalAllocations = 0
         var offenderTotals: [OffenderKey: OffenderAccumulator] = [:]
-        let rows = document.rows
+        let rows = document.rows(in: measurementWindow)
         let total = rows.count
 
         for row in rows {

@@ -61,6 +61,9 @@ public enum ExtractorOrchestrator {
         ("time-profile", "/trace-toc/run[@number=\"1\"]/data/table[@schema=\"time-profile\"]"),
     ]
 
+    public static let signpostIntervalsXPath =
+        "/trace-toc/run[@number=\"1\"]/data/table[@schema=\"os-signpost-interval\"]"
+
     public static let allocationsXPath =
         "/trace-toc/run[@number=\"1\"]/tracks/track[@name=\"Allocations\"]/details/detail[@name=\"Statistics\"]"
 
@@ -141,10 +144,20 @@ public enum ExtractorOrchestrator {
 
         switch capture.template {
         case "SwiftUI":
+            let measurement = try resolveMeasurementWindow(
+                capture: capture,
+                tracePath: tracePath,
+                exporter: exporter,
+                availableSchemas: availableSchemas,
+                debugExportsRoot: debugExportsRoot,
+                maximumDebugExportBytes: maximumDebugExportBytes
+            )
             return try extractSwiftUI(
                 tracePath: tracePath, exporter: exporter,
                 availableSchemas: availableSchemas,
                 maximumValidDurationNs: maximumValidDurationNs,
+                measurementWindow: measurement.window,
+                initialWarnings: measurement.warnings,
                 debugExportsRoot: debugExportsRoot,
                 maximumTimeProfileTraceBytes: maximumTimeProfileTraceBytes,
                 maximumDebugExportBytes: maximumDebugExportBytes
@@ -165,18 +178,14 @@ public enum ExtractorOrchestrator {
     private static func extractSwiftUI(
         tracePath: URL, exporter: XctraceExporting, availableSchemas: Set<String>,
         maximumValidDurationNs: Int,
+        measurementWindow: XctraceTimeWindow?,
+        initialWarnings: [String],
         debugExportsRoot: URL?,
         maximumTimeProfileTraceBytes: Int64?,
         maximumDebugExportBytes: Int?
     ) throws -> JSONValue {
-        var warnings: [String] = []
-        var updates: MetricsExtractor.SwiftUIUpdates?
-        var updateGroups: MetricsExtractor.UpdateGroups?
-        var updateGroupsDocument: XctraceQueryDocument?
-        var causes: MetricsExtractor.Causes?
-        var hitches: MetricsExtractor.EventTable?
-        var hangs: MetricsExtractor.EventTable?
-        var profile: MetricsExtractor.TimeProfile?
+        var warnings = initialWarnings
+        var metrics = SwiftUIMetrics()
 
         for schema in swiftUISchemaXPaths {
             guard availableSchemas.contains(schema.name) else { continue }
@@ -200,56 +209,162 @@ public enum ExtractorOrchestrator {
             let document = try XctraceQueryDocument(data: data)
             switch schema.name {
             case "swiftui-updates":
-                updates = MetricsExtractor.parseSwiftUIUpdates(
+                metrics.updates = MetricsExtractor.parseSwiftUIUpdates(
                     document,
-                    maximumValidDurationNs: maximumValidDurationNs
+                    maximumValidDurationNs: maximumValidDurationNs,
+                    measurementWindow: measurementWindow
                 )
             case "swiftui-update-groups":
-                updateGroupsDocument = document
-                updateGroups = MetricsExtractor.parseSwiftUIUpdateGroups(
+                metrics.updateGroupsDocument = document
+                metrics.updateGroups = MetricsExtractor.parseSwiftUIUpdateGroups(
                     document,
-                    maximumValidDurationNs: maximumValidDurationNs
+                    maximumValidDurationNs: maximumValidDurationNs,
+                    measurementWindow: measurementWindow
                 )
             case "swiftui-causes":
-                causes = MetricsExtractor.parseSwiftUICauses(document)
-            case "hitches":
-                hitches = MetricsExtractor.parseEventTable(
+                metrics.causes = MetricsExtractor.parseSwiftUICauses(
                     document,
-                    maximumValidDurationNs: maximumValidDurationNs
+                    measurementWindow: measurementWindow
+                )
+            case "hitches":
+                metrics.hitches = MetricsExtractor.parseEventTable(
+                    document,
+                    maximumValidDurationNs: maximumValidDurationNs,
+                    measurementWindow: measurementWindow
                 )
             case "potential-hangs":
-                hangs = MetricsExtractor.parseEventTable(
+                metrics.hangs = MetricsExtractor.parseEventTable(
                     document,
-                    maximumValidDurationNs: maximumValidDurationNs
+                    maximumValidDurationNs: maximumValidDurationNs,
+                    measurementWindow: measurementWindow
                 )
             case "time-profile":
-                profile = MetricsExtractor.parseTimeProfile(document)
+                metrics.profile = MetricsExtractor.parseTimeProfile(
+                    document,
+                    measurementWindow: measurementWindow
+                )
             default:
                 break
             }
         }
-        let findings = MetricsExtractor.deriveSwiftUIFindings(
-            updateGroupsDocument: updateGroupsDocument,
-            causes: causes
+        metrics.findings = MetricsExtractor.deriveSwiftUIFindings(
+            updateGroupsDocument: metrics.updateGroupsDocument,
+            causes: metrics.causes,
+            measurementWindow: measurementWindow
         )
+        return swiftUIRoot(
+            metrics: metrics,
+            availableSchemas: availableSchemas,
+            measurementWindow: measurementWindow,
+            warnings: warnings
+        )
+    }
 
+    private struct SwiftUIMetrics {
+        var updates: MetricsExtractor.SwiftUIUpdates?
+        var updateGroups: MetricsExtractor.UpdateGroups?
+        var updateGroupsDocument: XctraceQueryDocument?
+        var causes: MetricsExtractor.Causes?
+        var hitches: MetricsExtractor.EventTable?
+        var hangs: MetricsExtractor.EventTable?
+        var profile: MetricsExtractor.TimeProfile?
+        var findings: [CaptureFinding] = []
+    }
+
+    private static func swiftUIRoot(
+        metrics: SwiftUIMetrics,
+        availableSchemas: Set<String>,
+        measurementWindow: XctraceTimeWindow?,
+        warnings: [String]
+    ) -> JSONValue {
         var root: [String: JSONValue] = [:]
-        root["swiftui_updates"] = updates.map { encodeJSON($0.summary) } ?? .object([:])
-        root["swiftui_update_groups"] = updateGroups.map { encodeJSON($0.summary) } ?? .object([:])
-        root["swiftui_causes"] = causes.map { encodeJSON($0.summary) } ?? .object([:])
-        root["hitches"] = hitches.map { encodeJSON($0) } ?? .object([:])
-        root["potential_hangs"] = hangs.map { encodeJSON($0) } ?? .object([:])
-        root["time_profile"] = profile.map { encodeJSON($0.summary) } ?? .object([:])
-        root["top_offenders"] = updates.map { encodeJSON($0.topOffenders) } ?? .array([])
-        root["top_update_groups"] = updateGroups.map { encodeJSON($0.topGroups) } ?? .array([])
-        root["top_causes"] = causes.map { encodeJSON($0.topCauses) } ?? .array([])
-        root["top_frames"] = profile.map { encodeJSON($0.topFrames) } ?? .array([])
-        root["findings"] = encodeJSON(findings)
+        root["swiftui_updates"] = metrics.updates.map { encodeJSON($0.summary) } ?? .object([:])
+        root["swiftui_update_groups"] =
+            metrics.updateGroups.map { encodeJSON($0.summary) } ?? .object([:])
+        root["swiftui_causes"] = metrics.causes.map { encodeJSON($0.summary) } ?? .object([:])
+        root["hitches"] = metrics.hitches.map { encodeJSON($0) } ?? .object([:])
+        root["potential_hangs"] = metrics.hangs.map { encodeJSON($0) } ?? .object([:])
+        root["time_profile"] = metrics.profile.map { encodeJSON($0.summary) } ?? .object([:])
+        root["top_offenders"] = metrics.updates.map { encodeJSON($0.topOffenders) } ?? .array([])
+        root["top_update_groups"] =
+            metrics.updateGroups.map { encodeJSON($0.topGroups) } ?? .array([])
+        root["top_causes"] = metrics.causes.map { encodeJSON($0.topCauses) } ?? .array([])
+        root["top_frames"] = metrics.profile.map { encodeJSON($0.topFrames) } ?? .array([])
+        root["findings"] = encodeJSON(metrics.findings)
         root["available_schemas"] = .array(availableSchemas.sorted().map(JSONValue.string))
+        if let measurementWindow {
+            root["measurement_window"] = .object([
+                "duration_ns": .int(measurementWindow.durationNs),
+                "end_ns": .int(measurementWindow.endNs),
+                "start_ns": .int(measurementWindow.startNs),
+            ])
+        }
         if !warnings.isEmpty {
             root["extractor_warnings"] = .array(warnings.map(JSONValue.string))
         }
         return .object(root)
+    }
+
+    private struct MeasurementWindowResolution {
+        var window: XctraceTimeWindow?
+        var warnings: [String]
+    }
+
+    private static func resolveMeasurementWindow(
+        capture: RunManifest.Capture,
+        tracePath: URL,
+        exporter: XctraceExporting,
+        availableSchemas: Set<String>,
+        debugExportsRoot: URL?,
+        maximumDebugExportBytes: Int?
+    ) throws -> MeasurementWindowResolution {
+        guard let definition = PerfScenarioDefinitions.byID[capture.scenario] else {
+            throw Failure(message: "Unknown performance scenario \(capture.scenario)")
+        }
+        guard !definition.includesBootstrapInMeasurement else {
+            return MeasurementWindowResolution(window: nil, warnings: [])
+        }
+        guard availableSchemas.contains("os-signpost-interval") else {
+            throw Failure(message: "Missing os-signpost-interval schema for \(capture.scenario)")
+        }
+
+        let data = try exporter.exportQuery(tracePath: tracePath, xpath: signpostIntervalsXPath)
+        var warnings: [String] = []
+        if let warning = try retainDebugExportIfNeeded(
+            data,
+            root: debugExportsRoot,
+            filename: "measurement-window.xml",
+            maximumBytes: maximumDebugExportBytes
+        ) {
+            warnings.append(warning)
+        }
+        let document = try XctraceQueryDocument(data: data)
+        let matchingRecords = document.rows.compactMap { row -> [String: String]? in
+            let record = document.record(for: row)
+            guard
+                record["name"] == definition.signpostName,
+                record["category"] == "perf",
+                record["subsystem"] == "io.harnessmonitor"
+            else {
+                return nil
+            }
+            return record
+        }
+        guard matchingRecords.count == 1, let record = matchingRecords.first else {
+            throw Failure(
+                message: [
+                    "Expected one io.harnessmonitor/perf interval named",
+                    "\(definition.signpostName), found \(matchingRecords.count)",
+                ].joined(separator: " "))
+        }
+        guard
+            let startNs = MetricsExtractor.parseInt(record["start"]),
+            let durationNs = MetricsExtractor.parseInt(record["duration"]),
+            let window = XctraceTimeWindow(startNs: startNs, durationNs: durationNs)
+        else {
+            throw Failure(message: "Invalid measurement interval for \(capture.scenario)")
+        }
+        return MeasurementWindowResolution(window: window, warnings: warnings)
     }
 
     private static func extractAllocations(
