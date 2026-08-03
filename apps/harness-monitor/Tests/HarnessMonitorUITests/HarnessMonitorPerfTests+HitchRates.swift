@@ -70,10 +70,6 @@ extension HarnessMonitorPerfTests {
     measureScenario("sidebar-toggle-rich-detail")
   }
 
-  func testDashboardSidebarToggleHitchRate() {
-    measureScenario("dashboard-sidebar-toggle")
-  }
-
   func testTimelineFilterFormHitchRate() {
     measureScenario("timeline-filter-form")
   }

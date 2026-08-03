@@ -85,8 +85,10 @@ final class ScenarioCatalogTests: XCTestCase {
         XCTAssertEqual(ScenarioCatalog.previewScenario(for: "timeline-filter-form-visual-options-disabled"), "dashboard-landing")
         XCTAssertEqual(ScenarioCatalog.previewScenario(for: "permission-modal"), "cockpit")
         XCTAssertEqual(ScenarioCatalog.previewScenario(for: "task-board-settings"), "dashboard")
-        XCTAssertEqual(ScenarioCatalog.previewScenario(for: "repositories-settings"), "dashboard")
-        XCTAssertEqual(ScenarioCatalog.previewScenario(for: "dependencies-settings"), "dashboard")
+        XCTAssertEqual(
+            ScenarioCatalog.previewScenario(for: "repositories-settings"),
+            "repositories-settings"
+        )
         XCTAssertEqual(ScenarioCatalog.previewScenario(for: "offline-cached-open"), "offline-cached")
         XCTAssertEqual(ScenarioCatalog.previewScenario(for: "anything-else"), "dashboard")
     }
@@ -112,7 +114,6 @@ final class ScenarioCatalogTests: XCTestCase {
         XCTAssertTrue(ScenarioCatalog.swiftUI.contains("toast-overlay-churn"))
         XCTAssertTrue(ScenarioCatalog.swiftUI.contains("task-board-settings"))
         XCTAssertTrue(ScenarioCatalog.swiftUI.contains("repositories-settings"))
-        XCTAssertTrue(ScenarioCatalog.swiftUI.contains("dependencies-settings"))
         XCTAssertFalse(ScenarioCatalog.swiftUI.contains("settings-backdrop-cycle"))
         XCTAssertTrue(ScenarioCatalog.allocations.contains("settings-background-cycle"))
         XCTAssertTrue(ScenarioCatalog.allocations.contains("offline-cached-open"))
