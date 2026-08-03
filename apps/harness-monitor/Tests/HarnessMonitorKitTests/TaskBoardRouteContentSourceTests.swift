@@ -15,6 +15,9 @@ struct TaskBoardRouteContentSourceTests {
     let managementHierarchySource = try taskBoardSourceFile(
       named: "TaskBoardItemManagementPanel+Hierarchy.swift"
     )
+    let managementContentSource = try taskBoardSourceFile(
+      named: "TaskBoardItemManagementPanel+Content.swift"
+    )
     let managementComponentsSource = try taskBoardSourceFile(
       named: "TaskBoardItemManagementPanel+Components.swift"
     )
@@ -46,13 +49,13 @@ struct TaskBoardRouteContentSourceTests {
     #expect(selectionModelSource.contains("selectAPIItem(item)"))
     #expect(managementHierarchySource.contains("selectionModel.selectAPIItem(item)"))
     #expect(overviewSource.contains("let inboxItems = currentPresentation.inboxItems(in: lane)"))
-    #expect(managementPanelSource.contains("Session Task"))
-    #expect(managementPanelSource.contains("Board Only"))
+    #expect(managementContentSource.contains("Session Task"))
+    #expect(managementContentSource.contains("Board Only"))
     #expect(managementPanelSource.contains("TaskBoardManagementFacts("))
-    #expect(managementPanelSource.contains("TaskBoardDescriptionSection("))
+    #expect(managementContentSource.contains("TaskBoardDescriptionSection("))
     #expect(managementPanelSource.contains("TaskBoardExternalLinks("))
-    #expect(managementPanelSource.contains(".harnessDismissButtonStyle()"))
-    #expect(managementPanelSource.contains("xmark.circle.fill"))
+    #expect(managementContentSource.contains(".harnessDismissButtonStyle()"))
+    #expect(managementContentSource.contains("xmark.circle.fill"))
     #expect(!managementPanelSource.contains(".harnessAccessoryButtonStyle(tint: .secondary)"))
     #expect(
       managementPanelSource.contains(
@@ -75,9 +78,9 @@ struct TaskBoardRouteContentSourceTests {
     #expect(managementSupportSource.contains("maxHeight: minHeight"))
     #expect(managementSupportSource.contains("harness.task-board.manage-item.body-preview"))
     #expect(managementActionsSource.contains("Evaluate Item Live"))
-    #expect(managementActionsSource.contains("Preview Run Once"))
+    #expect(managementActionsSource.contains("Run Once"))
     #expect(managementActionsSource.contains(".confirmationDialog("))
-    #expect(managementPanelSource.contains("TaskBoardPlanLifecycleActionButtons("))
+    #expect(managementContentSource.contains("TaskBoardPlanLifecycleActionButtons("))
     #expect(!managementPanelSource.contains("metrics.managementPanelCornerRadius"))
     #expect(managementSupportSource.contains("Label(\"Begin Plan\""))
     #expect(managementSupportSource.contains("Label(\"Submit Plan\""))
@@ -95,7 +98,7 @@ struct TaskBoardRouteContentSourceTests {
     let unifiedSource = try taskBoardSourceFile(named: "TaskBoardLaneUnifiedColumn.swift")
     let listTunerSource = try taskBoardSourceFile(named: "TaskBoardNativeListTuner.swift")
     let dragRuntimeSource = try taskBoardSourceFile(named: "TaskBoardCardDragRuntime.swift")
-    let laneSupportSource = try taskBoardSourceFile(named: "TaskBoardLaneSupport.swift")
+    let cardChromeSource = try taskBoardSourceFile(named: "TaskBoardCardChrome.swift")
     let boardSource = try taskBoardSourceFile(named: "TaskBoardOverviewView+Board.swift")
 
     #expect(overviewSource.contains("lane.taskBoardDropStatus"))
@@ -127,7 +130,7 @@ struct TaskBoardRouteContentSourceTests {
     #expect(!unifiedSource.contains(".onDrop("))
     #expect(!unifiedSource.contains("let dragPayload:"))
     #expect(
-      laneSupportSource.contains(
+      cardChromeSource.contains(
         """
         lineWidth: cardStrokeWidth
                   )
@@ -158,14 +161,14 @@ struct TaskBoardRouteContentSourceTests {
     #expect(supportSource.contains("SessionSidebarMultiSelect.resolve("))
   }
 
-  @Test("Task board custom selection replaces the native rectangular focus effect")
-  func taskBoardCustomSelectionReplacesNativeRectangularFocusEffect() throws {
-    let supportSource = try taskBoardSourceFile(named: "TaskBoardLaneSupport.swift")
+  @Test("Task board custom selection retains the native focus effect")
+  func taskBoardCustomSelectionRetainsNativeFocusEffect() throws {
+    let cardChromeSource = try taskBoardSourceFile(named: "TaskBoardCardChrome.swift")
     let laneSource = try taskBoardSourceFile(named: "TaskBoardLaneUnifiedColumn.swift")
 
-    #expect(supportSource.contains(".focusEffectDisabled(isSelected)"))
-    #expect(supportSource.contains("if isSelected {"))
-    #expect(supportSource.contains("isSelected ? 2"))
+    #expect(!cardChromeSource.contains(".focusEffectDisabled("))
+    #expect(cardChromeSource.contains("if isSelected {"))
+    #expect(cardChromeSource.contains("isSelected ? 2"))
     #expect(!laneSource.contains(".selectionDisabled()"))
   }
 
@@ -181,13 +184,14 @@ struct TaskBoardRouteContentSourceTests {
     let overviewViewSource = try taskBoardSourceFile(named: "TaskBoardOverviewView.swift")
     let laneSource = try taskBoardSourceFile(named: "TaskBoardLaneViews.swift")
     let unifiedSource = try taskBoardSourceFile(named: "TaskBoardLaneUnifiedColumn.swift")
+    let unifiedRowsSource = try taskBoardSourceFile(named: "TaskBoardLaneUnifiedColumn+Rows.swift")
 
     #expect(
       !boardSource.contains(".contextMenu(forSelectionType: TaskBoardCardID.self)")
     )
     #expect(!unifiedSource.contains(".contextMenu {"))
-    #expect(unifiedSource.contains(".background {"))
-    #expect(unifiedSource.contains("TaskBoardCardContextMenu(cardID: cardID"))
+    #expect(unifiedRowsSource.contains(".background {"))
+    #expect(unifiedRowsSource.contains("TaskBoardCardContextMenu(cardID: cardID"))
     #expect(
       contextMenuSource.contains(
         "struct TaskBoardCardContextMenu: NSViewRepresentable"
