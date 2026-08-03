@@ -274,6 +274,22 @@ fn list_item_by_id<'a>(response: &'a Value, item_id: &str) -> &'a Value {
 }
 
 async fn seed_sensitive_item(state: &crate::daemon::http::DaemonHttpState) {
+    let db = state.async_db.get().expect("async db");
+    // The read-only repository-scope gate resolves a GitHub-linked item's
+    // repository from `execution_repository`, falling back to `project_id`
+    // only when `execution_repository` is unset. Setting it explicitly below
+    // keeps that gate from tripping over this item's deliberately
+    // credential-bearing `project_id` (the actual subject under test), and
+    // the configured inbox repository keeps the gate from filtering the item
+    // out of read results entirely.
+    let mut settings = db
+        .task_board_orchestrator_settings()
+        .await
+        .expect("load orchestrator settings");
+    settings.github_inbox.repositories = vec!["owner/repo".to_string()];
+    db.replace_task_board_orchestrator_settings(&settings)
+        .await
+        .expect("configure inbox repository scope");
     let item: TaskBoardItem = serde_json::from_value(json!({
         "schema_version": 1,
         "id": ITEM_ID,
@@ -291,6 +307,7 @@ async fn seed_sensitive_item(state: &crate::daemon::http::DaemonHttpState) {
         "lane_set_at": "2026-07-13T00:00:30Z",
         "tags": ["github_pat_abcdefghijklmnopqrstuvwxyz123456"],
         "project_id": "https://user:password@example.com/repo",
+        "execution_repository": "owner/repo",
         "target_project_types": ["github"],
         "agent_mode": "headless",
         "external_refs": [{
@@ -313,11 +330,7 @@ async fn seed_sensitive_item(state: &crate::daemon::http::DaemonHttpState) {
         "updated_at": "2026-07-13T00:01:00Z"
     }))
     .expect("sensitive task item");
-    state
-        .async_db
-        .get()
-        .expect("async db")
-        .create_task_board_item(item)
+    db.create_task_board_item(item)
         .await
         .expect("seed task item");
 }

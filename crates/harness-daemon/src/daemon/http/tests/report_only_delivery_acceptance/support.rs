@@ -140,6 +140,13 @@ async fn start_public_review_with_override(
         json!({ "enabled": false }),
     )
     .await;
+    put_json(
+        &client,
+        &base_url,
+        http_paths::TASK_BOARD_ORCHESTRATOR_SETTINGS,
+        json!({ "github_inbox": { "repositories": ["example/compass"] } }),
+    )
+    .await;
     let created = post_json(
         &client,
         &base_url,
