@@ -15,6 +15,16 @@ pub(super) fn register(registry: &mut ToolRegistry) {
                 input_schema: sync_schema,
             },
             TaskBoardToolDescriptor {
+                name: ws_methods::TASK_BOARD_SYNC_CANCEL,
+                description: "Cancel the active task-board synchronization.",
+                input_schema: empty_object_schema,
+            },
+            TaskBoardToolDescriptor {
+                name: ws_methods::TASK_BOARD_SYNC_STATUS,
+                description: "Read the active task-board synchronization status.",
+                input_schema: empty_object_schema,
+            },
+            TaskBoardToolDescriptor {
                 name: ws_methods::TASK_BOARD_DISPATCH,
                 description: "Dispatch task-board work through the daemon.",
                 input_schema: dispatch_schema,

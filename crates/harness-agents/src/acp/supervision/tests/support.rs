@@ -1,5 +1,6 @@
 use std::fmt;
 use std::fs;
+use std::ops::{Deref, DerefMut};
 use std::path::Path;
 use std::process::{Child, Command};
 use std::thread;
@@ -18,7 +19,30 @@ pub(super) fn ok<T, E: fmt::Debug>(result: Result<T, E>, context: &str) -> T {
     }
 }
 
-pub(super) fn spawn_sleep_child() -> Child {
+pub(super) struct TestChild(Child);
+
+impl Deref for TestChild {
+    type Target = Child;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for TestChild {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl Drop for TestChild {
+    fn drop(&mut self) {
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+    }
+}
+
+pub(super) fn spawn_sleep_child() -> TestChild {
     #[cfg(unix)]
     {
         use std::os::unix::process::CommandExt;
@@ -26,14 +50,14 @@ pub(super) fn spawn_sleep_child() -> Child {
         let mut cmd = Command::new("sleep");
         cmd.arg("60");
         cmd.process_group(0);
-        ok(cmd.spawn(), "spawn sleep")
+        TestChild(ok(cmd.spawn(), "spawn sleep"))
     }
     #[cfg(not(unix))]
     {
-        ok(
+        TestChild(ok(
             Command::new("timeout").args(["/t", "60"]).spawn(),
             "spawn timeout",
-        )
+        ))
     }
 }
 

@@ -83,6 +83,23 @@ fn task_board_ws_parity_part_1() -> Vec<(HttpRouteMethod, &'static str, &'static
             ws_methods::TASK_BOARD_SYNC,
             true,
         ),
+    ]
+}
+
+fn task_board_ws_parity_part_2() -> Vec<(HttpRouteMethod, &'static str, &'static str, bool)> {
+    vec![
+        (
+            HttpRouteMethod::Post,
+            http_paths::TASK_BOARD_SYNC_CANCEL,
+            ws_methods::TASK_BOARD_SYNC_CANCEL,
+            true,
+        ),
+        (
+            HttpRouteMethod::Get,
+            http_paths::TASK_BOARD_SYNC_STATUS,
+            ws_methods::TASK_BOARD_SYNC_STATUS,
+            true,
+        ),
         (
             HttpRouteMethod::Post,
             http_paths::TASK_BOARD_DISPATCH,
@@ -99,23 +116,6 @@ fn task_board_ws_parity_part_1() -> Vec<(HttpRouteMethod, &'static str, &'static
             HttpRouteMethod::Post,
             http_paths::TASK_BOARD_DISPATCH_PICK,
             ws_methods::TASK_BOARD_DISPATCH_PICK,
-            true,
-        ),
-    ]
-}
-
-fn task_board_ws_parity_part_2() -> Vec<(HttpRouteMethod, &'static str, &'static str, bool)> {
-    vec![
-        (
-            HttpRouteMethod::Post,
-            http_paths::TASK_BOARD_SYNC_CANCEL,
-            ws_methods::TASK_BOARD_SYNC_CANCEL,
-            true,
-        ),
-        (
-            HttpRouteMethod::Get,
-            http_paths::TASK_BOARD_SYNC_STATUS,
-            ws_methods::TASK_BOARD_SYNC_STATUS,
             true,
         ),
         (
@@ -142,6 +142,12 @@ fn task_board_ws_parity_part_2() -> Vec<(HttpRouteMethod, &'static str, &'static
             ws_methods::TASK_BOARD_PROJECTS_UPDATE,
             true,
         ),
+    ]
+}
+
+fn task_board_ws_parity_part_2_continued()
+-> Vec<(HttpRouteMethod, &'static str, &'static str, bool)> {
+    vec![
         (
             HttpRouteMethod::Get,
             http_paths::TASK_BOARD_MACHINES,
@@ -190,6 +196,11 @@ fn task_board_ws_parity_part_2() -> Vec<(HttpRouteMethod, &'static str, &'static
             ws_methods::TASK_BOARD_ORCHESTRATOR_RUN_ONCE,
             true,
         ),
+    ]
+}
+
+fn task_board_ws_parity_part_3() -> Vec<(HttpRouteMethod, &'static str, &'static str, bool)> {
+    vec![
         (
             HttpRouteMethod::Get,
             http_paths::TASK_BOARD_ORCHESTRATOR_SETTINGS,
@@ -202,11 +213,6 @@ fn task_board_ws_parity_part_2() -> Vec<(HttpRouteMethod, &'static str, &'static
             ws_methods::TASK_BOARD_ORCHESTRATOR_SETTINGS_UPDATE,
             true,
         ),
-    ]
-}
-
-fn task_board_ws_parity_part_3() -> Vec<(HttpRouteMethod, &'static str, &'static str, bool)> {
-    vec![
         (
             HttpRouteMethod::Get,
             http_paths::TASK_BOARD_ORCHESTRATOR_RUNTIME_CONFIG,
@@ -243,6 +249,12 @@ fn task_board_ws_parity_part_3() -> Vec<(HttpRouteMethod, &'static str, &'static
             ws_methods::TASK_BOARD_GIT_SIGNING_VERIFY,
             true,
         ),
+    ]
+}
+
+fn task_board_ws_parity_part_3_continued()
+-> Vec<(HttpRouteMethod, &'static str, &'static str, bool)> {
+    vec![
         (
             HttpRouteMethod::Put,
             http_paths::TASK_BOARD_GIT_RUNTIME_KEY_MATERIAL,
@@ -307,7 +319,9 @@ pub(super) fn expected_task_board_ws_parity()
     let mut expected = Vec::new();
     expected.extend(task_board_ws_parity_part_1());
     expected.extend(task_board_ws_parity_part_2());
+    expected.extend(task_board_ws_parity_part_2_continued());
     expected.extend(task_board_ws_parity_part_3());
+    expected.extend(task_board_ws_parity_part_3_continued());
     expected.extend(more::task_board_ws_parity_part_4());
     expected.extend(more::task_board_ws_parity_part_5());
     expected.extend(more::task_board_ws_parity_part_6());

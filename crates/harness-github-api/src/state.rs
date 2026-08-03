@@ -1,7 +1,5 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
-#[cfg(any(test, feature = "test-support"))]
-use std::sync::MutexGuard;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 use std::time::Duration;
@@ -44,23 +42,15 @@ fn daemon_root() -> PathBuf {
 }
 
 #[cfg(any(test, feature = "test-support"))]
-static GLOBAL_BUDGET_TEST_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+static GLOBAL_BUDGET_TEST_LOCK: OnceLock<Arc<AsyncMutex<()>>> = OnceLock::new();
 
 /// Serialize access to the shared rate-budget state across tests that
 /// exercise it directly, so one test's `reset_for_test` can't clobber
 /// another's in-flight assertions.
-///
-/// # Panics
-/// Panics if the lock is poisoned by another test panicking while holding
-/// it.
 #[cfg(any(test, feature = "test-support"))]
-// Held across the `reset_for_test` await deliberately: that is the
-// exclusivity guarantee this lock exists for, not an accidental hold in
-// production async code that could stall a scheduler.
-#[allow(clippy::await_holding_lock)]
-pub async fn acquire_global_budget_test_lock() -> MutexGuard<'static, ()> {
-    let lock = GLOBAL_BUDGET_TEST_LOCK.get_or_init(|| Mutex::new(()));
-    let guard = lock.lock().expect("global budget test lock poisoned");
+pub async fn acquire_global_budget_test_lock() -> OwnedMutexGuard<()> {
+    let lock = Arc::clone(GLOBAL_BUDGET_TEST_LOCK.get_or_init(|| Arc::new(AsyncMutex::new(()))));
+    let guard = lock.lock_owned().await;
     global_state().budget.reset_for_test().await;
     guard
 }

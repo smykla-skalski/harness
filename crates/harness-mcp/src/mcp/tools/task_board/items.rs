@@ -30,6 +30,16 @@ pub(super) fn register(registry: &mut ToolRegistry) {
                 input_schema: id_only_schema,
             },
             TaskBoardToolDescriptor {
+                name: ws_methods::TASK_BOARD_REVIEW_REPORT_GET,
+                description: "Fetch one task-board item's review report.",
+                input_schema: id_only_schema,
+            },
+            TaskBoardToolDescriptor {
+                name: ws_methods::TASK_BOARD_WORKFLOW_PROGRESS_GET,
+                description: "Fetch one task-board item's workflow progress.",
+                input_schema: id_only_schema,
+            },
+            TaskBoardToolDescriptor {
                 name: ws_methods::TASK_BOARD_POSITION_GET,
                 description: "Fetch one task-board item's canonical lane position snapshot.",
                 input_schema: id_only_schema,

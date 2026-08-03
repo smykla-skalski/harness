@@ -45,6 +45,12 @@ fn excluded_task(external_id: &str) -> ExternalTask {
     value
 }
 
+type RestoreCall = (
+    TaskBoardSyncItemSnapshot,
+    TaskBoardItemPatch,
+    Option<Vec<TaskBoardSyncConflict>>,
+);
+
 #[derive(Default)]
 struct FakeStore {
     // Outer: whether the test configured a canned hide result at all; inner:
@@ -53,13 +59,7 @@ struct FakeStore {
     hide_result: Mutex<Option<Option<TaskBoardItem>>>,
     hide_seen: Mutex<Option<(TaskBoardItemPatch, Option<Vec<TaskBoardSyncConflict>>)>>,
     restore_result: Mutex<Option<ProviderExclusionRestoreOutcome>>,
-    restore_seen: Mutex<
-        Option<(
-            TaskBoardSyncItemSnapshot,
-            TaskBoardItemPatch,
-            Option<Vec<TaskBoardSyncConflict>>,
-        )>,
-    >,
+    restore_seen: Mutex<Option<RestoreCall>>,
 }
 
 impl TaskBoardExternalCreateStore for FakeStore {}

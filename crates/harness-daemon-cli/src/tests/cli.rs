@@ -125,13 +125,25 @@ fn daemon_dev_execution_plan_skips_blank_codex_ws_url() {
         enable_acp: false,
         disable_acp: false,
     };
-    temp_env::with_var("HARNESS_APP_GROUP_ID", Some("com.user.preset"), || {
-        let plan = dev.execution_plan();
-        assert!(matches!(
-            plan.serve_config.codex_transport,
-            harness_daemon::daemon::codex_transport::CodexTransportKind::Stdio
-        ));
-    });
+    let daemon_data_home = std::env::temp_dir().join(format!(
+        "harness-daemon-cli-codex-transport-{}",
+        std::process::id()
+    ));
+    let daemon_data_home = daemon_data_home.to_str().expect("UTF-8 temporary path");
+    temp_env::with_vars(
+        [
+            ("HARNESS_APP_GROUP_ID", Some("com.user.preset")),
+            ("HARNESS_DAEMON_DATA_HOME", Some(daemon_data_home)),
+            ("HARNESS_CODEX_WS_URL", None),
+        ],
+        || {
+            let plan = dev.execution_plan();
+            assert!(matches!(
+                plan.serve_config.codex_transport,
+                harness_daemon::daemon::codex_transport::CodexTransportKind::Stdio
+            ));
+        },
+    );
 }
 
 #[test]

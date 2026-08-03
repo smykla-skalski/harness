@@ -16,6 +16,13 @@ use super::support::{ok, spawn_sleep_child, wait_for_file_marker};
 use crate::acp::client::DAEMON_SHUTDOWN;
 use crate::kind::DisconnectReason;
 
+fn watchdog_config(watchdog_timeout: Duration) -> SupervisionConfig {
+    SupervisionConfig {
+        watchdog_timeout,
+        ..SupervisionConfig::default()
+    }
+}
+
 #[tokio::test(start_paused = true)]
 async fn supervisor_starts_paused() {
     let child = spawn_sleep_child();
@@ -74,8 +81,7 @@ async fn client_call_guard_pauses_watchdog() {
 
 #[tokio::test(start_paused = true)]
 async fn watchdog_does_not_fire_while_paused() {
-    let mut config = SupervisionConfig::default();
-    config.watchdog_timeout = Duration::from_millis(10);
+    let config = watchdog_config(Duration::from_millis(10));
 
     let child = spawn_sleep_child();
     let supervisor = AcpSessionSupervisor::new(&child, config);
@@ -93,8 +99,7 @@ async fn watchdog_does_not_fire_while_paused() {
 
 #[tokio::test(start_paused = true)]
 async fn idle_supervisor_does_not_fire_watchdog() {
-    let mut config = SupervisionConfig::default();
-    config.watchdog_timeout = Duration::from_millis(10);
+    let config = watchdog_config(Duration::from_millis(10));
 
     let child = spawn_sleep_child();
     let supervisor = AcpSessionSupervisor::new(&child, config);
@@ -113,8 +118,7 @@ async fn idle_supervisor_does_not_fire_watchdog() {
 
 #[tokio::test(start_paused = true)]
 async fn watchdog_fires_after_timeout() {
-    let mut config = SupervisionConfig::default();
-    config.watchdog_timeout = Duration::from_millis(10);
+    let config = watchdog_config(Duration::from_millis(10));
 
     let child = spawn_sleep_child();
     let supervisor = AcpSessionSupervisor::new(&child, config);
@@ -132,8 +136,7 @@ async fn watchdog_fires_after_timeout() {
 
 #[tokio::test(start_paused = true)]
 async fn watchdog_loop_returns_watchdog_fired_after_timeout() {
-    let mut config = SupervisionConfig::default();
-    config.watchdog_timeout = Duration::from_millis(10);
+    let config = watchdog_config(Duration::from_millis(10));
 
     let child = spawn_sleep_child();
     let supervisor = Arc::new(AcpSessionSupervisor::new(&child, config));
@@ -149,8 +152,7 @@ async fn watchdog_loop_returns_watchdog_fired_after_timeout() {
 
 #[tokio::test(start_paused = true)]
 async fn watchdog_loop_does_not_fire_for_idle_agent() {
-    let mut config = SupervisionConfig::default();
-    config.watchdog_timeout = Duration::from_millis(20);
+    let config = watchdog_config(Duration::from_millis(20));
 
     let child = spawn_sleep_child();
     let supervisor = Arc::new(AcpSessionSupervisor::new(&child, config));
@@ -177,8 +179,7 @@ async fn watchdog_loop_does_not_fire_for_idle_agent() {
 
 #[tokio::test(start_paused = true)]
 async fn watchdog_loop_returns_none_when_session_is_done() {
-    let mut config = SupervisionConfig::default();
-    config.watchdog_timeout = Duration::from_mins(1);
+    let config = watchdog_config(Duration::from_mins(1));
 
     let child = spawn_sleep_child();
     let supervisor = Arc::new(AcpSessionSupervisor::new(&child, config));
@@ -202,8 +203,7 @@ async fn watchdog_loop_returns_none_when_session_is_done() {
 
 #[tokio::test(start_paused = true)]
 async fn record_event_resets_watchdog() {
-    let mut config = SupervisionConfig::default();
-    config.watchdog_timeout = Duration::from_millis(100);
+    let config = watchdog_config(Duration::from_millis(100));
 
     let child = spawn_sleep_child();
     let supervisor = AcpSessionSupervisor::new(&child, config);
