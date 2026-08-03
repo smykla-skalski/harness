@@ -18,6 +18,7 @@ struct SettingsRepositoryWorkingDirectoriesSection: View {
   @State private var obtaining: Set<String> = []
   @State private var reclaiming: Set<String> = []
   @State private var folderImport = RepositoryFolderImportRequest()
+  @State private var materializedRepositoryCount = 0
   /// Live obtain progress per repository, fed by the catch-all
   /// `observeAllWorkingCopyProgress()` subscription. Terminal events drop the
   /// entry, returning the row to its resolved or retry state.
@@ -40,7 +41,7 @@ struct SettingsRepositoryWorkingDirectoriesSection: View {
         Text("Add a repository above to choose its working directory")
           .foregroundStyle(.secondary)
       } else {
-        ForEach(Array(repositories.enumerated()), id: \.offset) { _, repository in
+        ForEach(Array(materializedRepositories.enumerated()), id: \.element) { _, repository in
           row(for: repository)
         }
       }
@@ -52,6 +53,7 @@ struct SettingsRepositoryWorkingDirectoriesSection: View {
         .foregroundStyle(.secondary)
     }
     .task(id: repositories) { await reload() }
+    .task(id: repositories) { await materializeRepositories() }
     .task { await observeProgress() }
     .fileImporter(
       isPresented: $folderImport.isPresented,
@@ -64,6 +66,21 @@ struct SettingsRepositoryWorkingDirectoriesSection: View {
           await reload()
         }
       }
+    }
+  }
+
+  private var materializedRepositories: ArraySlice<String> {
+    repositories.prefix(min(materializedRepositoryCount, repositories.count))
+  }
+
+  private func materializeRepositories() async {
+    while materializedRepositoryCount < repositories.count {
+      do {
+        try await Task.sleep(for: .milliseconds(16))
+      } catch {
+        return
+      }
+      materializedRepositoryCount = min(materializedRepositoryCount + 8, repositories.count)
     }
   }
 

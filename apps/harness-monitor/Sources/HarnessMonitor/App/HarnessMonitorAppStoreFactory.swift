@@ -46,6 +46,7 @@ enum HarnessMonitorAppStoreFactory {
     case taskDrop = "task-drop"
     case taskBoardBoardOnly = "task-board-board-only"
     case taskBoardDragPerformance = "task-board-drag-performance"
+    case repositoriesSettings = "repositories-settings"
     case offlineCached = "offline-cached"
     case overflow
     case empty
@@ -86,6 +87,8 @@ enum HarnessMonitorAppStoreFactory {
         .taskBoardBoardOnly
       case .taskBoardDragPerformance:
         .taskBoardDragPerformance
+      case .repositoriesSettings:
+        .repositoriesSettings
       case .offlineCached:
         .offlineCached
       case .overflow:

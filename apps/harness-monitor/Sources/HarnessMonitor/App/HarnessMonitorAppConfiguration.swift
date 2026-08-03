@@ -41,6 +41,12 @@ struct HarnessMonitorAppConfiguration {
       base: daemonOwnershipPreferenceEnvironment(base: baseEnvironment, defaults: defaults)
     )
     let perfScenario = HarnessMonitorPerfScenario(environment: environment)
+    if let perfScenario {
+      defaults.set(
+        perfInitialDashboardRoute(for: perfScenario).rawValue,
+        forKey: DashboardRouteRestorationDefaults.storageKey
+      )
+    }
     let resolvedEnvironment = perfScenario?.applyingDefaults(to: environment) ?? environment
     let isUITesting = resolvedEnvironment.values[uiTestsEnvironmentKey] == "1"
     let launchMode = HarnessMonitorLaunchMode(environment: resolvedEnvironment)
@@ -92,6 +98,12 @@ struct HarnessMonitorAppConfiguration {
       settingsInitialSection: perfScenario?.initialSettingsSection ?? .general,
       environment: resolvedEnvironment
     )
+  }
+
+  static func perfInitialDashboardRoute(
+    for scenario: HarnessMonitorPerfScenario
+  ) -> DashboardWindowRoute {
+    scenario == .repositoriesSettings ? .agents : .taskBoard
   }
 
   static func resolveUITestOverrides(

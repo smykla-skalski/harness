@@ -24,7 +24,7 @@ pub fn data_root() -> PathBuf {
 }
 
 #[cfg(target_os = "macos")]
-#[expect(
+#[allow(
     clippy::cognitive_complexity,
     reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
 )]

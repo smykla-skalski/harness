@@ -7,23 +7,23 @@ use crate::daemon::protocol::{
     TaskBoardAuditRequest, TaskBoardAuditResponse, TaskBoardCatalogRequest,
     TaskBoardCreateItemRequest, TaskBoardDeleteItemRequest, TaskBoardGetItemRequest,
     TaskBoardHostListResponse, TaskBoardHostLocalResponse, TaskBoardHostSetProjectTypesRequest,
-    TaskBoardHostSetProjectTypesResponse, TaskBoardMachinesResponse, TaskBoardPlanApproveRequest,
-    TaskBoardPlanBeginRequest, TaskBoardPlanRevokeRequest, TaskBoardPlanSubmitRequest,
-    TaskBoardPlanningResponse, TaskBoardProjectUpdateRequest, TaskBoardProjectUpdateResponse,
-    TaskBoardProjectsResponse, TaskBoardSyncCancelResponse, TaskBoardSyncRequest,
-    TaskBoardSyncResponse, TaskBoardSyncStatusResponse, TaskBoardUpdateItemRequest,
+    TaskBoardHostSetProjectTypesResponse, TaskBoardMachinesResponse, TaskBoardProjectUpdateRequest,
+    TaskBoardProjectUpdateResponse, TaskBoardProjectsResponse, TaskBoardSyncCancelResponse,
+    TaskBoardSyncRequest, TaskBoardSyncResponse, TaskBoardSyncStatusResponse,
+    TaskBoardUpdateItemRequest,
 };
-use crate::task_board::planning::PlanningTransition;
 use crate::task_board::{
-    ExternalSyncConfig, Machine, SpawnGateSwitches, TaskBoardItem, approve_plan, begin_planning,
-    build_audit_summary_with_policy, build_machine_summaries, build_project_summaries,
-    build_sync_summary, revoke_plan, submit_plan,
+    ExternalSyncConfig, Machine, SpawnGateSwitches, TaskBoardItem, build_audit_summary_with_policy,
+    build_machine_summaries, build_project_summaries, build_sync_summary,
 };
 use crate::workspace::utc_now;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::task_board::load_live_spawn_grants;
 use crate::daemon::db::task_board::prelude::*;
+use super::task_board_repository_scope::{
+    TaskBoardRepositoryScope, scoped_task_board_item_db, scoped_task_board_items_db,
+};
 
 pub(crate) use crate::task_board::external::{
     TaskBoardSyncCoordinatorFence, TaskBoardSyncCoordinatorFenceDecision,
@@ -32,6 +32,7 @@ pub(crate) use crate::task_board::external::{
 #[cfg(test)]
 mod external_ref_tests;
 mod list_items;
+mod planning;
 mod positions;
 mod provider_sync_context_store;
 mod provider_sync_exclusion;
@@ -50,6 +51,10 @@ mod update_request;
 mod workflow_progress;
 
 pub(crate) use list_items::read_task_board_items_db;
+pub(crate) use planning::{
+    approve_task_board_plan_db, begin_task_board_planning_db, revoke_task_board_plan_db,
+    submit_task_board_plan_db,
+};
 pub(crate) use positions::{
     get_task_board_item_position_snapshot_db, reset_task_board_item_position_db,
     set_task_board_item_position_db,
@@ -113,6 +118,9 @@ pub(crate) async fn create_task_board_item_db(
     }
     item.session_id.clone_from(&request.session_id);
     item.work_item_id.clone_from(&request.work_item_id);
+    TaskBoardRepositoryScope::load(db)
+        .await?
+        .ensure_item(&item)?;
     let mutation = if request.status.is_some() {
         Box::pin(db.create_task_board_item_at_requested_status(item)).await?
     } else {
@@ -125,7 +133,7 @@ pub(crate) async fn get_task_board_item_db(
     db: &AsyncDaemonDb,
     request: &TaskBoardGetItemRequest,
 ) -> Result<TaskBoardItem, CliError> {
-    db.task_board_item(&request.id).await
+    scoped_task_board_item_db(db, &request.id).await
 }
 
 pub(crate) async fn update_task_board_item_db(
@@ -134,10 +142,13 @@ pub(crate) async fn update_task_board_item_db(
     request: &TaskBoardUpdateItemRequest,
 ) -> Result<TaskBoardItem, CliError> {
     validate_update_estimates(request)?;
+    scoped_task_board_item_db(db, id).await?;
     super::task_board_completion::validate_linked_task_completion(db, id, request.status).await?;
+    let scope = TaskBoardRepositoryScope::load(db).await?;
     let mutation = db
         .update_task_board_item_with_triage(id, |item| {
             apply_update_request(item, request)?;
+            scope.ensure_item(item)?;
             Ok(true)
         })
         .await?
@@ -149,49 +160,15 @@ pub(crate) async fn delete_task_board_item_db(
     db: &AsyncDaemonDb,
     request: &TaskBoardDeleteItemRequest,
 ) -> Result<TaskBoardItem, CliError> {
+    scoped_task_board_item_db(db, &request.id).await?;
     Ok(db.delete_task_board_item(&request.id).await?.item)
-}
-
-pub(crate) async fn begin_task_board_planning_db(
-    db: &AsyncDaemonDb,
-    request: &TaskBoardPlanBeginRequest,
-) -> Result<TaskBoardPlanningResponse, CliError> {
-    apply_planning_transition_db(db, &request.id, begin_planning).await
-}
-
-pub(crate) async fn submit_task_board_plan_db(
-    db: &AsyncDaemonDb,
-    request: &TaskBoardPlanSubmitRequest,
-) -> Result<TaskBoardPlanningResponse, CliError> {
-    apply_planning_transition_db(db, &request.id, |item| submit_plan(item, &request.summary)).await
-}
-
-pub(crate) async fn approve_task_board_plan_db(
-    db: &AsyncDaemonDb,
-    request: &TaskBoardPlanApproveRequest,
-) -> Result<TaskBoardPlanningResponse, CliError> {
-    let approved_at = request.approved_at.clone().unwrap_or_else(utc_now);
-    apply_planning_transition_db(db, &request.id, |item| {
-        approve_plan(item, &request.approved_by, &approved_at)
-    })
-    .await
-}
-
-pub(crate) async fn revoke_task_board_plan_db(
-    db: &AsyncDaemonDb,
-    request: &TaskBoardPlanRevokeRequest,
-) -> Result<TaskBoardPlanningResponse, CliError> {
-    apply_planning_transition_db(db, &request.id, |item| {
-        revoke_plan(item, request.actor.as_deref())
-    })
-    .await
 }
 
 pub(crate) async fn audit_task_board_db(
     db: &AsyncDaemonDb,
     request: &TaskBoardAuditRequest,
 ) -> Result<TaskBoardAuditResponse, CliError> {
-    let items = db.list_task_board_items(request.status).await?;
+    let items = scoped_task_board_items_db(db, request.status).await?;
     let workspace = db.load_policy_workspace().await?;
     let policy = workspace
         .as_ref()
@@ -216,8 +193,9 @@ pub(crate) async fn list_task_board_projects_db(
     db: &AsyncDaemonDb,
     request: &TaskBoardCatalogRequest,
 ) -> Result<TaskBoardProjectsResponse, CliError> {
-    let items = db.list_task_board_items(request.status).await?;
-    let projects = db.list_task_board_projects().await?;
+    let scope = TaskBoardRepositoryScope::load(db).await?;
+    let items = scope.filter_items(db.list_task_board_items(request.status).await?);
+    let projects = scope.filter_projects(db.list_task_board_projects().await?);
     Ok(build_project_summaries(&items, &projects))
 }
 
@@ -266,7 +244,7 @@ pub(crate) async fn list_task_board_machines_db(
     db: &AsyncDaemonDb,
     request: &TaskBoardCatalogRequest,
 ) -> Result<TaskBoardMachinesResponse, CliError> {
-    let items = db.list_task_board_items(request.status).await?;
+    let items = scoped_task_board_items_db(db, request.status).await?;
     Ok(build_machine_summaries(&items))
 }
 
@@ -311,7 +289,7 @@ pub(crate) async fn sync_task_board_db(
             .await;
     }
     let config = active_external_sync_config_db(db).await?;
-    let items = db.list_task_board_items(request.status).await?;
+    let items = scoped_task_board_items_db(db, request.status).await?;
     let response = build_sync_summary(&items, &config);
     let db = db.clone();
     let request = request.clone();
@@ -448,28 +426,6 @@ pub(crate) async fn active_external_sync_config_db(
         )
         .with_github_import_labels_override(&settings.github_inbox.label_filter),
     )
-}
-
-async fn apply_planning_transition_db(
-    db: &AsyncDaemonDb,
-    id: &str,
-    transition_for: impl FnOnce(&TaskBoardItem) -> PlanningTransition,
-) -> Result<TaskBoardPlanningResponse, CliError> {
-    let mut transition = None;
-    let mutation = db
-        .update_task_board_item(id, |item| {
-            let next = transition_for(item);
-            item.status = next.to_status;
-            item.planning.clone_from(&next.planning);
-            transition = Some(next);
-            Ok(true)
-        })
-        .await?
-        .expect("task-board planning transition always mutates");
-    Ok(TaskBoardPlanningResponse {
-        transition: transition.expect("task-board transition was captured"),
-        item: mutation.item,
-    })
 }
 
 async fn ensure_local_machine(db: &AsyncDaemonDb) -> Result<Machine, CliError> {

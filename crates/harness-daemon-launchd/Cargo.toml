@@ -1,14 +1,14 @@
 [package]
 name = "harness-daemon-launchd"
-version = "56.0.0"
+version = "57.0.0"
 edition = "2024"
 rust-version = "1.95"
 publish = false
 
 [dependencies]
 fs-err = "3.3.0"
-harness-daemon-root = { path = "../harness-daemon-root", version = "56.0.0" }
-harness-kernel = { path = "../harness-kernel", version = "56.0.0" }
+harness-daemon-root = { path = "../harness-daemon-root", version = "57.0.0" }
+harness-kernel = { path = "../harness-kernel", version = "57.0.0" }
 serde = { version = "1.0.228", features = ["derive"] }
 tracing = "0.1.44"
 utoipa = "5.5.0"

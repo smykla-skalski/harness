@@ -20,6 +20,10 @@ struct PreviewHostApp: App {
         TaskBoardWorkflowProgressPreviewRenderer.dump
       ),
       ("HARNESS_TASK_BOARD_FILTERS_PREVIEW_DUMP", TaskBoardFilterPreviewRenderer.dump),
+      (
+        "HARNESS_SETTINGS_REPOSITORY_SCOPE_PREVIEW_DUMP",
+        SettingsRepositoryTaskBoardScopePreviewRenderer.dump
+      ),
       ("HARNESS_DASHBOARD_AGENTS_PREVIEW_DUMP", DashboardAgentsPreviewRenderer.dump),
       ("HARNESS_TASK_BOARD_QUICK_ADD_DUMP", TaskBoardLaneQuickAddPreviewRenderer.dump),
       ("HARNESS_SECRET_MIGRATION_CONSENT_DUMP", SecretMigrationConsentPreviewRenderer.dump),

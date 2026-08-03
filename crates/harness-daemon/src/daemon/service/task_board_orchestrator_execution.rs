@@ -13,7 +13,6 @@ use super::task_board_evaluation::evaluate_task_board_async;
 use super::task_board_github::run_task_board_github_automation_async;
 use super::task_board_orchestrator_db::record_tick;
 use super::task_board_orchestrator_step_mode::scoped_dispatch_request;
-use crate::daemon::db::task_board::prelude::*;
 
 /// A dry run has no request to dispatch, so it reports an empty summary rather
 /// than skipping the stage: the caller still records stage 3 as run.
@@ -99,7 +98,9 @@ async fn load_candidate_items(
 ) -> Result<Vec<TaskBoardItem>, CliError> {
     let mut items = Vec::with_capacity(item_ids.len());
     for item_id in item_ids {
-        items.push(db.task_board_item(item_id).await?);
+        items.push(
+            super::task_board_repository_scope::scoped_task_board_item_db(db, item_id).await?,
+        );
     }
     Ok(items)
 }

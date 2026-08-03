@@ -44,7 +44,9 @@ async fn request_dispatch_budget(
     if request.item_id.is_some() {
         return Ok(per_run_dispatch_budget(settings));
     }
-    let active_workflows = active_workflow_count(&db.list_task_board_items(None).await?);
+    let active_items =
+        super::super::task_board_repository_scope::scoped_task_board_items_db(db, None).await?;
+    let active_workflows = active_workflow_count(&active_items);
     Ok(dispatch_budget(settings, active_workflows))
 }
 

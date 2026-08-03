@@ -130,8 +130,13 @@ impl RemoteAssignmentStartSettlementQueries for AsyncDaemonDb {
         project_dir: &Path,
         started_at: &str,
     ) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
-        lifecycle::adopt_task_board_remote_executor_start(self, permit, project_dir, started_at)
-            .await
+        Box::pin(lifecycle::adopt_task_board_remote_executor_start(
+            self,
+            permit,
+            project_dir,
+            started_at,
+        ))
+        .await
     }
 
     async fn adopt_task_board_remote_executor_start_owned(

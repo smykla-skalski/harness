@@ -80,7 +80,7 @@ pub fn cleanup_orphans(sessions_root: &Path) -> io::Result<()> {
 /// Callers (typically the daemon at startup) use this one-liner instead of
 /// constructing the path themselves. Errors are swallowed after being logged —
 /// an orphan-sweep failure must never block startup.
-#[expect(
+#[allow(
     clippy::cognitive_complexity,
     reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
 )]

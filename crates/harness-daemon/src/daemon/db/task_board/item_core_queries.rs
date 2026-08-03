@@ -6,9 +6,8 @@
 //! is the single place `ItemCoreQueries` is implemented; every method body
 //! is a one-line forward into the plain function that owns the real logic.
 //!
-//! `AsyncDaemonDb` keeps its original inherent methods too, each now a thin
-//! forward into the matching trait method, so nothing outside `db/task_board`
-//! has to change to keep calling them by the same name.
+//! Daemon callers import this trait through `task_board::prelude`. Downstream
+//! migration fixtures use the narrower feature-gated schema query facade.
 
 use super::items::{TaskBoardItemSnapshot, TaskBoardMutation};
 use super::lane_order::TaskBoardItemsSnapshot;

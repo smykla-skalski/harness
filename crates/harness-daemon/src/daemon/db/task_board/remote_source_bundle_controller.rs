@@ -188,8 +188,6 @@ fn require_unchanged_upload_response(
 }
 
 #[cfg(test)]
-
-#[cfg(test)]
 pub(super) async fn insert_task_board_remote_source_bundle_offer_for_test(
     db: &AsyncDaemonDb,
     request: &crate::task_board::remote_wire::wire::RemoteOfferRequest,

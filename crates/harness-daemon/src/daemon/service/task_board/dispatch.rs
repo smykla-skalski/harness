@@ -407,9 +407,13 @@ pub(super) async fn build_dispatch_plans_for_request_async(
     request: &TaskBoardDispatchRequest,
 ) -> Result<Vec<DispatchPlan>, CliError> {
     let items = if let Some(item_id) = request.item_id.as_deref() {
-        vec![db.task_board_item(item_id).await?]
+        vec![
+            super::super::task_board_repository_scope::scoped_task_board_item_db(db, item_id)
+                .await?,
+        ]
     } else {
-        db.list_task_board_items(request.status).await?
+        super::super::task_board_repository_scope::scoped_task_board_items_db(db, request.status)
+            .await?
     };
     build_dispatch_plans_for_items_async(db, items, request).await
 }

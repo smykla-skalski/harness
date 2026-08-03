@@ -8,6 +8,7 @@ use super::tests::{
 use super::*;
 use harness_daemon::daemon::db::{
     AsyncDaemonDb, DaemonDb, TaskBoardRemoteHostTrustFence, TaskBoardRemoteLifecycleTrustSnapshot,
+    schema_query_test_support,
 };
 use harness_task_board::TaskBoardExecutionHostConfig;
 use harness_task_board::remote_wire::wire::RemoteOfferRequest;
@@ -164,10 +165,12 @@ async fn corrupt_controller_operation_tokens_fail_closed_after_reopen() {
         let db = AsyncDaemonDb::connect(&path)
             .await
             .expect("reopen structurally valid v43 database");
-        let error = db
-            .task_board_remote_assignment("assignment-a")
-            .await
-            .expect_err("corrupt controller operation token must not decode");
+        let error = schema_query_test_support::task_board_remote_assignment_exists(
+            &db,
+            "assignment-a",
+        )
+        .await
+        .expect_err("corrupt controller operation token must not decode");
         assert!(error.to_string().contains(diagnostic), "{suffix}: {error}");
     }
 }

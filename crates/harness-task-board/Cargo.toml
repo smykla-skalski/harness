@@ -1,6 +1,6 @@
 [package]
 name = "harness-task-board"
-version = "56.0.0"
+version = "57.0.0"
 edition = "2024"
 rust-version = "1.95"
 publish = false
@@ -27,12 +27,12 @@ daemon-runtime = []
 
 [dependencies]
 async-trait = "0.1.83"
-harness-github-api = { path = "../harness-github-api", version = "56.0.0" }
-harness-infra = { path = "../harness-infra", version = "56.0.0" }
-harness-kernel = { path = "../harness-kernel", version = "56.0.0" }
-harness-protocol = { path = "../harness-protocol", version = "56.0.0" }
-harness-session = { path = "../harness-session", version = "56.0.0" }
-harness-workspace = { path = "../harness-workspace", version = "56.0.0" }
+harness-github-api = { path = "../harness-github-api", version = "57.0.0" }
+harness-infra = { path = "../harness-infra", version = "57.0.0" }
+harness-kernel = { path = "../harness-kernel", version = "57.0.0" }
+harness-protocol = { path = "../harness-protocol", version = "57.0.0" }
+harness-session = { path = "../harness-session", version = "57.0.0" }
+harness-workspace = { path = "../harness-workspace", version = "57.0.0" }
 arc-swap = "1.9.1"
 base64 = "0.23.0"
 caseless = "0.2.2"
@@ -67,7 +67,7 @@ utoipa = "5.5.0"
 uuid = { version = "1.18.1", features = ["v4"] }
 
 [dev-dependencies]
-harness-github-api = { path = "../harness-github-api", version = "56.0.0", features = ["test-support"] }
+harness-github-api = { path = "../harness-github-api", version = "57.0.0", features = ["test-support"] }
 # Unconditional, unlike root's optional `dep:nix` under `bridge-runtime`: the
 # only user is this crate's own `#[cfg(unix)]` github test-support helper,
 # with no unrelated feature to piggyback on for gating the dependency itself.

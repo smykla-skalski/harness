@@ -1,19 +1,19 @@
 [package]
 name = "harness-daemon-session-service"
-version = "56.0.0"
+version = "57.0.0"
 edition = "2024"
 rust-version = "1.95"
 publish = false
 
 [dependencies]
-harness-agents = { path = "../harness-agents", version = "56.0.0" }
-harness-daemon-root = { path = "../harness-daemon-root", version = "56.0.0" }
-harness-daemon-snapshot = { path = "../harness-daemon-snapshot", version = "56.0.0" }
-harness-kernel = { path = "../harness-kernel", version = "56.0.0" }
-harness-protocol = { path = "../harness-protocol", version = "56.0.0" }
-harness-session = { path = "../harness-session", version = "56.0.0", features = ["daemon-runtime"] }
-harness-timeline = { path = "../harness-timeline", version = "56.0.0" }
-harness-workspace = { path = "../harness-workspace", version = "56.0.0" }
+harness-agents = { path = "../harness-agents", version = "57.0.0" }
+harness-daemon-root = { path = "../harness-daemon-root", version = "57.0.0" }
+harness-daemon-snapshot = { path = "../harness-daemon-snapshot", version = "57.0.0" }
+harness-kernel = { path = "../harness-kernel", version = "57.0.0" }
+harness-protocol = { path = "../harness-protocol", version = "57.0.0" }
+harness-session = { path = "../harness-session", version = "57.0.0", features = ["daemon-runtime"] }
+harness-timeline = { path = "../harness-timeline", version = "57.0.0" }
+harness-workspace = { path = "../harness-workspace", version = "57.0.0" }
 tokio = { version = "1.50.0", features = ["rt", "time"] }
 tracing = "0.1.44"
 

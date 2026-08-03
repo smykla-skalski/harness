@@ -222,6 +222,7 @@ mod task_board_orchestrator_run_lease;
 mod task_board_orchestrator_settings;
 mod task_board_orchestrator_step_mode;
 pub(crate) mod task_board_remote_controller;
+mod task_board_repository_scope;
 mod task_board_runtime;
 #[cfg(test)]
 mod task_board_sync_tests;

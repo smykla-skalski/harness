@@ -169,7 +169,7 @@ extension HarnessMonitorStore {
       await refreshTaskBoardDashboardSnapshot(using: client)
       let completion = try await waitForTaskBoardSourceRefresh(using: client)
       if taskBoardSyncPhase == .stopping || completion.cancelled {
-        await finishStoppedTaskBoardSync(using: client, position: feedbackPosition)
+        finishStoppedTaskBoardSync(using: client, position: feedbackPosition)
         return false
       }
       if let error = completion.error {
@@ -191,12 +191,12 @@ extension HarnessMonitorStore {
       return true
     } catch is CancellationError {
       if taskBoardSyncPhase == .stopping {
-        await finishStoppedTaskBoardSync(using: client, position: feedbackPosition)
+        finishStoppedTaskBoardSync(using: client, position: feedbackPosition)
       }
       return false
     } catch {
       if taskBoardSyncPhase == .stopping {
-        await finishStoppedTaskBoardSync(using: client, position: feedbackPosition)
+        finishStoppedTaskBoardSync(using: client, position: feedbackPosition)
         return false
       }
       updateTaskBoardRefreshActivity(
@@ -238,8 +238,8 @@ extension HarnessMonitorStore {
   private func finishStoppedTaskBoardSync(
     using client: any HarnessMonitorClientProtocol,
     position: ActionFeedback.Position
-  ) async {
-    await refreshTaskBoardDashboardSnapshot(using: client)
+  ) {
+    scheduleGitHubTaskBoardRefresh(using: client)
     presentSuccessFeedback("Task source refresh stopped", position: position)
   }
 
