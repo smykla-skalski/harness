@@ -249,7 +249,7 @@ enum DashboardAgentsPreviewFixtures {
       switch spec.runtime {
       case .acp: "preview-acp-worker"
       case .codex: "preview-codex-worker"
-      case .terminal: nil
+      case .terminal: "preview-terminal-worker"
       }
     return DashboardAgentSummary(
       identity: DashboardAgentIdentity(
