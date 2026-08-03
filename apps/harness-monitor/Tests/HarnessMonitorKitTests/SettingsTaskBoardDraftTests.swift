@@ -264,7 +264,11 @@ struct SettingsRepositoriesPerformanceSourceTests {
     #expect(source.contains("SettingsRepositoriesCatalogLoader.load("))
     #expect(source.contains("Task.detached(priority: .userInitiated)"))
     #expect(source.contains("LazyVStack(spacing: 0)"))
-    #expect(source.contains("ForEach(draft.rows) { row in"))
+    #expect(
+      source.contains(
+        "ForEach(draft.rows.prefix(min(materializedRowCount, draft.rows.count))) { row in"
+      )
+    )
     #expect(source.contains("ForEach(catalogRepositories.indices, id: \\.self) { index in"))
     #expect(!source.contains("if index > 0"))
     #expect(!source.contains("Array(draft.rows.enumerated())"))
@@ -277,15 +281,16 @@ struct SettingsRepositoriesPerformanceSourceTests {
 
   @Test("Repository switches use native sizing and explicit deletion")
   func repositorySwitchesUseNativeSizingAndExplicitDeletion() throws {
-    let tableSource = try settingsSourceFile("SettingsRepositoriesSection+Table.swift")
+    let rowSource = try settingsSourceFile("SettingsRepositoryTableRow.swift")
     let source = try settingsSourceFiles([
       "SettingsRepositoriesSection.swift",
       "SettingsRepositoriesSection+Persistence.swift",
       "SettingsSharedRepositoriesDraft.swift",
     ])
 
-    let nativeSwitchChain = ".toggleStyle(.switch)\n      .harnessNativeFormControl()"
-    #expect(tableSource.components(separatedBy: nativeSwitchChain).count - 1 == 2)
+    let nativeSwitchChain =
+      ".toggleStyle(.switch)\n    .controlSize(.mini)\n    .harnessNativeFormControl()"
+    #expect(rowSource.components(separatedBy: nativeSwitchChain).count - 1 == 2)
     #expect(source.contains("@AppStorage(SettingsRepositoriesCatalog.storageKey)"))
     #expect(source.contains("SettingsRepositoriesCatalog.decode(storedRepositoryCatalog)"))
     #expect(source.contains("SettingsRepositoriesCatalog.encode(repositoryCatalog)"))
