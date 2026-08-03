@@ -77,6 +77,8 @@ mise run install
 
 For a single root Harness unit test during development, use native libtest through `mise run test:unit:harness -- <filter>`; append `-- --exact` after the full test name for exact selection. The canonical `mise run test:unit` gate remains nextest-based and deliberately covers all unit-test package groups.
 
+Iterate on a focused nextest filter, not a whole unit group: `mise run test:unit:daemon -- -E 'test(/report_only/)'` runs only the matching `harness-daemon` tests instead of the full group of roughly 2,600. Test width is shared - `scripts/harness-jobserver.py` hands `NEXTEST_TEST_THREADS` out of one pool that spans every agent on the machine - so a whole-group run drops to its 2-thread floor under cross-session contention and can take 40 or more minutes where a focused run stays in the low minutes. Run a full group like `test:unit:daemon` only as a final gate, and read a slow whole-group run as throttled rather than broken. `docs/agent-guides/root-reference.md` covers the mechanism and how to tell a throttled run from a hung one.
+
 Keep compilation and test progress visible during diagnosis by running the selected `mise` task directly. If output must be persisted, pipe it through `tee`; do not end the live pipeline in `head`, `tail`, or `grep`, because those hide the build phase that dominates a cold run.
 
 ### Fast Rust iteration
