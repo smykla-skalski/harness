@@ -755,7 +755,7 @@ run = "swift build -c release --package-path apps/harness-monitor/Tools/HarnessM
 
 [tasks."monitor:tools:test:perf"]
 description = "Run unit tests for the harness-monitor-perf Swift CLI"
-run = "swift test --package-path apps/harness-monitor/Tools/HarnessMonitorPerf"
+run = "swift test --disable-swift-testing --package-path apps/harness-monitor/Tools/HarnessMonitorPerf"
 
 [tasks."monitor:audit:validation"]
 description = "Run both Harness Monitor audit validation suites (wrapper scripts + Swift perf tool tests) in sequence with fail-fast"
