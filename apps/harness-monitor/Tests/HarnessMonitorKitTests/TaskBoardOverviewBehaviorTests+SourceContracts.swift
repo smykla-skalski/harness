@@ -4,27 +4,31 @@ import Testing
 extension TaskBoardOverviewBehaviorTests {
   @Test("Task card hover feedback stays lane scoped")
   func taskCardHoverFeedbackStaysLaneScoped() throws {
-    let support = try taskBoardSourceFile(named: "TaskBoardLaneSupport.swift")
+    let cardChrome = try taskBoardSourceFile(named: "TaskBoardCardChrome.swift")
     let laneColumn = try taskBoardSourceFile(named: "TaskBoardLaneUnifiedColumn.swift")
+    let laneRowSupport = try taskBoardSourceFile(
+      named: "TaskBoardLaneUnifiedColumn+Rows.swift"
+    )
     let laneRows = try taskBoardSourceFile(named: "TaskBoardLaneViews.swift")
     let needsYouRows = try taskBoardSourceFile(named: "TaskBoardNeedsYouLaneViews.swift")
 
-    #expect(support.contains("extraHoverHint: isHovered"))
-    #expect(support.contains("respondsToHover: false"))
+    #expect(cardChrome.contains("extraHoverHint: isHovered"))
+    #expect(cardChrome.contains("respondsToHover: false"))
     #expect(
       laneColumn.contains(
         ".onContinuousHover(coordinateSpace: .named(cardHoverCoordinateSpace))"
       )
     )
-    #expect(laneColumn.contains("updateHoveredCard(id: nil)"))
-    #expect(!support.contains(".onHover {"))
+    #expect(laneRowSupport.contains("updateHoveredCard(id: nil)"))
+    #expect(!cardChrome.contains(".onHover {"))
     #expect(!laneRows.contains(".onHover {"))
     #expect(!needsYouRows.contains(".onHover {"))
   }
 
   @Test("Lane card frames report per card, not through a bound preference")
   func laneCardFramesAvoidBoundPreferenceAggregation() throws {
-    let support = try taskBoardSourceFile(named: "TaskBoardLaneSupport.swift")
+    let cardChrome = try taskBoardSourceFile(named: "TaskBoardCardChrome.swift")
+    let hoverTracking = try taskBoardSourceFile(named: "TaskBoardLaneHoverTracking.swift")
     let laneColumn = try taskBoardSourceFile(named: "TaskBoardLaneUnifiedColumn.swift")
 
     // The old aggregation reduced one PreferenceKey across every card in the
@@ -34,11 +38,12 @@ extension TaskBoardOverviewBehaviorTests {
     // not the whole PreferenceKey API, which unrelated future code in these files
     // may legitimately use. The positive checks are the real guard: the
     // card-frame modifier must keep reporting per card.
-    #expect(!support.contains("TaskBoardLaneCardFramePreferenceKey"))
-    #expect(!support.contains("TaskBoardLaneCardFrame("))
+    #expect(!cardChrome.contains("TaskBoardLaneCardFramePreferenceKey"))
+    #expect(!hoverTracking.contains("TaskBoardLaneCardFramePreferenceKey"))
+    #expect(!cardChrome.contains("TaskBoardLaneCardFrame("))
     #expect(!laneColumn.contains("TaskBoardLaneCardFramePreferenceKey"))
-    #expect(support.contains("onGeometryChange(for: CGRect.self)"))
-    #expect(support.contains("tracking.setFrame(frame, for: id)"))
+    #expect(cardChrome.contains("onGeometryChange(for: CGRect.self)"))
+    #expect(cardChrome.contains("tracking.setFrame(frame, for: id)"))
   }
 
   @Test("Expanded lane List owns custom insertion and card spacing")
@@ -47,6 +52,7 @@ extension TaskBoardOverviewBehaviorTests {
     let laneReveal = try taskBoardSourceFile(
       named: "TaskBoardLaneUnifiedColumn+Reveal.swift"
     )
+    let laneRows = try taskBoardSourceFile(named: "TaskBoardLaneUnifiedColumn+Rows.swift")
     let listTuner = try taskBoardSourceFile(named: "TaskBoardNativeListTuner.swift")
     let laneChrome = try taskBoardSourceFile(named: "TaskBoardLaneChrome.swift")
 
@@ -67,18 +73,18 @@ extension TaskBoardOverviewBehaviorTests {
       )
     )
     #expect(laneReveal.contains("await nativeListCoordinator.reveal(row:"))
-    #expect(laneColumn.contains(".listRowInsets("))
-    #expect(laneColumn.contains("leading: metrics.listRowHorizontalInset"))
-    #expect(laneColumn.contains("trailing: metrics.listRowHorizontalInset"))
-    #expect(laneColumn.contains(".listRowSeparator(.hidden)"))
-    #expect(laneColumn.contains(".listRowBackground(Color.clear)"))
+    #expect(laneRows.contains(".listRowInsets("))
+    #expect(laneRows.contains("leading: metrics.listRowHorizontalInset"))
+    #expect(laneRows.contains("trailing: metrics.listRowHorizontalInset"))
+    #expect(laneRows.contains(".listRowSeparator(.hidden)"))
+    #expect(laneRows.contains(".listRowBackground(Color.clear)"))
     #expect(laneColumn.contains(".introspect(.list, on: .macOS(.v26))"))
     #expect(listTuner.contains("draggingDestinationFeedbackStyle = .none"))
-    #expect(laneColumn.contains("private var cardGapState: TaskBoardLaneCardGapState"))
+    #expect(laneColumn.contains("var cardGapState: TaskBoardLaneCardGapState"))
     #expect(laneColumn.contains("cardGapState.displayIndex"))
-    #expect(laneColumn.contains("cardGapState.showsMarker"))
-    #expect(laneColumn.contains("StrokeStyle(lineWidth: 1.5, dash: [5])"))
-    #expect(laneColumn.contains("HarnessMonitorTheme.accent.opacity(0.12)"))
+    #expect(laneRows.contains("cardGapState.showsMarker"))
+    #expect(laneRows.contains("StrokeStyle(lineWidth: 1.5, dash: [5])"))
+    #expect(laneRows.contains("HarnessMonitorTheme.accent.opacity(0.12)"))
     #expect(!laneColumn.contains("cardGapModel.target"))
     #expect(listTuner.contains("setGapTarget(nil, reason: \"before-model-mutation\")"))
     #expect(listTuner.contains("selectionHighlightStyle = .none"))
@@ -124,13 +130,13 @@ extension TaskBoardOverviewBehaviorTests {
 
   @Test("Task cards use a raised neutral surface fill")
   func taskCardsUseRaisedNeutralSurfaceFill() throws {
-    let support = try taskBoardSourceFile(named: "TaskBoardLaneSupport.swift")
+    let cardChrome = try taskBoardSourceFile(named: "TaskBoardCardChrome.swift")
 
-    #expect(support.contains("private var cardSurfaceFill: Color"))
-    #expect(support.contains("Color(red: 0.205, green: 0.24, blue: 0.25)"))
-    #expect(support.contains("Color(red: 0.99, green: 0.995, blue: 1)"))
-    #expect(support.contains(".fill(cardSurfaceFill)"))
-    #expect(!support.contains(".background.opacity(reduceTransparency ? 0.68 : 0.56)"))
+    #expect(cardChrome.contains("private var cardSurfaceFill: Color"))
+    #expect(cardChrome.contains("Color(red: 0.205, green: 0.24, blue: 0.25)"))
+    #expect(cardChrome.contains("Color(red: 0.99, green: 0.995, blue: 1)"))
+    #expect(cardChrome.contains(".fill(cardSurfaceFill)"))
+    #expect(!cardChrome.contains(".background.opacity(reduceTransparency ? 0.68 : 0.56)"))
   }
 
   @Test("Expanded and collapsed lane titles use matching type size")
@@ -234,15 +240,17 @@ extension TaskBoardOverviewBehaviorTests {
     let laneColumn = try taskBoardSourceFile(named: "TaskBoardLaneUnifiedColumn.swift")
     let laneChrome = try taskBoardSourceFile(named: "TaskBoardLaneChrome.swift")
     let dragRuntime = try taskBoardSourceFile(named: "TaskBoardCardDragRuntime.swift")
+    let dragDecisions = try taskBoardSourceFile(named: "TaskBoardCardDragDiagnostics.swift")
 
     #expect(board.contains("dropHighlightState: cardDragRuntimeValue.highlightState(for: lane)"))
-    #expect(interaction.contains("case .initial:"))
-    #expect(interaction.contains("case .active:"))
+    #expect(interaction.contains("switch taskBoardCardDragSessionDecision("))
+    #expect(dragDecisions.contains("case .initial:"))
+    #expect(dragDecisions.contains("case .active:"))
     #expect(interaction.contains("updateInitialCardDrag(session)"))
     #expect(interaction.contains("updateDraggedCardIDs(draggedIDs)"))
-    #expect(interaction.contains("case .ended(let operation):"))
-    #expect(interaction.contains("case .dataTransferCompleted:"))
-    #expect(interaction.contains("operation == .move || operation == .copy ? .ignore : .clear"))
+    #expect(dragDecisions.contains("case .ended(let operation):"))
+    #expect(dragDecisions.contains("case .dataTransferCompleted:"))
+    #expect(dragDecisions.contains("operation == .move || operation == .copy ? .ignore : .clear"))
     #expect(interaction.contains("cardDragRuntimeValue.begin("))
     #expect(dragRuntime.contains("final class TaskBoardLaneDropHighlightState"))
     #expect(dragRuntime.contains("highlightState(for: lane).setTargeted(true)"))
