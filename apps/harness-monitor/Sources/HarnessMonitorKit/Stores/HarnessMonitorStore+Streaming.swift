@@ -150,8 +150,6 @@ extension HarnessMonitorStore {
       .acpEvents, .acpPermissionBatch, .acpPermissionBatchRemoved, .githubDataChanged,
       .taskBoardUpdated, .auditEvent:
       break
-    case .reviewsLocalCloneProgress(let progress):
-      applyLocalCloneProgress(progress)
     case .taskBoardWorkingCopyProgress(let progress):
       applyWorkingCopyProgress(progress)
     }

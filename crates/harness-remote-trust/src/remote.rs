@@ -204,7 +204,6 @@ const READ_WS_METHODS: &[&str] = &[
     ws_methods::REVIEWS_FILES_PATCH,
     ws_methods::REVIEWS_FILES_PREVIEW,
     ws_methods::REVIEWS_FILES_BLOB,
-    ws_methods::REVIEWS_FILES_LOCAL_CLONES_LIST,
     ws_methods::REVIEWS_AVATAR,
     ws_methods::REVIEWS_TIMELINE,
 ];
@@ -322,7 +321,6 @@ const WRITE_WS_METHODS: &[&str] = &[
     ws_methods::REVIEWS_COMMENT,
     ws_methods::REVIEWS_FILES_VIEWED,
     ws_methods::REVIEWS_FILES_COMMENT,
-    ws_methods::REVIEWS_FILES_LOCAL_CLONES_DELETE,
     ws_methods::REVIEWS_REVIEW_THREADS_RESOLVE,
 ];
 

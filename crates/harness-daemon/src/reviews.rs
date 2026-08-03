@@ -56,17 +56,12 @@ pub use enums::{
 pub use file_comment::{
     ReviewsFileCommentKind, ReviewsFileCommentRequest, ReviewsFileCommentResponse,
 };
-#[cfg(feature = "daemon-runtime")]
-pub(crate) use files::local_clone::{
-    LocalCloneRegistry, LocalCloneRoot, RegistryEntry, RepoKey,
-    local_clone_list_entry_from_registry,
-};
 #[cfg(any(test, feature = "daemon-runtime"))]
 pub(crate) use files::preview_from_patch;
 #[cfg(any(test, feature = "daemon-runtime"))]
 pub(crate) use files::viewed::{ViewedMutation, classify_outcome};
 pub use files::{
-    FilesLargeDiffStrategy, HarnessCodeLanguage, LocalCloneListEntry, ReviewFile,
+    HarnessCodeLanguage, ReviewFile,
     ReviewFileChangeType, ReviewFilePatch, ReviewFilePreview, ReviewFileServedBy,
     ReviewFileViewedOutcome, ReviewFileViewedState, ReviewFilesViewedResult,
     ReviewFilesViewedTarget, ReviewImageMime, ReviewsFilesBlobRequest, ReviewsFilesBlobResponse,

@@ -33,7 +33,7 @@ pub(super) fn reviews_routes() -> OpenApiRouter<DaemonHttpState> {
     // the same reason.
     let router = super::reviews_actions::merge_action_routes(router);
     let router = router.merge(review_content_routes());
-    // Review-files preview/patch/blob/local-clone handlers live in the sibling
+    // Review-files preview/patch/blob handlers live in the sibling
     // `reviews_files` module to keep this file within the line-length cap.
     let router = super::reviews_files::merge_files_routes(router);
     router.merge(review_thread_routes())

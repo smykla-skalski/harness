@@ -8,8 +8,7 @@ extension HarnessMonitorStore {
   /// UI sees the new headRefOid.
   public func preparePatches(
     forPullRequest pullRequestID: String,
-    paths: [String],
-    largeDiffStrategy: FilesLargeDiffStrategy? = nil
+    paths: [String]
   ) async {
     let viewModel = self.viewModel(forPullRequest: pullRequestID)
     let candidatePaths = patchCandidatePaths(paths: paths, viewModel: viewModel)
@@ -34,11 +33,7 @@ extension HarnessMonitorStore {
       headRefOidExpected: viewModel.headRefOid,
       paths: pendingPaths,
       number: viewModel.number,
-      repositoryFullName: viewModel.repositoryFullName,
-      baseRefOidExpected: viewModel.baseRefOid,
-      headRefName: viewModel.headRefName,
-      baseRefName: viewModel.baseRefName,
-      largeDiffStrategy: largeDiffStrategy
+      repositoryFullName: viewModel.repositoryFullName
     )
     let interval = ReviewFilesPerf.beginPatchFetch(
       pullRequestID: pullRequestID,

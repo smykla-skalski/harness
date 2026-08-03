@@ -1,36 +1,20 @@
-//! Inline PR file-changes wire types for the Reviews dashboard, relocated
-//! from `harness-reviews::files`. The GraphQL/REST fetch, local-clone
-//! runtime, patch parsing, caching, and strategy-selection logic all stay in
-//! `harness-reviews`; only the request/response DTOs and the enums with
-//! self-contained parse/format helpers move.
+//! Inline PR file-changes wire types for the Reviews dashboard.
+//! The GraphQL/REST fetch, patch parsing, caching, and preview logic
+//! all stay in `harness-reviews`; only the request/response DTOs and
+//! the enums with self-contained parse/format helpers move.
 
 pub mod blob;
 pub mod language;
-pub mod local_clone;
 pub mod viewed;
 
 pub use blob::{ReviewImageMime, ReviewsFilesBlobRequest, ReviewsFilesBlobResponse};
 pub use language::HarnessCodeLanguage;
-pub use local_clone::LocalCloneListEntry;
 pub use viewed::{
     ReviewFileViewedOutcome, ReviewFilesViewedResult, ReviewFilesViewedTarget,
     ReviewsFilesViewedRequest, ReviewsFilesViewedResponse,
 };
 
 use serde::{Deserialize, Serialize};
-
-/// User-facing toggle in Settings. Picked from the `SwiftUI` Picker;
-/// serialized through to the daemon on each request.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, utoipa::ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum FilesLargeDiffStrategy {
-    /// For PRs above the threshold, use the local bare clone.
-    #[default]
-    AutoLocalClone,
-    /// Always use GitHub REST regardless of size (no local clones).
-    #[serde(rename = "force_github_rest", alias = "force_git_hub_rest")]
-    ForceGitHubRest,
-}
 
 /// Request a list of changed files for a single pull request.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
@@ -54,19 +38,7 @@ pub struct ReviewsFilesListResponse {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub number: Option<u64>,
     pub head_ref_oid: String,
-    /// PR's source branch name (e.g. `renovate/foo`). Used by the local-clone
-    /// path so `ensure_clone` fetches the right ref instead of always
-    /// opening `refs/heads/main`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub head_ref_name: Option<String>,
-    /// Merge-base OID for the PR. Required for the local-clone diff path
-    /// to compute `base..head` patches.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub base_ref_oid: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub base_ref_name: Option<String>,
-    /// `owner/name` of the repository the PR lives in. Lets the Monitor
-    /// hand the patch request a clone target without re-querying GraphQL.
+    /// `owner/name` of the repository the PR lives in.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub repository_full_name: Option<String>,
     pub viewer_can_mark_viewed: bool,
@@ -89,7 +61,7 @@ fn default_pagination_complete() -> bool {
 }
 
 /// Metadata for one file inside a PR. No patch body here - patches arrive
-/// via the separate `patch` endpoint (REST or local-clone diff).
+/// via the separate patch endpoint.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewFile {
     pub path: String,
@@ -181,34 +153,12 @@ pub struct ReviewsFilesPatchRequest {
     pub head_ref_oid_expected: String,
     pub paths: Vec<String>,
     /// GitHub PR number (the integer in `pulls/{n}/files`). Required for
-    /// the REST path; when absent, the daemon can only route to the
-    /// local-clone path (which uses GitHub's synthetic
-    /// `refs/pull/<number>/head` ref for forks + same-repo PR branches).
+    /// the REST path.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub number: Option<u64>,
-    /// Owner/name of the repository the PR lives in. When present, the
-    /// daemon can route the patch fetch through the local-clone runtime
-    /// (zero-rate-limit) or the REST path.
+    /// Owner/name of the repository the PR lives in.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub repository_full_name: Option<String>,
-    /// Merge-base OID against which to compute the diff. Required for the
-    /// local-clone path; when absent the handler falls back to REST.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub base_ref_oid_expected: Option<String>,
-    /// PR's source branch name (e.g. `renovate/foo`). When present, the
-    /// local-clone runtime fetches that ref directly instead of the
-    /// daemon's default-branch fallback.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub head_ref_name: Option<String>,
-    /// PR base branch name. When present, the local clone fetches it directly
-    /// before computing the expected base/head OID diff.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub base_ref_name: Option<String>,
-    /// User's `filesLargeDiffStrategy` choice from Settings. Daemon honors
-    /// `ForceGitHubRest` by skipping the local-clone runtime entirely.
-    /// Defaults to `AutoLocalClone` for callers that don't supply it.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub large_diff_strategy: Option<FilesLargeDiffStrategy>,
 }
 
 impl ReviewsFilesPatchRequest {
@@ -262,14 +212,6 @@ pub struct ReviewsFilesPreviewRequest {
     pub number: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub repository_full_name: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub base_ref_oid_expected: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub head_ref_name: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub base_ref_name: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub large_diff_strategy: Option<FilesLargeDiffStrategy>,
     #[serde(default = "preview_line_limit")]
     pub line_limit: u32,
 }
@@ -340,14 +282,9 @@ pub struct ReviewsFilesPreviewResponse {
 pub enum ReviewFileServedBy {
     #[default]
     GithubRest,
-    LocalClone,
-    /// Local-clone path was attempted but fell back to REST due to a clone
-    /// failure. Surfaces a different UI affordance ("via local clone
-    /// (fallback)").
-    GithubRestFallback,
 }
 
-/// One file's patch body + metadata produced by either REST or local clone.
+/// One file's patch body + metadata produced via GitHub REST.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReviewFilePatch {
     pub path: String,

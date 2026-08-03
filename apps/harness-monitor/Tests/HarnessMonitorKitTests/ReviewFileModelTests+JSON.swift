@@ -12,9 +12,6 @@ final class ReviewFileModelJSONTests: XCTestCase {
       pullRequestID: "PR_kwDOABC",
       number: 42,
       headRefOid: "abc123",
-      headRefName: "renovate/foo",
-      baseRefOid: "def456",
-      baseRefName: "main",
       repositoryFullName: "owner/repo",
       viewerCanMarkViewed: true,
       files: [
@@ -78,9 +75,6 @@ final class ReviewFileModelJSONTests: XCTestCase {
     XCTAssertEqual(parsed.pullRequestID, response.pullRequestID)
     XCTAssertEqual(parsed.number, 42)
     XCTAssertEqual(parsed.headRefOid, response.headRefOid)
-    XCTAssertEqual(parsed.headRefName, "renovate/foo")
-    XCTAssertEqual(parsed.baseRefOid, "def456")
-    XCTAssertEqual(parsed.baseRefName, "main")
     XCTAssertEqual(parsed.repositoryFullName, "owner/repo")
     XCTAssertEqual(parsed.files.count, 6)
     XCTAssertEqual(parsed.files[0].languageHint, .rust)

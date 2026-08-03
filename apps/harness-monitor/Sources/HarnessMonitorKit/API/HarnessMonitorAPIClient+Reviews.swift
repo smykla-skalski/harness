@@ -272,23 +272,6 @@ extension HarnessMonitorAPIClient {
     return ReviewsFilesBlobResponse(wire: wire)
   }
 
-  public func listReviewLocalClones() async throws -> [ReviewLocalCloneEntry] {
-    let wire: [LocalCloneListEntryWire] = try await post(
-      "/v1/reviews/files/local-clones",
-      body: ReviewsFilesLocalClonesListRequest(),
-      decoder: PolicyWireCoding.decoder
-    )
-    return wire.map(ReviewLocalCloneEntry.init(wire:))
-  }
-
-  public func deleteReviewLocalClone(repoKeySegment: String) async throws {
-    let body = ReviewsFilesLocalClonesDeleteRequest(repoKeySegment: repoKeySegment)
-    // The daemon returns the post-delete listing, but the Settings sheet
-    // refetches via listReviewLocalClones, so the body is decoded structurally
-    // and discarded rather than through a convert-bound hand mirror.
-    let _: JSONValue = try await post("/v1/reviews/files/local-clones/delete", body: body)
-  }
-
   public func fetchReviewTimeline(
     request: ReviewsTimelineRequest
   ) async throws -> ReviewsTimelineResponse {
@@ -331,25 +314,5 @@ extension HarnessMonitorAPIClient {
       decoder: PolicyWireCoding.decoder
     )
     return ReviewsFileCommentResponse(wire: wire)
-  }
-}
-
-/// Empty request body for listing local clones. The daemon does not need
-/// any parameters but the HTTP route expects a POST so we send an empty
-/// payload to satisfy the contract.
-public struct ReviewsFilesLocalClonesListRequest: Codable, Equatable, Sendable {
-  public init() {}
-}
-
-/// Request body for deleting a single local clone by repo key segment.
-public struct ReviewsFilesLocalClonesDeleteRequest: Codable, Equatable, Sendable {
-  public let repoKeySegment: String
-
-  public init(repoKeySegment: String) {
-    self.repoKeySegment = repoKeySegment
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case repoKeySegment = "repo_key_segment"
   }
 }

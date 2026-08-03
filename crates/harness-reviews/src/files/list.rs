@@ -75,12 +75,6 @@ struct PullRequestNode {
     number: Option<u64>,
     #[serde(rename = "headRefOid")]
     head_ref_oid: Option<String>,
-    #[serde(rename = "headRefName")]
-    head_ref_name: Option<String>,
-    #[serde(rename = "baseRefOid")]
-    base_ref_oid: Option<String>,
-    #[serde(rename = "baseRefName")]
-    base_ref_name: Option<String>,
     #[serde(rename = "viewerCanUpdate")]
     viewer_can_update: Option<bool>,
     repository: Option<RepositoryNode>,
@@ -261,9 +255,6 @@ async fn fetch_files_paginated(
         pull_request_id,
         number: state.number,
         head_ref_oid: state.head_ref_oid,
-        head_ref_name: state.head_ref_name,
-        base_ref_oid: state.base_ref_oid,
-        base_ref_name: state.base_ref_name,
         repository_full_name: state.repository_full_name,
         viewer_can_mark_viewed: state.viewer_can_update,
         files,
@@ -276,9 +267,6 @@ async fn fetch_files_paginated(
 struct FilesPageState {
     head_ref_oid: String,
     number: Option<u64>,
-    head_ref_name: Option<String>,
-    base_ref_oid: Option<String>,
-    base_ref_name: Option<String>,
     repository_full_name: Option<String>,
     viewer_can_update: bool,
 }
@@ -288,25 +276,13 @@ impl FilesPageState {
         Self {
             head_ref_oid: String::new(),
             number: None,
-            head_ref_name: None,
-            base_ref_oid: None,
-            base_ref_name: None,
             repository_full_name: None,
             viewer_can_update: false,
         }
     }
 
     fn merge_node(&mut self, node: &PullRequestNode) {
-        merge_option_first_wins(&mut self.head_ref_name, node.head_ref_name.as_ref());
-        merge_option_first_wins(&mut self.base_ref_oid, node.base_ref_oid.as_ref());
-        merge_option_first_wins(&mut self.base_ref_name, node.base_ref_name.as_ref());
         merge_scalar_fields(self, node);
-    }
-}
-
-fn merge_option_first_wins(target: &mut Option<String>, source: Option<&String>) {
-    if target.is_none() {
-        *target = source.cloned();
     }
 }
 

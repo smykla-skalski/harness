@@ -133,8 +133,6 @@ final class TaskBoardURLProtocol: URLProtocol, @unchecked Sendable {
     Route("/v1/reviews/files/preview"): sampleReviewsFilesPreviewResponseText,
     Route("/v1/reviews/files/viewed"): sampleReviewsFilesViewedResponseText,
     Route("/v1/reviews/files/blob"): sampleReviewsFilesBlobResponseText,
-    Route("/v1/reviews/files/local-clones"):
-      sampleReviewsLocalClonesText,
     Route("/v1/reviews/timeline"): sampleReviewsTimelineResponseText,
   ]
 

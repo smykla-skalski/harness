@@ -57,18 +57,9 @@ public final class ReviewFilesViewModel {
 
   public var state: ReviewFilesLoadState = .idle
   public var headRefOid: String = ""
-  /// PR's source branch name (`refs/heads/<x>` qualifier dropped).
-  /// Used by the local-clone patch dispatch so the daemon fetches the
-  /// actual PR ref. `nil` keeps the daemon on its default-branch fallback.
-  public var headRefName: String?
-  /// Merge-base OID; the local-clone patch dispatch needs this to
-  /// compute `base..head` diffs. `nil` falls back to the REST path.
-  public var baseRefOid: String?
-  /// PR base branch name. The daemon fetches this ref before local diffing.
-  public var baseRefName: String?
-  /// `owner/name` of the PR's repository. `nil` falls back to REST.
+  /// `owner/name` of the PR's repository. Required for REST patch fetches.
   public var repositoryFullName: String?
-  /// Pull request number, used to fetch `refs/pull/<number>/head`.
+  /// Pull request number, used by the GitHub REST files endpoint.
   public var number: UInt64?
   public var viewerCanMarkViewed: Bool = true
   public var paginationComplete: Bool = true
@@ -103,9 +94,6 @@ public final class ReviewFilesViewModel {
   public func ingest(response: ReviewsFilesListResponse) {
     state = .loaded
     headRefOid = response.headRefOid
-    headRefName = response.headRefName
-    baseRefOid = response.baseRefOid
-    baseRefName = response.baseRefName
     repositoryFullName = response.repositoryFullName
     number = response.number
     viewerCanMarkViewed = response.viewerCanMarkViewed

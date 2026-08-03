@@ -114,8 +114,7 @@ extension DashboardReviewFilesModeContentPane {
     store.startPatchPreviewPrewarm(
       forPullRequest: item.pullRequestID,
       visiblePaths: paths.visible,
-      backgroundPaths: paths.background,
-      largeDiffStrategy: preferences.snapshot.filesLargeDiffStrategy
+      backgroundPaths: paths.background
     )
   }
 

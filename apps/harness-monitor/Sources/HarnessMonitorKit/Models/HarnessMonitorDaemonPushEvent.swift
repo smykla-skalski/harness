@@ -77,7 +77,6 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
     case acpPermissionBatchRemoved(AcpPermissionBatchRemovedPayload)
     case githubDataChanged(GitHubDataChangedPayload)
     case taskBoardUpdated(TaskBoardUpdatedPayload)
-    case reviewsLocalCloneProgress(ReviewLocalCloneProgress)
     case taskBoardWorkingCopyProgress(TaskBoardWorkingCopyProgress)
     case auditEvent(HarnessMonitorAuditEvent)
     case unknown(eventName: String, payload: JSONValue)
@@ -106,7 +105,6 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
       case .acpPermissionBatchRemoved: return "acp_permission_batch_removed"
       case .githubDataChanged: return "github_data_changed"
       case .taskBoardUpdated: return "task_board_updated"
-      case .reviewsLocalCloneProgress: return "reviews_local_clone_progress"
       case .taskBoardWorkingCopyProgress: return "task_board_working_copy_progress"
       case .auditEvent: return "audit_event"
       case .unknown(let eventName, _): return "unknown:\(eventName)"
