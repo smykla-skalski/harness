@@ -14,6 +14,7 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::policy_canvas::{bump_change_policy, feed_gate_cache, load_or_seed_workspace};
 use super::policy_canvas_response::policy_canvas_workspace_response;
+use crate::daemon::reviews_store::PolicyGraphQueries;
 
 /// Serialize the active (or named) canvas document so the caller can save it
 /// to disk as a JSON file.

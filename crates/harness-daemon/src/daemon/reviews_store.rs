@@ -8,11 +8,10 @@
 //! own policy-runtime traits. When #1086 extracts `service::reviews`, this
 //! trait moves with it for free.
 //!
-//! `AsyncDaemonDb`/`DaemonDb` keep their original inherent methods too, each
-//! now a thin forward into the matching trait method (or, for the one
-//! generic read-modify-write helper a trait method can't express cleanly,
-//! straight into the crate function), so nothing outside this file has to
-//! change to keep calling them by the same name.
+//! No inherent impl remains on `AsyncDaemonDb`/`DaemonDb` here: every caller
+//! reaches these methods through [`PolicyGraphQueries`] or
+//! [`PolicyGraphSyncQueries`] instead, so this file carries no orphan-rule
+//! obstacle to `AsyncDaemonDb`/`DaemonDb` moving to their own crate.
 
 use harness_policy_graph_store::{
     NewApprovalGrant, PolicyCanvasDraftSaveResult, count_pending_approval_grants,
@@ -122,6 +121,15 @@ pub(crate) trait PolicyGraphQueries: Send + Sync {
         document: PolicyGraph,
         if_revision: u64,
     ) -> Result<PolicyCanvasDraftSaveResult, CliError>;
+
+    /// Atomically read-modify-write the policy workspace.
+    async fn update_policy_workspace<F, R>(
+        &self,
+        mutate: F,
+    ) -> Result<(PolicyCanvasWorkspace, R), CliError>
+    where
+        F: FnOnce(&mut PolicyCanvasWorkspace) -> Result<R, CliError> + Send,
+        R: Send;
 }
 
 impl PolicyGraphQueries for AsyncDaemonDb {
@@ -254,6 +262,17 @@ impl PolicyGraphQueries for AsyncDaemonDb {
     ) -> Result<PolicyCanvasDraftSaveResult, CliError> {
         save_policy_canvas_draft(self, canvas_id, document, if_revision).await
     }
+
+    async fn update_policy_workspace<F, R>(
+        &self,
+        mutate: F,
+    ) -> Result<(PolicyCanvasWorkspace, R), CliError>
+    where
+        F: FnOnce(&mut PolicyCanvasWorkspace) -> Result<R, CliError> + Send,
+        R: Send,
+    {
+        update_policy_workspace(self, mutate).await
+    }
 }
 
 pub(crate) trait PolicyGraphSyncQueries {
@@ -266,184 +285,3 @@ impl PolicyGraphSyncQueries for DaemonDb {
     }
 }
 
-impl AsyncDaemonDb {
-    pub(crate) async fn ensure_pending_approval_grant(
-        &self,
-        grant: &NewApprovalGrant,
-    ) -> Result<PolicyApprovalGrant, CliError> {
-        <Self as PolicyGraphQueries>::ensure_pending_approval_grant(self, grant).await
-    }
-
-    pub(crate) async fn live_approval_grant(
-        &self,
-        board_item_id: &str,
-        action: PolicyAction,
-        canvas_revision: u64,
-    ) -> Result<Option<PolicyApprovalGrant>, CliError> {
-        <Self as PolicyGraphQueries>::live_approval_grant(
-            self,
-            board_item_id,
-            action,
-            canvas_revision,
-        )
-        .await
-    }
-
-    #[cfg(test)]
-    pub(crate) async fn live_approval_grant_at(
-        &self,
-        board_item_id: &str,
-        action: PolicyAction,
-        canvas_revision: u64,
-        now: &str,
-    ) -> Result<Option<PolicyApprovalGrant>, CliError> {
-        <Self as PolicyGraphQueries>::live_approval_grant_at(
-            self,
-            board_item_id,
-            action,
-            canvas_revision,
-            now,
-        )
-        .await
-    }
-
-    #[cfg(test)]
-    pub(crate) async fn approval_grant(
-        &self,
-        id: &str,
-    ) -> Result<Option<PolicyApprovalGrant>, CliError> {
-        <Self as PolicyGraphQueries>::approval_grant(self, id).await
-    }
-
-    pub(crate) async fn list_pending_approval_grants(
-        &self,
-    ) -> Result<Vec<PolicyApprovalGrant>, CliError> {
-        <Self as PolicyGraphQueries>::list_pending_approval_grants(self).await
-    }
-
-    #[cfg(test)]
-    pub(crate) async fn list_pending_approval_grants_at(
-        &self,
-        now: &str,
-    ) -> Result<Vec<PolicyApprovalGrant>, CliError> {
-        <Self as PolicyGraphQueries>::list_pending_approval_grants_at(self, now).await
-    }
-
-    pub(crate) async fn count_pending_approval_grants(&self) -> Result<usize, CliError> {
-        <Self as PolicyGraphQueries>::count_pending_approval_grants(self).await
-    }
-
-    #[cfg(test)]
-    pub(crate) async fn count_pending_approval_grants_at(
-        &self,
-        now: &str,
-    ) -> Result<usize, CliError> {
-        <Self as PolicyGraphQueries>::count_pending_approval_grants_at(self, now).await
-    }
-
-    pub(crate) async fn resolve_approval_grant(
-        &self,
-        id: &str,
-        approve: bool,
-        actor: &str,
-    ) -> Result<PolicyApprovalGrant, CliError> {
-        <Self as PolicyGraphQueries>::resolve_approval_grant(self, id, approve, actor).await
-    }
-
-    #[cfg(test)]
-    pub(crate) async fn resolve_approval_grant_at(
-        &self,
-        id: &str,
-        approve: bool,
-        actor: &str,
-        now: &str,
-    ) -> Result<PolicyApprovalGrant, CliError> {
-        <Self as PolicyGraphQueries>::resolve_approval_grant_at(self, id, approve, actor, now).await
-    }
-
-    pub(crate) async fn revoke_approval_grant(
-        &self,
-        id: &str,
-        actor: &str,
-    ) -> Result<PolicyApprovalGrant, CliError> {
-        <Self as PolicyGraphQueries>::revoke_approval_grant(self, id, actor).await
-    }
-
-    #[cfg(test)]
-    pub(crate) async fn revoke_approval_grant_at(
-        &self,
-        id: &str,
-        actor: &str,
-        now: &str,
-    ) -> Result<PolicyApprovalGrant, CliError> {
-        <Self as PolicyGraphQueries>::revoke_approval_grant_at(self, id, actor, now).await
-    }
-
-    pub(crate) async fn record_policy_decision_row(
-        &self,
-        decision: &RecordedPolicyDecision,
-    ) -> Result<(), CliError> {
-        <Self as PolicyGraphQueries>::record_policy_decision_row(self, decision).await
-    }
-
-    pub(crate) async fn recent_policy_decisions_for_canvas(
-        &self,
-        canvas_id: &str,
-        limit: usize,
-    ) -> Result<Vec<RecordedPolicyDecision>, CliError> {
-        <Self as PolicyGraphQueries>::recent_policy_decisions_for_canvas(self, canvas_id, limit)
-            .await
-    }
-
-    pub(crate) async fn prune_policy_decisions(&self, keep: usize) -> Result<u64, CliError> {
-        <Self as PolicyGraphQueries>::prune_policy_decisions(self, keep).await
-    }
-
-    pub(crate) async fn load_policy_workspace(
-        &self,
-    ) -> Result<Option<PolicyCanvasWorkspace>, CliError> {
-        <Self as PolicyGraphQueries>::load_policy_workspace(self).await
-    }
-
-    pub(crate) async fn replace_policy_workspace(
-        &self,
-        workspace: &PolicyCanvasWorkspace,
-    ) -> Result<(), CliError> {
-        <Self as PolicyGraphQueries>::replace_policy_workspace(self, workspace).await
-    }
-
-    /// Atomically read-modify-write the policy workspace. Forwards straight
-    /// into the crate function rather than through [`PolicyGraphQueries`]:
-    /// the closure-generic signature doesn't fit a trait method cleanly, and
-    /// nothing outside this crate needs it behind the trait's own interface.
-    pub(crate) async fn update_policy_workspace<F, R>(
-        &self,
-        mutate: F,
-    ) -> Result<(PolicyCanvasWorkspace, R), CliError>
-    where
-        F: FnOnce(&mut PolicyCanvasWorkspace) -> Result<R, CliError>,
-    {
-        update_policy_workspace(self, mutate).await
-    }
-
-    pub(crate) async fn save_policy_canvas_draft(
-        &self,
-        canvas_id: &str,
-        document: PolicyGraph,
-        if_revision: u64,
-    ) -> Result<PolicyCanvasDraftSaveResult, CliError> {
-        <Self as PolicyGraphQueries>::save_policy_canvas_draft(
-            self,
-            canvas_id,
-            document,
-            if_revision,
-        )
-        .await
-    }
-}
-
-impl DaemonDb {
-    pub(crate) fn load_policy_workspace(&self) -> Result<Option<PolicyCanvasWorkspace>, CliError> {
-        <Self as PolicyGraphSyncQueries>::load_policy_workspace(self)
-    }
-}

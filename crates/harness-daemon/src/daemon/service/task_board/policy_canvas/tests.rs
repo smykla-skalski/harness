@@ -5,6 +5,7 @@ use crate::daemon::protocol::PolicyPipelinePromoteRequest;
 use crate::task_board::policy_graph::{PolicyCanvasWorkspace, apply_set_global_enforcement};
 
 use super::promote_policy_pipeline;
+use crate::daemon::reviews_store::PolicyGraphQueries;
 
 async fn connect() -> (TempDir, AsyncDaemonDb) {
     let dir = tempdir().expect("tempdir");

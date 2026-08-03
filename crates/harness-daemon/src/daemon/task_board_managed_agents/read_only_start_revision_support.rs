@@ -2,6 +2,7 @@
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::reviews_store::PolicyGraphQueries;
 
 pub(super) async fn bump_settings_revision(db: &AsyncDaemonDb) {
     let mut settings = db

@@ -14,6 +14,7 @@ use harness_policy_graph_store::{
     insert_pending_grant_at,
 };
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::reviews_store::PolicyGraphQueries;
 
 async fn connect() -> (TempDir, AsyncDaemonDb) {
     let dir = tempdir().expect("tempdir");

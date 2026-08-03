@@ -34,6 +34,7 @@ use super::super::task_board_db::task_board_host_local_db;
 use super::super::{create_task, start_session_direct};
 use super::dispatch_preparation::reserve_and_prepare_task_board_dispatch;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::reviews_store::PolicyGraphQueries;
 
 /// Build dispatch plans for task-board items.
 ///

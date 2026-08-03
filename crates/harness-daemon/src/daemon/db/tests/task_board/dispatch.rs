@@ -11,6 +11,7 @@ use crate::task_board::{
     build_dispatch_plans_with_policy,
 };
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::reviews_store::PolicyGraphQueries;
 
 #[tokio::test]
 async fn task_board_dispatch_intents_survive_until_worker_outcome() {

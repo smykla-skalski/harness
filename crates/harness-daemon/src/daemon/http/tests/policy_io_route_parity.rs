@@ -8,6 +8,7 @@ use crate::daemon::remote_auth::REMOTE_CLIENT_ID_HEADER;
 
 use super::remote_limits_support::{remote_state_with_viewer_config, remote_token};
 use super::task_board_route_parity_support::*;
+use crate::daemon::reviews_store::PolicyGraphQueries;
 
 #[test]
 fn task_board_http_and_ws_policy_io_routes_match() {

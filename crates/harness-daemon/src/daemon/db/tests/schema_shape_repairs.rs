@@ -1,6 +1,7 @@
 use tempfile::tempdir;
 
 use super::*;
+use crate::daemon::reviews_store::PolicyGraphQueries;
 
 #[tokio::test]
 async fn async_connect_repairs_current_schema_missing_external_create_intents() {

@@ -6,6 +6,7 @@ use crate::daemon::protocol::{http_paths, ws_methods};
 use crate::task_board::{PolicyAction, PolicyReasonCode};
 
 use super::task_board_route_parity_support::{post_json, serve_http, ws_result};
+use crate::daemon::reviews_store::PolicyGraphQueries;
 
 #[test]
 fn policy_approval_grant_revoke_http_and_ws_match() {

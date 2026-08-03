@@ -9,6 +9,7 @@ use super::task_board_route_parity_support::*;
 use super::task_board_support::{
     assert_task_board_capabilities_match, on_large_stack, without_durable_task_board_automation,
 };
+use crate::daemon::reviews_store::PolicyGraphQueries;
 
 #[test]
 fn task_board_http_and_ws_workflow_routes_match() {
