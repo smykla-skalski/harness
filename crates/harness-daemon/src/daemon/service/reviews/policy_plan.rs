@@ -17,6 +17,7 @@ use harness_kernel::errors::CliError;
 use super::policy_mapping::preview_step;
 use super::preview::{preview_action_target, preview_action_warnings};
 use super::token::github_token;
+use crate::daemon::reviews_store::PolicyGraphQueries;
 
 pub(super) async fn authored_database_reviews_policy_plan(
     database: &AsyncDaemonDb,

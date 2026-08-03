@@ -16,6 +16,7 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::policy_canvas::{bump_change_policy, feed_gate_cache};
 use super::policy_canvas_response::policy_canvas_workspace_response;
+use crate::daemon::reviews_store::PolicyGraphQueries;
 
 #[cfg(test)]
 mod tests;

@@ -4,6 +4,7 @@ use tempfile::{TempDir, tempdir};
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
 use crate::task_board::policy_graph::{PolicyCanvasWorkspace, apply_duplicate};
 use harness_kernel::errors::{CliError, CliErrorKind};
+use crate::daemon::reviews_store::{PolicyGraphQueries, PolicyGraphSyncQueries};
 
 async fn connect() -> (TempDir, AsyncDaemonDb) {
     let dir = tempdir().expect("tempdir");

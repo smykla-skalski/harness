@@ -11,6 +11,7 @@ use crate::task_board::policy_graph::{
     install_decision_sink, install_pending_grant_sink,
 };
 use harness_kernel::errors::CliError;
+use crate::daemon::reviews_store::PolicyGraphQueries;
 
 /// Wire policy storage at daemon boot and seed the database-backed workspace.
 ///

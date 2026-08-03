@@ -28,6 +28,7 @@ use super::task_board_repository_scope::{
 pub(crate) use crate::task_board::external::{
     TaskBoardSyncCoordinatorFence, TaskBoardSyncCoordinatorFenceDecision,
 };
+use crate::daemon::reviews_store::PolicyGraphQueries;
 
 #[cfg(test)]
 mod external_ref_tests;

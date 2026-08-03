@@ -10,6 +10,7 @@ use crate::task_board::policy_graph::PolicyCanvasWorkspace;
 use super::task_board_managed_worker_assertions::assert_codex_worker_started;
 use super::task_board_support::*;
 use super::*;
+use crate::daemon::reviews_store::PolicyGraphQueries;
 
 #[test]
 fn task_board_http_dispatch_evaluate_and_run_once_use_real_state() {

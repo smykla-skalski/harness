@@ -6,6 +6,7 @@ use crate::task_board::{TaskBoardItem, TaskBoardStatus};
 
 use super::super::*;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::reviews_store::PolicyGraphQueries;
 
 mod catalog;
 mod policy;

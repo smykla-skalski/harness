@@ -13,6 +13,7 @@ use crate::task_board::{
     PolicyApprovalGrant, PolicyGraph, PolicyReasonCode, TaskBoardItem, TaskBoardStatus,
     TaskBoardWorkflowStatus, build_dispatch_plans_with_policy,
 };
+use crate::daemon::reviews_store::PolicyGraphQueries;
 
 struct HeldFixture {
     _dir: TempDir,

@@ -15,6 +15,7 @@ use crate::task_board::{
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::reviews_store::PolicyGraphQueries;
 
 const DISPATCH_CLAIM_HEARTBEAT_INTERVAL: Duration = Duration::from_secs(10);
 

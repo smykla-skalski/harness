@@ -5,6 +5,7 @@ use crate::task_board::policy_graph::PolicyCanvasWorkspace;
 
 use super::task_board_support::{put_json, seed_ready_board_item, serve_http};
 use super::*;
+use crate::daemon::reviews_store::PolicyGraphQueries;
 
 #[test]
 fn task_board_http_dispatch_pick_accepts_empty_body() {
