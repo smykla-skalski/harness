@@ -10,6 +10,7 @@ use super::test_support::{
     sample_session_state_with_open_task, sample_session_state_with_open_task_and_codex_agent,
     with_isolated_async_harness_env,
 };
+use crate::daemon::db::prelude::*;
 
 const SESSION_ID: &str = "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc";
 const IDEMPOTENT_SESSION_ID: &str = "11111111-1111-4111-8111-111111111111";

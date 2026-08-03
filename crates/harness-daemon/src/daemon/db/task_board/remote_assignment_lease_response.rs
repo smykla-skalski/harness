@@ -15,82 +15,81 @@ use super::remote_operation_trust::{
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardRemoteAssignmentState;
 use crate::task_board::remote_wire::wire::{RemoteLeaseRenewRequest, RemoteLeaseRenewResponse};
+use crate::daemon::db::prelude::*;
 
 #[path = "remote_assignment_lease_response/replay.rs"]
-mod replay;
+pub(super) mod replay;
 
-impl AsyncDaemonDb {
-    pub(crate) async fn record_task_board_remote_assignment_lease_renewal(
-        &self,
-        request: &RemoteLeaseRenewRequest,
-        response: &RemoteLeaseRenewResponse,
-        authenticated_principal: &str,
-        recorded_at: &str,
-    ) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
-        request
-            .validate()
-            .map_err(|error| db_error(format!("validate remote renewal request: {error}")))?;
-        response
-            .validate(request)
-            .map_err(|error| db_error(format!("validate remote renewal response: {error}")))?;
-        nonblank(
-            authenticated_principal,
-            "remote assignment authenticated principal",
-        )?;
-        let recorded = canonical_time(recorded_at, "remote renewal response time")?;
-        let renewed_expiry = canonical_time(&response.lease.expires_at, "renewed lease expiry")?;
-        let mut transaction = self
-            .begin_immediate_transaction("task board remote renewal response")
-            .await?;
-        let record = require_assignment(&mut transaction, &request.binding.assignment_id).await?;
-        if renewal_response_replayed(&record, request, response, authenticated_principal) {
-            commit_noop(transaction, "replayed remote renewal response").await?;
-            return Ok(TaskBoardRemoteMutationOutcome::Replayed(record));
-        }
-        let window = renewal_window(
-            &record,
-            request,
-            response,
+pub(super) async fn record_task_board_remote_assignment_lease_renewal(
+    db: &AsyncDaemonDb,
+    request: &RemoteLeaseRenewRequest,
+    response: &RemoteLeaseRenewResponse,
+    authenticated_principal: &str,
+    recorded_at: &str,
+) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
+    request
+        .validate()
+        .map_err(|error| db_error(format!("validate remote renewal request: {error}")))?;
+    response
+        .validate(request)
+        .map_err(|error| db_error(format!("validate remote renewal response: {error}")))?;
+    nonblank(
+        authenticated_principal,
+        "remote assignment authenticated principal",
+    )?;
+    let recorded = canonical_time(recorded_at, "remote renewal response time")?;
+    let renewed_expiry = canonical_time(&response.lease.expires_at, "renewed lease expiry")?;
+    let mut transaction = db
+        .begin_immediate_transaction("task board remote renewal response")
+        .await?;
+    let record = require_assignment(&mut transaction, &request.binding.assignment_id).await?;
+    if renewal_response_replayed(&record, request, response, authenticated_principal) {
+        commit_noop(transaction, "replayed remote renewal response").await?;
+        return Ok(TaskBoardRemoteMutationOutcome::Replayed(record));
+    }
+    let window = renewal_window(
+        &record,
+        request,
+        response,
+        renewed_expiry,
+        authenticated_principal,
+    )?;
+    if !window.acceptable {
+        commit_noop(transaction, "stale remote renewal response").await?;
+        return Ok(TaskBoardRemoteMutationOutcome::Stale(record));
+    }
+    let RenewalWindow {
+        current_expiry,
+        deadline,
+        settlement_only,
+        ..
+    } = window;
+    consume_controller_operation_trust_in_tx(
+        &mut transaction,
+        &record,
+        TaskBoardRemoteOperationKind::Renew,
+        &request.request_sha256,
+    )
+    .await?;
+    settle_renewal_response_in_tx(
+        transaction,
+        &record,
+        request,
+        response,
+        recorded_at,
+        &RenewalFence {
+            recorded,
             renewed_expiry,
-            authenticated_principal,
-        )?;
-        if !window.acceptable {
-            commit_noop(transaction, "stale remote renewal response").await?;
-            return Ok(TaskBoardRemoteMutationOutcome::Stale(record));
-        }
-        let RenewalWindow {
             current_expiry,
             deadline,
             settlement_only,
-            ..
-        } = window;
-        consume_controller_operation_trust_in_tx(
-            &mut transaction,
-            &record,
-            TaskBoardRemoteOperationKind::Renew,
-            &request.request_sha256,
-        )
-        .await?;
-        settle_renewal_response_in_tx(
-            transaction,
-            &record,
-            request,
-            response,
-            recorded_at,
-            &RenewalFence {
-                recorded,
-                renewed_expiry,
-                current_expiry,
-                deadline,
-                settlement_only,
-            },
-            &RenewalLabels {
-                late: "late renewal response",
-                settled: "renewal response",
-            },
-        )
-        .await
-    }
+        },
+        &RenewalLabels {
+            late: "late renewal response",
+            settled: "renewal response",
+        },
+    )
+    .await
 }
 
 /// The live renewal path's counterpart to the replay path's `ReplayWindow`:

@@ -4,6 +4,7 @@ use serde::Serialize;
 
 use crate::daemon::db::DaemonDb;
 use crate::daemon::remote_acme::build_remote_acme_runtime_plan;
+use crate::daemon::remote_acme_queries::RemoteAcmeQueries;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 pub(crate) struct RemotePairingInvitation {

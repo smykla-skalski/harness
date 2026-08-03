@@ -1,3 +1,4 @@
+use crate::daemon::db::conversation::DaemonDbConversation;
 use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
@@ -16,6 +17,7 @@ use super::async_mutations::{
     init_git_project, start_async_http_session, test_http_state_with_empty_async_db,
 };
 use super::*;
+use crate::daemon::db::prelude::*;
 
 fn append_project_ledger_entry(project_dir: &std::path::Path) {
     let ledger_path = project_context_dir(project_dir)

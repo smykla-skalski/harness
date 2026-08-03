@@ -5,6 +5,8 @@ use sqlx::query_scalar;
 use super::super::{TaskBoardTriageOverrideClearInput, TaskBoardTriageOverrideSetInput};
 use super::*;
 use crate::task_board::TriageVerdict;
+use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
+use crate::daemon::db::task_board::triage_queries::TriageQueries;
 
 struct ItemSnapshot {
     revision: i64,

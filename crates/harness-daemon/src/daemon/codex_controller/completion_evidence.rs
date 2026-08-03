@@ -6,6 +6,7 @@ use crate::session::types::{SessionState, TaskStatus};
 use harness_kernel::errors::CliError;
 
 use super::handle::{CodexControllerHandle, lock_db, record_snapshot_event};
+use crate::daemon::db::prelude::*;
 
 const WORKTREE_BASELINE_EVENT: &str = "agent/worktree_baseline";
 const COMPLETION_DETAIL_LIMIT: usize = 2_000;

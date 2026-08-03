@@ -12,9 +12,9 @@ use super::remote_assignment_start_authority::{
     executor_lifecycle_settings_still_compatible, remote_executor_identity,
 };
 use super::remote_start_receipts::durable_start_receipt_run_matches;
-use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardRemoteAssignmentState;
+use crate::daemon::db::prelude::*;
 
 const LIFECYCLE_OWNER_DOMAIN: &str = "harness.task-board.remote-executor-lifecycle-owner.v1";
 const LIFECYCLE_OWNER_SECONDS: i64 = 30;
@@ -44,27 +44,21 @@ pub(super) struct ExecutorLifecycleOwnerEvidence {
     pub(super) sha256: Option<String>,
 }
 
-impl AsyncDaemonDb {
-    pub(crate) async fn claim_task_board_remote_executor_lifecycle_owner(
+pub(crate) trait RemoteAssignmentLifecycleOwnerQueries: Send + Sync {
+    async fn claim_task_board_remote_executor_lifecycle_owner_with_settings(
         &self,
         assignment_id: &str,
         owner_instance_id: &str,
         acquired_at: &str,
-    ) -> Result<Option<TaskBoardRemoteExecutorLifecycleOwner>, CliError> {
-        <Self as RemoteExecutionQueries>::claim_task_board_remote_executor_lifecycle_owner(
-            self,
-            assignment_id,
-            owner_instance_id,
-            acquired_at,
-        )
-        .await
-    }
+    ) -> Result<Option<TaskBoardRemoteExecutorLifecycleClaim>, CliError>;
+}
 
+impl RemoteAssignmentLifecycleOwnerQueries for AsyncDaemonDb {
     #[expect(
         clippy::cognitive_complexity,
         reason = "fenced transaction guard chain; each guard settles the transaction before returning"
     )]
-    pub(crate) async fn claim_task_board_remote_executor_lifecycle_owner_with_settings(
+    async fn claim_task_board_remote_executor_lifecycle_owner_with_settings(
         &self,
         assignment_id: &str,
         owner_instance_id: &str,

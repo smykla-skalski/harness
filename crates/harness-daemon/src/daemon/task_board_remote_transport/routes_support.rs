@@ -17,6 +17,7 @@ use crate::task_board::{
     TaskBoardRemoteAssignmentState, validate_local_execution_host_config,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
+use crate::daemon::db::task_board::prelude::*;
 
 pub(super) async fn assignment_route<'a>(
     headers: &HeaderMap,

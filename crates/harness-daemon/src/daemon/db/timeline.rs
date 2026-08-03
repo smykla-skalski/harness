@@ -6,10 +6,71 @@ use super::{
 use super::{OptionalExtension, SessionTimelineStateRow, usize_from_i64};
 #[cfg(test)]
 use harness_protocol::timeline::{TimelineCursor, TimelineWindowRequest, TimelineWindowResponse};
+use crate::daemon::db::prelude::*;
 
-impl DaemonDb {
+pub(crate) trait DaemonDbTimeline {
     #[cfg(test)]
-    pub(crate) fn load_session_timeline_window(
+    fn load_session_timeline_window(
+        &self,
+        session_id: &str,
+        request: &TimelineWindowRequest,
+    ) -> Result<Option<TimelineWindowResponse>, CliError>;
+
+    /// Rebuild the canonical timeline ledger from the current resolved session.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when timeline materialization or SQL writes fail.
+    fn rebuild_session_timeline_from_resolved(
+        &self,
+        resolved: &daemon_index::ResolvedSession,
+    ) -> Result<(), CliError>;
+
+    /// Rebuild the timeline ledger for every session by replaying legacy sources
+    /// (`session_log`, `conversation_events`, `task_checkpoints`, `signal_index`).
+    ///
+    /// Sessions whose state cannot be parsed are logged and skipped - failing the
+    /// whole backfill because of one bad row would block the migration.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when the session list cannot be enumerated.
+    fn backfill_legacy_timelines(&self) -> Result<(), CliError>;
+
+    fn list_backfillable_session_ids(&self) -> Result<Vec<String>, CliError>;
+
+    fn backfill_session_timeline(&self, session_id: &str);
+
+    #[cfg(test)]
+    fn load_session_timeline_state(
+        &self,
+        session_id: &str,
+    ) -> Result<Option<SessionTimelineStateRow>, CliError>;
+
+    #[cfg(test)]
+    fn load_timeline_cursor_offset(
+        &self,
+        session_id: &str,
+        cursor: &TimelineCursor,
+    ) -> Result<Option<usize>, CliError>;
+
+    #[cfg(test)]
+    fn load_timeline_entries_range(
+        &self,
+        session_id: &str,
+        offset: usize,
+        limit: usize,
+    ) -> Result<Vec<StoredTimelineEntry>, CliError>;
+
+    #[cfg(test)]
+    fn load_timeline_cursor_at_offset(
+        &self,
+        session_id: &str,
+        offset: Option<usize>,
+    ) -> Result<Option<TimelineCursor>, CliError>;
+}
+
+impl DaemonDbTimeline for DaemonDb {
+    #[cfg(test)]
+    fn load_session_timeline_window(
         &self,
         session_id: &str,
         request: &TimelineWindowRequest,
@@ -87,11 +148,7 @@ impl DaemonDb {
         }))
     }
 
-    /// Rebuild the canonical timeline ledger from the current resolved session.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] when timeline materialization or SQL writes fail.
-    pub(crate) fn rebuild_session_timeline_from_resolved(
+    fn rebuild_session_timeline_from_resolved(
         &self,
         resolved: &daemon_index::ResolvedSession,
     ) -> Result<(), CliError> {
@@ -111,15 +168,7 @@ impl DaemonDb {
         )
     }
 
-    /// Rebuild the timeline ledger for every session by replaying legacy sources
-    /// (`session_log`, `conversation_events`, `task_checkpoints`, `signal_index`).
-    ///
-    /// Sessions whose state cannot be parsed are logged and skipped - failing the
-    /// whole backfill because of one bad row would block the migration.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] when the session list cannot be enumerated.
-    pub(crate) fn backfill_legacy_timelines(&self) -> Result<(), CliError> {
+    fn backfill_legacy_timelines(&self) -> Result<(), CliError> {
         for session_id in self.list_backfillable_session_ids()? {
             self.backfill_session_timeline(&session_id);
         }

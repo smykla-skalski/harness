@@ -12,6 +12,7 @@ use crate::task_board::{
 use super::super::repository_conventions;
 use super::super::support::{automation_config, github_token_for_repository};
 use super::preparation::validate_publication_automations;
+use crate::daemon::db::task_board::prelude::*;
 
 /// Stands in for the base branch until the publish path detects the real one.
 /// Named rather than spelled "main" inline so a reader hitting it in a debugger

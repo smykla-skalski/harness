@@ -1,3 +1,4 @@
+use super::activity_fold::DaemonDbActivityFold;
 use super::{
     CliError, Connection, ConversationEvent, DaemonDb, OptionalExtension,
     PreparedAgentTranscriptResync, PreparedConversationEventImport, SessionState, daemon_index,
@@ -13,14 +14,117 @@ use self::persistence::{
     conversation_timeline_rows_after, replace_session_activity, replace_session_conversation_state,
     upsert_agent_activity, upsert_changed_conversation_events,
 };
+use crate::daemon::db::prelude::*;
 
-impl DaemonDb {
+pub(crate) trait DaemonDbConversation {
     /// Refresh runtime transcript caches from file-backed agent logs without
     /// reimporting session state through a broader file reconcile path.
     ///
     /// # Errors
     /// Returns [`CliError`] on I/O, serialization, or SQL failures.
-    pub(crate) fn sync_runtime_transcripts(
+    fn sync_runtime_transcripts(
+        &self,
+        resolved: &super::daemon_index::ResolvedSession,
+    ) -> Result<(), CliError>;
+
+    /// Sync conversation events for an agent into the database.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    fn sync_conversation_events(
+        &self,
+        session_id: &str,
+        agent_id: &str,
+        runtime: &str,
+        events: &[ConversationEvent],
+    ) -> Result<(), CliError>;
+
+    /// Append live conversation events for an agent without replacing existing
+    /// transcript history.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL or timeline conversion failures.
+    fn append_conversation_events(
+        &self,
+        session_id: &str,
+        agent_id: &str,
+        runtime: &str,
+        events: &[ConversationEvent],
+    ) -> Result<(), CliError>;
+
+    /// Incrementally upsert conversation events whose sequence is greater than
+    /// `after_sequence`, returning whether any conversation row changed.
+    ///
+    /// Events at or below the cursor are skipped entirely (no read, no write) so
+    /// an unchanged transcript prefix keeps its stored row identity instead of
+    /// being deleted and reinserted. Pass `-1` to consider every event, in which
+    /// case a row whose stored JSON already matches is still skipped for live
+    /// append idempotency.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL or timeline conversion failures.
+    fn upsert_conversation_events_after(
+        &self,
+        session_id: &str,
+        agent_id: &str,
+        runtime: &str,
+        events: &[ConversationEvent],
+        after_sequence: i64,
+    ) -> Result<bool, CliError>;
+
+    /// Return the stored conversation event count and highest sequence for an
+    /// agent, used to drive incremental transcript resync.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on query failure.
+    fn conversation_event_cursor(
+        &self,
+        session_id: &str,
+        agent_id: &str,
+    ) -> Result<(usize, i64), CliError>;
+
+    /// Load conversation events for a session agent from the index.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on query failure.
+    fn load_conversation_events(
+        &self,
+        session_id: &str,
+        agent_id: &str,
+    ) -> Result<Vec<ConversationEvent>, CliError>;
+
+    /// Sync agent tool activity summaries for a session into the cache.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    fn sync_agent_activity(
+        &self,
+        session_id: &str,
+        activities: &[daemon_protocol::AgentToolActivitySummary],
+    ) -> Result<(), CliError>;
+
+    /// Insert or update one cached agent activity summary.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    fn upsert_agent_activity(
+        &self,
+        session_id: &str,
+        activity: &daemon_protocol::AgentToolActivitySummary,
+    ) -> Result<(), CliError>;
+
+    /// Load cached agent activity summaries for a session.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on query failure.
+    fn load_agent_activity(
+        &self,
+        session_id: &str,
+    ) -> Result<Vec<daemon_protocol::AgentToolActivitySummary>, CliError>;
+}
+
+impl DaemonDbConversation for DaemonDb {
+    fn sync_runtime_transcripts(
         &self,
         resolved: &super::daemon_index::ResolvedSession,
     ) -> Result<(), CliError> {
@@ -58,11 +162,7 @@ impl DaemonDb {
         Ok(())
     }
 
-    /// Sync conversation events for an agent into the database.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL failures.
-    pub fn sync_conversation_events(
+    fn sync_conversation_events(
         &self,
         session_id: &str,
         agent_id: &str,
@@ -139,12 +239,7 @@ impl DaemonDb {
         Ok(())
     }
 
-    /// Append live conversation events for an agent without replacing existing
-    /// transcript history.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL or timeline conversion failures.
-    pub fn append_conversation_events(
+    fn append_conversation_events(
         &self,
         session_id: &str,
         agent_id: &str,
@@ -174,18 +269,7 @@ impl DaemonDb {
         Ok(())
     }
 
-    /// Incrementally upsert conversation events whose sequence is greater than
-    /// `after_sequence`, returning whether any conversation row changed.
-    ///
-    /// Events at or below the cursor are skipped entirely (no read, no write) so
-    /// an unchanged transcript prefix keeps its stored row identity instead of
-    /// being deleted and reinserted. Pass `-1` to consider every event, in which
-    /// case a row whose stored JSON already matches is still skipped for live
-    /// append idempotency.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL or timeline conversion failures.
-    pub(super) fn upsert_conversation_events_after(
+    fn upsert_conversation_events_after(
         &self,
         session_id: &str,
         agent_id: &str,
@@ -223,12 +307,7 @@ impl DaemonDb {
         Ok(changed)
     }
 
-    /// Return the stored conversation event count and highest sequence for an
-    /// agent, used to drive incremental transcript resync.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on query failure.
-    pub(super) fn conversation_event_cursor(
+    fn conversation_event_cursor(
         &self,
         session_id: &str,
         agent_id: &str,
@@ -245,11 +324,7 @@ impl DaemonDb {
             .map_err(|error| db_error(format!("load conversation event cursor: {error}")))
     }
 
-    /// Load conversation events for a session agent from the index.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on query failure.
-    pub fn load_conversation_events(
+    fn load_conversation_events(
         &self,
         session_id: &str,
         agent_id: &str,
@@ -278,11 +353,7 @@ impl DaemonDb {
         }
         Ok(events)
     }
-    /// Sync agent tool activity summaries for a session into the cache.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL failures.
-    pub fn sync_agent_activity(
+    fn sync_agent_activity(
         &self,
         session_id: &str,
         activities: &[daemon_protocol::AgentToolActivitySummary],
@@ -291,11 +362,7 @@ impl DaemonDb {
         replace_session_activity(&self.conn, session_id, activities)
     }
 
-    /// Insert or update one cached agent activity summary.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL failures.
-    pub fn upsert_agent_activity(
+    fn upsert_agent_activity(
         &self,
         session_id: &str,
         activity: &daemon_protocol::AgentToolActivitySummary,
@@ -303,11 +370,7 @@ impl DaemonDb {
         upsert_agent_activity(&self.conn, session_id, activity)
     }
 
-    /// Load cached agent activity summaries for a session.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on query failure.
-    pub fn load_agent_activity(
+    fn load_agent_activity(
         &self,
         session_id: &str,
     ) -> Result<Vec<daemon_protocol::AgentToolActivitySummary>, CliError> {
@@ -343,7 +406,7 @@ impl harness_daemon_snapshot::ConversationQueries for DaemonDb {
         &self,
         session_id: &str,
     ) -> Result<Vec<daemon_protocol::AgentToolActivitySummary>, CliError> {
-        Self::load_agent_activity(self, session_id)
+        DaemonDbConversation::load_agent_activity(self, session_id)
     }
 }
 

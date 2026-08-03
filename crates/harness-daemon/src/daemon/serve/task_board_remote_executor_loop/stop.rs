@@ -14,6 +14,7 @@ use crate::workspace::utc_now;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::runtime::stop_remote_run;
+use crate::daemon::db::task_board::prelude::*;
 
 pub(super) async fn settle_lifecycle_settings_drift(
     state: &DaemonHttpState,

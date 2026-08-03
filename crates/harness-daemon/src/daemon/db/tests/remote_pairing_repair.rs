@@ -4,6 +4,7 @@ use crate::daemon::remote_identity::RemoteClientRegistration;
 use crate::daemon::remote_pairing::{
     RemotePairingClaimRequest, RemotePairingCode, RemotePairingRecord,
 };
+use crate::daemon::remote_pairing_queries::RemotePairingQueries;
 
 #[test]
 fn remote_pairing_claim_recovers_revoked_stable_client() {

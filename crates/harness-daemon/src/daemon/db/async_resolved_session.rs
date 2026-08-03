@@ -1,5 +1,6 @@
 use tokio::task::spawn_blocking;
 
+use super::async_writes::AsyncSessionWriteQueries;
 use super::{
     AsyncDaemonDb, CliError, DiscoveredProject, PathBuf, SessionState, daemon_index, db_error,
 };

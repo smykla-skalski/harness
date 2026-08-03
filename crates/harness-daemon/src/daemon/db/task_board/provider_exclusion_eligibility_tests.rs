@@ -1,6 +1,8 @@
 use super::{connect, exclusion_context, pre_dispatch_item};
 use crate::task_board::store::TaskBoardItemPatch;
 use crate::task_board::types::TaskBoardItemKind;
+use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
+use crate::daemon::db::task_board::provider_queries::ProviderQueries;
 
 #[tokio::test]
 async fn hides_a_pre_dispatch_umbrella_and_unparents_its_children() {

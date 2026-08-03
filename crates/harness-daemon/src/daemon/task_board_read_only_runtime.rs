@@ -19,6 +19,7 @@ pub(crate) mod agent_turn_report;
 mod git_evidence;
 
 pub(crate) use agent_turn_report::AgentTurnReportStart;
+use crate::daemon::db::prelude::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum TaskBoardPublishVerification {

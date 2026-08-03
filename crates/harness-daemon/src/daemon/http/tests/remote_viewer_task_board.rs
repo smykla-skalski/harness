@@ -24,6 +24,7 @@ use super::remote_viewer_task_board_triage::{
     assert_ws_viewer_triage_override_mutations_are_denied, seed_triage_item,
 };
 use super::test_http_state_with_db;
+use crate::daemon::db::task_board::prelude::*;
 
 pub(super) const VIEWER_ID: &str = "viewer-task-board";
 const OPERATOR_ID: &str = "operator-task-board";

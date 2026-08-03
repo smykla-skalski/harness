@@ -9,7 +9,6 @@ use super::lane_order::{
     record_lane_transition_audit_in_tx, replace_with_lane_transition_in_tx,
 };
 use super::lane_order_audit::record_lane_position_audit_in_tx;
-use super::lane_placement_queries::LanePlacementQueries;
 use super::triage_apply::{override_implied_status, reapply_active_override_outcome_in_tx};
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
 use crate::task_board::{
@@ -17,6 +16,7 @@ use crate::task_board::{
     validate_lane_placement,
 };
 use harness_kernel::errors::CliErrorKind;
+use crate::daemon::db::prelude::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TaskBoardLanePositionInput {
@@ -42,44 +42,6 @@ pub(crate) struct TaskBoardLaneMutationResult {
     pub(crate) item_revision: i64,
     pub(crate) items_change_seq: i64,
     pub(crate) shifted: Vec<TaskBoardLaneShift>,
-}
-
-impl AsyncDaemonDb {
-    /// Apply a manual absolute slot change under one item-list sequence CAS.
-    pub(crate) async fn set_task_board_lane_position(
-        &self,
-        input: TaskBoardLanePositionInput,
-    ) -> Result<TaskBoardLaneMutationResult, CliError> {
-        <Self as LanePlacementQueries>::set_task_board_lane_position(self, input).await
-    }
-
-    /// Reset an item to derived default ordering under one item-list sequence
-    /// CAS. See [`LanePlacementQueries::reset_task_board_lane_position`] for
-    /// the full contract.
-    pub(crate) async fn reset_task_board_lane_position(
-        &self,
-        input: TaskBoardLaneResetInput,
-    ) -> Result<TaskBoardLaneMutationResult, CliError> {
-        <Self as LanePlacementQueries>::reset_task_board_lane_position(self, input).await
-    }
-
-    /// Later automation can use this internal seam without replacing manual
-    /// anchors or an active override's lane/provenance -- the latter is the
-    /// override choke point's job to reassert, not arbitrary automation's.
-    pub(crate) async fn place_task_board_item_automatically(
-        &self,
-        item_id: &str,
-        lane_position: u32,
-        producer: String,
-    ) -> Result<Option<TaskBoardLaneMutationResult>, CliError> {
-        <Self as LanePlacementQueries>::place_task_board_item_automatically(
-            self,
-            item_id,
-            lane_position,
-            producer,
-        )
-        .await
-    }
 }
 
 /// Real implementation behind [`LanePlacementQueries::set_task_board_lane_position`].

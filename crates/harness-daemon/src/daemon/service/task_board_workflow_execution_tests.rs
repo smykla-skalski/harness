@@ -19,6 +19,8 @@ use super::task_board_workflow_review::record_workflow_reviewer_outcome;
 use super::task_board_workflow_test_support::{
     CREATED_AT, TestDatabase, create_execution, outcome_record, reviewers, seed_snapshot,
 };
+use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db::prelude::*;
 
 #[tokio::test]
 async fn write_workflow_is_rejected_without_a_durable_execution() {

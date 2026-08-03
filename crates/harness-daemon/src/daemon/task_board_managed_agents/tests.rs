@@ -24,6 +24,7 @@ use super::{
     resolve_start_failure, start_worker_for_applied_task, stop_worker_in_lane, terminal_worker_id,
     terminal_worker_request,
 };
+use crate::daemon::db::prelude::*;
 
 #[path = "write_request_recovery_tests.rs"]
 mod write_request_recovery_tests;

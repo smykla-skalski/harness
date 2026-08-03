@@ -7,6 +7,7 @@ use crate::task_board::{
     TaskBoardAutomationRunTrigger, TaskBoardAutomationScope, TaskBoardOrchestratorDispatchInput,
     TaskBoardOrchestratorSettings, TaskBoardStatus,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 /// The default settings already enable `SyncTaskBoard`, so this is the
 /// configuration the tests below vary one field at a time from.
@@ -166,6 +167,85 @@ async fn a_run_dispatches_only_items_present_when_it_was_prepared() {
         .collect::<Vec<_>>();
 
     assert_eq!(planned_ids, ["present-at-prepare"]);
+}
+
+#[tokio::test]
+async fn a_run_uses_only_configured_repository_candidates() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let db = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
+        .await
+        .expect("open database");
+    let mut settings = settings_without_a_source();
+    settings.github_inbox.repositories = vec!["smykla-skalski/harness".into()];
+    db.replace_task_board_orchestrator_settings(&settings)
+        .await
+        .expect("save settings");
+    for (id, repository) in [
+        ("allowed", Some("smykla-skalski/harness")),
+        ("blocked", Some("example/other")),
+        ("local", None),
+    ] {
+        let mut item = crate::task_board::TaskBoardItem::new(
+            id.into(),
+            id.into(),
+            String::new(),
+            "2026-08-02T10:00:00Z".into(),
+        );
+        item.execution_repository = repository.map(Into::into);
+        db.create_task_board_item(item)
+            .await
+            .expect("create candidate");
+    }
+    let request = TaskBoardOrchestratorRunOnceRequest {
+        status: Some(TaskBoardStatus::Todo),
+        dry_run: Some(true),
+        ..TaskBoardOrchestratorRunOnceRequest::default()
+    };
+
+    let prepared = prepare_run(&db, &request, &settings, None)
+        .await
+        .expect("prepare run");
+
+    assert_eq!(prepared.candidate_item_ids, ["allowed", "local"]);
+}
+
+#[tokio::test]
+async fn an_explicit_item_outside_repository_scope_is_refused() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let db = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
+        .await
+        .expect("open database");
+    let mut settings = settings_without_a_source();
+    settings.github_inbox.repositories = vec!["smykla-skalski/harness".into()];
+    db.replace_task_board_orchestrator_settings(&settings)
+        .await
+        .expect("save settings");
+    let mut item = crate::task_board::TaskBoardItem::new(
+        "blocked".into(),
+        "Blocked".into(),
+        String::new(),
+        "2026-08-02T10:00:00Z".into(),
+    );
+    item.execution_repository = Some("example/other".into());
+    db.create_task_board_item(item)
+        .await
+        .expect("create candidate");
+    let request = TaskBoardOrchestratorRunOnceRequest {
+        item_id: Some("blocked".into()),
+        dry_run: Some(true),
+        ..TaskBoardOrchestratorRunOnceRequest::default()
+    };
+
+    let error = prepare_run(&db, &request, &settings, None)
+        .await
+        .expect_err("inactive repository must not dispatch");
+
+    assert!(
+        error
+            .message()
+            .contains("outside configured repository scope"),
+        "unexpected: {error}"
+    );
 }
 
 #[tokio::test]

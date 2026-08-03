@@ -12,6 +12,7 @@ use super::super::TaskBoardAutomationRunSession;
 use super::dispatch::{
     apply_dispatch_plan_async, build_dispatch_plans_for_request_async, reject_explicit_kind_block,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 pub(crate) async fn dispatch_task_board_for_orchestrator_async(
     request: &TaskBoardDispatchRequest,
@@ -27,9 +28,26 @@ pub(crate) async fn dispatch_task_board_for_orchestrator_async(
         return Ok(DispatchExecutionSummary::dry_run(plans));
     }
     reject_explicit_kind_block(request, &plans)?;
-    let active_workflows = active_workflow_count(&db.list_task_board_items(None).await?);
-    let budget = dispatch_budget(settings, active_workflows);
+    let budget = request_dispatch_budget(request, db, settings).await?;
     execute_plans(request, db, plans, budget, session).await
+}
+
+/// The board-wide concurrency cap paces unscoped background passes. A request
+/// that names its item is the caller's own choice - step mode reaches here that
+/// way too, since it picks one item up front - so counting workflows the run
+/// never targeted would starve the single item it did name.
+async fn request_dispatch_budget(
+    request: &TaskBoardDispatchRequest,
+    db: &AsyncDaemonDb,
+    settings: &TaskBoardOrchestratorSettings,
+) -> Result<usize, CliError> {
+    if request.item_id.is_some() {
+        return Ok(per_run_dispatch_budget(settings));
+    }
+    let active_items =
+        super::super::task_board_repository_scope::scoped_task_board_items_db(db, None).await?;
+    let active_workflows = active_workflow_count(&active_items);
+    Ok(dispatch_budget(settings, active_workflows))
 }
 
 async fn execute_plans(
@@ -79,24 +97,22 @@ fn active_workflow_count(items: &[crate::task_board::TaskBoardItem]) -> usize {
         .count()
 }
 
+fn per_run_dispatch_budget(settings: &TaskBoardOrchestratorSettings) -> usize {
+    usize::try_from(settings.scheduling.max_dispatches_per_run).unwrap_or(usize::MAX)
+}
+
 fn dispatch_budget(settings: &TaskBoardOrchestratorSettings, active_workflows: usize) -> usize {
     let active_workflows = u32::try_from(active_workflows).unwrap_or(u32::MAX);
     let concurrent_slots = settings
         .scheduling
         .max_concurrent_workflows
         .saturating_sub(active_workflows);
-    usize::try_from(
-        settings
-            .scheduling
-            .max_dispatches_per_run
-            .min(concurrent_slots),
-    )
-    .unwrap_or(usize::MAX)
+    per_run_dispatch_budget(settings).min(usize::try_from(concurrent_slots).unwrap_or(usize::MAX))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::dispatch_budget;
+    use super::{dispatch_budget, per_run_dispatch_budget};
     use crate::task_board::TaskBoardOrchestratorSettings;
 
     #[test]
@@ -108,5 +124,23 @@ mod tests {
         assert_eq!(dispatch_budget(&settings, 0), 2);
         assert_eq!(dispatch_budget(&settings, 1), 1);
         assert_eq!(dispatch_budget(&settings, 2), 0);
+    }
+
+    /// A named item must still dispatch with the board's default single
+    /// concurrency slot already taken by an unrelated workflow.
+    #[test]
+    fn explicit_dispatch_ignores_the_board_wide_concurrency_cap() {
+        let settings = TaskBoardOrchestratorSettings::default();
+        assert_eq!(dispatch_budget(&settings, 1), 0);
+        assert_eq!(per_run_dispatch_budget(&settings), 1);
+    }
+
+    #[test]
+    fn explicit_dispatch_still_honors_the_per_run_cap() {
+        let mut settings = TaskBoardOrchestratorSettings::default();
+        settings.scheduling.max_dispatches_per_run = 2;
+        settings.scheduling.max_concurrent_workflows = 0;
+
+        assert_eq!(per_run_dispatch_budget(&settings), 2);
     }
 }

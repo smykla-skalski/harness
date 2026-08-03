@@ -11,6 +11,10 @@ use crate::task_board::remote_wire::wire::{
     RemoteAssignmentWireState, RemoteCancelRequest, RemoteSettledRequest,
     TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION, test_codex_launch,
 };
+use crate::daemon::db::task_board::remote_assignment_authority_queries::RemoteAssignmentAuthorityQueries;
+use crate::daemon::db::task_board::remote_assignment_terminal::RemoteAssignmentTerminalQueries;
+use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
+use crate::daemon::db::task_board::remote_source_bundle_queries::RemoteSourceBundleQueries;
 
 const SETTLED_AT: &str = "2026-07-19T10:00:50Z";
 

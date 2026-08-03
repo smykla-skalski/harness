@@ -14,6 +14,7 @@ use crate::task_board::{
     TaskBoardPhaseCapabilityProfile, TaskBoardPhaseVerdict, TaskBoardReviewResult,
     TaskBoardReviewerOutcome, TaskBoardWorkflowExecutionCas,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 pub(super) struct PreparedLifecycle {
     pub(super) prepared: PreparedRemoteOffer,

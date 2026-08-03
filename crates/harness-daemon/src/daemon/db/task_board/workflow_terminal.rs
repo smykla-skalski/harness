@@ -13,6 +13,11 @@ pub(super) use dispatch::{PreparedDispatchSettlement, settle_prepared_dispatch_i
 #[path = "workflow_terminal_in_tx.rs"]
 mod in_tx;
 pub(super) use in_tx::project_terminal_execution_in_tx;
+#[cfg(test)]
+use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
+#[cfg(test)]
+use crate::daemon::db::task_board::workflow_execution_queries::WorkflowExecutionQueries;
+use crate::daemon::db::prelude::*;
 
 #[derive(Debug)]
 pub(crate) struct TaskBoardWorkflowTerminalProjection {
@@ -22,36 +27,34 @@ pub(crate) struct TaskBoardWorkflowTerminalProjection {
     pub(crate) admission_released: bool,
 }
 
-impl AsyncDaemonDb {
-    pub(crate) async fn recover_orphaned_task_board_read_only_workflow_admissions(
-        &self,
-    ) -> Result<Vec<String>, CliError> {
-        let mut transaction = self
-            .begin_immediate_transaction("read-only workflow admission recovery")
-            .await?;
-        let owners = sqlx::query_scalar::<_, String>(
-            "SELECT DISTINCT managed_worker_id
-             FROM task_board_dispatch_admission_ledger
-             WHERE kind = 'concurrency' AND state = 'committed'
-               AND managed_worker_id LIKE 'workflow-%'
-             ORDER BY managed_worker_id",
-        )
-        .fetch_all(transaction.as_mut())
-        .await
-        .map_err(|error| db_error(format!("load read-only workflow admissions: {error}")))?;
-        let mut released = Vec::new();
-        for owner in owners {
-            if recover_orphaned_admission_owner_in_tx(&mut transaction, &owner).await? {
-                released.push(owner);
-            }
+pub(super) async fn recover_orphaned_task_board_read_only_workflow_admissions(
+    db: &AsyncDaemonDb,
+) -> Result<Vec<String>, CliError> {
+    let mut transaction = db
+        .begin_immediate_transaction("read-only workflow admission recovery")
+        .await?;
+    let owners = sqlx::query_scalar::<_, String>(
+        "SELECT DISTINCT managed_worker_id
+         FROM task_board_dispatch_admission_ledger
+         WHERE kind = 'concurrency' AND state = 'committed'
+           AND managed_worker_id LIKE 'workflow-%'
+         ORDER BY managed_worker_id",
+    )
+    .fetch_all(transaction.as_mut())
+    .await
+    .map_err(|error| db_error(format!("load read-only workflow admissions: {error}")))?;
+    let mut released = Vec::new();
+    for owner in owners {
+        if recover_orphaned_admission_owner_in_tx(&mut transaction, &owner).await? {
+            released.push(owner);
         }
-        transaction.commit().await.map_err(|error| {
-            db_error(format!(
-                "commit read-only workflow admission recovery: {error}"
-            ))
-        })?;
-        Ok(released)
     }
+    transaction.commit().await.map_err(|error| {
+        db_error(format!(
+            "commit read-only workflow admission recovery: {error}"
+        ))
+    })?;
+    Ok(released)
 }
 
 /// Releases this owner's committed admission only when it names a
@@ -82,25 +85,23 @@ async fn recover_orphaned_admission_owner_in_tx(
     release_managed_worker_admission_in_tx(transaction, owner).await
 }
 
-impl AsyncDaemonDb {
-    pub(crate) async fn project_task_board_read_only_workflow_terminal(
-        &self,
-        execution_id: &str,
-    ) -> Result<TaskBoardWorkflowTerminalProjection, CliError> {
-        let mut transaction = self
-            .begin_immediate_transaction("read-only workflow terminal projection")
-            .await?;
-        let execution = load_execution_in_tx(&mut transaction, execution_id)
-            .await?
-            .ok_or_else(|| db_error(format!("workflow execution '{execution_id}' not found")))?;
-        let projection = project_terminal_execution_in_tx(&mut transaction, &execution).await?;
-        transaction.commit().await.map_err(|error| {
-            db_error(format!(
-                "commit read-only workflow terminal projection: {error}"
-            ))
-        })?;
-        Ok(projection)
-    }
+pub(super) async fn project_task_board_read_only_workflow_terminal(
+    db: &AsyncDaemonDb,
+    execution_id: &str,
+) -> Result<TaskBoardWorkflowTerminalProjection, CliError> {
+    let mut transaction = db
+        .begin_immediate_transaction("read-only workflow terminal projection")
+        .await?;
+    let execution = load_execution_in_tx(&mut transaction, execution_id)
+        .await?
+        .ok_or_else(|| db_error(format!("workflow execution '{execution_id}' not found")))?;
+    let projection = project_terminal_execution_in_tx(&mut transaction, &execution).await?;
+    transaction.commit().await.map_err(|error| {
+        db_error(format!(
+            "commit read-only workflow terminal projection: {error}"
+        ))
+    })?;
+    Ok(projection)
 }
 
 #[cfg(test)]

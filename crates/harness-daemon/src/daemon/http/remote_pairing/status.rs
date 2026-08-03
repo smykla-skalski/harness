@@ -1,3 +1,5 @@
+use crate::daemon::remote_identity_queries::RemoteIdentitySyncQueries;
+use crate::daemon::remote_pairing_queries::RemotePairingQueries;
 use std::time::Instant;
 
 use axum::Json;

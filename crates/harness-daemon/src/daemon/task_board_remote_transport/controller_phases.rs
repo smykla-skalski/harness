@@ -19,6 +19,7 @@ use crate::task_board::remote_wire::wire::{
     RemoteCancelRequest, RemoteCancelResponse, RemoteLeaseRenewRequest, RemoteLeaseRenewResponse,
     RemoteOfferRequest, RemoteOfferResponse,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 impl RemoteExecutionControllerClient {
     /// Returns the durable offer receipt for `request`, or `None` when the

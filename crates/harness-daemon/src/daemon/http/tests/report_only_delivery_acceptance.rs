@@ -6,6 +6,7 @@ use crate::daemon::protocol::http_paths;
 use crate::task_board::TaskBoardAiReviewReportStatus;
 
 use super::task_board_support::{get_json, put_json};
+use crate::daemon::db::task_board::prelude::*;
 
 #[path = "report_only_delivery_acceptance/support.rs"]
 mod support;

@@ -4,6 +4,7 @@ use crate::session::{storage as session_storage, types::SessionState};
 use tokio::task::spawn_blocking;
 
 use super::{CliError, CliErrorKind, HookAgent, Path, PathBuf, ResolvedSession};
+use crate::daemon::db::prelude::*;
 
 pub(crate) fn resolve_hook_agent(runtime_name: &str) -> Option<HookAgent> {
     match runtime_name {

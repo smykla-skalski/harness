@@ -29,19 +29,6 @@ pub(super) struct ClaimReceiptDecodeInput<'a> {
     pub(super) receipt_sha256: Option<&'a str>,
 }
 
-impl AsyncDaemonDb {
-    pub(crate) async fn exact_task_board_remote_claim_receipt(
-        &self,
-        request: &RemoteClaimRequest,
-        principal: &str,
-    ) -> Result<Option<(RemoteClaimResponse, TaskBoardRemoteAssignmentRecord)>, CliError> {
-        <Self as RemoteExecutionQueries>::exact_task_board_remote_claim_receipt(
-            self, request, principal,
-        )
-        .await
-    }
-}
-
 pub(super) async fn exact_task_board_remote_claim_receipt(
     db: &AsyncDaemonDb,
     request: &RemoteClaimRequest,

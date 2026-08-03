@@ -70,20 +70,19 @@ pub(super) async fn load(
     Ok(CancelTargetPage { targets, truncated })
 }
 
-impl AsyncDaemonDb {
-    pub(crate) async fn task_board_automation_cancel_target(
-        &self,
-        execution_id: &str,
-    ) -> Result<Option<TaskBoardAutomationCancelTarget>, CliError> {
-        let mut transaction =
-            self.pool().begin().await.map_err(|error| {
-                db_error(format!("begin automation cancel target read: {error}"))
-            })?;
-        let target = cancel_target_in_tx(&mut transaction, execution_id).await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit automation cancel target read: {error}")))?;
-        Ok(target)
-    }
+pub(in super::super) async fn task_board_automation_cancel_target(
+    db: &AsyncDaemonDb,
+    execution_id: &str,
+) -> Result<Option<TaskBoardAutomationCancelTarget>, CliError> {
+    let mut transaction = db
+        .pool()
+        .begin()
+        .await
+        .map_err(|error| db_error(format!("begin automation cancel target read: {error}")))?;
+    let target = cancel_target_in_tx(&mut transaction, execution_id).await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit automation cancel target read: {error}")))?;
+    Ok(target)
 }

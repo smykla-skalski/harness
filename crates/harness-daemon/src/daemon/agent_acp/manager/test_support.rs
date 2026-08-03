@@ -15,6 +15,7 @@ use crate::session::types::{
     AgentRegistration, AgentStatus, CURRENT_VERSION, SessionMetrics, SessionRole, SessionState,
     SessionStatus,
 };
+use crate::daemon::db::prelude::*;
 
 /// Deadlock guard for polls that wait on a real spawned ACP subprocess to reach
 /// a lifecycle state (disconnect, runtime-session binding, signal ack). These

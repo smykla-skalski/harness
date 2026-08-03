@@ -3,12 +3,14 @@
 //! Cache key is `(pull_request_id, head_ref_oid, path_sha)`. When a PR is
 //! force-pushed, its `head_ref_oid` changes and the cache key changes - no
 //! stale patches will be served. The in-memory layer is a `DashMap` of
+
+#![allow(dead_code)]
 //! `Arc<FilesEntry>`; the on-disk layer is a per-file JSON blob under
 //! `<runtime>/reviews/patches/<repo>/<pr>/<head>/<path_sha>.json`.
 //!
 //! This module owns cache-key derivation, on-disk path layout, LRU
 //! comparisons, and serde for the JSON envelope. Service handlers compose it
-//! with the GitHub REST/local-clone fetch paths.
+//! with the GitHub REST fetch path.
 
 use std::cmp::Ordering;
 use std::fmt::Write as _;

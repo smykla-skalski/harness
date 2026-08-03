@@ -26,6 +26,7 @@ use super::sessions::session_detail_from_async_daemon_db;
 use super::{
     build_log_entry, effective_project_dir, session_not_found, sync_file_state_from_async_db,
 };
+use crate::daemon::db::prelude::*;
 
 async fn resolve_async(
     async_db: &super::db::AsyncDaemonDb,

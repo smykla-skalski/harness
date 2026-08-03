@@ -16,6 +16,7 @@ use crate::task_board::{
     TaskBoardExecutionPhase, TaskBoardLocalExecutionRepositoryConfig,
     TaskBoardPhaseCapabilityProfile, TaskBoardWorkflowKind,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 const REPOSITORY: &str = "example/harness";
 const CLAIMED_AT: &str = "2026-07-19T10:00:10Z";

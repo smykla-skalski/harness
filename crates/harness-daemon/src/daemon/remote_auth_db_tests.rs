@@ -1,6 +1,7 @@
 use crate::daemon::db::DaemonDb;
 use crate::daemon::remote::RemoteRole;
 use crate::daemon::remote_identity::RemoteClientRegistration;
+use crate::daemon::remote_identity_queries::RemoteIdentitySyncQueries;
 
 #[test]
 fn revoked_execution_coordinator_token_cannot_be_reauthenticated() {

@@ -12,6 +12,7 @@ use super::unadopted_tests::{
     claimed_executor_workspace, failed_at_claimed_status, load_assignment, run_deep_cleanup_async,
     terminal_settlement, with_isolated_sessions,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 #[test]
 fn failed_at_claimed_cleanup_requires_a_validated_receipt() {

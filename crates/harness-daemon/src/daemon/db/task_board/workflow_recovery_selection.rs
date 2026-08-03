@@ -6,6 +6,7 @@ use super::workflow_execution_candidates::load_candidates;
 use super::workflow_execution_rows::WorkflowExecutionRow;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardWorkflowExecutionRecord;
+use crate::daemon::db::prelude::*;
 
 #[path = "workflow_recovery_selection/remote_candidates.rs"]
 mod remote_candidates;
@@ -72,30 +73,29 @@ const SELECT_THROUGH_CURSOR: &str = "SELECT * FROM task_board_workflow_execution
       )
       AND (updated_at < ?1 OR (updated_at = ?1 AND execution_id <= ?2))
     ORDER BY updated_at, execution_id LIMIT ?3";
-impl AsyncDaemonDb {
-    pub(crate) async fn recoverable_task_board_workflow_executions(
-        &self,
-        limit: usize,
-    ) -> Result<Vec<TaskBoardWorkflowExecutionRecord>, CliError> {
-        if limit == 0 {
-            return Ok(Vec::new());
-        }
-        let effective_limit = limit.min(100);
-        let sql_limit = i64::try_from(effective_limit)
-            .map_err(|_| db_error("workflow execution recovery limit is out of range"))?;
-        let mut transaction = self
-            .begin_immediate_transaction("recoverable workflow execution selection")
-            .await?;
-        let page = load_recovery_page_in_tx(&mut transaction, effective_limit, sql_limit).await?;
-        settle_recovery_selection(transaction, page).await
-    }
 
-    pub(crate) async fn remote_candidate_task_board_workflow_executions(
-        &self,
-        limit: usize,
-    ) -> Result<Vec<TaskBoardWorkflowExecutionRecord>, CliError> {
-        remote_candidates::remote_candidate_task_board_workflow_executions(self, limit).await
+pub(super) async fn recoverable_task_board_workflow_executions(
+    db: &AsyncDaemonDb,
+    limit: usize,
+) -> Result<Vec<TaskBoardWorkflowExecutionRecord>, CliError> {
+    if limit == 0 {
+        return Ok(Vec::new());
     }
+    let effective_limit = limit.min(100);
+    let sql_limit = i64::try_from(effective_limit)
+        .map_err(|_| db_error("workflow execution recovery limit is out of range"))?;
+    let mut transaction = db
+        .begin_immediate_transaction("recoverable workflow execution selection")
+        .await?;
+    let page = load_recovery_page_in_tx(&mut transaction, effective_limit, sql_limit).await?;
+    settle_recovery_selection(transaction, page).await
+}
+
+pub(super) async fn remote_candidate_task_board_workflow_executions(
+    db: &AsyncDaemonDb,
+    limit: usize,
+) -> Result<Vec<TaskBoardWorkflowExecutionRecord>, CliError> {
+    remote_candidates::remote_candidate_task_board_workflow_executions(db, limit).await
 }
 
 /// One page of recovery candidates. `truncated` means more executions are

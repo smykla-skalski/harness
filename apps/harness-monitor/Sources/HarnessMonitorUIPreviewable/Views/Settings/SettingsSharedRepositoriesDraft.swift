@@ -71,6 +71,10 @@ struct SettingsSharedRepositoriesDraft: Equatable {
     rows.filter(\.taskBoardEnabled).map(\.repositoryPath)
   }
 
+  var taskBoardEnabledCount: Int {
+    rows.count(where: \.taskBoardEnabled)
+  }
+
   var repositoryCatalog: [String] {
     rows.map(\.repositoryPath)
   }
@@ -113,6 +117,19 @@ struct SettingsSharedRepositoriesDraft: Equatable {
   mutating func setTaskBoardEnabled(_ isEnabled: Bool, for rowID: String) {
     guard let index = rowIndexes[rowID] else { return }
     rows[index].taskBoardEnabled = isEnabled
+  }
+
+  mutating func setTaskBoardEnabledForAll(_ isEnabled: Bool) {
+    for index in rows.indices {
+      rows[index].taskBoardEnabled = isEnabled
+    }
+  }
+
+  mutating func enableOnlyForTaskBoard(rowID: String) {
+    guard rowIndexes[rowID] != nil else { return }
+    for index in rows.indices {
+      rows[index].taskBoardEnabled = rows[index].id == rowID
+    }
   }
 
   mutating func remove(rowID: String) {

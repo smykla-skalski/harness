@@ -169,7 +169,9 @@ pub(super) async fn execute(
     }
     metrics.capture(&batch);
     let batch = batch.into_completed()?;
-    let items = db.list_task_board_items(request.status).await?;
+    let items =
+        super::super::task_board_repository_scope::scoped_task_board_items_db(db, request.status)
+            .await?;
     let summary =
         super::super::task_board::build_sync_response_from_items(&items, &config, batch.operations);
     super::super::task_board::log_sync_completion(&summary);
@@ -247,6 +249,7 @@ mod tests {
     use tempfile::tempdir;
 
     use super::*;
+    use crate::daemon::db::task_board::prelude::*;
     use crate::daemon::db::AsyncAuditQueries;
     use crate::daemon::protocol::HarnessMonitorAuditEventsRequest;
     use crate::task_board::{

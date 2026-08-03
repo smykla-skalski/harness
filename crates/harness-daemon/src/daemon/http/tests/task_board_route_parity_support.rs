@@ -13,6 +13,7 @@ use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{http_paths, ws_methods};
 use crate::task_board::planning::{approve_plan, submit_plan};
 use crate::task_board::{TaskBoardItem, TaskBoardStatus};
+use crate::daemon::db::task_board::prelude::*;
 
 mod normalize;
 

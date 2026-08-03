@@ -8,10 +8,12 @@ use crate::task_board::{
     TASK_BOARD_EXECUTION_TARGET_RESOURCE, TaskBoardAttemptState, TaskBoardExecutionDiagnostic,
     TaskBoardExecutionState, TaskBoardFailureClass, TaskBoardWorkflowExecutionCas,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 #[path = "admission_dispatch_remote_result_adoption_support.rs"]
 mod support;
 use support::*;
+use crate::daemon::db::prelude::*;
 
 #[tokio::test]
 async fn completed_result_adopts_once_and_settles_prepared_start_before_target_clear() {

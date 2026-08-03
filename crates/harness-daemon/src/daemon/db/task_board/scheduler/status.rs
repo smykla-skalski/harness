@@ -3,7 +3,7 @@ use sqlx::{Sqlite, SqliteConnection, Transaction, query_as};
 
 mod ledger;
 mod queue;
-mod targets;
+pub(super) mod targets;
 mod wake;
 
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
@@ -59,23 +59,21 @@ struct ProviderBackoff {
     latest: StoredInstant,
 }
 
-impl AsyncDaemonDb {
-    pub(crate) async fn task_board_automation_snapshot(
-        &self,
-    ) -> Result<TaskBoardAutomationSnapshot, CliError> {
-        let mut transaction = self.pool().begin().await.map_err(|error| {
-            db_error(format!(
-                "begin task board automation snapshot transaction: {error}"
-            ))
-        })?;
-        let snapshot = snapshot_in_transaction(&mut transaction).await?;
-        transaction.commit().await.map_err(|error| {
-            db_error(format!(
-                "commit task board automation snapshot transaction: {error}"
-            ))
-        })?;
-        Ok(snapshot)
-    }
+pub(super) async fn task_board_automation_snapshot(
+    db: &AsyncDaemonDb,
+) -> Result<TaskBoardAutomationSnapshot, CliError> {
+    let mut transaction = db.pool().begin().await.map_err(|error| {
+        db_error(format!(
+            "begin task board automation snapshot transaction: {error}"
+        ))
+    })?;
+    let snapshot = snapshot_in_transaction(&mut transaction).await?;
+    transaction.commit().await.map_err(|error| {
+        db_error(format!(
+            "commit task board automation snapshot transaction: {error}"
+        ))
+    })?;
+    Ok(snapshot)
 }
 
 pub(super) async fn snapshot_in_transaction(

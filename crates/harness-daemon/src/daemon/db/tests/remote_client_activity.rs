@@ -1,3 +1,4 @@
+use crate::daemon::remote_identity_queries::{RemoteIdentityQueries, RemoteIdentitySyncQueries};
 use sqlx::query_scalar;
 
 use super::*;

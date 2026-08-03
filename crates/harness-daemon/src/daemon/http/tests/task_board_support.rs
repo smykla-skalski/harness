@@ -8,6 +8,7 @@ use tokio::task::JoinHandle;
 use crate::daemon::protocol::{http_paths, ws_methods};
 use crate::task_board::planning::{approve_plan, submit_plan};
 use crate::task_board::{AgentMode, TaskBoardItem, TaskBoardStatus};
+use crate::daemon::db::task_board::prelude::*;
 
 pub(super) fn without_durable_task_board_automation<R>(body: impl FnOnce() -> R) -> R {
     temp_env::with_var(

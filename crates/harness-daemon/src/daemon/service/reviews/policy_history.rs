@@ -18,6 +18,7 @@ use crate::task_board::policy_runtime::repository::PolicyRuntimeRepository;
 use harness_kernel::errors::CliError;
 
 use super::policy::require_policy_runtime_db;
+use crate::daemon::db::task_board::prelude::*;
 
 /// How many runs the history response carries. Bounds the payload so a busy
 /// subject cannot flood the observability surface with every retained run.

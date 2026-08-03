@@ -7,11 +7,15 @@ struct DashboardAgentsRouteView: View {
   let history: GlobalWindowNavigationHistory
   let isRouteVisible: Bool
   let refreshesAutomatically: Bool
+  let initialTerminalDetail: DashboardTerminalAgentDetail?
   let initialAcpDetail: DashboardAcpAgentDetail?
+  let initialCodexDetail: DashboardCodexAgentDetail?
   @AppStorage(DashboardAgentSelectionDefaults.storageKey)
   private var persistedSelectionRaw = ""
   @State private var state: DashboardAgentsRouteState
+  @State private var isPresentingTerminalCreate = false
   @State private var isPresentingAcpCreate = false
+  @State private var isPresentingCodexCreate = false
 
   init(
     store: HarnessMonitorStore,
@@ -20,7 +24,9 @@ struct DashboardAgentsRouteView: View {
     isRouteVisible: Bool,
     refreshesAutomatically: Bool = true,
     initialState: DashboardAgentBrowserViewState = DashboardAgentBrowserViewState(),
+    initialTerminalDetail: DashboardTerminalAgentDetail? = nil,
     initialAcpDetail: DashboardAcpAgentDetail? = nil,
+    initialCodexDetail: DashboardCodexAgentDetail? = nil,
     selectionDefaults: UserDefaults = .standard
   ) {
     self.store = store
@@ -28,7 +34,9 @@ struct DashboardAgentsRouteView: View {
     self.history = history
     self.isRouteVisible = isRouteVisible
     self.refreshesAutomatically = refreshesAutomatically
+    self.initialTerminalDetail = initialTerminalDetail
     self.initialAcpDetail = initialAcpDetail
+    self.initialCodexDetail = initialCodexDetail
     _persistedSelectionRaw = AppStorage(
       wrappedValue: "",
       DashboardAgentSelectionDefaults.storageKey,
@@ -90,8 +98,13 @@ struct DashboardAgentsRouteView: View {
           DashboardAgentDetailPane(
             store: store,
             agent: selectedAgent,
+            loadsTerminalDetailAutomatically: refreshesAutomatically,
             loadsAcpDetailAutomatically: refreshesAutomatically,
-            initialAcpDetail: initialAcpDetail
+            loadsCodexDetailAutomatically: refreshesAutomatically,
+            initialTerminalDetail: initialTerminalDetail,
+            initialAcpDetail: initialAcpDetail,
+            initialCodexDetail: initialCodexDetail,
+            onTerminalMembershipRemoved: { requestRefresh(force: true) }
           )
           .frame(minWidth: 380, maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -121,11 +134,26 @@ struct DashboardAgentsRouteView: View {
     .task(id: history.pendingDashboardAgentsRestoreRequest?.requestID) {
       applyPendingHistoryRestoreIfNeeded()
     }
+    .sheet(isPresented: $isPresentingTerminalCreate) {
+      DashboardTerminalAgentCreateSheet(
+        store: store,
+        sessions: sessions,
+        onCreated: selectCreatedTerminalAgent,
+        onStartFailed: { requestRefresh(force: true) }
+      )
+    }
     .sheet(isPresented: $isPresentingAcpCreate) {
       DashboardAcpAgentCreateSheet(
         store: store,
         sessions: sessions,
         onCreated: selectCreatedAcpAgent
+      )
+    }
+    .sheet(isPresented: $isPresentingCodexCreate) {
+      DashboardCodexAgentCreateSheet(
+        store: store,
+        sessions: sessions,
+        onCreated: selectCreatedCodexAgent
       )
     }
   }
@@ -140,6 +168,20 @@ struct DashboardAgentsRouteView: View {
           .foregroundStyle(.secondary)
       }
       Spacer()
+      Button {
+        isPresentingTerminalCreate = true
+      } label: {
+        Label("New terminal agent", systemImage: "plus")
+      }
+      .disabled(sessions.isEmpty)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardTerminalCreateButton)
+      Button {
+        isPresentingCodexCreate = true
+      } label: {
+        Label("New Codex agent", systemImage: "plus")
+      }
+      .disabled(sessions.isEmpty)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardCodexCreateButton)
       Button {
         isPresentingAcpCreate = true
       } label: {
@@ -206,6 +248,40 @@ struct DashboardAgentsRouteView: View {
         checkoutID: session.checkoutId
       ),
       runtimeKind: .acp,
+      managedAgentID: snapshot.managedAgentID
+    )
+    persistedSelectionRaw = identity.selectionRawValue
+    history.recordDashboardAgentSelection(identity)
+    requestRefresh(force: true)
+  }
+
+  private func selectCreatedTerminalAgent(
+    _ snapshot: AgentTuiSnapshot,
+    _ session: SessionSummary
+  ) {
+    let identity = DashboardAgentIdentity(
+      workspace: DashboardAgentWorkspaceIdentity(
+        projectID: session.projectId,
+        checkoutID: session.checkoutId
+      ),
+      runtimeKind: .terminal,
+      managedAgentID: snapshot.managedAgentID
+    )
+    persistedSelectionRaw = identity.selectionRawValue
+    history.recordDashboardAgentSelection(identity)
+    requestRefresh(force: true)
+  }
+
+  private func selectCreatedCodexAgent(
+    _ snapshot: CodexRunSnapshot,
+    _ session: SessionSummary
+  ) {
+    let identity = DashboardAgentIdentity(
+      workspace: DashboardAgentWorkspaceIdentity(
+        projectID: session.projectId,
+        checkoutID: session.checkoutId
+      ),
+      runtimeKind: .codex,
       managedAgentID: snapshot.managedAgentID
     )
     persistedSelectionRaw = identity.selectionRawValue
@@ -304,7 +380,7 @@ private struct DashboardAgentsRefreshContext: Hashable {
 }
 
 extension HarnessMonitorStore.ConnectionState {
-  fileprivate var refreshIdentity: String {
+  var refreshIdentity: String {
     switch self {
     case .idle: "idle"
     case .connecting: "connecting"

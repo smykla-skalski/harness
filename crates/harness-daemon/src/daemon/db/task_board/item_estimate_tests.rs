@@ -4,6 +4,7 @@ use tempfile::{TempDir, tempdir};
 use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::TaskBoardItem;
 use crate::task_board::types::MAX_TASK_BOARD_ESTIMATE;
+use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
 
 #[tokio::test]
 async fn estimates_round_trip_at_both_storage_boundaries_and_clear() {

@@ -3,6 +3,7 @@ use std::path::Path;
 use crate::daemon::db::AsyncDaemonDb;
 
 use super::*;
+use crate::daemon::db::prelude::*;
 
 const TASK_LIFECYCLE_SESSION_ID: &str = "52c91a38-b0d5-58ec-9c6b-fe52dae2cbf1";
 

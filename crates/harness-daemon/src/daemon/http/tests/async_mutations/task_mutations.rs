@@ -1,4 +1,5 @@
 use super::*;
+use crate::daemon::db::prelude::*;
 
 #[test]
 fn post_task_create_uses_async_db_when_sync_db_is_unavailable() {

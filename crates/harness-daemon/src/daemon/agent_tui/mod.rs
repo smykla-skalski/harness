@@ -64,7 +64,7 @@ pub(crate) use manager::ActiveAgentTui;
 pub(crate) use process::AgentTuiInputWorker;
 #[cfg(any(feature = "bridge-runtime", feature = "daemon-runtime"))]
 pub(crate) use process::{AgentTuiAttachState, AgentTuiSnapshotContext, snapshot_from_process};
-#[cfg(all(test, feature = "daemon-runtime"))]
+#[cfg(any(feature = "bridge-runtime", feature = "daemon-runtime"))]
 pub(crate) use readiness::signal_readiness_ready;
 #[cfg(all(test, feature = "daemon-runtime"))]
 pub(crate) use spawn::{build_auto_join_prompt, resolved_command_argv, send_initial_prompt};

@@ -1,13 +1,16 @@
-use sqlx::{Sqlite, Transaction, query_as, query_scalar};
-
-use super::triage_decisions::{TriageDecisionRow, decision_from_row};
-use super::triage_override::current_triage_override_in_tx;
-use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
-use crate::infra::io;
+use super::triage_escalation_store::ClaimedTaskBoardTriageEscalation;
+use super::triage_override::{
+    TaskBoardTriageOverrideClearInput, TaskBoardTriageOverrideMutationResult,
+    TaskBoardTriageOverrideSetInput,
+};
+use super::{triage_escalation_store, triage_override, triage_rules_activation, triage_rules_preview, triage_rules_store};
+use crate::daemon::db::{AsyncDaemonDb, CliError};
 use crate::task_board::{
-    TaskBoardTriageDecision, TaskBoardTriageDecisionRecord, TaskBoardTriageEffectiveOutcome,
-    TaskBoardTriageEscalationStatus, TaskBoardTriageOverride, effective_triage_outcome,
-    is_canonical_decided_at,
+    TaskBoardTriageDecisionRecord, TaskBoardTriageEffectiveOutcome, TaskBoardTriageEscalationStatus,
+    TaskBoardTriageEscalationVerdictOutcome, TaskBoardTriageOverride,
+    TriageRuleSetActivationResult, TriageRuleSetAuditEntry, TriageRuleSetDraft,
+    TriageRuleSetDraftSaveResult, TriageRuleSetPreviewResult, TriageRuleSetRevisionSummary,
+    TriageRuleSetV1, TriageVerdict,
 };
 
 pub(crate) const TASK_BOARD_TRIAGE_HISTORY_MAX_LIMIT: u32 = 100;
@@ -29,246 +32,276 @@ pub(crate) struct TaskBoardTriageHistoryPage {
     pub(crate) next_before_generation: Option<u64>,
 }
 
-#[derive(sqlx::FromRow)]
-struct TriageDecisionRecordRow {
-    decision_id: String,
-    item_id: String,
-    generation: i64,
-    verdict: String,
-    reason_code: String,
-    reason_detail: Option<String>,
-    evaluator_identity: String,
-    evaluator_version: i64,
-    evidence_fingerprint: String,
-    cause: String,
-    decided_at: String,
-    is_current: i64,
-    superseded_at: Option<String>,
+#[path = "triage_queries_reads.rs"]
+mod reads;
+use reads::{task_board_triage_current, task_board_triage_history};
+
+pub(crate) trait TriageQueries: Send + Sync {
+    async fn task_board_triage_current(
+        &self,
+        item_id: &str,
+    ) -> Result<TaskBoardTriageCurrentRead, CliError>;
+
+    async fn task_board_triage_history(
+        &self,
+        item_id: &str,
+        before_generation: Option<u64>,
+        limit: u32,
+    ) -> Result<TaskBoardTriageHistoryPage, CliError>;
+
+    /// Set (or replace) a durable triage override under one item-revision
+    /// and item-list sequence CAS. Always authoritative for lane outcome,
+    /// even over a manual anchor -- a manually anchored item still moves
+    /// lanes, carrying its slot/actor/`lane_set_at` with it.
+    async fn set_task_board_triage_override(
+        &self,
+        input: TaskBoardTriageOverrideSetInput,
+    ) -> Result<TaskBoardTriageOverrideMutationResult, CliError>;
+
+    /// Clear a durable triage override under one item-revision and
+    /// item-list sequence CAS, first refreshing stale automatic evidence
+    /// when needed and then reconciling that decision's placement. A manual
+    /// anchor still reconciles, keeping its slot/actor/`lane_set_at`.
+    async fn clear_task_board_triage_override(
+        &self,
+        input: TaskBoardTriageOverrideClearInput,
+    ) -> Result<TaskBoardTriageOverrideMutationResult, CliError>;
+
+    /// Apply one agent-reported verdict. See
+    /// `triage_apply_agent::apply_agent_triage_verdict_in_tx` for the full
+    /// CAS/eligibility contract; this is only the transaction boundary.
+    async fn report_task_board_triage_escalation_verdict(
+        &self,
+        escalation_id: &str,
+        verdict_token: &str,
+        reported_fingerprint: &str,
+        verdict: TriageVerdict,
+        rationale: &str,
+    ) -> Result<TaskBoardTriageEscalationVerdictOutcome, CliError>;
+
+    /// Count of currently `running` escalations, for the executor to size
+    /// its next claim batch against `max_concurrent`.
+    async fn count_running_task_board_triage_escalations(&self) -> Result<usize, CliError>;
+
+    /// Claim up to `limit` `pending` rows (oldest `requested_at` first),
+    /// minting a fresh single-use `verdict_token` and `managed_run_id` for
+    /// each and moving it to `running`.
+    async fn claim_pending_task_board_triage_escalations(
+        &self,
+        limit: usize,
+    ) -> Result<Vec<ClaimedTaskBoardTriageEscalation>, CliError>;
+
+    /// Sweep every `running` row whose `started_at` is older than
+    /// `timeout_seconds` to `timed_out`. Returns the `managed_run_id` of
+    /// every swept row so the caller can also request the underlying
+    /// process stop.
+    async fn sweep_stale_task_board_triage_escalations(
+        &self,
+        timeout_seconds: u64,
+    ) -> Result<Vec<String>, CliError>;
+
+    /// Mark one `running` escalation `failed` immediately, with the real
+    /// failure reason.
+    async fn fail_running_task_board_triage_escalation(
+        &self,
+        escalation_id: &str,
+        failure_reason: &str,
+    ) -> Result<(), CliError>;
+
+    /// The current escalation status for one item, if it has a live
+    /// (pending/running) escalation.
+    async fn task_board_triage_escalation_status_for_item(
+        &self,
+        item_id: &str,
+    ) -> Result<Option<TaskBoardTriageEscalationStatus>, CliError>;
+
+    async fn load_task_board_triage_rules_draft(
+        &self,
+    ) -> Result<Option<TriageRuleSetDraft>, CliError>;
+
+    /// CAS-save a draft candidate. `expected_revision` must be `None` when
+    /// no draft exists yet, or the draft's current revision to replace it.
+    async fn save_task_board_triage_rules_draft(
+        &self,
+        candidate: TriageRuleSetV1,
+        actor: String,
+        expected_revision: Option<i64>,
+    ) -> Result<TriageRuleSetDraftSaveResult, CliError>;
+
+    async fn list_task_board_triage_rules_revisions(
+        &self,
+        limit: u32,
+    ) -> Result<Vec<TriageRuleSetRevisionSummary>, CliError>;
+
+    async fn list_task_board_triage_rules_audit(
+        &self,
+        limit: u32,
+    ) -> Result<Vec<TriageRuleSetAuditEntry>, CliError>;
+
+    /// CAS-activate `candidate`, or deactivate back to the `BuiltInV1`
+    /// default when `candidate` is `None`.
+    async fn activate_task_board_triage_rules(
+        &self,
+        candidate: Option<TriageRuleSetV1>,
+        actor: String,
+        expected_active_revision: Option<i64>,
+    ) -> Result<TriageRuleSetActivationResult, CliError>;
+
+    /// Evaluate `candidate` against one frozen read of the current inbox
+    /// without persisting anything.
+    async fn preview_task_board_triage_rules(
+        &self,
+        candidate: TriageRuleSetV1,
+    ) -> Result<TriageRuleSetPreviewResult, CliError>;
 }
 
-impl AsyncDaemonDb {
-    pub(crate) async fn task_board_triage_current(
+/// The trait's one and only impl for [`AsyncDaemonDb`]. Every method is a
+/// thin, single-line forward into the plain function that actually owns the
+/// area's query logic, kept in the file the query has always lived in.
+impl TriageQueries for AsyncDaemonDb {
+    async fn task_board_triage_current(
         &self,
         item_id: &str,
     ) -> Result<TaskBoardTriageCurrentRead, CliError> {
-        io::validate_safe_segment(item_id)?;
-        let mut transaction = self
-            .pool()
-            .begin()
-            .await
-            .map_err(|error| db_error(format!("begin task board triage read: {error}")))?;
-        require_item_in_tx(&mut transaction, item_id).await?;
-        let row = query_as::<_, TriageDecisionRecordRow>(
-            "SELECT decision_id, item_id, generation, verdict, reason_code, reason_detail,
-                    evaluator_identity, evaluator_version, evidence_fingerprint, cause,
-                    decided_at, is_current, superseded_at
-             FROM task_board_triage_decisions
-             WHERE item_id = ?1 AND is_current = 1
-             LIMIT 1",
-        )
-        .bind(item_id)
-        .fetch_optional(transaction.as_mut())
-        .await
-        .map_err(|error| {
-            db_error(format!(
-                "load current task board triage decision '{item_id}': {error}"
-            ))
-        })?;
-        let triage_override = current_triage_override_in_tx(&mut transaction, item_id).await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit task board triage read: {error}")))?;
-        let current = row.map(record_from_row).transpose()?;
-        let decision = current.as_ref().and_then(decision_from_record);
-        let effective = effective_triage_outcome(triage_override.as_ref(), decision.as_ref());
-        let pending_escalation_status = self
-            .task_board_triage_escalation_status_for_item(item_id)
-            .await?;
-        Ok(TaskBoardTriageCurrentRead {
-            current,
-            triage_override,
-            effective,
-            pending_escalation_status,
-        })
+        task_board_triage_current(self, item_id).await
     }
 
-    pub(crate) async fn task_board_triage_history(
+    async fn task_board_triage_history(
         &self,
         item_id: &str,
         before_generation: Option<u64>,
         limit: u32,
     ) -> Result<TaskBoardTriageHistoryPage, CliError> {
-        io::validate_safe_segment(item_id)?;
-        let before_generation = before_generation.map(history_generation).transpose()?;
-        let limit = history_limit(limit)?;
-        let fetch_limit = i64::from(limit) + 1;
-        let mut transaction = self
-            .pool()
-            .begin()
-            .await
-            .map_err(|error| db_error(format!("begin task board triage history: {error}")))?;
-        require_item_in_tx(&mut transaction, item_id).await?;
-        let rows = query_as::<_, TriageDecisionRecordRow>(
-            "SELECT decision_id, item_id, generation, verdict, reason_code, reason_detail,
-                    evaluator_identity, evaluator_version, evidence_fingerprint, cause,
-                    decided_at, is_current, superseded_at
-             FROM task_board_triage_decisions
-             WHERE item_id = ?1 AND (?2 IS NULL OR generation < ?2)
-             ORDER BY generation DESC
-             LIMIT ?3",
+        task_board_triage_history(self, item_id, before_generation, limit).await
+    }
+
+    async fn set_task_board_triage_override(
+        &self,
+        input: TaskBoardTriageOverrideSetInput,
+    ) -> Result<TaskBoardTriageOverrideMutationResult, CliError> {
+        triage_override::set_task_board_triage_override(self, input).await
+    }
+
+    async fn clear_task_board_triage_override(
+        &self,
+        input: TaskBoardTriageOverrideClearInput,
+    ) -> Result<TaskBoardTriageOverrideMutationResult, CliError> {
+        triage_override::clear_task_board_triage_override(self, input).await
+    }
+
+    async fn report_task_board_triage_escalation_verdict(
+        &self,
+        escalation_id: &str,
+        verdict_token: &str,
+        reported_fingerprint: &str,
+        verdict: TriageVerdict,
+        rationale: &str,
+    ) -> Result<TaskBoardTriageEscalationVerdictOutcome, CliError> {
+        triage_escalation_store::report_task_board_triage_escalation_verdict(
+            self,
+            escalation_id,
+            verdict_token,
+            reported_fingerprint,
+            verdict,
+            rationale,
         )
-        .bind(item_id)
-        .bind(before_generation)
-        .bind(fetch_limit)
-        .fetch_all(transaction.as_mut())
         .await
-        .map_err(|error| {
-            db_error(format!(
-                "load task board triage history '{item_id}': {error}"
-            ))
-        })?;
-        transaction
-            .commit()
+    }
+
+    async fn count_running_task_board_triage_escalations(&self) -> Result<usize, CliError> {
+        triage_escalation_store::count_running_task_board_triage_escalations(self).await
+    }
+
+    async fn claim_pending_task_board_triage_escalations(
+        &self,
+        limit: usize,
+    ) -> Result<Vec<ClaimedTaskBoardTriageEscalation>, CliError> {
+        triage_escalation_store::claim_pending_task_board_triage_escalations(self, limit).await
+    }
+
+    async fn sweep_stale_task_board_triage_escalations(
+        &self,
+        timeout_seconds: u64,
+    ) -> Result<Vec<String>, CliError> {
+        triage_escalation_store::sweep_stale_task_board_triage_escalations(self, timeout_seconds)
             .await
-            .map_err(|error| db_error(format!("commit task board triage history: {error}")))?;
-        let limit = usize::try_from(limit)
-            .map_err(|_| db_error("task board triage history limit is out of range"))?;
-        history_page(rows, limit)
     }
-}
 
-async fn require_item_in_tx(
-    transaction: &mut Transaction<'_, Sqlite>,
-    item_id: &str,
-) -> Result<(), CliError> {
-    let exists =
-        query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM task_board_items WHERE item_id = ?1)")
-            .bind(item_id)
-            .fetch_one(transaction.as_mut())
-            .await
-            .map_err(|error| db_error(format!("check task board item '{item_id}': {error}")))?;
-    if exists {
-        Ok(())
-    } else {
-        Err(db_error(format!("task-board item '{item_id}' not found")))
+    async fn fail_running_task_board_triage_escalation(
+        &self,
+        escalation_id: &str,
+        failure_reason: &str,
+    ) -> Result<(), CliError> {
+        triage_escalation_store::fail_running_task_board_triage_escalation(
+            self,
+            escalation_id,
+            failure_reason,
+        )
+        .await
     }
-}
 
-fn history_generation(generation: u64) -> Result<i64, CliError> {
-    i64::try_from(generation)
-        .ok()
-        .filter(|generation| *generation > 0)
-        .ok_or_else(|| db_error("task board triage history cursor is out of range"))
-}
-
-fn history_limit(limit: u32) -> Result<u32, CliError> {
-    (1..=TASK_BOARD_TRIAGE_HISTORY_MAX_LIMIT)
-        .contains(&limit)
-        .then_some(limit)
-        .ok_or_else(|| db_error("task board triage history limit is out of range"))
-}
-
-fn history_page(
-    rows: Vec<TriageDecisionRecordRow>,
-    limit: usize,
-) -> Result<TaskBoardTriageHistoryPage, CliError> {
-    let has_more = rows.len() > limit;
-    let decisions = rows
-        .into_iter()
-        .take(limit)
-        .map(record_from_row)
-        .collect::<Result<Vec<_>, _>>()?;
-    let next_before_generation = if has_more {
-        decisions.last().map(|decision| decision.generation)
-    } else {
-        None
-    };
-    Ok(TaskBoardTriageHistoryPage {
-        decisions,
-        next_before_generation,
-    })
-}
-
-/// Reconstruct the unwrapped decision from a freshly loaded (never redacted)
-/// record, for feeding [`effective_triage_outcome`]. Returns `None` only if
-/// the record's `evidence_fingerprint` was already redacted, which never
-/// happens for a record built directly from this module's own reads.
-fn decision_from_record(record: &TaskBoardTriageDecisionRecord) -> Option<TaskBoardTriageDecision> {
-    Some(TaskBoardTriageDecision {
-        verdict: record.verdict,
-        reason_code: record.reason_code,
-        reason_detail: record.reason_detail.clone(),
-        evaluator_identity: record.evaluator_identity.clone(),
-        evaluator_version: record.evaluator_version,
-        evidence_fingerprint: record.evidence_fingerprint.clone()?,
-        cause: record.cause,
-        decided_at: record.decided_at.clone(),
-    })
-}
-
-fn record_from_row(
-    row: TriageDecisionRecordRow,
-) -> Result<TaskBoardTriageDecisionRecord, CliError> {
-    if !is_canonical_decision_id(&row.decision_id) {
-        return Err(db_error("stored triage decision id is not canonical"));
+    async fn task_board_triage_escalation_status_for_item(
+        &self,
+        item_id: &str,
+    ) -> Result<Option<TaskBoardTriageEscalationStatus>, CliError> {
+        triage_escalation_store::task_board_triage_escalation_status_for_item(self, item_id).await
     }
-    io::validate_safe_segment(&row.item_id)?;
-    let generation = u64::try_from(row.generation)
-        .ok()
-        .filter(|generation| *generation > 0)
-        .ok_or_else(|| db_error("stored triage generation is out of range"))?;
-    validate_supersession(
-        row.is_current,
-        &row.decided_at,
-        row.superseded_at.as_deref(),
-    )?;
-    let decision = decision_from_row(TriageDecisionRow {
-        verdict: row.verdict,
-        reason_code: row.reason_code,
-        reason_detail: row.reason_detail,
-        evaluator_identity: row.evaluator_identity,
-        evaluator_version: row.evaluator_version,
-        evidence_fingerprint: row.evidence_fingerprint,
-        cause: row.cause,
-        decided_at: row.decided_at,
-    })?;
-    Ok(TaskBoardTriageDecisionRecord::from_decision(
-        row.decision_id,
-        row.item_id,
-        generation,
-        decision,
-        row.superseded_at,
-    ))
-}
 
-fn is_canonical_decision_id(value: &str) -> bool {
-    value.strip_prefix("triage-").is_some_and(|suffix| {
-        suffix.len() == 32
-            && suffix
-                .bytes()
-                .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
-    })
-}
+    async fn load_task_board_triage_rules_draft(
+        &self,
+    ) -> Result<Option<TriageRuleSetDraft>, CliError> {
+        triage_rules_store::load_task_board_triage_rules_draft(self).await
+    }
 
-fn validate_supersession(
-    is_current: i64,
-    decided_at: &str,
-    superseded_at: Option<&str>,
-) -> Result<(), CliError> {
-    let valid = match (is_current, superseded_at) {
-        (1, None) => true,
-        (0, Some(superseded_at)) => {
-            is_canonical_decided_at(superseded_at) && superseded_at >= decided_at
-        }
-        _ => false,
-    };
-    if valid {
-        Ok(())
-    } else {
-        Err(db_error(
-            "stored triage supersession state is not canonical",
-        ))
+    async fn save_task_board_triage_rules_draft(
+        &self,
+        candidate: TriageRuleSetV1,
+        actor: String,
+        expected_revision: Option<i64>,
+    ) -> Result<TriageRuleSetDraftSaveResult, CliError> {
+        triage_rules_store::save_task_board_triage_rules_draft(
+            self,
+            candidate,
+            actor,
+            expected_revision,
+        )
+        .await
+    }
+
+    async fn list_task_board_triage_rules_revisions(
+        &self,
+        limit: u32,
+    ) -> Result<Vec<TriageRuleSetRevisionSummary>, CliError> {
+        triage_rules_store::list_task_board_triage_rules_revisions(self, limit).await
+    }
+
+    async fn list_task_board_triage_rules_audit(
+        &self,
+        limit: u32,
+    ) -> Result<Vec<TriageRuleSetAuditEntry>, CliError> {
+        triage_rules_store::list_task_board_triage_rules_audit(self, limit).await
+    }
+
+    async fn activate_task_board_triage_rules(
+        &self,
+        candidate: Option<TriageRuleSetV1>,
+        actor: String,
+        expected_active_revision: Option<i64>,
+    ) -> Result<TriageRuleSetActivationResult, CliError> {
+        triage_rules_activation::activate_task_board_triage_rules(
+            self,
+            candidate,
+            actor,
+            expected_active_revision,
+        )
+        .await
+    }
+
+    async fn preview_task_board_triage_rules(
+        &self,
+        candidate: TriageRuleSetV1,
+    ) -> Result<TriageRuleSetPreviewResult, CliError> {
+        triage_rules_preview::preview_task_board_triage_rules(self, candidate).await
     }
 }
 

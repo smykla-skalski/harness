@@ -17,6 +17,8 @@ use crate::task_board::remote_wire::wire::{
     TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
 use crate::task_board::{TaskBoardLocalExecutionRepositoryConfig, TaskBoardWorkflowKind};
+use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db::prelude::*;
 
 const CLAIMED_AT: &str = "2026-07-19T10:00:10Z";
 const AUTHORITY_AT: &str = "2026-07-19T10:00:20Z";

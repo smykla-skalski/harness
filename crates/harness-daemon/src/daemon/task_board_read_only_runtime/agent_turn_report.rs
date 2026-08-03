@@ -12,6 +12,7 @@ use crate::daemon::agent_acp::{
 use crate::daemon::db::{AgentTurnRunSnapshot, AgentTurnRunStatus, AsyncDaemonDb};
 use crate::daemon::http::DaemonHttpState;
 use harness_kernel::errors::{CliError, CliErrorKind};
+use crate::daemon::db::prelude::*;
 
 /// Everything an agent-turn report start needs from the frozen attempt, apart
 /// from the runtime handle the production state supplies.

@@ -11,7 +11,7 @@
     "license": {
       "name": "MIT"
     },
-    "version": "56.0.0"
+    "version": "57.0.0"
   },
   "servers": [
     {
@@ -4977,122 +4977,6 @@
           }
         },
         "x-websocket-method": "reviews.files_list"
-      }
-    },
-    "/v1/reviews/files/local-clones": {
-      "post": {
-        "tags": [
-          "reviews"
-        ],
-        "description": "List the entries in the local bare-clone registry used to serve review file content",
-        "operationId": "post_review_files_local_clones",
-        "responses": {
-          "200": {
-            "description": "Local bare-clone registry entries",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/LocalCloneListEntry"
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Request error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DaemonErrorBody"
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/RemoteAuthRequired"
-          },
-          "414": {
-            "$ref": "#/components/responses/RemoteRequestUriTooLong"
-          },
-          "431": {
-            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
-          },
-          "429": {
-            "$ref": "#/components/responses/RemoteRequestThrottled"
-          },
-          "503": {
-            "$ref": "#/components/responses/RemoteServiceUnavailable"
-          },
-          "504": {
-            "$ref": "#/components/responses/RemoteRequestTimedOut"
-          }
-        },
-        "x-websocket-method": "reviews.files_local_clones_list"
-      }
-    },
-    "/v1/reviews/files/local-clones/delete": {
-      "post": {
-        "tags": [
-          "reviews"
-        ],
-        "description": "Delete a local bare clone by its repository key segment and return the registry state after removal",
-        "operationId": "post_review_files_local_clones_delete",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DeleteLocalClonePayload"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Local bare-clone registry after the deletion",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DeleteLocalCloneResponseBody"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Request error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DaemonErrorBody"
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/RemoteAuthRequired"
-          },
-          "414": {
-            "$ref": "#/components/responses/RemoteRequestUriTooLong"
-          },
-          "413": {
-            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
-          },
-          "431": {
-            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
-          },
-          "429": {
-            "$ref": "#/components/responses/RemoteRequestThrottled"
-          },
-          "503": {
-            "$ref": "#/components/responses/RemoteServiceUnavailable"
-          },
-          "504": {
-            "$ref": "#/components/responses/RemoteRequestTimedOut"
-          }
-        },
-        "x-websocket-method": "reviews.files_local_clones_delete"
       }
     },
     "/v1/reviews/files/patch": {
@@ -17045,31 +16929,6 @@
           }
         }
       },
-      "DeleteLocalClonePayload": {
-        "type": "object",
-        "required": [
-          "repo_key_segment"
-        ],
-        "properties": {
-          "repo_key_segment": {
-            "type": "string"
-          }
-        }
-      },
-      "DeleteLocalCloneResponseBody": {
-        "type": "object",
-        "required": [
-          "clones"
-        ],
-        "properties": {
-          "clones": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/LocalCloneListEntry"
-            }
-          }
-        }
-      },
       "DeleteWorkingCopyPayload": {
         "type": "object",
         "required": [
@@ -17818,14 +17677,6 @@
             ]
           }
         }
-      },
-      "FilesLargeDiffStrategy": {
-        "type": "string",
-        "description": "User-facing toggle in Settings. Picked from the `SwiftUI` Picker;\nserialized through to the daemon on each request.",
-        "enum": [
-          "auto_local_clone",
-          "force_github_rest"
-        ]
       },
       "FixSafety": {
         "type": "string",
@@ -18972,43 +18823,6 @@
               "string",
               "null"
             ]
-          }
-        }
-      },
-      "LocalCloneListEntry": {
-        "type": "object",
-        "description": "One row in the Settings-panel projection of the clones registry.",
-        "required": [
-          "repo_full_name",
-          "repo_key_segment",
-          "size_bytes",
-          "created_at",
-          "last_used_at",
-          "last_fetched_at"
-        ],
-        "properties": {
-          "created_at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "last_fetched_at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "last_used_at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "repo_full_name": {
-            "type": "string"
-          },
-          "repo_key_segment": {
-            "type": "string"
-          },
-          "size_bytes": {
-            "type": "integer",
-            "format": "int64",
-            "minimum": 0
           }
         }
       },
@@ -24749,7 +24563,7 @@
       },
       "ReviewFile": {
         "type": "object",
-        "description": "Metadata for one file inside a PR. No patch body here - patches arrive\nvia the separate `patch` endpoint (REST or local-clone diff).",
+        "description": "Metadata for one file inside a PR. No patch body here - patches arrive\nvia the separate patch endpoint.",
         "required": [
           "path",
           "change_type",
@@ -24813,7 +24627,7 @@
       },
       "ReviewFilePatch": {
         "type": "object",
-        "description": "One file's patch body + metadata produced by either REST or local clone.",
+        "description": "One file's patch body + metadata produced via GitHub REST.",
         "required": [
           "path",
           "patch",
@@ -24930,9 +24744,7 @@
         "type": "string",
         "description": "Annotates which path produced a patch body so the UI can label provenance.",
         "enum": [
-          "github_rest",
-          "local_clone",
-          "github_rest_fallback"
+          "github_rest"
         ]
       },
       "ReviewFileViewedOutcome": {
@@ -26321,19 +26133,6 @@
           "fetched_at"
         ],
         "properties": {
-          "base_ref_name": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "base_ref_oid": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Merge-base OID for the PR. Required for the local-clone diff path\nto compute `base..head` patches."
-          },
           "fetched_at": {
             "type": "string"
           },
@@ -26342,13 +26141,6 @@
             "items": {
               "$ref": "#/components/schemas/ReviewFile"
             }
-          },
-          "head_ref_name": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "PR's source branch name (e.g. `renovate/foo`). Used by the local-clone\npath so `ensure_clone` fetches the right ref instead of always\nopening `refs/heads/main`."
           },
           "head_ref_oid": {
             "type": "string"
@@ -26383,7 +26175,7 @@
               "string",
               "null"
             ],
-            "description": "`owner/name` of the repository the PR lives in. Lets the Monitor\nhand the patch request a clone target without re-querying GraphQL."
+            "description": "`owner/name` of the repository the PR lives in."
           },
           "viewer_can_mark_viewed": {
             "type": "boolean"
@@ -26399,40 +26191,8 @@
           "paths"
         ],
         "properties": {
-          "base_ref_name": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "PR base branch name. When present, the local clone fetches it directly\nbefore computing the expected base/head OID diff."
-          },
-          "base_ref_oid_expected": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Merge-base OID against which to compute the diff. Required for the\nlocal-clone path; when absent the handler falls back to REST."
-          },
-          "head_ref_name": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "PR's source branch name (e.g. `renovate/foo`). When present, the\nlocal-clone runtime fetches that ref directly instead of the\ndaemon's default-branch fallback."
-          },
           "head_ref_oid_expected": {
             "type": "string"
-          },
-          "large_diff_strategy": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/FilesLargeDiffStrategy",
-                "description": "User's `filesLargeDiffStrategy` choice from Settings. Daemon honors\n`ForceGitHubRest` by skipping the local-clone runtime entirely.\nDefaults to `AutoLocalClone` for callers that don't supply it."
-              }
-            ]
           },
           "number": {
             "type": [
@@ -26440,7 +26200,7 @@
               "null"
             ],
             "format": "int64",
-            "description": "GitHub PR number (the integer in `pulls/{n}/files`). Required for\nthe REST path; when absent, the daemon can only route to the\nlocal-clone path (which uses GitHub's synthetic\n`refs/pull/<number>/head` ref for forks + same-repo PR branches).",
+            "description": "GitHub PR number (the integer in `pulls/{n}/files`). Required for\nthe REST path.",
             "minimum": 0
           },
           "paths": {
@@ -26457,7 +26217,7 @@
               "string",
               "null"
             ],
-            "description": "Owner/name of the repository the PR lives in. When present, the\ndaemon can route the patch fetch through the local-clone runtime\n(zero-rate-limit) or the REST path."
+            "description": "Owner/name of the repository the PR lives in."
           }
         }
       },
@@ -26510,36 +26270,8 @@
           "paths"
         ],
         "properties": {
-          "base_ref_name": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "base_ref_oid_expected": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "head_ref_name": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
           "head_ref_oid_expected": {
             "type": "string"
-          },
-          "large_diff_strategy": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/FilesLargeDiffStrategy"
-              }
-            ]
           },
           "line_limit": {
             "type": "integer",

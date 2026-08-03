@@ -13,6 +13,7 @@ use super::orchestration::{
     update_codex_orchestration_status,
 };
 use super::orchestration_registration::{RegisteredOrchestrationAgent, RegistrationMutation};
+use crate::daemon::db::prelude::*;
 
 fn should_reconcile_board_item(
     state: &SessionState,

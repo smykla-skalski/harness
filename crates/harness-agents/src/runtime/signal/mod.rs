@@ -113,7 +113,7 @@ fn is_json_path(path: &Path) -> bool {
     path.extension().is_some_and(|ext| ext == "json")
 }
 
-#[expect(
+#[allow(
     clippy::cognitive_complexity,
     reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
 )]
@@ -136,7 +136,7 @@ fn read_json_file_contents(path: &Path) -> Option<String> {
     }
 }
 
-#[expect(
+#[allow(
     clippy::cognitive_complexity,
     reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
 )]
@@ -224,7 +224,7 @@ fn acknowledge_rename_raced_with_prior_move(
     error.kind() == io::ErrorKind::NotFound && acknowledged_signal_file.is_file()
 }
 
-#[expect(
+#[allow(
     clippy::cognitive_complexity,
     reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
 )]
@@ -361,7 +361,7 @@ fn next_quarantine_path(path: &Path) -> PathBuf {
     }
 }
 
-#[expect(
+#[allow(
     clippy::cognitive_complexity,
     reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
 )]
@@ -380,7 +380,7 @@ fn warn_signal_json_quarantine_failure(
     );
 }
 
-#[expect(
+#[allow(
     clippy::cognitive_complexity,
     reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
 )]

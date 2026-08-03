@@ -12,6 +12,7 @@ use crate::daemon::remote_identity::{
 use crate::daemon::remote_pairing::{
     RemotePairingClaimRequest, RemotePairingCode, RemotePairingRecord,
 };
+use crate::daemon::remote_pairing_queries::RemotePairingQueries;
 
 #[test]
 fn remote_pairing_claim_rolls_back_client_and_pairing_when_audit_fails() {

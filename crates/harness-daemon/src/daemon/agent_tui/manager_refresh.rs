@@ -23,6 +23,7 @@ use super::LIVE_REFRESH_INTERVAL;
 use super::manager::{ActiveAgentTui, AgentTuiManagerHandle};
 use super::model::{AgentTuiSnapshot, AgentTuiStatus, session_disconnect_reason};
 use super::support::{agent_id_for_tui, lock, lock_db};
+use crate::daemon::db::prelude::*;
 
 impl AgentTuiManagerHandle {
     pub(super) fn db(&self) -> Result<Arc<Mutex<DaemonDb>>, CliError> {

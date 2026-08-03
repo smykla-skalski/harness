@@ -19,7 +19,7 @@ use crate::task_board::remote_wire::wire::{
 };
 
 #[derive(Clone, Copy)]
-pub(super) enum SourceReassignmentEvidence<'a> {
+pub(crate) enum SourceReassignmentEvidence<'a> {
     Abandonment {
         request: &'a RemoteSourceBundleAbandonRequest,
         response: &'a RemoteSourceBundleAbandonResponse,

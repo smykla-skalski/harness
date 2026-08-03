@@ -11,6 +11,7 @@ use harness_kernel::errors::CliError;
 
 use super::super::task_board_read_only_runtime::TaskBoardReadOnlyRuntime;
 use super::attempts::{invalid_transition, require_human};
+use crate::daemon::db::task_board::prelude::*;
 
 pub(super) fn unapplied_completed_attempt(
     execution: &TaskBoardWorkflowExecutionRecord,

@@ -11,6 +11,7 @@ use crate::daemon::protocol::http_paths;
 use crate::task_board::TaskBoardItem;
 
 use super::remote_viewer_support::get_http_json;
+use crate::daemon::db::task_board::prelude::*;
 
 /// Enough items that a small page size leaves several pages to walk.
 const PAGED_ITEMS: usize = 7;

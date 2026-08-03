@@ -4,6 +4,7 @@ mod audit;
 mod control;
 mod history;
 mod metrics;
+pub(super) mod queries;
 mod recovery;
 mod runs;
 mod stages;

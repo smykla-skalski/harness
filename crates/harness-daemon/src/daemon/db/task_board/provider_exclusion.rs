@@ -11,7 +11,6 @@ use super::items::{
     ParentAssignmentValidation, TaskBoardMutation, TriageOutcome, bump_change_in_tx,
 };
 use super::lane_order::LaneTransitionKind;
-use super::provider_queries::ProviderQueries;
 use super::triage_apply::reapply_active_override_outcome_in_tx;
 use super::triage_apply_rules::apply_active_triage_in_tx;
 use super::triage_audit::ProviderExclusionConflictAudit;
@@ -25,68 +24,7 @@ use crate::task_board::{
     TaskBoardTriageOverride, canonicalize_labels, is_exclusion_label,
 };
 use harness_task_board_provider_sync::replace_open_sync_conflicts_in_connection;
-
-impl AsyncDaemonDb {
-    /// Tombstones an already-visible, pre-dispatch item because the provider
-    /// now reports an exclusion label. `expected_revision` and `context`'s
-    /// stored provider ref both CAS against the exact state the caller
-    /// matched by; either moving means `None`, doing nothing. Also `None`
-    /// when the item is not eligible to be hidden this way: already deleted,
-    /// past pre-dispatch, or carrying durable dispatch/admission evidence of
-    /// claimed or started work. `patch` (the normal reconciliation patch,
-    /// minus parent) is applied before tombstoning, so the row it stores
-    /// carries the label that triggered the exclusion and a fresh
-    /// `sync_state` for a later restore to recover. Records exactly one
-    /// typed audit event, with every child unparented in the same
-    /// transaction, even when the item has no lane anchor to change.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] when the item does not exist or the hide fails.
-    pub async fn hide_task_board_item_for_provider_exclusion(
-        &self,
-        item_id: &str,
-        expected_revision: i64,
-        patch: TaskBoardItemPatch,
-        context: &ProviderExclusionAuditContext,
-        conflicts: Option<Vec<TaskBoardSyncConflict>>,
-    ) -> Result<Option<TaskBoardMutation>, CliError> {
-        <Self as ProviderQueries>::hide_task_board_item_for_provider_exclusion(
-            self,
-            item_id,
-            expected_revision,
-            patch,
-            context,
-            conflicts,
-        )
-        .await
-    }
-
-    /// Restores a previously provider-exclusion-tombstoned item because the
-    /// provider no longer reports an exclusion label. See
-    /// [`ProviderQueries::restore_task_board_item_for_provider_exclusion`]
-    /// for the full contract.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] when the item does not exist or the restore fails.
-    pub(crate) async fn restore_task_board_item_for_provider_exclusion(
-        &self,
-        expected_item_id: &str,
-        expected_revision: i64,
-        patch: TaskBoardItemPatch,
-        context: &ProviderExclusionAuditContext,
-        conflicts: Option<Vec<TaskBoardSyncConflict>>,
-    ) -> Result<ProviderExclusionRestoreOutcome, CliError> {
-        <Self as ProviderQueries>::restore_task_board_item_for_provider_exclusion(
-            self,
-            expected_item_id,
-            expected_revision,
-            patch,
-            context,
-            conflicts,
-        )
-        .await
-    }
-}
+use crate::daemon::db::prelude::*;
 
 /// Real implementation behind [`ProviderQueries::hide_task_board_item_for_provider_exclusion`],
 /// called from the single consolidated trait impl in `provider_queries.rs`

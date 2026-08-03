@@ -20,6 +20,7 @@ use super::{
     WatchChanges, WatchServicePort, emit_watch_changes, emit_watch_changes_with,
     liveness_reconcile_due, poll_change_tracking, poll_change_tracking_async,
 };
+use crate::daemon::db::prelude::*;
 
 /// Mirrors `service::SESSION_LIVENESS_REFRESH_TTL` for tests that exercise the
 /// loop's own due-or-not arithmetic; `watch` takes the real value as a

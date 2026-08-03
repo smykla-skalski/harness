@@ -20,6 +20,7 @@ use crate::session::types::{
     AgentRegistration, AgentStatus, CURRENT_VERSION, ManagedAgentRef, SessionMetrics, SessionRole,
     SessionState, SessionStatus, TaskSeverity, TaskSource,
 };
+use crate::daemon::db::prelude::*;
 
 static ASYNC_HARNESS_ENV_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 

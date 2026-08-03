@@ -11,6 +11,7 @@ use crate::task_board::remote_wire::wire::{
 };
 use crate::task_board::{TaskBoardExecutionAttemptCas, TaskBoardWorkflowExecutionCas};
 use harness_kernel::errors::CliErrorKind;
+use crate::daemon::db::task_board::prelude::*;
 
 const OFFERED_AT: &str = "2026-07-19T10:00:00Z";
 const CLAIMED_AT: &str = "2026-07-19T10:00:05Z";

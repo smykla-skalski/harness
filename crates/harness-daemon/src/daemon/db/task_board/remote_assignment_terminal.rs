@@ -15,7 +15,6 @@ use super::remote_operation_trust::{
     TaskBoardRemoteOperationKind, TaskBoardRemoteOperationTrustFence,
     consume_successor_recovery_operation_trust_in_tx,
 };
-use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardRemoteAssignmentState;
 use crate::task_board::remote_wire::wire::{
@@ -30,6 +29,7 @@ pub(super) use offer_response::record_task_board_remote_offer_response;
 use offer_screen::{
     OfferScreen, OfferScreenLabels, screen_offer_response_in_tx, validate_offer_request,
 };
+use crate::daemon::db::prelude::*;
 
 const OFFER_RESPONSE_LABELS: OfferScreenLabels = OfferScreenLabels {
     principal: "remote assignment authenticated principal",
@@ -49,22 +49,39 @@ const PREDECESSOR_ACCEPTANCE_LABELS: OfferScreenLabels = OfferScreenLabels {
     conflict: "recovered offer acceptance conflicts with immutable receipt evidence",
 };
 
-impl AsyncDaemonDb {
-    pub(crate) async fn record_task_board_remote_offer_response(
+pub(crate) trait RemoteAssignmentTerminalQueries: Send + Sync {
+    async fn record_task_board_remote_predecessor_offer_acceptance(
         &self,
         response: &RemoteOfferResponse,
         authenticated_principal: &str,
+        trust: &TaskBoardRemoteOperationTrustFence,
         observed_at: &str,
-    ) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
-        <Self as RemoteExecutionQueries>::record_task_board_remote_offer_response(
-            self,
-            response,
-            authenticated_principal,
-            observed_at,
-        )
-        .await
-    }
-    pub(crate) async fn record_task_board_remote_predecessor_offer_acceptance(
+    ) -> Result<TaskBoardRemoteMutationOutcome, CliError>;
+
+    async fn cancel_task_board_remote_assignment(
+        &self,
+        request: &RemoteCancelRequest,
+        authenticated_principal: &str,
+        cancelled_at: &str,
+    ) -> Result<TaskBoardRemoteMutationOutcome, CliError>;
+
+    async fn mark_task_board_remote_assignment_unknown(
+        &self,
+        binding: &RemoteAttemptBinding,
+        reason: &str,
+        observed_at: &str,
+    ) -> Result<TaskBoardRemoteMutationOutcome, CliError>;
+
+    async fn supersede_unclaimed_task_board_remote_assignment(
+        &self,
+        binding: &RemoteAttemptBinding,
+        reason: &str,
+        superseded_at: &str,
+    ) -> Result<TaskBoardRemoteMutationOutcome, CliError>;
+}
+
+impl RemoteAssignmentTerminalQueries for AsyncDaemonDb {
+    async fn record_task_board_remote_predecessor_offer_acceptance(
         &self,
         response: &RemoteOfferResponse,
         authenticated_principal: &str,
@@ -120,7 +137,7 @@ impl AsyncDaemonDb {
         ))
         .await
     }
-    pub(crate) async fn cancel_task_board_remote_assignment(
+    async fn cancel_task_board_remote_assignment(
         &self,
         request: &RemoteCancelRequest,
         authenticated_principal: &str,
@@ -180,7 +197,7 @@ impl AsyncDaemonDb {
         }
         finish_mutation(transaction, &record.assignment_id, "cancellation").await
     }
-    pub(crate) async fn mark_task_board_remote_assignment_unknown(
+    async fn mark_task_board_remote_assignment_unknown(
         &self,
         binding: &RemoteAttemptBinding,
         reason: &str,
@@ -217,7 +234,7 @@ impl AsyncDaemonDb {
         finish_mutation(transaction, &record.assignment_id, "unknown outcome").await
     }
 
-    pub(crate) async fn supersede_unclaimed_task_board_remote_assignment(
+    async fn supersede_unclaimed_task_board_remote_assignment(
         &self,
         binding: &RemoteAttemptBinding,
         reason: &str,

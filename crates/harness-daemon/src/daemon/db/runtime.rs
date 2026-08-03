@@ -17,12 +17,60 @@ pub(crate) fn ensure_shared_db(
     Ok(db_slot.get().cloned().unwrap_or(db))
 }
 
-impl DaemonDb {
+/// Codex controller run and managed terminal-agent snapshot persistence.
+///
+/// `pub`, not `pub(crate)`: most of these were already `pub fn` on `DaemonDb`
+/// before this trait existed, and several test modules call them directly on
+/// a seeded `DaemonDb` from outside this crate.
+pub trait RuntimeSnapshotQueries {
     /// Save or update a Codex controller run snapshot.
     ///
     /// # Errors
     /// Returns [`CliError`] on SQL or serialization failures.
-    pub fn save_codex_run(&self, snapshot: &CodexRunSnapshot) -> Result<(), CliError> {
+    fn save_codex_run(&self, snapshot: &CodexRunSnapshot) -> Result<(), CliError>;
+
+    /// Load one Codex controller run snapshot.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL or parse failures.
+    fn codex_run(&self, run_id: &str) -> Result<Option<CodexRunSnapshot>, CliError>;
+
+    /// List Codex controller runs for a session, newest first.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL or parse failures.
+    fn list_codex_runs(&self, session_id: &str) -> Result<Vec<CodexRunSnapshot>, CliError>;
+
+    /// Persist a managed terminal agent snapshot.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on serialization or SQL failures.
+    fn save_agent_tui(&self, snapshot: &AgentTuiSnapshot) -> Result<(), CliError>;
+
+    /// Load one managed terminal agent snapshot.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL or parse failures.
+    fn agent_tui(&self, tui_id: &str) -> Result<Option<AgentTuiSnapshot>, CliError>;
+
+    /// Load the minimal freshness state needed to guard live-refresh persists.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL or parse failures.
+    fn agent_tui_live_refresh_state(
+        &self,
+        tui_id: &str,
+    ) -> Result<Option<AgentTuiLiveRefreshState>, CliError>;
+
+    /// List managed terminal agent snapshots for a session, newest first.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL or parse failures.
+    fn list_agent_tuis(&self, session_id: &str) -> Result<Vec<AgentTuiSnapshot>, CliError>;
+}
+
+impl RuntimeSnapshotQueries for DaemonDb {
+    fn save_codex_run(&self, snapshot: &CodexRunSnapshot) -> Result<(), CliError> {
         let pending_approvals_json = serde_json::to_string(&snapshot.pending_approvals)
             .map_err(|error| db_error(format!("serialize codex approvals: {error}")))?;
         let resolved_approvals_json = serde_json::to_string(&snapshot.resolved_approvals)
@@ -114,11 +162,7 @@ impl DaemonDb {
         Ok(())
     }
 
-    /// Load one Codex controller run snapshot.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL or parse failures.
-    pub fn codex_run(&self, run_id: &str) -> Result<Option<CodexRunSnapshot>, CliError> {
+    fn codex_run(&self, run_id: &str) -> Result<Option<CodexRunSnapshot>, CliError> {
         let result = self.conn.query_row(
             "SELECT run_id, session_id, task_id, board_item_id, workflow_execution_id,
                 session_agent_id, display_name,
@@ -138,11 +182,7 @@ impl DaemonDb {
         }
     }
 
-    /// List Codex controller runs for a session, newest first.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL or parse failures.
-    pub fn list_codex_runs(&self, session_id: &str) -> Result<Vec<CodexRunSnapshot>, CliError> {
+    fn list_codex_runs(&self, session_id: &str) -> Result<Vec<CodexRunSnapshot>, CliError> {
         let mut statement = self
             .conn
             .prepare(
@@ -168,11 +208,7 @@ impl DaemonDb {
         Ok(snapshots)
     }
 
-    /// Persist a managed terminal agent snapshot.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on serialization or SQL failures.
-    pub fn save_agent_tui(&self, snapshot: &AgentTuiSnapshot) -> Result<(), CliError> {
+    fn save_agent_tui(&self, snapshot: &AgentTuiSnapshot) -> Result<(), CliError> {
         let argv_json = serde_json::to_string(&snapshot.argv)
             .map_err(|error| db_error(format!("serialize terminal agent argv: {error}")))?;
         self.conn
@@ -224,11 +260,7 @@ impl DaemonDb {
         Ok(())
     }
 
-    /// Load one managed terminal agent snapshot.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL or parse failures.
-    pub fn agent_tui(&self, tui_id: &str) -> Result<Option<AgentTuiSnapshot>, CliError> {
+    fn agent_tui(&self, tui_id: &str) -> Result<Option<AgentTuiSnapshot>, CliError> {
         let result = self.conn.query_row(
             "SELECT tui_id, session_id, agent_id, runtime, status, argv_json,
                 project_dir, rows, cols, cursor_row, cursor_col, screen_text,
@@ -245,11 +277,7 @@ impl DaemonDb {
         }
     }
 
-    /// Load the minimal freshness state needed to guard live-refresh persists.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL or parse failures.
-    pub(crate) fn agent_tui_live_refresh_state(
+    fn agent_tui_live_refresh_state(
         &self,
         tui_id: &str,
     ) -> Result<Option<AgentTuiLiveRefreshState>, CliError> {
@@ -275,11 +303,7 @@ impl DaemonDb {
         }
     }
 
-    /// List managed terminal agent snapshots for a session, newest first.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL or parse failures.
-    pub fn list_agent_tuis(&self, session_id: &str) -> Result<Vec<AgentTuiSnapshot>, CliError> {
+    fn list_agent_tuis(&self, session_id: &str) -> Result<Vec<AgentTuiSnapshot>, CliError> {
         let mut statement = self
             .conn
             .prepare(

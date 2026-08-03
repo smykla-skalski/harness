@@ -12,6 +12,9 @@ use crate::task_board::{
     BUILTIN_V1_EVALUATOR_IDENTITY, OVERRIDE_PLACEMENT_PRODUCER, TaskBoardLaneOrigin,
     TaskBoardTriageEffectiveSource, TriageVerdict,
 };
+use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
+use crate::daemon::db::task_board::lane_placement_queries::LanePlacementQueries;
+use crate::daemon::db::task_board::triage_queries::TriageQueries;
 
 #[tokio::test]
 async fn set_todo_promotes_a_inbox_item_with_ranked_placement() {

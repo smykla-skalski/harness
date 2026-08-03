@@ -203,6 +203,22 @@ impl BridgeClient {
         )
     }
 
+    /// Tell the bridge that one bridge-managed terminal agent has finished its
+    /// startup sequence, releasing the deferred session join.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when the bridge rejects the request or the payload
+    /// cannot be decoded.
+    pub fn agent_tui_ready(&self, tui_id: &str) -> Result<AgentTuiSnapshot, CliError> {
+        self.typed_capability_request(
+            BridgeCapability::AgentTui,
+            "ready",
+            &BridgeGetRequest {
+                tui_id: tui_id.to_string(),
+            },
+        )
+    }
+
     /// Send keyboard-like input to one bridge-managed terminal agent.
     ///
     /// # Errors

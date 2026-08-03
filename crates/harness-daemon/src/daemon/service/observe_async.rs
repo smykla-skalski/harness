@@ -12,6 +12,7 @@ use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::index::ResolvedSession;
 use crate::observe::types::Issue;
 use crate::session::observe::{should_observe, should_tick_liveness};
+use crate::daemon::db::prelude::*;
 
 const SWEEP_CYCLE_COUNT: u64 = 100;
 

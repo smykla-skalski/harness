@@ -1,3 +1,4 @@
+use crate::daemon::remote_identity_queries::RemoteIdentitySyncQueries;
 use axum::extract::State;
 use axum::http::{Request, StatusCode};
 use axum::middleware;

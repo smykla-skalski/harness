@@ -63,10 +63,6 @@ struct DashboardReviewsPreferences: Codable, Equatable {
   var filesShowImagePreview: Bool = true
   var filesTreeDefaultExpandedDepth: Int = 2
   var filesImagePreviewMaxBytes: Int = 5 * 1024 * 1024
-  var filesLargeDiffStrategyRaw: String = FilesLargeDiffStrategy.autoLocalClone.rawValue
-  var filesLocalCloneThresholdLines: Int = 500
-  var filesLocalCloneDiskBudgetMB: Int = 5_120
-  var filesLocalCloneMaxAgeDays: Int = 30
   var filesAccessibilityPerLineMode: Bool = false
   var showActivityTimeline: Bool = true
   var showActivityInlineComments: Bool = false
@@ -119,10 +115,6 @@ struct DashboardReviewsPreferences: Codable, Equatable {
     case filesShowImagePreview
     case filesTreeDefaultExpandedDepth
     case filesImagePreviewMaxBytes
-    case filesLargeDiffStrategyRaw
-    case filesLocalCloneThresholdLines
-    case filesLocalCloneDiskBudgetMB
-    case filesLocalCloneMaxAgeDays
     case filesAccessibilityPerLineMode
     case showActivityTimeline
     case showActivityInlineComments
@@ -175,10 +167,6 @@ struct DashboardReviewsPreferences: Codable, Equatable {
 
   var filesDefaultViewMode: FilesViewMode {
     FilesViewMode(rawValue: filesDefaultViewModeRaw) ?? .unified
-  }
-
-  var filesLargeDiffStrategy: FilesLargeDiffStrategy {
-    FilesLargeDiffStrategy(rawValue: filesLargeDiffStrategyRaw) ?? .autoLocalClone
   }
 
   var filesSortMode: ReviewFilesSortMode {

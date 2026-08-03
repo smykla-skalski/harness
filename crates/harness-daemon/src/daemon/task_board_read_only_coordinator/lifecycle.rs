@@ -10,6 +10,7 @@ use crate::task_board::{
     TaskBoardWorkflowKind,
 };
 use harness_kernel::errors::CliError;
+use crate::daemon::db::task_board::prelude::*;
 
 #[path = "lifecycle/verification_retry.rs"]
 mod verification_retry;

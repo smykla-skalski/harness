@@ -5,6 +5,7 @@ use crate::daemon::db::AgentTurnRunStatus;
 
 use super::tests::{FakeManager, open_store, request};
 use super::{OpenRouterAgentTurnRuntime, OpenRouterRunCorrelation};
+use crate::daemon::db::prelude::*;
 
 const AUTHENTICATION_DETAIL: &str = "OpenRouter rejected its credential: HTTP 401 unauthorized";
 

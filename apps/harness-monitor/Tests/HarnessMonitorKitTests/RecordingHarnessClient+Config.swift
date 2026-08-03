@@ -92,6 +92,12 @@ extension RecordingHarnessClient {
     }
   }
 
+  func configureTaskBoardItemsDelay(_ delay: Duration?) {
+    lock.withLock {
+      taskBoardItemsDelay = delay
+    }
+  }
+
   func configureTaskBoardProjectsErrors(_ errors: [any Error]) {
     lock.withLock {
       queuedTaskBoardProjectsErrors = errors

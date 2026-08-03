@@ -1,3 +1,4 @@
+use crate::daemon::db::conversation::DaemonDbConversation;
 use crate::daemon::index as daemon_index;
 
 use super::resolved_events::{
@@ -15,6 +16,7 @@ use super::{
     session_extensions_async, session_not_found, session_observe, start_daemon_observe_loop,
     utc_now,
 };
+use crate::daemon::db::prelude::*;
 
 /// Start or refresh the daemon-owned session observation loop.
 ///

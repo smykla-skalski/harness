@@ -11,6 +11,7 @@ use crate::workspace::utc_now;
 use super::support::{
     WAIT_TIMEOUT, recv_broadcast_events, sample_snapshot, wait_until, with_agent_tui_home,
 };
+use crate::daemon::db::prelude::*;
 
 // `saw_sessions_updated`/`saw_session_updated` deliberately mirror the two
 // event names under test (`sessions_updated_delta` and `session_updated`);

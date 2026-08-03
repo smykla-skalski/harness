@@ -28,6 +28,7 @@ use crate::task_board::{
     TaskBoardExecutionHostAdvertisement, TaskBoardPhaseCapabilityProfile,
     TaskBoardRemoteAssignmentState, TaskBoardWorkflowExecutionCas,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 pub(super) const HOST_ID: &str = "executor-a";
 pub(super) const TOKEN_ENV: &str = "HARNESS_REMOTE_CONTROLLER_TEST_TOKEN";

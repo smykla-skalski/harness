@@ -2,17 +2,19 @@ use tempfile::tempdir;
 
 use crate::daemon::db::{AsyncDaemonDb, ColorEdit, DisplayNameEdit, ProjectEdit};
 use crate::daemon::protocol::{
-    TaskBoardCreateItemRequest, TaskBoardProjectUpdateRequest, TaskBoardUpdateIdentityClears,
-    TaskBoardUpdateItemRequest,
+    TaskBoardCreateItemRequest, TaskBoardDeleteItemRequest, TaskBoardPlanBeginRequest,
+    TaskBoardProjectUpdateRequest, TaskBoardUpdateIdentityClears, TaskBoardUpdateItemRequest,
 };
 use crate::task_board::project::TaskBoardProjectSource;
 use crate::task_board::project_color::TaskBoardProjectColor;
 use crate::task_board::{TaskBoardOrchestratorSettings, TaskBoardStatus};
 
 use super::{
-    active_external_sync_config_db, create_task_board_item_db, read_task_board_items_db,
-    update_task_board_item_db, update_task_board_project_db,
+    active_external_sync_config_db, begin_task_board_planning_db, create_task_board_item_db,
+    delete_task_board_item_db, read_task_board_items_db, update_task_board_item_db,
+    update_task_board_project_db,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 async fn connect(directory: &tempfile::TempDir) -> AsyncDaemonDb {
     AsyncDaemonDb::connect(&directory.path().join("harness.db"))
@@ -179,6 +181,158 @@ async fn a_blank_title_is_refused_and_persists_nothing() {
     );
 }
 
+#[tokio::test]
+async fn board_reads_follow_the_configured_repository_scope() {
+    let directory = tempdir().expect("tempdir");
+    let db = connect(&directory).await;
+    let mut settings = TaskBoardOrchestratorSettings::default();
+    settings.github_inbox.repositories = vec!["smykla-skalski/harness".into()];
+    db.replace_task_board_orchestrator_settings(&settings)
+        .await
+        .expect("save repository scope");
+
+    for (id, repository) in [
+        ("allowed", Some("SMYKLA-SKALSKI/HARNESS")),
+        ("blocked", Some("example/other")),
+        ("local", None),
+    ] {
+        let mut item = crate::task_board::TaskBoardItem::new(
+            id.into(),
+            id.into(),
+            String::new(),
+            "2026-08-02T10:00:00Z".into(),
+        );
+        item.execution_repository = repository.map(Into::into);
+        db.create_task_board_item(item)
+            .await
+            .expect("seed stored item");
+    }
+
+    let listed = read_task_board_items_db(&db).await.expect("list items");
+    let ids = listed
+        .items
+        .iter()
+        .map(|snapshot| snapshot.item.id.as_str())
+        .collect::<Vec<_>>();
+
+    assert_eq!(ids, ["allowed", "local"]);
+}
+
+#[tokio::test]
+async fn repository_scope_rejects_stale_item_mutations() {
+    let directory = tempdir().expect("tempdir");
+    let db = connect(&directory).await;
+    let mut settings = TaskBoardOrchestratorSettings::default();
+    settings.github_inbox.repositories = vec!["example/allowed".into()];
+    db.replace_task_board_orchestrator_settings(&settings)
+        .await
+        .expect("save repository scope");
+
+    let mut blocked = crate::task_board::TaskBoardItem::new(
+        "blocked".into(),
+        "Blocked".into(),
+        String::new(),
+        "2026-08-02T10:00:00Z".into(),
+    );
+    blocked.execution_repository = Some("example/blocked".into());
+    db.create_task_board_item(blocked)
+        .await
+        .expect("seed stale item");
+
+    let update_error = update_task_board_item_db(
+        &db,
+        "blocked",
+        &TaskBoardUpdateItemRequest {
+            title: Some("Changed".into()),
+            ..TaskBoardUpdateItemRequest::default()
+        },
+    )
+    .await
+    .expect_err("stale update must be refused");
+    let planning_error = begin_task_board_planning_db(
+        &db,
+        &TaskBoardPlanBeginRequest {
+            id: "blocked".into(),
+        },
+    )
+    .await
+    .expect_err("stale planning mutation must be refused");
+    let delete_error = delete_task_board_item_db(
+        &db,
+        &TaskBoardDeleteItemRequest {
+            id: "blocked".into(),
+        },
+    )
+    .await
+    .expect_err("stale delete must be refused");
+
+    for error in [update_error, planning_error, delete_error] {
+        assert!(
+            error
+                .message()
+                .contains("outside configured repository scope"),
+            "unexpected: {error}"
+        );
+    }
+    assert_eq!(
+        db.task_board_item("blocked")
+            .await
+            .expect("stale item remains")
+            .title,
+        "Blocked"
+    );
+}
+
+#[tokio::test]
+async fn repository_scope_rejects_creates_and_moves_into_disabled_repositories() {
+    let directory = tempdir().expect("tempdir");
+    let db = connect(&directory).await;
+    let mut settings = TaskBoardOrchestratorSettings::default();
+    settings.github_inbox.repositories = vec!["example/allowed".into()];
+    db.replace_task_board_orchestrator_settings(&settings)
+        .await
+        .expect("save repository scope");
+
+    let blocked_create: TaskBoardCreateItemRequest = serde_json::from_value(serde_json::json!({
+        "id": "blocked-create",
+        "title": "Blocked create",
+        "execution_repository": "example/blocked",
+    }))
+    .expect("create request");
+    create_task_board_item_db(&db, &blocked_create)
+        .await
+        .expect_err("disabled repository create must be refused");
+
+    let allowed_create: TaskBoardCreateItemRequest = serde_json::from_value(serde_json::json!({
+        "id": "allowed",
+        "title": "Allowed",
+        "execution_repository": "example/allowed",
+    }))
+    .expect("create request");
+    create_task_board_item_db(&db, &allowed_create)
+        .await
+        .expect("create allowed item");
+    update_task_board_item_db(
+        &db,
+        "allowed",
+        &TaskBoardUpdateItemRequest {
+            execution_repository: Some("example/blocked".into()),
+            ..TaskBoardUpdateItemRequest::default()
+        },
+    )
+    .await
+    .expect_err("move into disabled repository must be refused");
+
+    assert_eq!(
+        db.task_board_item("allowed")
+            .await
+            .expect("allowed item remains")
+            .execution_repository
+            .as_deref(),
+        Some("example/allowed")
+    );
+}
+
 /// Moving an item to another project has to re-resolve its attribution.
 /// `resolve_item_project_in_tx` treats an assigned project as settled, so a
 /// stale one survives every later write and the card keeps naming the project
@@ -187,6 +341,11 @@ async fn a_blank_title_is_refused_and_persists_nothing() {
 async fn moving_an_item_re_resolves_its_project() {
     let directory = tempdir().expect("tempdir");
     let db = connect(&directory).await;
+    let mut settings = TaskBoardOrchestratorSettings::default();
+    settings.github_inbox.repositories = vec!["acme/widgets".into(), "acme/gadgets".into()];
+    db.replace_task_board_orchestrator_settings(&settings)
+        .await
+        .expect("save repository scope");
     let create: TaskBoardCreateItemRequest = serde_json::from_value(serde_json::json!({
         "title": "Move me",
         "project_id": "acme/widgets",

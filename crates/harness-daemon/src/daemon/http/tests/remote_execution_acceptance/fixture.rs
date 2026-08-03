@@ -1,3 +1,4 @@
+use crate::daemon::remote_identity_queries::RemoteIdentitySyncQueries;
 use std::collections::BTreeMap;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
@@ -30,6 +31,7 @@ use crate::task_board::{
     TaskBoardWorkflowStatus, TaskBoardWorkflowTransitionState, bind_plan_approval,
     build_planning_result, resolve_task_board_reviewers,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 pub(super) const HOST_ID: &str = "executor-a";
 pub(super) const HOST_INSTANCE: &str = "executor-acceptance-a";

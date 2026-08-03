@@ -12,6 +12,7 @@ use crate::task_board::remote_wire::wire::RemoteLeaseRenewRequest;
 use crate::task_board::remote_wire::wire::RemoteStatusRequest;
 use harness_kernel::errors::CliError;
 use harness_kernel::errors::CliErrorKind;
+use crate::daemon::db::task_board::prelude::*;
 
 pub(super) async fn poll_active_assignment(
     db: &AsyncDaemonDb,

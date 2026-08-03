@@ -89,11 +89,6 @@ extension HarnessMonitorUITestAccessibility {
   static let settingsTaskBoardStatus = "harness.settings.task-board.status"
   static let settingsTaskBoardReloadButton = "harness.settings.task-board.reload"
   static let settingsTaskBoardSaveButton = "harness.settings.task-board.save"
-  static let settingsRepositoriesRoot = "harness.settings.repositories"
-  static let settingsRepositoriesReloadButton = "harness.settings.repositories.reload"
-  static let settingsRepositoriesSaveButton = "harness.settings.repositories.save"
-  static let settingsRepositoriesOwnerField = "harness.settings.repositories.owner"
-  static let settingsRepositoriesNameField = "harness.settings.repositories.name"
   static let settingsTaskBoardProjectDirField = "harness.settings.task-board.project-dir"
   static let settingsTaskBoardRepositoriesSummary =
     "harness.settings.task-board.repositories.summary"

@@ -17,6 +17,7 @@ use crate::task_board::remote_wire::wire::{
     TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
 use crate::task_board::{TaskBoardExecutionPhase, TaskBoardRemoteAssignmentState};
+use crate::daemon::db::prelude::*;
 
 pub(crate) const REMOTE_RESULT_ARTIFACT_PATH: &str = "result/attempt.json";
 pub(crate) const REMOTE_RESULT_ARTIFACT_MEDIA_TYPE: &str =
@@ -30,43 +31,41 @@ pub(crate) struct TaskBoardRemoteTerminalArtifact {
     pub(crate) content: Vec<u8>,
 }
 
-impl AsyncDaemonDb {
-    #[expect(
-        clippy::cognitive_complexity,
-        reason = "fenced transaction guard chain; each guard settles the transaction before returning"
-    )]
-    pub(crate) async fn complete_task_board_remote_executor_terminal(
-        &self,
-        owner: &TaskBoardRemoteExecutorLifecycleOwner,
-        response: &RemoteStatusResponse,
-        artifacts: &[TaskBoardRemoteTerminalArtifact],
-    ) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
-        let mut transaction = self
-            .begin_immediate_transaction("task board remote executor terminal")
-            .await?;
-        let record = require_assignment(&mut transaction, &owner.assignment_id).await?;
-        if terminal_replay_matches(&mut transaction, &record, owner, response, artifacts).await? {
-            commit_noop(transaction, "replayed remote executor terminal").await?;
-            return Ok(TaskBoardRemoteMutationOutcome::Replayed(record));
-        }
-        if record.wire_state().is_terminal() {
-            commit_noop(transaction, "conflicting remote executor terminal replay").await?;
-            return Ok(TaskBoardRemoteMutationOutcome::Stale(record));
-        }
-        validate_terminal_response(&record, owner, response, artifacts)?;
-        if !executor_terminal_authority_matches(&mut transaction, &record, owner, response).await? {
-            commit_noop(transaction, "stale remote executor terminal authority").await?;
-            return Ok(TaskBoardRemoteMutationOutcome::Stale(record));
-        }
-        if artifact_count_in_tx(&mut transaction, &record).await? != 0 {
-            return Err(concurrent(
-                "remote executor terminal has pre-existing artifact evidence",
-            ));
-        }
-        insert_terminal_artifacts(&mut transaction, &record, response, artifacts).await?;
-        persist_terminal_status(&mut transaction, &record, owner, response).await?;
-        finish_mutation(transaction, &record.assignment_id, "executor terminal").await
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "fenced transaction guard chain; each guard settles the transaction before returning"
+)]
+pub(super) async fn complete_task_board_remote_executor_terminal(
+    db: &AsyncDaemonDb,
+    owner: &TaskBoardRemoteExecutorLifecycleOwner,
+    response: &RemoteStatusResponse,
+    artifacts: &[TaskBoardRemoteTerminalArtifact],
+) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
+    let mut transaction = db
+        .begin_immediate_transaction("task board remote executor terminal")
+        .await?;
+    let record = require_assignment(&mut transaction, &owner.assignment_id).await?;
+    if terminal_replay_matches(&mut transaction, &record, owner, response, artifacts).await? {
+        commit_noop(transaction, "replayed remote executor terminal").await?;
+        return Ok(TaskBoardRemoteMutationOutcome::Replayed(record));
     }
+    if record.wire_state().is_terminal() {
+        commit_noop(transaction, "conflicting remote executor terminal replay").await?;
+        return Ok(TaskBoardRemoteMutationOutcome::Stale(record));
+    }
+    validate_terminal_response(&record, owner, response, artifacts)?;
+    if !executor_terminal_authority_matches(&mut transaction, &record, owner, response).await? {
+        commit_noop(transaction, "stale remote executor terminal authority").await?;
+        return Ok(TaskBoardRemoteMutationOutcome::Stale(record));
+    }
+    if artifact_count_in_tx(&mut transaction, &record).await? != 0 {
+        return Err(concurrent(
+            "remote executor terminal has pre-existing artifact evidence",
+        ));
+    }
+    insert_terminal_artifacts(&mut transaction, &record, response, artifacts).await?;
+    persist_terminal_status(&mut transaction, &record, owner, response).await?;
+    finish_mutation(transaction, &record.assignment_id, "executor terminal").await
 }
 
 async fn executor_terminal_authority_matches(

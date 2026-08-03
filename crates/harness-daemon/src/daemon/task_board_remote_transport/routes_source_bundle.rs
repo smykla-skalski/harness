@@ -13,6 +13,7 @@ use crate::task_board::remote_wire::wire::{
 use crate::task_board::remote_wire::wire::{
     RemoteSourceBundleAbandonResponse, RemoteSourceBundleReceiptVerificationResponse,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 #[utoipa::path(
     post,

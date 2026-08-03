@@ -39,8 +39,6 @@ extension HarnessMonitorStore {
       .acpInspect, .acpAgentsReconciled, .acpProcessIncident, .acpBridgeResyncIncident,
       .acpEvents, .acpPermissionBatch, .acpPermissionBatchRemoved:
       break
-    case .reviewsLocalCloneProgress(let progress):
-      applyLocalCloneProgress(progress)
     case .taskBoardWorkingCopyProgress(let progress):
       applyWorkingCopyProgress(progress)
     case .githubDataChanged(let payload):

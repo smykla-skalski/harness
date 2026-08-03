@@ -7,6 +7,7 @@
 //! may ask, and what the caller is allowed to see afterwards - is decided by
 //! the caller, not here.
 
+use crate::daemon::remote_pairing_queries::RemotePairingQueries;
 use chrono::{DateTime, Duration as ChronoDuration, Utc};
 
 use super::invitation::build_remote_pairing_invitation;

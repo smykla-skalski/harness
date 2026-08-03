@@ -113,43 +113,41 @@ impl TaskBoardRemoteOfferReceipt {
     }
 }
 
-impl AsyncDaemonDb {
-    pub(crate) async fn exact_task_board_remote_offer_receipt(
-        &self,
-        request: &RemoteOfferRequest,
-        authenticated_principal: &str,
-    ) -> Result<Option<TaskBoardRemoteOfferReceipt>, CliError> {
-        request
-            .validate()
-            .map_err(|error| db_error(format!("validate remote offer receipt lookup: {error}")))?;
-        nonblank(
-            authenticated_principal,
-            "remote offer receipt lookup principal",
-        )?;
-        let mut transaction = self
-            .pool()
-            .begin()
-            .await
-            .map_err(|error| db_error(format!("begin remote offer receipt lookup: {error}")))?;
-        let receipts = load_offer_receipt_collisions_in_tx(&mut transaction, request).await?;
-        let receipt = match receipts.as_slice() {
-            [] => None,
-            [receipt] if receipt.is_exact_replay(request, authenticated_principal) => {
-                Some(receipt.clone())
-            }
-            _ => {
-                return Err(CliErrorKind::concurrent_modification(
-                    "remote offer receipt conflicts with the exact request",
-                )
-                .into());
-            }
-        };
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit remote offer receipt lookup: {error}")))?;
-        Ok(receipt)
-    }
+pub(super) async fn exact_task_board_remote_offer_receipt(
+    db: &AsyncDaemonDb,
+    request: &RemoteOfferRequest,
+    authenticated_principal: &str,
+) -> Result<Option<TaskBoardRemoteOfferReceipt>, CliError> {
+    request
+        .validate()
+        .map_err(|error| db_error(format!("validate remote offer receipt lookup: {error}")))?;
+    nonblank(
+        authenticated_principal,
+        "remote offer receipt lookup principal",
+    )?;
+    let mut transaction = db
+        .pool()
+        .begin()
+        .await
+        .map_err(|error| db_error(format!("begin remote offer receipt lookup: {error}")))?;
+    let receipts = load_offer_receipt_collisions_in_tx(&mut transaction, request).await?;
+    let receipt = match receipts.as_slice() {
+        [] => None,
+        [receipt] if receipt.is_exact_replay(request, authenticated_principal) => {
+            Some(receipt.clone())
+        }
+        _ => {
+            return Err(CliErrorKind::concurrent_modification(
+                "remote offer receipt conflicts with the exact request",
+            )
+            .into());
+        }
+    };
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit remote offer receipt lookup: {error}")))?;
+    Ok(receipt)
 }
 
 #[derive(sqlx::FromRow)]

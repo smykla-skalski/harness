@@ -83,6 +83,7 @@ struct SettingsRepositoryAutomationOverridesPanel: View {
       .toggleStyle(.switch)
       .controlSize(.mini)
       .harnessNativeFormControl()
+      .frame(minHeight: 24)
       .accessibilityIdentifier(
         HarnessMonitorAccessibility.settingsRepositoriesOverrideToggle(index, kind.rawValue)
       )

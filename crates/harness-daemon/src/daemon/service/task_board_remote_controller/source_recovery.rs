@@ -16,6 +16,7 @@ use crate::task_board::{
     TaskBoardWorkflowExecutionRecord,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
+use crate::daemon::db::task_board::prelude::*;
 
 #[expect(
     clippy::cognitive_complexity,

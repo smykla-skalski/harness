@@ -21,14 +21,14 @@ struct RemotePairingMetadata {
 
 /// What the metadata column carries beyond the columns of its own.
 #[derive(Debug)]
-pub(super) struct RemotePairingMetadataFields {
+pub(crate) struct RemotePairingMetadataFields {
     pub reviews_query: Option<ReviewsQueryRequest>,
     pub minted_for: Option<RemotePairingSubject>,
     pub minted_by: Option<String>,
     pub revoked_at: Option<String>,
 }
 
-pub(super) fn encode_remote_pairing_metadata(
+pub(crate) fn encode_remote_pairing_metadata(
     reviews_query: Option<&ReviewsQueryRequest>,
     minted_for: Option<&RemotePairingSubject>,
     minted_by: Option<&str>,
@@ -43,7 +43,7 @@ pub(super) fn encode_remote_pairing_metadata(
     .map_err(|error| db_error(format!("serialize remote pairing metadata: {error}")))
 }
 
-pub(super) fn decode_remote_pairing_metadata(
+pub(crate) fn decode_remote_pairing_metadata(
     value: &str,
 ) -> Result<RemotePairingMetadataFields, String> {
     let metadata = serde_json::from_str::<RemotePairingMetadata>(value)

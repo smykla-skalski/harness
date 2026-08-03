@@ -70,10 +70,6 @@ extension DashboardReviewsPreferences {
     try container.encode(filesShowImagePreview, forKey: .filesShowImagePreview)
     try container.encode(filesTreeDefaultExpandedDepth, forKey: .filesTreeDefaultExpandedDepth)
     try container.encode(filesImagePreviewMaxBytes, forKey: .filesImagePreviewMaxBytes)
-    try container.encode(filesLargeDiffStrategyRaw, forKey: .filesLargeDiffStrategyRaw)
-    try container.encode(filesLocalCloneThresholdLines, forKey: .filesLocalCloneThresholdLines)
-    try container.encode(filesLocalCloneDiskBudgetMB, forKey: .filesLocalCloneDiskBudgetMB)
-    try container.encode(filesLocalCloneMaxAgeDays, forKey: .filesLocalCloneMaxAgeDays)
     try container.encode(filesAccessibilityPerLineMode, forKey: .filesAccessibilityPerLineMode)
     try container.encode(filesSortModeRaw, forKey: .filesSortModeRaw)
     try container.encode(filesConversationVisibilityRaw, forKey: .filesConversationVisibilityRaw)
@@ -240,18 +236,6 @@ extension DashboardReviewsPreferences {
     filesImagePreviewMaxBytes =
       try container.decodeIfPresent(Int.self, forKey: .filesImagePreviewMaxBytes)
       ?? defaults.filesImagePreviewMaxBytes
-    filesLargeDiffStrategyRaw =
-      try container.decodeIfPresent(String.self, forKey: .filesLargeDiffStrategyRaw)
-      ?? defaults.filesLargeDiffStrategyRaw
-    filesLocalCloneThresholdLines =
-      try container.decodeIfPresent(Int.self, forKey: .filesLocalCloneThresholdLines)
-      ?? defaults.filesLocalCloneThresholdLines
-    filesLocalCloneDiskBudgetMB =
-      try container.decodeIfPresent(Int.self, forKey: .filesLocalCloneDiskBudgetMB)
-      ?? defaults.filesLocalCloneDiskBudgetMB
-    filesLocalCloneMaxAgeDays =
-      try container.decodeIfPresent(Int.self, forKey: .filesLocalCloneMaxAgeDays)
-      ?? defaults.filesLocalCloneMaxAgeDays
     filesAccessibilityPerLineMode =
       try container.decodeIfPresent(Bool.self, forKey: .filesAccessibilityPerLineMode)
       ?? defaults.filesAccessibilityPerLineMode

@@ -43,62 +43,61 @@ const SELECT_PROJECTABLE_EXECUTIONS: &str = "SELECT execution.*
               'workflow failed' ELSE 'workflow was cancelled' END) END))
       ) ORDER BY execution.updated_at, execution.execution_id LIMIT ?1";
 
-impl AsyncDaemonDb {
-    pub(crate) async fn ready_task_board_workflow_executions(
-        &self,
-        now: &str,
-        limit: usize,
-    ) -> Result<Vec<TaskBoardWorkflowExecutionRecord>, CliError> {
-        if limit == 0 {
-            return Ok(Vec::new());
-        }
-        let limit = i64::try_from(limit.min(100))
-            .map_err(|_| db_error("workflow execution ready limit is out of range"))?;
-        let mut transaction =
-            self.pool().begin().await.map_err(|error| {
-                db_error(format!("begin ready workflow execution load: {error}"))
-            })?;
-        let rows = query_as::<_, WorkflowExecutionRow>(SELECT_READY_EXECUTIONS)
-            .bind(now)
-            .bind(limit)
-            .fetch_all(transaction.as_mut())
-            .await
-            .map_err(|error| db_error(format!("load ready workflow executions: {error}")))?;
-        let executions = load_candidates(&mut transaction, rows).await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit ready workflow execution load: {error}")))?;
-        Ok(executions)
+pub(super) async fn ready_task_board_workflow_executions(
+    db: &AsyncDaemonDb,
+    now: &str,
+    limit: usize,
+) -> Result<Vec<TaskBoardWorkflowExecutionRecord>, CliError> {
+    if limit == 0 {
+        return Ok(Vec::new());
     }
+    let limit = i64::try_from(limit.min(100))
+        .map_err(|_| db_error("workflow execution ready limit is out of range"))?;
+    let mut transaction = db
+        .pool()
+        .begin()
+        .await
+        .map_err(|error| db_error(format!("begin ready workflow execution load: {error}")))?;
+    let rows = query_as::<_, WorkflowExecutionRow>(SELECT_READY_EXECUTIONS)
+        .bind(now)
+        .bind(limit)
+        .fetch_all(transaction.as_mut())
+        .await
+        .map_err(|error| db_error(format!("load ready workflow executions: {error}")))?;
+    let executions = load_candidates(&mut transaction, rows).await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit ready workflow execution load: {error}")))?;
+    Ok(executions)
+}
 
-    pub(crate) async fn projectable_task_board_read_only_workflow_executions(
-        &self,
-        limit: usize,
-    ) -> Result<Vec<TaskBoardWorkflowExecutionRecord>, CliError> {
-        if limit == 0 {
-            return Ok(Vec::new());
-        }
-        let limit = i64::try_from(limit.min(100))
-            .map_err(|_| db_error("workflow execution projection limit is out of range"))?;
-        let mut transaction = self.pool().begin().await.map_err(|error| {
-            db_error(format!(
-                "begin projectable workflow execution load: {error}"
-            ))
-        })?;
-        let rows = query_as::<_, WorkflowExecutionRow>(SELECT_PROJECTABLE_EXECUTIONS)
-            .bind(limit)
-            .fetch_all(transaction.as_mut())
-            .await
-            .map_err(|error| db_error(format!("load projectable workflow executions: {error}")))?;
-        let executions = load_candidates(&mut transaction, rows).await?;
-        transaction.commit().await.map_err(|error| {
-            db_error(format!(
-                "commit projectable workflow execution load: {error}"
-            ))
-        })?;
-        Ok(executions)
+pub(super) async fn projectable_task_board_read_only_workflow_executions(
+    db: &AsyncDaemonDb,
+    limit: usize,
+) -> Result<Vec<TaskBoardWorkflowExecutionRecord>, CliError> {
+    if limit == 0 {
+        return Ok(Vec::new());
     }
+    let limit = i64::try_from(limit.min(100))
+        .map_err(|_| db_error("workflow execution projection limit is out of range"))?;
+    let mut transaction = db.pool().begin().await.map_err(|error| {
+        db_error(format!(
+            "begin projectable workflow execution load: {error}"
+        ))
+    })?;
+    let rows = query_as::<_, WorkflowExecutionRow>(SELECT_PROJECTABLE_EXECUTIONS)
+        .bind(limit)
+        .fetch_all(transaction.as_mut())
+        .await
+        .map_err(|error| db_error(format!("load projectable workflow executions: {error}")))?;
+    let executions = load_candidates(&mut transaction, rows).await?;
+    transaction.commit().await.map_err(|error| {
+        db_error(format!(
+            "commit projectable workflow execution load: {error}"
+        ))
+    })?;
+    Ok(executions)
 }
 
 pub(super) async fn load_candidates(

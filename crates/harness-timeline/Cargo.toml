@@ -1,16 +1,16 @@
 [package]
 name = "harness-timeline"
-version = "56.0.0"
+version = "57.0.0"
 edition = "2024"
 rust-version = "1.95"
 publish = false
 
 [dependencies]
-harness-agents = { path = "../harness-agents", version = "56.0.0" }
-harness-kernel = { path = "../harness-kernel", version = "56.0.0" }
-harness-observe = { path = "../harness-observe", version = "56.0.0", default-features = false }
-harness-protocol = { path = "../harness-protocol", version = "56.0.0" }
-harness-session = { path = "../harness-session", version = "56.0.0" }
+harness-agents = { path = "../harness-agents", version = "57.0.0" }
+harness-kernel = { path = "../harness-kernel", version = "57.0.0" }
+harness-observe = { path = "../harness-observe", version = "57.0.0", default-features = false }
+harness-protocol = { path = "../harness-protocol", version = "57.0.0" }
+harness-session = { path = "../harness-session", version = "57.0.0" }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
 

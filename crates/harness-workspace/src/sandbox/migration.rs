@@ -59,7 +59,7 @@ struct SplitMarker {
 ///
 /// Returns `MigrationError::Io` on any filesystem failure, or
 /// `MigrationError::Serde` if the marker file cannot be serialized.
-#[expect(
+#[allow(
     clippy::cognitive_complexity,
     reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
 )]
@@ -103,7 +103,7 @@ pub fn migrate(old_root: &Path, new_root: &Path) -> Result<MigrationOutcome, Mig
     Ok(MigrationOutcome::Migrated)
 }
 
-#[expect(
+#[allow(
     clippy::cognitive_complexity,
     reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
 )]
@@ -344,7 +344,7 @@ fn write_marker(new_root: &Path, old_root: &Path) -> Result<(), MigrationError> 
 /// Run the startup data-root migration on macOS. Logs failures and returns;
 /// never panics. Callers invoke this through `app::run_startup_migrations()`.
 #[cfg(target_os = "macos")]
-#[expect(
+#[allow(
     clippy::cognitive_complexity,
     reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
 )]

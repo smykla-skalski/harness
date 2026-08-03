@@ -10,6 +10,7 @@ use crate::task_board::{
     TaskBoardAutomationWakeRecoveryReason, TaskBoardAutomationWakeRequest,
 };
 use harness_kernel::errors::CliError;
+use crate::daemon::db::task_board::scheduler::queries::TaskBoardAutomationSchedulerQueries;
 
 #[tokio::test]
 async fn pending_wake_batch_is_bounded_and_stable_by_sequence() {

@@ -8,6 +8,7 @@ use crate::task_board::{
 
 use super::fixture::{Fixture, NOW, seed_execution_with_reviewers};
 use super::runtime::{FakeReadOnlyRuntime, PlannedReport};
+use crate::daemon::db::task_board::prelude::*;
 
 #[tokio::test]
 async fn pull_request_review_runs_review_cleanup_and_terminal_without_publication() {

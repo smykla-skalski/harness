@@ -4,6 +4,7 @@ use sqlx::{Sqlite, Transaction, query, query_as, query_scalar};
 
 use super::remote_assignment_model::canonical_time;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
+use crate::daemon::db::prelude::*;
 
 const RECOVERY_QUEUE: &str = "task_board_remote_assignments";
 const RECOVERY_BATCH_LIMIT: usize = 128;
@@ -165,7 +166,7 @@ const DUE_PAGE_THROUGH_CURSOR: &str =
      LIMIT ?3";
 
 #[derive(Debug, Clone, sqlx::FromRow)]
-pub(super) struct RawRecoveryCandidate {
+pub(crate) struct RawRecoveryCandidate {
     pub(super) assignment_id: String,
     pub(super) fencing_epoch: i64,
     pub(super) assignment_state: String,
@@ -174,22 +175,20 @@ pub(super) struct RawRecoveryCandidate {
     pub(super) lease_id: Option<String>,
 }
 
-impl AsyncDaemonDb {
-    pub(super) async fn quarantine_remote_recovery_failure(
-        &self,
-        candidate: &RawRecoveryCandidate,
-        now: &str,
-        error: &CliError,
-    ) -> Result<(), CliError> {
-        let mut transaction = self
-            .begin_immediate_transaction("remote recovery quarantine")
-            .await?;
-        quarantine_remote_recovery_failure_in_tx(&mut transaction, candidate, now, error.code())
-            .await?;
-        transaction.commit().await.map_err(|commit_error| {
-            db_error(format!("commit remote recovery quarantine: {commit_error}"))
-        })
-    }
+pub(super) async fn quarantine_remote_recovery_failure(
+    db: &AsyncDaemonDb,
+    candidate: &RawRecoveryCandidate,
+    now: &str,
+    error: &CliError,
+) -> Result<(), CliError> {
+    let mut transaction = db
+        .begin_immediate_transaction("remote recovery quarantine")
+        .await?;
+    quarantine_remote_recovery_failure_in_tx(&mut transaction, candidate, now, error.code())
+        .await?;
+    transaction.commit().await.map_err(|commit_error| {
+        db_error(format!("commit remote recovery quarantine: {commit_error}"))
+    })
 }
 
 pub(super) async fn quarantine_remote_recovery_failure_in_tx(

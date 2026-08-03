@@ -2,6 +2,7 @@ use super::*;
 use crate::agents::runtime::RuntimeCapabilities;
 use crate::agents::runtime::event::{ConversationEvent, ConversationEventKind};
 use crate::daemon::db::DaemonDb;
+use crate::daemon::db::conversation::DaemonDbConversation;
 use crate::daemon::index::DiscoveredProject;
 use crate::session::types::{
     AgentRegistration, AgentStatus as SessionAgentStatus, SessionMetrics, SessionRole,
@@ -10,6 +11,7 @@ use crate::session::types::{
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, OnceLock};
 use tokio::sync::{broadcast, mpsc};
+use crate::daemon::db::prelude::*;
 
 #[test]
 fn process_incident_event_maps_process_exit() {

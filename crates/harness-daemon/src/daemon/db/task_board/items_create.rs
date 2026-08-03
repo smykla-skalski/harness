@@ -14,108 +14,85 @@ use super::{
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
 use crate::task_board::TaskBoardItem;
+use crate::daemon::db::prelude::*;
 
-impl AsyncDaemonDb {
-    /// Insert one new Task Board item. Never evaluates `BuiltInV1`: every
-    /// internal lane/dispatch/workflow/migration/test-fixture constructor
-    /// must keep using this method so an unrelated internal create can never
-    /// become accidental triage ingress. The public create API and provider
-    /// import use the `_with_triage` methods below instead.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] when the item is invalid or the insert fails.
-    pub async fn create_task_board_item(
-        &self,
-        item: TaskBoardItem,
-    ) -> Result<TaskBoardMutation, CliError> {
-        self.create_task_board_item_impl(item, TaskBoardTriageIngress::None, false)
-            .await
-    }
+pub(crate) async fn create_task_board_item(
+    db: &AsyncDaemonDb,
+    item: TaskBoardItem,
+) -> Result<TaskBoardMutation, CliError> {
+    create_task_board_item_impl(db, item, TaskBoardTriageIngress::None, false).await
+}
 
-    /// Like [`create_task_board_item`], but also evaluates `BuiltInV1` in the
-    /// same transaction, for the public create API.
-    pub(crate) async fn create_task_board_item_with_triage(
-        &self,
-        item: TaskBoardItem,
-    ) -> Result<TaskBoardMutation, CliError> {
-        self.create_task_board_item_impl(item, TaskBoardTriageIngress::HumanUpdate, false)
-            .await
-    }
+pub(crate) async fn create_task_board_item_with_triage(
+    db: &AsyncDaemonDb,
+    item: TaskBoardItem,
+) -> Result<TaskBoardMutation, CliError> {
+    create_task_board_item_impl(db, item, TaskBoardTriageIngress::HumanUpdate, false).await
+}
 
-    /// Like [`create_task_board_item_with_triage`], but for a create whose
-    /// request named the starting lane. The decision is still recorded, so a
-    /// later clear or re-evaluation has one to reconcile against, but the
-    /// placement effect never runs -- exactly how a human status move through
-    /// the update API is treated.
-    pub(crate) async fn create_task_board_item_at_requested_status(
-        &self,
-        item: TaskBoardItem,
-    ) -> Result<TaskBoardMutation, CliError> {
-        self.create_task_board_item_impl(item, TaskBoardTriageIngress::HumanUpdate, true)
-            .await
-    }
+pub(crate) async fn create_task_board_item_at_requested_status(
+    db: &AsyncDaemonDb,
+    item: TaskBoardItem,
+) -> Result<TaskBoardMutation, CliError> {
+    create_task_board_item_impl(db, item, TaskBoardTriageIngress::HumanUpdate, true).await
+}
 
-    /// Like [`create_task_board_item`], but also evaluates `BuiltInV1` in the
-    /// same transaction, for provider import.
-    pub(crate) async fn create_task_board_item_with_provider_triage(
-        &self,
-        item: TaskBoardItem,
-    ) -> Result<TaskBoardMutation, CliError> {
-        self.create_task_board_item_impl(item, TaskBoardTriageIngress::ProviderReconcile, false)
-            .await
-    }
+pub(crate) async fn create_task_board_item_with_provider_triage(
+    db: &AsyncDaemonDb,
+    item: TaskBoardItem,
+) -> Result<TaskBoardMutation, CliError> {
+    create_task_board_item_impl(db, item, TaskBoardTriageIngress::ProviderReconcile, false).await
+}
 
-    #[expect(
-        clippy::cognitive_complexity,
-        reason = "sequential create/insert/triage/audit/commit steps, each already its own helper"
-    )]
-    async fn create_task_board_item_impl(
-        &self,
-        mut item: TaskBoardItem,
-        ingress: TaskBoardTriageIngress,
-        suppress_placement: bool,
-    ) -> Result<TaskBoardMutation, CliError> {
-        validate_item(&item)?;
-        item.status = item.status.canonical_persisted_status();
-        validate_item(&item)?;
-        let mut transaction = self
-            .begin_immediate_transaction("task board item create")
-            .await?;
-        reject_if_item_exists_in_tx(&mut transaction, &item.id).await?;
-        resolve_item_project_in_tx(&mut transaction, &mut item).await?;
-        let inserted = insert_with_lane_transition_in_tx(&mut transaction, item).await?;
-        let before_triage = inserted.item.clone();
-        let (write, outcome) = match ingress {
-            TaskBoardTriageIngress::None => (inserted, None),
-            TaskBoardTriageIngress::HumanUpdate | TaskBoardTriageIngress::ProviderReconcile => {
-                apply_triage_after_insert_in_tx(&mut transaction, inserted, suppress_placement)
-                    .await?
-            }
-        };
-        let change_revision = bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
-        let mutation_kind =
-            (ingress != TaskBoardTriageIngress::None).then_some(TaskBoardMutationKind::Create);
-        record_triage_or_lane_audit_in_tx(
-            &mut transaction,
-            &before_triage,
-            outcome.as_ref(),
-            mutation_kind,
-            &write,
-            change_revision,
-            false,
-            &self.triage_escalation_config(),
-        )
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "sequential create/insert/triage/audit/commit steps, each already its own helper"
+)]
+async fn create_task_board_item_impl(
+    db: &AsyncDaemonDb,
+    mut item: TaskBoardItem,
+    ingress: TaskBoardTriageIngress,
+    suppress_placement: bool,
+) -> Result<TaskBoardMutation, CliError> {
+    validate_item(&item)?;
+    item.status = item.status.canonical_persisted_status();
+    validate_item(&item)?;
+    let mut transaction = db
+        .begin_immediate_transaction("task board item create")
         .await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit task board item create: {error}")))?;
-        Ok(TaskBoardMutation {
-            item: write.item,
-            item_revision: write.item_revision,
-            change_revision,
-        })
-    }
+    reject_if_item_exists_in_tx(&mut transaction, &item.id).await?;
+    resolve_item_project_in_tx(&mut transaction, &mut item).await?;
+    let inserted = insert_with_lane_transition_in_tx(&mut transaction, item).await?;
+    let before_triage = inserted.item.clone();
+    let (write, outcome) = match ingress {
+        TaskBoardTriageIngress::None => (inserted, None),
+        TaskBoardTriageIngress::HumanUpdate | TaskBoardTriageIngress::ProviderReconcile => {
+            apply_triage_after_insert_in_tx(&mut transaction, inserted, suppress_placement).await?
+        }
+    };
+    let change_revision = bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
+    let mutation_kind =
+        (ingress != TaskBoardTriageIngress::None).then_some(TaskBoardMutationKind::Create);
+    record_triage_or_lane_audit_in_tx(
+        &mut transaction,
+        &before_triage,
+        outcome.as_ref(),
+        mutation_kind,
+        &write,
+        change_revision,
+        false,
+        &db.triage_escalation_config(),
+    )
+    .await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit task board item create: {error}")))?;
+    Ok(TaskBoardMutation {
+        item: write.item,
+        item_revision: write.item_revision,
+        change_revision,
+    })
 }
 
 async fn reject_if_item_exists_in_tx(

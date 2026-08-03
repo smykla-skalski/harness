@@ -22,6 +22,7 @@ use crate::task_board::remote_wire::wire::{
     RemoteAssignmentWireState, RemoteCancelRequest, RemoteCancelResponse, RemoteClaimRequest,
     TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
+use crate::daemon::db::prelude::*;
 
 /// A claim receipt reconstructed from an authenticated cancel response for an
 /// assignment the controller offered but never durably claimed. The executor is
@@ -33,36 +34,34 @@ struct AdoptedCancelClaim {
     receipt_sha256: String,
 }
 
-impl AsyncDaemonDb {
-    pub(crate) async fn record_task_board_remote_assignment_cancel(
-        &self,
-        request: &RemoteCancelRequest,
-        response: &RemoteCancelResponse,
-        authenticated_principal: &str,
-        recorded_at: &str,
-    ) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
-        validate_cancel_exchange(request, response, authenticated_principal, recorded_at)?;
-        let mut transaction = self
-            .begin_immediate_transaction("task board remote cancel response")
-            .await?;
-        let record = require_assignment(&mut transaction, &request.binding.assignment_id).await?;
-        if cancel_response_replayed(&record, request, response, authenticated_principal) {
-            return settle_replayed_cancel_in_tx(transaction, record).await;
-        }
-        if !cancellable(&record)
-            || !mutation_binding_matches(
-                &record,
-                &request.binding,
-                authenticated_principal,
-                &request.lease_id,
-            )
-            || !cancel_evidence_matches(&record, response)
-        {
-            commit_noop(transaction, "stale remote cancel response").await?;
-            return Ok(TaskBoardRemoteMutationOutcome::Stale(record));
-        }
-        settle_cancel_response_in_tx(transaction, &record, request, response, recorded_at).await
+pub(super) async fn record_task_board_remote_assignment_cancel(
+    db: &AsyncDaemonDb,
+    request: &RemoteCancelRequest,
+    response: &RemoteCancelResponse,
+    authenticated_principal: &str,
+    recorded_at: &str,
+) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
+    validate_cancel_exchange(request, response, authenticated_principal, recorded_at)?;
+    let mut transaction = db
+        .begin_immediate_transaction("task board remote cancel response")
+        .await?;
+    let record = require_assignment(&mut transaction, &request.binding.assignment_id).await?;
+    if cancel_response_replayed(&record, request, response, authenticated_principal) {
+        return settle_replayed_cancel_in_tx(transaction, record).await;
     }
+    if !cancellable(&record)
+        || !mutation_binding_matches(
+            &record,
+            &request.binding,
+            authenticated_principal,
+            &request.lease_id,
+        )
+        || !cancel_evidence_matches(&record, response)
+    {
+        commit_noop(transaction, "stale remote cancel response").await?;
+        return Ok(TaskBoardRemoteMutationOutcome::Stale(record));
+    }
+    settle_cancel_response_in_tx(transaction, &record, request, response, recorded_at).await
 }
 
 fn validate_cancel_exchange(

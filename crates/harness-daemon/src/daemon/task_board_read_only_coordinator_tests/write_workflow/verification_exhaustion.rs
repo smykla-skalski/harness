@@ -7,6 +7,7 @@ use super::fixture::{seed_write_execution, seed_write_execution_with_retry_limit
 use super::{
     BASE_HEAD, FIRST_HEAD, FakeWriteRuntime, PlannedRun, RETRY_AT, load_execution, tick, tick_at,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 #[tokio::test]
 async fn exhausted_publication_verification_preserves_non_authoritative_mutation_evidence() {

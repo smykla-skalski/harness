@@ -17,6 +17,7 @@ use harness_kernel::errors::CliError;
 use super::super::task_board_db::{
     ReviewsProjectionAuditSummary, record_reviews_projection_result,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 pub(super) enum MissingReviewResolution {
     ExactActiveImports(ReviewsQueryRequest),

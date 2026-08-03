@@ -6,6 +6,7 @@ use harness_task_board::{
 };
 
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::task_board::prelude::*;
 
 const COMPLETION_START: &str = "<!-- harness:dependency-completion:start -->";
 const COMPLETION_HEADER: &str =

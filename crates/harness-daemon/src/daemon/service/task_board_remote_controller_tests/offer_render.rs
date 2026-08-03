@@ -12,6 +12,7 @@ use crate::task_board::{
 
 use super::super::{TaskBoardRemoteControllerReport, offer_remote_candidates};
 use super::{assignment_count, refresh_fixture_observation};
+use crate::daemon::db::task_board::prelude::*;
 
 /// The failure this pins: the render error propagated out of the loop, and the
 /// controller pass is a precondition of every dispatch route. One execution

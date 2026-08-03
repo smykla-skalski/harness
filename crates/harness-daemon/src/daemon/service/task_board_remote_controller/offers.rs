@@ -8,6 +8,7 @@ use super::{
     TaskBoardRemoteControllerReport, canonical_now, prepare_candidate_source,
     remote_preparing_attempt, requests, select_local_target, warn_offer_render_refused,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 /// Offers one candidate execution to a remote host. Every way a candidate can
 /// fail to go remote ends the same way - select the local target and return -

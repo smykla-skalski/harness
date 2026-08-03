@@ -4,6 +4,7 @@ use crate::task_board::progress_rollup::build_progress_rollups_from;
 use harness_kernel::errors::CliError;
 use harness_task_board_remote_viewer::{RevisionedTaskBoardItem, TaskBoardListProjectionSource};
 use std::collections::HashMap;
+use crate::daemon::db::task_board::prelude::*;
 
 /// The whole live board, in board order, that one list read selects from.
 ///
@@ -43,7 +44,10 @@ impl From<TaskBoardListSource> for TaskBoardListProjectionSource {
 pub(crate) async fn read_task_board_items_db(
     db: &AsyncDaemonDb,
 ) -> Result<TaskBoardListSource, CliError> {
-    let snapshot = db.task_board_items_snapshot(None).await?;
+    let mut snapshot = db.task_board_items_snapshot(None).await?;
+    let scope =
+        super::super::task_board_repository_scope::TaskBoardRepositoryScope::load(db).await?;
+    snapshot.items = scope.filter_snapshots(snapshot.items);
     // Roll-ups always derive from the full live set, never from the caller's
     // selection, or a filtered read would silently undercount siblings that
     // did not match it.

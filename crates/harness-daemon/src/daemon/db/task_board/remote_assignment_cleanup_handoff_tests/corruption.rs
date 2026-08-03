@@ -1,4 +1,6 @@
 use super::*;
+use crate::daemon::db::task_board::remote_assignment_authority_queries::RemoteAssignmentAuthorityQueries;
+use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 
 #[tokio::test]
 async fn cleanup_handoff_bypasses_an_undecodable_parent_but_no_handoff_fails_closed() {

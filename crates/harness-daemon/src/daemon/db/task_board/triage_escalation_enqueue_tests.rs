@@ -2,6 +2,8 @@ use tempfile::tempdir;
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::{TaskBoardItem, TaskBoardStatus, TaskBoardTriageEscalationConfig};
+use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
+use crate::daemon::db::task_board::triage_queries::TriageQueries;
 
 async fn connect() -> (tempfile::TempDir, AsyncDaemonDb) {
     let directory = tempdir().expect("tempdir");

@@ -7,6 +7,7 @@ use crate::daemon::remote_identity::{
     RemoteAuditOutcome, RemoteAuditScopeDecision, RemoteClientRegistration, RemoteStoredClient,
     RemoteTokenHash,
 };
+use crate::daemon::remote_identity_queries::RemoteIdentitySyncQueries;
 use rusqlite::Connection;
 use std::sync::{Arc, Mutex};
 use std::thread;

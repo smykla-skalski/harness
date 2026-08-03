@@ -2,6 +2,8 @@
 //! and truncation labeling. Kept free of network IO so callers and tests
 //! can exercise them without touching network client state.
 
+#![allow(dead_code)]
+
 use serde::Deserialize;
 
 use crate::files::{ReviewFileChangeType, ReviewFilePatch, ReviewFileServedBy};

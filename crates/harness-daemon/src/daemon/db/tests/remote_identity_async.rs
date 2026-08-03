@@ -1,3 +1,5 @@
+use crate::daemon::remote_identity_queries::{RemoteIdentityQueries, RemoteIdentitySyncQueries};
+use crate::daemon::remote_pairing_queries::RemotePairingAsyncQueries;
 use sqlx::query_scalar;
 use tempfile::tempdir;
 

@@ -9,6 +9,7 @@ use self::fixture as write_fixture;
 use super::driver::HeadlessWorkflowDriver;
 use super::fixture::{Fixture, NOW};
 use runtime::{FakeWriteRuntime, PlannedRun};
+use crate::daemon::db::task_board::prelude::*;
 
 mod dependency_triage;
 mod fixture;

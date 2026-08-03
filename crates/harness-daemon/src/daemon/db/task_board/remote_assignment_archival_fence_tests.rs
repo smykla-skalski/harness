@@ -2,6 +2,8 @@ use super::TaskBoardRemoteOfferOutcome;
 use super::remote_assignment_test_support::*;
 use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::{TaskBoardExecutionAttemptCas, TaskBoardWorkflowExecutionCas};
+use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
+use crate::daemon::db::prelude::*;
 
 #[tokio::test]
 async fn controller_offer_rejects_archival_idempotency_collision_without_mutation() {

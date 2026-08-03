@@ -11,7 +11,7 @@
 use harness_policy_graph_store::PolicyGraphStore;
 use sqlx::{Sqlite, SqlitePool, Transaction};
 
-use super::{AsyncDaemonDb, CliError};
+use super::{AsyncDaemonDb, AsyncDaemonTransactions, CliError};
 
 impl PolicyGraphStore for AsyncDaemonDb {
     fn pool(&self) -> &SqlitePool {
@@ -22,6 +22,6 @@ impl PolicyGraphStore for AsyncDaemonDb {
         &self,
         context: &str,
     ) -> Result<Transaction<'_, Sqlite>, CliError> {
-        AsyncDaemonDb::begin_immediate_transaction(self, context).await
+        <Self as AsyncDaemonTransactions>::begin_immediate_transaction(self, context).await
     }
 }

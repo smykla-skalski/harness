@@ -23,59 +23,50 @@ use crate::task_board::{
     TASK_BOARD_EXECUTION_TARGET_ATTEMPT_RESOURCE, TASK_BOARD_EXECUTION_TARGET_RESOURCE,
     TaskBoardExecutionAttemptRecord, TaskBoardItem, TaskBoardWorkflowExecutionRecord,
 };
+use crate::daemon::db::prelude::*;
 
-impl AsyncDaemonDb {
-    /// Persist a workflow execution and its first attempt without charging admission.
-    pub(crate) async fn prepare_task_board_workflow_dispatch(
-        &self,
-        intent_id: &str,
-        claim_token: &str,
-    ) -> Result<TaskBoardItem, CliError> {
-        let mut transaction = self
-            .begin_immediate_transaction("task board workflow dispatch preparation")
-            .await?;
-        let prepared =
-            screen_workflow_dispatch_in_tx(&mut transaction, intent_id, claim_token).await?;
-        persist_prepared_workflow_dispatch_in_tx(
-            &mut transaction,
-            intent_id,
-            claim_token,
-            &prepared,
-        )
+pub(super) async fn prepare_task_board_workflow_dispatch(
+    db: &AsyncDaemonDb,
+    intent_id: &str,
+    claim_token: &str,
+) -> Result<TaskBoardItem, CliError> {
+    let mut transaction = db
+        .begin_immediate_transaction("task board workflow dispatch preparation")
         .await?;
-        transaction.commit().await.map_err(|error| {
-            db_error(format!(
-                "commit task board workflow dispatch preparation: {error}"
-            ))
-        })?;
-        Ok(prepared.item)
-    }
+    let prepared = screen_workflow_dispatch_in_tx(&mut transaction, intent_id, claim_token).await?;
+    persist_prepared_workflow_dispatch_in_tx(&mut transaction, intent_id, claim_token, &prepared)
+        .await?;
+    transaction.commit().await.map_err(|error| {
+        db_error(format!(
+            "commit task board workflow dispatch preparation: {error}"
+        ))
+    })?;
+    Ok(prepared.item)
+}
 
-    /// Commit admission only after the exact local or remote worker durably started.
-    pub(crate) async fn complete_task_board_workflow_dispatch_start(
-        &self,
-        execution_id: &str,
-    ) -> Result<bool, CliError> {
-        let mut transaction = self
-            .begin_immediate_transaction("task board workflow dispatch start completion")
-            .await?;
-        let Some((execution, intent_id)) =
-            screen_prepared_dispatch_start_in_tx(&mut transaction, execution_id).await?
-        else {
-            transaction.commit().await.map_err(|error| {
-                db_error(format!("commit completed workflow dispatch no-op: {error}"))
-            })?;
-            return Ok(false);
-        };
-        settle_durable_dispatch_start_in_tx(&mut transaction, &execution, execution_id, &intent_id)
-            .await?;
+pub(super) async fn complete_task_board_workflow_dispatch_start(
+    db: &AsyncDaemonDb,
+    execution_id: &str,
+) -> Result<bool, CliError> {
+    let mut transaction = db
+        .begin_immediate_transaction("task board workflow dispatch start completion")
+        .await?;
+    let Some((execution, intent_id)) =
+        screen_prepared_dispatch_start_in_tx(&mut transaction, execution_id).await?
+    else {
         transaction.commit().await.map_err(|error| {
-            db_error(format!(
-                "commit task board workflow dispatch start: {error}"
-            ))
+            db_error(format!("commit completed workflow dispatch no-op: {error}"))
         })?;
-        Ok(true)
-    }
+        return Ok(false);
+    };
+    settle_durable_dispatch_start_in_tx(&mut transaction, &execution, execution_id, &intent_id)
+        .await?;
+    transaction.commit().await.map_err(|error| {
+        db_error(format!(
+            "commit task board workflow dispatch start: {error}"
+        ))
+    })?;
+    Ok(true)
 }
 
 /// The execution and its prepared intent, `None` once the intent already

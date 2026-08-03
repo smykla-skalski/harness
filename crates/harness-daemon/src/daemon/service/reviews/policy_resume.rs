@@ -30,6 +30,7 @@ use crate::task_board::policy_runtime::repository::PolicyRuntimeRepository;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::policy::{background_reviews_policy_runs_enabled, require_policy_runtime_db};
+use crate::daemon::db::task_board::prelude::*;
 
 pub(crate) async fn resume_reviews_policy_event(
     event: &PolicyWorkflowEvent,

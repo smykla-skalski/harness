@@ -19,6 +19,7 @@ use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::CodexRunMode;
 
 use super::test_support::{controller_with_db, with_isolated_async_harness_env};
+use crate::daemon::db::task_board::prelude::*;
 
 const HEAD: &str = "0123456789abcdef0123456789abcdef01234567";
 

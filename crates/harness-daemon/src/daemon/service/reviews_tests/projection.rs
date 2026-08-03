@@ -16,6 +16,7 @@ use super::super::{
     refresh::reconcile_targeted_missing_task_board_reviews, store_cached_query_response,
 };
 use super::parsed;
+use crate::daemon::db::task_board::prelude::*;
 
 #[path = "projection/db_backed.rs"]
 mod db_backed;

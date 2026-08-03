@@ -13,6 +13,7 @@ use crate::task_board::{
     TaskBoardAutomationWakeRecoveryReason, TaskBoardAutomationWakeRequest, TaskBoardExecutionState,
     TaskBoardItem,
 };
+use crate::daemon::db::task_board::prelude::*;
 const REASON: &str = "operator requested exact remote cancellation";
 
 #[tokio::test]

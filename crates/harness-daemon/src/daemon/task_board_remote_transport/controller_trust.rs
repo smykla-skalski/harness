@@ -12,6 +12,7 @@ use crate::daemon::db::{
 };
 use crate::task_board::TaskBoardExecutionHostConfig;
 use crate::task_board::remote_wire::wire_conversion::domain_host_advertisement;
+use crate::daemon::db::task_board::prelude::*;
 
 impl RemoteExecutionControllerClient {
     pub(crate) fn connect(

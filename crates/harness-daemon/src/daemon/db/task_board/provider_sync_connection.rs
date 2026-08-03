@@ -7,7 +7,7 @@
 use harness_task_board_provider_sync::ProviderSyncStore;
 use sqlx::{Sqlite, SqlitePool, Transaction};
 
-use crate::daemon::db::{AsyncDaemonDb, CliError};
+use crate::daemon::db::{AsyncDaemonDb, AsyncDaemonTransactions, CliError};
 use crate::task_board::TaskBoardItem;
 
 use super::items::{
@@ -24,7 +24,7 @@ impl ProviderSyncStore for AsyncDaemonDb {
         &self,
         context: &str,
     ) -> Result<Transaction<'_, Sqlite>, CliError> {
-        AsyncDaemonDb::begin_immediate_transaction(self, context).await
+        <Self as AsyncDaemonTransactions>::begin_immediate_transaction(self, context).await
     }
 
     async fn bump_change_in_tx(

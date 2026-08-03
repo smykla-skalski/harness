@@ -7,6 +7,7 @@ use super::super::{
     session_service, task_drop_effect_signal_records, try_wake_started_workers, utc_now,
     write_task_start_signals,
 };
+use crate::daemon::db::prelude::*;
 
 /// Create a task through the shared session service.
 ///

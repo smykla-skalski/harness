@@ -31,6 +31,11 @@ pub(crate) use runtime::{
 #[path = "remote_assignment_test_support/cancel_targets.rs"]
 mod cancel_targets;
 pub(crate) use cancel_targets::seed_cancelable_controller_targets;
+use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
+use crate::daemon::db::task_board::orchestrator_settings_queries::OrchestratorSettingsQueries;
+use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
+use crate::daemon::db::task_board::remote_hosts::RemoteHostQueries;
+use crate::daemon::db::task_board::workflow_execution_queries::WorkflowExecutionQueries;
 
 pub(crate) const NOW: &str = "2026-07-19T10:00:00Z";
 pub(crate) const CLAIMED_AT: &str = "2026-07-19T10:00:10Z";

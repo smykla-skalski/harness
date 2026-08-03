@@ -6,6 +6,7 @@ use crate::daemon::db::complete_write_preparation;
 use crate::task_board::{
     AgentMode, TaskBoardLaunchCapability, TaskBoardStatus, TaskBoardWorkflowStatus,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 #[tokio::test]
 async fn admission_revalidates_then_commits_and_releases_concurrency() {

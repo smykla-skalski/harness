@@ -20,6 +20,7 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 use tokio::task::spawn_blocking;
 
 use super::{DaemonHttpState, require_async_db};
+use crate::daemon::db::task_board::prelude::*;
 
 mod automation_run;
 mod item_ops;

@@ -377,7 +377,7 @@
     {
       "id": "repositories-settings",
       "signpostName": "repositories-settings",
-      "defaultPreviewScenario": "dashboard",
+      "defaultPreviewScenario": "repositories-settings",
       "initialSettingsSection": "repositories",
       "disablesVisualOptions": false,
       "needsPreviewAcpPermissionBatch": false,
@@ -385,13 +385,13 @@
       "durationSeconds": 8,
       "templates": ["swiftui"],
       "swiftUIBudget": {
-        "totalUpdates": 35000,
-        "bodyUpdates": 3500,
-        "maxUpdateGroupMilliseconds": 50,
+        "totalUpdates": 285000,
+        "bodyUpdates": 33000,
+        "maxUpdateGroupMilliseconds": 75,
         "hitches": 0,
         "potentialHangs": 0,
-        "p95UpdateMilliseconds": 8,
-        "updateGroupP95Milliseconds": 30
+        "p95UpdateMilliseconds": 0.1,
+        "updateGroupP95Milliseconds": 1
       }
     },
     {

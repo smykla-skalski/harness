@@ -18,6 +18,7 @@ use crate::git::{GitError, GitResult};
 use crate::task_board::TaskBoardWorkflowExecutionCas;
 use crate::workspace::utc_now;
 use harness_kernel::errors::{CliError, CliErrorKind};
+use crate::daemon::db::task_board::prelude::*;
 
 #[path = "task_board_remote_result_import/orchestration.rs"]
 mod orchestration;

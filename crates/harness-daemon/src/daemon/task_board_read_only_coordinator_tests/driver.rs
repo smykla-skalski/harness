@@ -4,6 +4,7 @@ use crate::task_board::{TaskBoardStatus, TaskBoardWorkflowExecutionRecord};
 use super::super::task_board_read_only_coordinator::reconcile_task_board_read_only_workflows_with_runtime;
 use super::super::task_board_read_only_runtime::TaskBoardReadOnlyRuntime;
 use super::fixture::Fixture;
+use crate::daemon::db::task_board::prelude::*;
 
 pub(super) struct HeadlessWorkflowDriver<'a, R> {
     fixture: &'a Fixture,

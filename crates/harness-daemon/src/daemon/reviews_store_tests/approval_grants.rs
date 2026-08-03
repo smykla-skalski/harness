@@ -13,6 +13,7 @@ use harness_policy_graph_store::{
     NewApprovalGrant, consume_approval_grant_in_tx, consume_approval_grant_in_tx_at,
     insert_pending_grant_at,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 async fn connect() -> (TempDir, AsyncDaemonDb) {
     let dir = tempdir().expect("tempdir");

@@ -1,3 +1,4 @@
+use crate::daemon::db::conversation::DaemonDbConversation;
 use std::collections::BTreeMap;
 use std::env::temp_dir;
 use std::path::PathBuf;
@@ -24,6 +25,7 @@ use crate::session::types::{
 };
 
 use super::ReplayBuffer;
+use crate::daemon::db::prelude::*;
 
 pub(super) fn test_ws_state() -> DaemonHttpState {
     build_test_http_state("20.6.0", "2026-04-13T00:00:00Z", false)

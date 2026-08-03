@@ -1,6 +1,8 @@
+use crate::daemon::db::imports::DaemonDbSessionResync;
 use std::path::PathBuf;
 
 use super::{CliError, Path, ResolvedSession, index, session_not_found};
+use crate::daemon::db::prelude::*;
 
 pub(crate) fn liveness_project_dir_for_resolved(resolved: &ResolvedSession) -> Option<PathBuf> {
     harness_daemon_session_service::liveness_project_dir_for_resolved(resolved)

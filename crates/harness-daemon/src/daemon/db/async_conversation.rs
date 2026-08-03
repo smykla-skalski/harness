@@ -56,13 +56,20 @@ ON CONFLICT(session_id) DO UPDATE SET
     oldest_recorded_at = (SELECT MIN(recorded_at) FROM session_timeline_entries WHERE session_id = ?1),
     updated_at = excluded.updated_at";
 
-impl AsyncDaemonDb {
-    /// Refresh runtime transcript caches from file-backed agent logs without
-    /// reimporting session state through the sync daemon DB.
-    ///
+/// Runtime transcript cache refresh (agent activity + conversation events)
+/// through the canonical async daemon DB, without reimporting full session
+/// state through the sync daemon DB.
+pub(crate) trait AsyncConversationSyncQueries: Send + Sync {
     /// # Errors
     /// Returns [`CliError`] on I/O, serialization, or SQL failures.
-    pub(crate) async fn sync_runtime_transcripts(
+    async fn sync_runtime_transcripts(
+        &self,
+        resolved: &daemon_index::ResolvedSession,
+    ) -> Result<(), CliError>;
+}
+
+impl AsyncConversationSyncQueries for AsyncDaemonDb {
+    async fn sync_runtime_transcripts(
         &self,
         resolved: &daemon_index::ResolvedSession,
     ) -> Result<(), CliError> {

@@ -74,7 +74,7 @@ pub enum SessionCommand {
     /// Unified managed terminal and Codex thread operations.
     Agents {
         #[command(subcommand)]
-        command: SessionAgentsCommand,
+        command: Box<SessionAgentsCommand>,
     },
     /// Observe all agents in a session.
     Observe(SessionObserveArgs),

@@ -23,6 +23,7 @@ use crate::task_board::{
     TaskBoardWorkflowSnapshot, TaskBoardWorkflowStatus, TaskBoardWorkflowTransitionState,
     bind_plan_approval, build_planning_result, resolve_task_board_reviewers,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 #[path = "offers/openrouter.rs"]
 mod openrouter;

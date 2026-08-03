@@ -11,6 +11,7 @@ use crate::task_board::{
 use harness_kernel::errors::CliError;
 
 use super::attempts::{invalid_transition, require_human};
+use crate::daemon::db::task_board::prelude::*;
 
 pub(super) async fn recover_terminal_attempt_state(
     db: &AsyncDaemonDb,

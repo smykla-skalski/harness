@@ -56,6 +56,7 @@ fn bridge_reconfigure_requires_force_to_disable_agent_tui_with_active_sessions()
                     transcript_path: tmp.path().join("transcript.log"),
                     size: AgentTuiSize { rows: 24, cols: 80 },
                     prompt: None,
+                    user_prompt: None,
                     effort: None,
                 })
                 .expect("start agent tui");
@@ -158,6 +159,7 @@ fn bridge_does_not_resend_auto_join_for_cli_prompt_runtimes() {
                     transcript_path: tmp.path().join("cli-runtime-transcript.log"),
                     size: AgentTuiSize { rows: 24, cols: 80 },
                     prompt: Some(prompt.to_string()),
+                    user_prompt: None,
                     effort: None,
                 })
                 .expect("start agent tui");
@@ -257,6 +259,7 @@ fn bridge_accepts_timed_input_sequences() {
                     transcript_path: tmp.path().join("sequence-transcript.log"),
                     size: AgentTuiSize { rows: 24, cols: 80 },
                     prompt: None,
+                    user_prompt: None,
                     effort: None,
                 })
                 .expect("start agent tui");

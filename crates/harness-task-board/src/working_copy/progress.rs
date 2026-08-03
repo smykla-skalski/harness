@@ -20,8 +20,7 @@ use tracing::warn;
 use harness_protocol::daemon::StreamEvent;
 
 /// WS push-event name for working-copy obtain progress. Snake-case with a
-/// `task_board_` prefix so subscribers can filter by prefix, matching the
-/// convention used by `reviews_local_clone_progress`.
+/// `task_board_` prefix so subscribers can filter by prefix.
 pub const TASK_BOARD_WORKING_COPY_PROGRESS_EVENT: &str = "task_board_working_copy_progress";
 
 /// One progress event for a working-copy obtain.

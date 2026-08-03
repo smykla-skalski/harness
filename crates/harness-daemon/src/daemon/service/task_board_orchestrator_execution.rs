@@ -98,7 +98,9 @@ async fn load_candidate_items(
 ) -> Result<Vec<TaskBoardItem>, CliError> {
     let mut items = Vec::with_capacity(item_ids.len());
     for item_id in item_ids {
-        items.push(db.task_board_item(item_id).await?);
+        items.push(
+            super::task_board_repository_scope::scoped_task_board_item_db(db, item_id).await?,
+        );
     }
     Ok(items)
 }

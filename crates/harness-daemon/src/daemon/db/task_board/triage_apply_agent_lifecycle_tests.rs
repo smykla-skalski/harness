@@ -11,6 +11,8 @@ use crate::task_board::{
     TaskBoardStatus, TriagePriorityAction, TriageRule, TriageRuleCondition, TriageRuleOutcome,
     TriageRuleSetV1, TriageVerdict,
 };
+use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
+use crate::daemon::db::task_board::triage_queries::TriageQueries;
 
 async fn pending_escalation_count(db: &crate::daemon::db::AsyncDaemonDb, item_id: &str) -> i64 {
     sqlx::query_scalar(

@@ -18,7 +18,6 @@ use super::remote_outbound_sources::{
 use super::workflow_execution_attempts::update_attempt_in_tx;
 use super::workflow_execution_fencing::{TaskBoardFirstStartAdmission, WorkflowExecutionFencing};
 use super::workflow_executions::{load_execution_in_tx, update_execution_in_tx};
-use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardExecutionPhase;
 use crate::task_board::remote_wire::wire::{RemoteOfferRequest, RemoteRuntimeLaunchEnvelope};
@@ -43,28 +42,22 @@ use screen::{
 };
 pub(crate) use types::TaskBoardRemoteOfferWindow;
 use types::{OfferPreparation, OfferTimes};
+use crate::daemon::db::prelude::*;
 
-impl AsyncDaemonDb {
-    pub(crate) async fn offer_task_board_remote_assignment(
+pub(crate) trait RemoteAssignmentOfferQueries: Send + Sync {
+    async fn offer_task_board_remote_assignment_with_source(
         &self,
         expected_execution: &TaskBoardWorkflowExecutionCas,
         expected_attempt: &TaskBoardExecutionAttemptCas,
         request: &RemoteOfferRequest,
+        source_content: Option<&[u8]>,
         authenticated_principal: &str,
         window: TaskBoardRemoteOfferWindow<'_>,
-    ) -> Result<TaskBoardRemoteOfferOutcome, CliError> {
-        <Self as RemoteExecutionQueries>::offer_task_board_remote_assignment(
-            self,
-            expected_execution,
-            expected_attempt,
-            request,
-            authenticated_principal,
-            window,
-        )
-        .await
-    }
+    ) -> Result<TaskBoardRemoteOfferOutcome, CliError>;
+}
 
-    pub(crate) async fn offer_task_board_remote_assignment_with_source(
+impl RemoteAssignmentOfferQueries for AsyncDaemonDb {
+    async fn offer_task_board_remote_assignment_with_source(
         &self,
         expected_execution: &TaskBoardWorkflowExecutionCas,
         expected_attempt: &TaskBoardExecutionAttemptCas,

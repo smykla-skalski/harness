@@ -18,7 +18,8 @@ const RESOLVE_RUNTIME_SESSION_AGENT_SQL: &str = "SELECT a.session_id, a.agent_id
       AND s.is_active = 1
      ORDER BY a.session_id, a.agent_id";
 
-impl AsyncDaemonDb {
+/// Runtime-session-to-agent resolution through the canonical async daemon DB.
+pub(crate) trait AsyncAgentResolutionQueries: Send + Sync {
     /// Resolve a runtime-session ID to live (`session_id`, `agent_id`) pairs.
     ///
     /// Returns every match so the caller can detect ambiguity. Uses the
@@ -27,7 +28,15 @@ impl AsyncDaemonDb {
     ///
     /// # Errors
     /// Returns [`CliError`] on SQL failures.
-    pub(crate) async fn resolve_runtime_session_agents(
+    async fn resolve_runtime_session_agents(
+        &self,
+        runtime_name: &str,
+        runtime_session_id: &str,
+    ) -> Result<Vec<(String, String)>, CliError>;
+}
+
+impl AsyncAgentResolutionQueries for AsyncDaemonDb {
+    async fn resolve_runtime_session_agents(
         &self,
         runtime_name: &str,
         runtime_session_id: &str,

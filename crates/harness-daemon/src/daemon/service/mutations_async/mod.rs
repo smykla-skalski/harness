@@ -29,6 +29,7 @@ pub(crate) use tasks::{
     assign_task_async, checkpoint_task_async, create_task_async, create_task_with_id_async,
     delete_task_async, drop_task_async, update_task_async, update_task_queue_policy_async,
 };
+use crate::daemon::db::prelude::*;
 
 async fn resolved_session_for_mutation(
     async_db: &super::db::AsyncDaemonDb,

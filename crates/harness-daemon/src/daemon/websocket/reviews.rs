@@ -73,13 +73,6 @@ pub(crate) async fn dispatch_reviews_method(
         ws_methods::REVIEWS_FILES_COMMENT => {
             Some(dispatch_reviews_files_comment(request, state).await)
         }
-        ws_methods::REVIEWS_FILES_LOCAL_CLONES_LIST => Some(dispatch_query_result(
-            &request.id,
-            service::list_review_local_clones().await,
-        )),
-        ws_methods::REVIEWS_FILES_LOCAL_CLONES_DELETE => Some(
-            super::reviews_local_clones::dispatch_reviews_files_local_clones_delete(request).await,
-        ),
         ws_methods::REVIEWS_AVATAR => Some(dispatch_reviews_avatar(request).await),
         ws_methods::REVIEWS_TIMELINE => Some(dispatch_reviews_timeline(request).await),
         ws_methods::REVIEWS_REVIEW_THREADS_RESOLVE => {

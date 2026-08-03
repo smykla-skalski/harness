@@ -20,6 +20,7 @@ use crate::session::types::CONTROL_PLANE_ACTOR_ID;
 use crate::task_board::TaskBoardAutomationDesiredMode;
 
 use super::task_board_route_parity_support::{get_json, post_json, serve_http, ws_result};
+use crate::daemon::db::task_board::prelude::*;
 
 #[test]
 fn automation_observability_http_and_websocket_routes_match() {

@@ -8,12 +8,14 @@ use crate::daemon::protocol::{
     TaskBoardShiftedItemRevision,
 };
 use crate::infra::io::validate_safe_segment;
+use crate::daemon::db::task_board::prelude::*;
 
 pub(crate) async fn get_task_board_item_position_snapshot_db(
     db: &AsyncDaemonDb,
     item_id: &str,
 ) -> Result<TaskBoardItemPositionSnapshot, CliError> {
     validate_safe_segment(item_id)?;
+    super::super::task_board_repository_scope::scoped_task_board_item_db(db, item_id).await?;
     let snapshot = db.task_board_items_snapshot(None).await?;
     let item = snapshot
         .items
@@ -33,6 +35,7 @@ pub(crate) async fn set_task_board_item_position_db(
     request: &TaskBoardSetItemPositionRequest,
 ) -> Result<TaskBoardItemPositionMutationResponse, CliError> {
     validate_safe_segment(item_id)?;
+    super::super::task_board_repository_scope::scoped_task_board_item_db(db, item_id).await?;
     let result = db
         .set_task_board_lane_position(TaskBoardLanePositionInput {
             item_id: item_id.to_owned(),
@@ -52,6 +55,7 @@ pub(crate) async fn reset_task_board_item_position_db(
     request: &TaskBoardResetItemPositionRequest,
 ) -> Result<TaskBoardItemPositionMutationResponse, CliError> {
     validate_safe_segment(item_id)?;
+    super::super::task_board_repository_scope::scoped_task_board_item_db(db, item_id).await?;
     let result = db
         .reset_task_board_lane_position(TaskBoardLaneResetInput {
             item_id: item_id.to_owned(),

@@ -8,6 +8,7 @@ use crate::daemon::db::TaskBoardRemoteMutationOutcome;
 use crate::task_board::{
     TaskBoardAttemptState, TaskBoardExecutionState, TaskBoardRemoteAssignmentState,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 #[tokio::test]
 async fn lost_cancel_response_retries_exactly_and_restarts_from_durable_response() {

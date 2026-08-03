@@ -10,9 +10,10 @@ use super::remote_assignment_recovery_queue::{
     RawRecoveryCandidate, clear_recovery_quarantine_in_tx, due_assignment_page,
 };
 use super::remote_operation_trust::abandon_controller_operation_trust_in_tx;
-use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
+use crate::daemon::db::task_board::remote_assignment_executor_lifecycle_queries::RemoteAssignmentExecutorLifecycleQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardRemoteAssignmentState;
+use crate::daemon::db::prelude::*;
 
 #[derive(sqlx::FromRow)]
 struct RecoveryRow {
@@ -36,15 +37,19 @@ pub(crate) struct TaskBoardRemoteRecoveryBatch {
     pub(crate) incomplete: bool,
 }
 
-impl AsyncDaemonDb {
-    pub(crate) async fn recover_task_board_remote_assignments(
-        &self,
-        now: &str,
-    ) -> Result<TaskBoardRemoteRecoveryBatch, CliError> {
-        <Self as RemoteExecutionQueries>::recover_task_board_remote_assignments(self, now).await
-    }
+pub(crate) trait RemoteAssignmentRecoveryQueries: Send + Sync {
+    async fn task_board_remote_assignment_recovery_deadline(&self)
+    -> Result<Option<String>, CliError>;
 
-    pub(crate) async fn task_board_remote_assignment_recovery_deadline(
+    async fn recover_one_remote_assignment(
+        &self,
+        candidate: &RawRecoveryCandidate,
+        now: &str,
+    ) -> Result<Option<TaskBoardRemoteAssignmentRecord>, CliError>;
+}
+
+impl RemoteAssignmentRecoveryQueries for AsyncDaemonDb {
+    async fn task_board_remote_assignment_recovery_deadline(
         &self,
     ) -> Result<Option<String>, CliError> {
         const STATEMENT: &str =
@@ -131,7 +136,7 @@ impl AsyncDaemonDb {
             .map_err(|error| db_error(format!("load remote assignment recovery deadline: {error}")))
     }
 
-    pub(super) async fn recover_one_remote_assignment(
+    async fn recover_one_remote_assignment(
         &self,
         candidate: &RawRecoveryCandidate,
         now: &str,

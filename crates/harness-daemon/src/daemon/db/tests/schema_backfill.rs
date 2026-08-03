@@ -1,4 +1,5 @@
 use super::*;
+use crate::daemon::db::conversation::DaemonDbConversation;
 use crate::session::types::CURRENT_VERSION;
 use serde_json::json;
 

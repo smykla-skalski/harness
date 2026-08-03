@@ -27,6 +27,7 @@ use crate::task_board::{
     TaskBoardWorkflowExecutionRecord,
 };
 use harness_kernel::errors::CliError;
+use crate::daemon::db::task_board::prelude::*;
 
 pub(super) const HOST_ID: &str = "executor-a";
 pub(super) const TOKEN_ENV: &str = "HARNESS_REMOTE_AUTHORITY_TEST_TOKEN";

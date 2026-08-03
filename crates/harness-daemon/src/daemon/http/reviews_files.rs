@@ -1,9 +1,8 @@
-use std::time::Instant;
-
 use axum::Json;
 use axum::extract::State;
 use axum::http::HeaderMap;
 use axum::response::Response;
+use std::time::Instant;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
 use crate::daemon::protocol::{
@@ -13,21 +12,17 @@ use crate::daemon::protocol::{
     ReviewsFilesPreviewResponse, ReviewsFilesViewedRequest, ReviewsFilesViewedResponse, http_paths,
 };
 use crate::daemon::service;
-use crate::reviews::LocalCloneListEntry;
 
 use super::DaemonHttpState;
 use super::auth::require_auth;
 use super::openapi::DaemonErrorBody;
 use super::response::{extract_request_id, timed_json};
 
-/// Wire the review-files endpoints onto the reviews router. These handlers live
-/// in their own module so `reviews.rs` stays within the file-length cap.
+/// Wire the review-files endpoints onto the reviews router.
 pub(super) fn merge_files_routes(
     router: OpenApiRouter<DaemonHttpState>,
 ) -> OpenApiRouter<DaemonHttpState> {
-    router
-        .merge(review_file_content_routes())
-        .merge(review_local_clone_routes())
+    router.merge(review_file_content_routes())
 }
 
 fn review_file_content_routes() -> OpenApiRouter<DaemonHttpState> {
@@ -38,12 +33,6 @@ fn review_file_content_routes() -> OpenApiRouter<DaemonHttpState> {
         .routes(routes!(post_review_files_viewed))
         .routes(routes!(post_review_files_blob))
         .routes(routes!(post_review_files_comment))
-}
-
-fn review_local_clone_routes() -> OpenApiRouter<DaemonHttpState> {
-    OpenApiRouter::new()
-        .routes(routes!(post_review_files_local_clones))
-        .routes(routes!(post_review_files_local_clones_delete))
 }
 
 #[utoipa::path(
@@ -226,78 +215,6 @@ pub(super) async fn post_review_files_comment(
     timed_json(
         "POST",
         http_paths::REVIEWS_FILES_COMMENT,
-        &request_id,
-        start,
-        result,
-    )
-}
-
-#[utoipa::path(
-    post,
-    path = "/v1/reviews/files/local-clones",
-    tag = "reviews",
-    description = "List the entries in the local bare-clone registry used to serve review file content",
-    responses(
-        (status = 200, description = "Local bare-clone registry entries", body = Vec<LocalCloneListEntry>),
-        (status = 400, description = "Request error", body = DaemonErrorBody),
-    ),
-)]
-pub(super) async fn post_review_files_local_clones(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-) -> Response {
-    let start = Instant::now();
-    let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
-        return *response;
-    }
-    let result = service::list_review_local_clones().await;
-    timed_json(
-        "POST",
-        http_paths::REVIEWS_FILES_LOCAL_CLONES,
-        &request_id,
-        start,
-        result,
-    )
-}
-
-#[derive(serde::Deserialize, utoipa::ToSchema)]
-pub(super) struct DeleteLocalClonePayload {
-    repo_key_segment: String,
-}
-
-#[derive(serde::Serialize, utoipa::ToSchema)]
-pub(super) struct DeleteLocalCloneResponseBody {
-    clones: Vec<LocalCloneListEntry>,
-}
-
-#[utoipa::path(
-    post,
-    path = "/v1/reviews/files/local-clones/delete",
-    tag = "reviews",
-    description = "Delete a local bare clone by its repository key segment and return the registry state after removal",
-    request_body = DeleteLocalClonePayload,
-    responses(
-        (status = 200, description = "Local bare-clone registry after the deletion", body = DeleteLocalCloneResponseBody),
-        (status = 400, description = "Request error", body = DaemonErrorBody),
-    ),
-)]
-pub(super) async fn post_review_files_local_clones_delete(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-    Json(payload): Json<DeleteLocalClonePayload>,
-) -> Response {
-    let start = Instant::now();
-    let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
-        return *response;
-    }
-    let result = service::delete_review_local_clone(&payload.repo_key_segment)
-        .await
-        .map(|clones| DeleteLocalCloneResponseBody { clones });
-    timed_json(
-        "POST",
-        http_paths::REVIEWS_FILES_LOCAL_CLONES_DELETE,
         &request_id,
         start,
         result,

@@ -12,6 +12,8 @@ use crate::task_board::{
     complete_task_board_report_only_review,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
+use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db::prelude::*;
 
 const SUPPORTED_AGENT_TURN_RUNTIMES: [&str; 1] = ["openrouter"];
 

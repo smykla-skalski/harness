@@ -13,9 +13,9 @@ use super::control::{TaskBoardAutomationControlRecord, ensure_control_row, load_
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::daemon::protocol::HarnessMonitorAuditEvent;
 use crate::task_board::{
-    TaskBoardAutomationAdmissionState, TaskBoardAutomationDesiredMode,
     TaskBoardAutomationRunOutcome, TaskBoardAutomationRunTrigger, TaskBoardAutomationScope,
 };
+use crate::daemon::db::prelude::*;
 
 const RUN_LEASE_SECONDS: i64 = 30;
 
@@ -74,90 +74,75 @@ enum RunAdmissionDecision {
     },
 }
 
-impl AsyncDaemonDb {
-    pub(crate) async fn try_acquire_task_board_automation_run(
-        &self,
-        request: &TaskBoardRunAcquireRequest,
-    ) -> Result<TaskBoardAutomationRunAdmission, CliError> {
-        let mut transaction = self
-            .begin_immediate_transaction("task board automation run acquire")
-            .await?;
-        let observed = evaluate_run_admission_in_tx(&mut transaction, request).await?;
-        let control = match observed.decision {
-            RunAdmissionDecision::Refuse { admission, context } => {
-                return commit_non_acquired_run(
-                    transaction,
-                    observed.expired_events,
-                    admission,
-                    context,
-                )
-                .await;
-            }
-            RunAdmissionDecision::Acquire(control) => control,
-        };
-        let (lease_epoch, started_event) =
-            acquire_run_in_tx(&mut transaction, request, &control).await?;
-        let mut events = observed.expired_events;
-        events.push(started_event);
-        commit(transaction, "task board automation run").await?;
-        broadcast_automation_audits(&events);
-        Ok(TaskBoardAutomationRunAdmission::Acquired(run_lease(
-            request,
-            &control,
-            lease_epoch,
-        )))
-    }
-
-    pub(crate) async fn heartbeat_task_board_automation_run(
-        &self,
-        lease: &TaskBoardAutomationRunLease,
-        now: DateTime<Utc>,
-    ) -> Result<TaskBoardAutomationRunFence, CliError> {
-        let mut transaction = self
-            .begin_immediate_transaction("task board automation run heartbeat")
-            .await?;
-        let row = load_run_fence(&mut transaction, lease).await?;
-        if row.lease_expires_at <= now {
-            return Err(expired_lease(&lease.run_id));
-        }
-        let control = load_control_in_tx(&mut transaction).await?;
-        let fence = run_fence(lease, &control, &row.state);
-        renew_run_lease(&mut transaction, lease, now).await?;
-        commit(transaction, "task board automation heartbeat").await?;
-        Ok(fence)
-    }
-
-    pub(crate) async fn finalize_task_board_automation_run(
-        &self,
-        lease: &TaskBoardAutomationRunLease,
-        outcome: TaskBoardAutomationRunOutcome,
-        error_kind: Option<&str>,
-        error: Option<&str>,
-        now: DateTime<Utc>,
-    ) -> Result<TaskBoardAutomationRunOutcome, CliError> {
-        let mut transaction = self
-            .begin_immediate_transaction("task board automation run finalize")
-            .await?;
-        let row = load_run_fence(&mut transaction, lease).await?;
-        if row.lease_expires_at <= now {
-            return Err(lost_lease(&lease.run_id));
-        }
-        let control = load_control_in_tx(&mut transaction).await?;
-        let outcome = final_outcome(lease, &control, &row.state, outcome);
-        let event = finalize_run_in_tx(
-            &mut transaction,
-            lease,
-            &row,
-            outcome,
-            error_kind,
-            error,
-            now,
-        )
+pub(super) async fn try_acquire_task_board_automation_run(
+    db: &AsyncDaemonDb,
+    request: &TaskBoardRunAcquireRequest,
+) -> Result<TaskBoardAutomationRunAdmission, CliError> {
+    let mut transaction = db
+        .begin_immediate_transaction("task board automation run acquire")
         .await?;
-        commit(transaction, "task board automation run finalization").await?;
-        broadcast_automation_audits(slice::from_ref(&event));
-        Ok(outcome)
+    let observed = evaluate_run_admission_in_tx(&mut transaction, request).await?;
+    let control = match observed.decision {
+        RunAdmissionDecision::Refuse { admission, context } => {
+            return commit_non_acquired_run(transaction, observed.expired_events, admission, context)
+                .await;
+        }
+        RunAdmissionDecision::Acquire(control) => control,
+    };
+    let (lease_epoch, started_event) =
+        acquire_run_in_tx(&mut transaction, request, &control).await?;
+    let mut events = observed.expired_events;
+    events.push(started_event);
+    commit(transaction, "task board automation run").await?;
+    broadcast_automation_audits(&events);
+    Ok(TaskBoardAutomationRunAdmission::Acquired(run_lease(
+        request,
+        &control,
+        lease_epoch,
+    )))
+}
+
+pub(super) async fn heartbeat_task_board_automation_run(
+    db: &AsyncDaemonDb,
+    lease: &TaskBoardAutomationRunLease,
+    now: DateTime<Utc>,
+) -> Result<TaskBoardAutomationRunFence, CliError> {
+    let mut transaction = db
+        .begin_immediate_transaction("task board automation run heartbeat")
+        .await?;
+    let row = load_run_fence(&mut transaction, lease).await?;
+    if row.lease_expires_at <= now {
+        return Err(expired_lease(&lease.run_id));
     }
+    let control = load_control_in_tx(&mut transaction).await?;
+    let fence = run_fence(lease, &control, &row.state);
+    renew_run_lease(&mut transaction, lease, now).await?;
+    commit(transaction, "task board automation heartbeat").await?;
+    Ok(fence)
+}
+
+pub(super) async fn finalize_task_board_automation_run(
+    db: &AsyncDaemonDb,
+    lease: &TaskBoardAutomationRunLease,
+    outcome: TaskBoardAutomationRunOutcome,
+    error_kind: Option<&str>,
+    error: Option<&str>,
+    now: DateTime<Utc>,
+) -> Result<TaskBoardAutomationRunOutcome, CliError> {
+    let mut transaction = db
+        .begin_immediate_transaction("task board automation run finalize")
+        .await?;
+    let row = load_run_fence(&mut transaction, lease).await?;
+    if row.lease_expires_at <= now {
+        return Err(lost_lease(&lease.run_id));
+    }
+    let control = load_control_in_tx(&mut transaction).await?;
+    let outcome = final_outcome(lease, &control, &row.state, outcome);
+    let event =
+        finalize_run_in_tx(&mut transaction, lease, &row, outcome, error_kind, error, now).await?;
+    commit(transaction, "task board automation run finalization").await?;
+    broadcast_automation_audits(slice::from_ref(&event));
+    Ok(outcome)
 }
 
 async fn evaluate_run_admission_in_tx(
@@ -398,113 +383,10 @@ async fn finalize_run_row(
     ensure_single_run_changed(changed, &lease.run_id)
 }
 
-fn run_lease(
-    request: &TaskBoardRunAcquireRequest,
-    control: &TaskBoardAutomationControlRecord,
-    lease_epoch: u64,
-) -> TaskBoardAutomationRunLease {
-    TaskBoardAutomationRunLease {
-        run_id: request.run_id.clone(),
-        trigger: request.trigger,
-        lease_owner: request.lease_owner.clone(),
-        lease_epoch,
-        stop_generation: control.stop_generation,
-        started_at: request.now.to_rfc3339(),
-    }
-}
-
-fn run_fence(
-    lease: &TaskBoardAutomationRunLease,
-    control: &TaskBoardAutomationControlRecord,
-    state: &str,
-) -> TaskBoardAutomationRunFence {
-    if state == "cancelling"
-        || control.stop_generation != lease.stop_generation
-        || !admission_is_open(lease.trigger, control)
-    {
-        TaskBoardAutomationRunFence::Draining
-    } else {
-        TaskBoardAutomationRunFence::Active
-    }
-}
-
-fn final_outcome(
-    lease: &TaskBoardAutomationRunLease,
-    control: &TaskBoardAutomationControlRecord,
-    state: &str,
-    requested: TaskBoardAutomationRunOutcome,
-) -> TaskBoardAutomationRunOutcome {
-    if state == "cancelling" || control.stop_generation != lease.stop_generation {
-        TaskBoardAutomationRunOutcome::Cancelled
-    } else {
-        requested
-    }
-}
-
-fn trigger_is_enabled(
-    trigger: TaskBoardAutomationRunTrigger,
-    control: &TaskBoardAutomationControlRecord,
-) -> bool {
-    match trigger {
-        TaskBoardAutomationRunTrigger::Manual => {
-            control.admission_state != TaskBoardAutomationAdmissionState::Draining
-        }
-        TaskBoardAutomationRunTrigger::Recovery
-        | TaskBoardAutomationRunTrigger::Scheduled
-        | TaskBoardAutomationRunTrigger::Event => {
-            control.desired_mode == TaskBoardAutomationDesiredMode::Continuous
-                && control.admission_state == TaskBoardAutomationAdmissionState::Accepting
-        }
-    }
-}
-
-fn admission_is_open(
-    trigger: TaskBoardAutomationRunTrigger,
-    control: &TaskBoardAutomationControlRecord,
-) -> bool {
-    trigger == TaskBoardAutomationRunTrigger::Manual
-        || control.admission_state == TaskBoardAutomationAdmissionState::Accepting
-}
-
-pub(super) const fn run_trigger_label(trigger: TaskBoardAutomationRunTrigger) -> &'static str {
-    match trigger {
-        TaskBoardAutomationRunTrigger::Scheduled => "scheduled",
-        TaskBoardAutomationRunTrigger::Event => "event",
-        TaskBoardAutomationRunTrigger::Manual => "manual",
-        TaskBoardAutomationRunTrigger::Recovery => "recovery",
-    }
-}
-
-pub(super) const fn run_outcome_label(outcome: TaskBoardAutomationRunOutcome) -> &'static str {
-    match outcome {
-        TaskBoardAutomationRunOutcome::Completed => "completed",
-        TaskBoardAutomationRunOutcome::Noop => "noop",
-        TaskBoardAutomationRunOutcome::Partial => "partial",
-        TaskBoardAutomationRunOutcome::Failed => "failed",
-        TaskBoardAutomationRunOutcome::Cancelled => "cancelled",
-    }
-}
-
-fn ensure_single_run_changed(changed: u64, run_id: &str) -> Result<(), CliError> {
-    if changed == 1 {
-        Ok(())
-    } else {
-        Err(lost_lease(run_id))
-    }
-}
-
-fn to_db_integer(value: u64) -> i64 {
-    i64::try_from(value).unwrap_or(i64::MAX)
-}
-
-fn expired_lease(run_id: &str) -> CliError {
-    db_error(format!(
-        "task board automation run '{run_id}' lease expired"
-    ))
-}
-
-fn lost_lease(run_id: &str) -> CliError {
-    db_error(format!(
-        "task board automation run '{run_id}' lost its coordinator lease"
-    ))
-}
+#[path = "runs_support.rs"]
+mod support;
+use support::{
+    ensure_single_run_changed, expired_lease, final_outcome, lost_lease, run_fence, run_lease,
+    to_db_integer, trigger_is_enabled,
+};
+pub(super) use support::{run_outcome_label, run_trigger_label};

@@ -4,6 +4,8 @@ use tempfile::{TempDir, tempdir};
 use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::project::is_project_id;
 use crate::task_board::{ExternalRef, ExternalRefProvider, TaskBoardItem};
+use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
+use crate::daemon::db::task_board::project_registry_queries::ProjectRegistryQueries;
 
 /// The state a build whose rules could not name a repository leaves the board
 /// in: no item holds a project, and none is registered either. Every row goes

@@ -1,4 +1,5 @@
 use super::*;
+use crate::daemon::db::prelude::*;
 
 fn set_adoption_metadata(project: &Path, session_id: &str) {
     let layout =

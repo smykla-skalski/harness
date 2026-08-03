@@ -222,18 +222,6 @@ extension WebSocketTransport {
     return ReviewsFilesBlobResponse(wire: wire)
   }
 
-  public func listReviewLocalClones() async throws -> [ReviewLocalCloneEntry] {
-    let value = try await rpc(method: .reviewsFilesLocalClonesList, params: nil)
-    let wire: [LocalCloneListEntryWire] = try decodePolicyWire(value)
-    return wire.map(ReviewLocalCloneEntry.init(wire:))
-  }
-
-  public func deleteReviewLocalClone(repoKeySegment: String) async throws {
-    let request = ReviewsFilesLocalClonesDeleteRequest(repoKeySegment: repoKeySegment)
-    let params = try encodeParams(request, extra: [:])
-    _ = try await rpc(method: .reviewsFilesLocalClonesDelete, params: params)
-  }
-
   public func fetchReviewTimeline(
     request: ReviewsTimelineRequest
   ) async throws -> ReviewsTimelineResponse {

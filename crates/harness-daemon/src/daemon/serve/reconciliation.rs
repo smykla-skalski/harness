@@ -1,9 +1,11 @@
+use crate::daemon::db::imports::DaemonDbSessionResync;
 use std::sync::{Arc, Mutex};
 
 use tokio::task::spawn_blocking;
 
 use super::super::db;
 use super::{CliError, CliErrorKind, SessionStatus, index, state};
+use crate::daemon::db::prelude::*;
 
 /// Startup must not await this. It walks every discovered project, and the
 /// manifest that tells the Monitor which port to dial is only written once

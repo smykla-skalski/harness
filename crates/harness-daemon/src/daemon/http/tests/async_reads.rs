@@ -1,3 +1,4 @@
+use crate::daemon::db::conversation::DaemonDbConversation;
 use std::env::temp_dir;
 use std::sync::{Arc, Mutex, OnceLock};
 
@@ -10,6 +11,7 @@ use crate::daemon::agent_tui::AgentTuiManagerHandle;
 use crate::daemon::codex_controller::CodexControllerHandle;
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
 use crate::daemon::state::DaemonManifest;
+use crate::daemon::db::prelude::*;
 
 mod managed_agents;
 mod sessions;

@@ -7,16 +7,6 @@ extension DaemonPushEvent {
   static func makeDataChangedEvent(from streamEvent: StreamEvent) throws -> Self? {
     let at = streamEvent.recordedAt
     switch streamEvent.event {
-    case "reviews_local_clone_progress":
-      return Self(
-        recordedAt: at,
-        sessionId: nil,
-        kind: .reviewsLocalCloneProgress(
-          ReviewLocalCloneProgress(
-            wire: try streamEvent.decodePayloadWire(as: LocalCloneProgressEventPayloadWire.self)
-          )
-        )
-      )
     case "task_board_working_copy_progress":
       return Self(
         recordedAt: at,

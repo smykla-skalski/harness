@@ -14,6 +14,7 @@ use crate::task_board::{
     TaskBoardSyncStore,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
+use crate::daemon::db::task_board::prelude::*;
 
 #[async_trait]
 impl TaskBoardExternalCreateStore for AsyncDaemonDb {
@@ -103,7 +104,7 @@ impl TaskBoardSyncStore for AsyncDaemonDb {
     }
 
     async fn create_item(&self, item: TaskBoardItem) -> Result<TaskBoardItem, CliError> {
-        self.create_task_board_item_with_provider_triage(item)
+        Box::pin(self.create_task_board_item_with_provider_triage(item))
             .await
             .map(|mutation| mutation.item)
     }

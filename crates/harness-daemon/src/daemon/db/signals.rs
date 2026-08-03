@@ -5,12 +5,70 @@ use super::{
     utc_now,
 };
 
-impl DaemonDb {
+/// Signal-index reads and writes for a session, plus the shared-runtime
+/// detector the signal-delivery path uses to fence duplicate wakes.
+///
+/// `pub`, not `pub(crate)`: `sync_signal_index`, `load_signals`, and
+/// `session_has_shared_runtime_signal_dir` were already `pub` on `DaemonDb`
+/// before this trait existed.
+pub trait SignalIndexQueries {
     /// Sync the signal index for a session from a list of signal records.
     ///
     /// # Errors
     /// Returns [`CliError`] on SQL failures.
-    pub fn sync_signal_index(
+    fn sync_signal_index(
+        &self,
+        session_id: &str,
+        signals: &[SessionSignalRecord],
+    ) -> Result<(), CliError>;
+
+    /// Merge updated signal records into the existing session index.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when loading or writing the signal index fails.
+    fn merge_signal_records(
+        &self,
+        session_id: &str,
+        records: &[SessionSignalRecord],
+    ) -> Result<(), CliError>;
+
+    /// Load signals for a session from the index.
+    ///
+    /// Pending signals whose `expires_at` has passed are surfaced as
+    /// `Expired` at read time so every caller sees a correct status without
+    /// a background sweeper or a schema change. Signals keep their stored
+    /// status once an ack has been written, so delivered/rejected/deferred
+    /// rows pass through unchanged.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on query failure.
+    fn load_signals(&self, session_id: &str) -> Result<Vec<SessionSignalRecord>, CliError>;
+
+    /// Load only pending signals whose expiry has already passed.
+    ///
+    /// This keeps callers on the indexed fast path for the common case where a
+    /// session has no expired pending deliveries to reconcile.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on query or JSON parse failure.
+    fn load_expired_pending_signals(
+        &self,
+        session_id: &str,
+    ) -> Result<Vec<ExpiredPendingSignalIndexRecord>, CliError>;
+
+    /// Whether any agent in the session shares a runtime session ID with a
+    /// different orchestration session.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on query failure.
+    fn session_has_shared_runtime_signal_dir(
+        &self,
+        state: &SessionState,
+    ) -> Result<bool, CliError>;
+}
+
+impl SignalIndexQueries for DaemonDb {
+    fn sync_signal_index(
         &self,
         session_id: &str,
         signals: &[SessionSignalRecord],
@@ -65,11 +123,7 @@ impl DaemonDb {
         Ok(())
     }
 
-    /// Merge updated signal records into the existing session index.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] when loading or writing the signal index fails.
-    pub(crate) fn merge_signal_records(
+    fn merge_signal_records(
         &self,
         session_id: &str,
         records: &[SessionSignalRecord],
@@ -125,17 +179,7 @@ impl DaemonDb {
         Ok(())
     }
 
-    /// Load signals for a session from the index.
-    ///
-    /// Pending signals whose `expires_at` has passed are surfaced as
-    /// `Expired` at read time so every caller sees a correct status without
-    /// a background sweeper or a schema change. Signals keep their stored
-    /// status once an ack has been written, so delivered/rejected/deferred
-    /// rows pass through unchanged.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on query failure.
-    pub fn load_signals(&self, session_id: &str) -> Result<Vec<SessionSignalRecord>, CliError> {
+    fn load_signals(&self, session_id: &str) -> Result<Vec<SessionSignalRecord>, CliError> {
         let mut statement = self
             .conn
             .prepare(
@@ -187,14 +231,7 @@ impl DaemonDb {
         Ok(signals)
     }
 
-    /// Load only pending signals whose expiry has already passed.
-    ///
-    /// This keeps callers on the indexed fast path for the common case where a
-    /// session has no expired pending deliveries to reconcile.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on query or JSON parse failure.
-    pub(crate) fn load_expired_pending_signals(
+    fn load_expired_pending_signals(
         &self,
         session_id: &str,
     ) -> Result<Vec<ExpiredPendingSignalIndexRecord>, CliError> {
@@ -238,12 +275,7 @@ impl DaemonDb {
         Ok(signals)
     }
 
-    /// Whether any agent in the session shares a runtime session ID with a
-    /// different orchestration session.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on query failure.
-    pub fn session_has_shared_runtime_signal_dir(
+    fn session_has_shared_runtime_signal_dir(
         &self,
         state: &SessionState,
     ) -> Result<bool, CliError> {
@@ -280,16 +312,20 @@ impl DaemonDb {
 // (see that crate's `storage` module); implementing it here, next to the
 // inherent methods it forwards to, is the same shape `AuditEventStore` and
 // `PullRequestActionStore` already use for a trait defined outside `db`.
+//
+// Fully qualifies through `SignalIndexQueries` rather than `Self::`: once
+// this trait's methods share a name with `SignalIndexQueries`'s, bare
+// `Self::method` resolves to this very impl and cycles instead of forwarding.
 impl harness_daemon_snapshot::SessionSignalQueries for DaemonDb {
     fn load_signals(&self, session_id: &str) -> Result<Vec<SessionSignalRecord>, CliError> {
-        Self::load_signals(self, session_id)
+        <Self as SignalIndexQueries>::load_signals(self, session_id)
     }
 
     fn session_has_shared_runtime_signal_dir(
         &self,
         state: &SessionState,
     ) -> Result<bool, CliError> {
-        Self::session_has_shared_runtime_signal_dir(self, state)
+        <Self as SignalIndexQueries>::session_has_shared_runtime_signal_dir(self, state)
     }
 
     fn sync_signal_index(
@@ -297,7 +333,7 @@ impl harness_daemon_snapshot::SessionSignalQueries for DaemonDb {
         session_id: &str,
         signals: &[SessionSignalRecord],
     ) -> Result<(), CliError> {
-        Self::sync_signal_index(self, session_id, signals)
+        <Self as SignalIndexQueries>::sync_signal_index(self, session_id, signals)
     }
 }
 

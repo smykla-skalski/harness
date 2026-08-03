@@ -1,3 +1,4 @@
+use crate::daemon::db::conversation::DaemonDbConversation;
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 
 use async_trait::async_trait;
@@ -6,6 +7,7 @@ use tokio::task::spawn_blocking;
 
 use crate::agents::kind::DisconnectReason;
 use crate::agents::runtime::event::ConversationEvent;
+use crate::daemon::db::prelude::*;
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb, ensure_shared_db};
 use crate::daemon::protocol::StreamEvent;
 use crate::daemon::service;

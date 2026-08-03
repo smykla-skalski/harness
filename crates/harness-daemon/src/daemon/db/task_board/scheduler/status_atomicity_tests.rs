@@ -11,6 +11,7 @@ use crate::task_board::{
     TaskBoardAutomationEffectiveState, TaskBoardAutomationWakePayload,
     TaskBoardAutomationWakeRecoveryReason, TaskBoardAutomationWakeRequest,
 };
+use crate::daemon::db::task_board::scheduler::queries::TaskBoardAutomationSchedulerQueries;
 
 #[tokio::test]
 async fn lean_policy_revision_matches_active_live_policy_semantics() {

@@ -1,3 +1,5 @@
+use crate::daemon::db::writes::SessionWriteQueries;
+
 use super::summary_rows::SessionSummaryRow;
 use super::{
     BTreeMap, CliError, DaemonDb, DiscoveredProject, LIVENESS_CANDIDATE_IDS_SQL, Path, PathBuf,
@@ -8,34 +10,83 @@ use crate::session::service::canonicalize_persisted_session_state;
 use crate::session::storage;
 use crate::workspace::utc_now;
 
-impl DaemonDb {
+/// Project/session summary reads for the API listing endpoints, plus
+/// session resolution by ID.
+///
+/// `pub`, not `pub(crate)`: matches the other sync `db` traits this file's
+/// methods were already reachable through before this trait existed.
+pub trait SessionSummaryQueries {
     /// Return the number of sessions in the database.
     ///
     /// # Errors
     /// Returns [`CliError`] on SQL failures.
-    pub fn session_count(&self) -> Result<i64, CliError> {
-        self.conn
-            .query_row("SELECT COUNT(*) FROM sessions", [], |row| row.get(0))
-            .map_err(|error| db_error(format!("count sessions: {error}")))
-    }
+    fn session_count(&self) -> Result<i64, CliError>;
 
     /// Return the number of rows in the projects table.
     ///
     /// # Errors
     /// Returns [`CliError`] on query failure.
-    pub fn project_count(&self) -> Result<i64, CliError> {
-        self.conn
-            .query_row("SELECT COUNT(*) FROM projects", [], |row| row.get(0))
-            .map_err(|error| db_error(format!("count projects: {error}")))
-    }
-
-    // -- Read query methods for API endpoints --
+    fn project_count(&self) -> Result<i64, CliError>;
 
     /// Fast counts for the health endpoint.
     ///
     /// # Errors
     /// Returns [`CliError`] on query failure.
-    pub fn health_counts(&self) -> Result<(usize, usize, usize), CliError> {
+    fn health_counts(&self) -> Result<(usize, usize, usize), CliError>;
+
+    /// Load all project summaries with session counts and worktree info.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on query failure.
+    fn list_project_summaries(&self) -> Result<Vec<daemon_protocol::ProjectSummary>, CliError>;
+
+    /// Load all session summaries for the sessions list endpoint.
+    /// Joins session state with project data to produce protocol-level summaries.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on query failure.
+    fn list_session_summaries_full(&self) -> Result<Vec<daemon_protocol::SessionSummary>, CliError>;
+
+    /// List session ids eligible for liveness reconciliation without parsing
+    /// full session state. Mirrors the async pool query so both reconcile
+    /// paths filter on status and agent count in `SQLite` instead of
+    /// deserializing every session.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on query failure.
+    fn list_liveness_candidate_ids(&self) -> Result<Vec<String>, CliError>;
+
+    /// Load all session states for the sessions list endpoint.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on query failure.
+    fn list_session_summaries(&self) -> Result<Vec<SessionState>, CliError>;
+
+    /// Resolve a session into a `ResolvedSession` using the DB instead of
+    /// filesystem discovery.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on query or parse failure.
+    fn resolve_session(
+        &self,
+        session_id: &str,
+    ) -> Result<Option<daemon_index::ResolvedSession>, CliError>;
+}
+
+impl SessionSummaryQueries for DaemonDb {
+    fn session_count(&self) -> Result<i64, CliError> {
+        self.conn
+            .query_row("SELECT COUNT(*) FROM sessions", [], |row| row.get(0))
+            .map_err(|error| db_error(format!("count sessions: {error}")))
+    }
+
+    fn project_count(&self) -> Result<i64, CliError> {
+        self.conn
+            .query_row("SELECT COUNT(*) FROM projects", [], |row| row.get(0))
+            .map_err(|error| db_error(format!("count projects: {error}")))
+    }
+
+    fn health_counts(&self) -> Result<(usize, usize, usize), CliError> {
         self.conn
             .query_row(
                 "SELECT
@@ -56,11 +107,7 @@ impl DaemonDb {
             .map_err(|error| db_error(format!("health counts: {error}")))
     }
 
-    /// Load all project summaries with session counts and worktree info.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on query failure.
-    pub fn list_project_summaries(&self) -> Result<Vec<daemon_protocol::ProjectSummary>, CliError> {
+    fn list_project_summaries(&self) -> Result<Vec<daemon_protocol::ProjectSummary>, CliError> {
         use daemon_protocol::{ProjectSummary, WorktreeSummary};
 
         let mut statement = self
@@ -145,12 +192,7 @@ impl DaemonDb {
         Ok(summaries)
     }
 
-    /// Load all session summaries for the sessions list endpoint.
-    /// Joins session state with project data to produce protocol-level summaries.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on query failure.
-    pub fn list_session_summaries_full(
+    fn list_session_summaries_full(
         &self,
     ) -> Result<Vec<daemon_protocol::SessionSummary>, CliError> {
         let mut statement = self
@@ -217,14 +259,7 @@ impl DaemonDb {
         Ok(summaries)
     }
 
-    /// List session ids eligible for liveness reconciliation without parsing
-    /// full session state. Mirrors the async pool query so both reconcile
-    /// paths filter on status and agent count in `SQLite` instead of
-    /// deserializing every session.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on query failure.
-    pub fn list_liveness_candidate_ids(&self) -> Result<Vec<String>, CliError> {
+    fn list_liveness_candidate_ids(&self) -> Result<Vec<String>, CliError> {
         let mut statement = self
             .conn
             .prepare(LIVENESS_CANDIDATE_IDS_SQL)
@@ -243,11 +278,7 @@ impl DaemonDb {
         Ok(session_ids)
     }
 
-    /// Load all session states for the sessions list endpoint.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on query failure.
-    pub fn list_session_summaries(&self) -> Result<Vec<SessionState>, CliError> {
+    fn list_session_summaries(&self) -> Result<Vec<SessionState>, CliError> {
         let mut statement = self
             .conn
             .prepare(
@@ -288,12 +319,7 @@ impl DaemonDb {
         Ok(sessions)
     }
 
-    /// Resolve a session into a `ResolvedSession` using the DB instead of
-    /// filesystem discovery.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on query or parse failure.
-    pub fn resolve_session(
+    fn resolve_session(
         &self,
         session_id: &str,
     ) -> Result<Option<daemon_index::ResolvedSession>, CliError> {

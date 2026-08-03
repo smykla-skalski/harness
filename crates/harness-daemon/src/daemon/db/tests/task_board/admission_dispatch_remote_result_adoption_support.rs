@@ -21,6 +21,7 @@ use crate::task_board::{
     TaskBoardFailureClass, TaskBoardLocalAttemptResult, TaskBoardPhaseVerdict,
     TaskBoardReviewResult, TaskBoardReviewerOutcome, TaskBoardWorkflowExecutionCas,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 const PRINCIPAL: &str = "executor-a";
 pub(super) const RESULT_PATH: &str = "result/attempt.json";

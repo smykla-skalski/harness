@@ -15,9 +15,9 @@ use crate::daemon::db::task_board::remote_assignment_lease::{commit_noop, requir
 use crate::daemon::db::task_board::remote_assignment_model::{
     TaskBoardRemoteAssignmentRecord, canonical_time, concurrent, to_i64,
 };
-use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardRemoteAssignmentState;
+use crate::daemon::db::prelude::*;
 
 const START_IO_PERMIT_DOMAIN: &str = "harness.task-board.remote-executor-start-io-permit.v1";
 
@@ -64,23 +64,6 @@ impl TaskBoardRemoteExecutorStartIoPermitOutcome {
             Self::Replayed(permit) => permit,
             other => panic!("{message}: {other:?}"),
         }
-    }
-}
-
-impl AsyncDaemonDb {
-    pub(crate) async fn claim_task_board_remote_executor_start_io_permit(
-        &self,
-        authority: &TaskBoardRemoteExecutorStartAuthority,
-        project_dir: &Path,
-        permitted_at: &str,
-    ) -> Result<TaskBoardRemoteExecutorStartIoPermitOutcome, CliError> {
-        <Self as RemoteExecutionQueries>::claim_task_board_remote_executor_start_io_permit(
-            self,
-            authority,
-            project_dir,
-            permitted_at,
-        )
-        .await
     }
 }
 

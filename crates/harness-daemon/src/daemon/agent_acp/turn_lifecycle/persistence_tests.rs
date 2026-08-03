@@ -5,6 +5,7 @@ use crate::daemon::db::AgentTurnRunStatus;
 
 use super::tests::{FakeManager, HEAD, MODEL, open_store, request};
 use super::{OpenRouterAgentTurnRuntime, OpenRouterRunCorrelation};
+use crate::daemon::db::prelude::*;
 
 #[tokio::test]
 async fn start_records_a_durable_running_run() {

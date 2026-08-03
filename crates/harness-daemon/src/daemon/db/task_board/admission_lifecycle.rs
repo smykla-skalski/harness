@@ -18,11 +18,11 @@ use super::admission::{TaskBoardDispatchAdmissionSnapshot, evaluate_dispatch_adm
 use super::admission_reservations::{
     clear_current_admission_in_tx, persist_admission_snapshot_in_tx,
 };
-use super::dispatch_admission_queries::DispatchAdmissionQueries;
 use super::dispatch_admission_tx_ext::TaskBoardDispatchAdmissionTxExt;
 use super::items::bump_change_in_tx;
 use crate::daemon::db::{AsyncDaemonDb, CliError, CliErrorKind, db_error, utc_now};
 use crate::task_board::{TaskBoardItem, TaskBoardLaunchCapability};
+use crate::daemon::db::prelude::*;
 
 #[derive(Debug)]
 pub(super) enum TaskBoardAdmissionCheck {
@@ -394,19 +394,6 @@ pub(in crate::daemon::db) async fn release_managed_worker_admission_in_tx(
         bump_change_in_tx(transaction, ITEMS_CHANGE_SCOPE).await?;
     }
     Ok(changed > 0)
-}
-
-impl AsyncDaemonDb {
-    pub(crate) async fn release_task_board_admission_for_managed_worker(
-        &self,
-        managed_worker_id: &str,
-    ) -> Result<bool, CliError> {
-        <Self as DispatchAdmissionQueries>::release_task_board_admission_for_managed_worker(
-            self,
-            managed_worker_id,
-        )
-        .await
-    }
 }
 
 /// Real implementation behind

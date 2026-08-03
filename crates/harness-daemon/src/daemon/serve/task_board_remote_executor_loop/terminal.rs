@@ -19,6 +19,7 @@ use crate::task_board::{
 };
 use crate::workspace::utc_now;
 use harness_kernel::errors::{CliError, CliErrorKind};
+use crate::daemon::db::task_board::prelude::*;
 
 const MAX_TERMINAL_ARTIFACT_BYTES: u64 = 32 * 1024 * 1024;
 

@@ -13,6 +13,7 @@ use crate::task_board::{
 use super::admission_dispatch::{
     admission_policy, configure_policy, ledger_kind_state, preparing_intent, test_db,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 #[tokio::test]
 async fn worker_claim_renewal_prevents_reclaim() {

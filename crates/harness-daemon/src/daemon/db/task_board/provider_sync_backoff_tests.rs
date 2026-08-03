@@ -11,6 +11,7 @@ use crate::task_board::{
     ExternalSyncOptions, ExternalTask, ExternalTaskRef, TaskBoardItem,
 };
 use harness_kernel::errors::CliError;
+use crate::daemon::db::task_board::provider_queries::ProviderQueries;
 
 #[tokio::test]
 async fn malformed_persisted_backoff_fails_closed_without_calling_provider() {

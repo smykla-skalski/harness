@@ -21,6 +21,32 @@ private actor StubTaskBoardPageSource: TaskBoardItemPageSource {
   }
 }
 
+private actor MutatingTaskBoardPageSource: TaskBoardItemPageSource {
+  private(set) var requestedCursors: [String?] = []
+
+  func taskBoardItemPage(
+    status: TaskBoardStatus?,
+    cursor: String?
+  ) async throws -> TaskBoardListItemsResponseWire {
+    requestedCursors.append(cursor)
+    switch requestedCursors.count {
+    case 1:
+      return page(ids: ["old-1"], totalMatched: 2, changeSeq: 41, nextCursor: "old-2")
+    case 2:
+      throw HarnessMonitorAPIError.server(
+        code: 400,
+        message:
+          "the task-board list cursor is stale because the board changed; "
+          + "restart without a cursor"
+      )
+    case 3:
+      return page(ids: ["new-1"], totalMatched: 2, changeSeq: 42, nextCursor: "new-2")
+    default:
+      return page(ids: ["new-2"], totalMatched: 2, changeSeq: 42, nextCursor: nil)
+    }
+  }
+}
+
 /// The daemon bounds every task-board list response, so the app reads the whole
 /// board by walking cursors. These cover the walk's two ways of ending: a page
 /// without a cursor, and a cursor that stops producing items.
@@ -41,6 +67,18 @@ struct TaskBoardItemPageWalkTests {
     #expect(merged.itemRevisions == ["task-1": 1, "task-2": 1, "task-3": 1])
     #expect(merged.itemsChangeSeq == 41)
     #expect(merged.nextCursor == nil)
+  }
+
+  @Test("restarts from page one when the board changes during a walk")
+  func restartsAfterAStaleCursor() async throws {
+    let source = MutatingTaskBoardPageSource()
+
+    let merged = try await source.mergedTaskBoardItemPages(status: nil)
+
+    let requested = await source.requestedCursors
+    #expect(requested == [nil, "old-2", nil, "new-2"])
+    #expect(merged.items.map(\.id) == ["new-1", "new-2"])
+    #expect(merged.itemsChangeSeq == 42)
   }
 
   /// A cursor naming the resume point it was just given can never drain, and

@@ -32,7 +32,7 @@ impl WorktreeController {
     /// # Errors
     /// Returns `WorktreeError::CreateFailed` when git rejects the worktree creation,
     /// `WorktreeError::Io` on filesystem errors.
-    #[expect(
+    #[allow(
         clippy::cognitive_complexity,
         reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
     )]
@@ -82,7 +82,7 @@ impl WorktreeController {
     /// # Errors
     /// Returns `WorktreeError::RemoveFailed`/`BranchDeleteFailed` on git errors,
     /// `WorktreeError::Io` on filesystem errors.
-    #[expect(
+    #[allow(
         clippy::cognitive_complexity,
         reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
     )]

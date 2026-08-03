@@ -247,7 +247,7 @@ fn signal_dir_has_pending_session_signal(
     }
 }
 
-#[expect(
+#[allow(
     clippy::cognitive_complexity,
     reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
 )]

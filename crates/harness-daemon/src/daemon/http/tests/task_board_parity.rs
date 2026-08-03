@@ -15,6 +15,7 @@ use crate::task_board::{TaskBoardAiReviewReportRecord, TaskBoardAiReviewReportSt
 use super::task_board_review_report_support::{
     seed_running_execution, settle_active_review_attempt,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 mod review_freshness;
 mod workflow_progress;

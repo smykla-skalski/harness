@@ -41,6 +41,7 @@ use crate::task_board::policy_runtime::models::{
 #[cfg(test)]
 use crate::task_board::policy_runtime::repository::PolicyRuntimeRepository;
 use harness_kernel::errors::{CliError, CliErrorKind};
+use crate::daemon::db::task_board::prelude::*;
 
 #[cfg(test)]
 pub(crate) use super::policy_resume::{

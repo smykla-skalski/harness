@@ -4,7 +4,7 @@ use std::thread;
 use std::time::Duration;
 
 use harness::daemon::agent_tui::{AgentTuiManagerHandle, AgentTuiSnapshot, AgentTuiStatus};
-use harness::daemon::db::DaemonDb;
+use harness::daemon::db::{DaemonDb, SessionWriteQueries};
 use harness::session::service;
 use harness::session::types::SessionRole;
 use tokio::sync::broadcast;

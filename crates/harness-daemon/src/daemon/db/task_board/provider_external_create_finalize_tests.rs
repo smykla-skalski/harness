@@ -9,6 +9,8 @@ use crate::task_board::{
     TaskBoardExternalCreateExisting, TaskBoardExternalCreateFinalizeDisposition,
     TaskBoardExternalCreateIntentState, TaskBoardStatus,
 };
+use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
+use crate::daemon::db::task_board::provider_queries::ProviderQueries;
 
 #[tokio::test]
 async fn finalize_attaches_latest_item_and_retains_receipt() {

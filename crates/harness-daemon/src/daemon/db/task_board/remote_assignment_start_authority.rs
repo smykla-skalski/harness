@@ -1,10 +1,9 @@
-use std::path::Path;
-
-use sqlx::{Sqlite, Transaction, query, query_scalar};
+use sqlx::{Sqlite, Transaction, query};
 
 mod evidence;
-mod failed_at_claimed;
-mod settings_fence;
+pub(super) mod failed_at_claimed;
+pub(super) mod lifecycle;
+pub(super) mod settings_fence;
 mod start_adoption;
 mod start_io_permit;
 
@@ -20,29 +19,24 @@ pub(crate) use failed_at_claimed::{
 };
 pub(super) use settings_fence::refuse_settings_replacement_during_executor_start_io;
 use settings_fence::revoke_unpermitted_start_in_tx;
-use start_adoption::persist_start_adoption_in_tx;
 pub(super) use start_io_permit::claim_task_board_remote_executor_start_io_permit;
 pub(super) use start_io_permit::start_io_permit_digest_from_evidence;
 pub(crate) use start_io_permit::{
     TaskBoardRemoteExecutorStartIoPermit, TaskBoardRemoteExecutorStartIoPermitOutcome,
     executor_start_io_permit,
 };
+use crate::daemon::db::prelude::*;
 
 pub(crate) const EXECUTOR_RESTARTED_BEFORE_START: &str =
     "remote executor restarted before worker start";
 
 use super::ORCHESTRATOR_CHANGE_SCOPE;
 use super::items::bump_change_in_tx;
-use super::remote_assignment_lease::{commit_noop, finish_mutation, require_assignment};
-use super::remote_assignment_lifecycle_owner::lifecycle_owner_expiry;
+use super::remote_assignment_lease::{commit_noop, require_assignment};
 use super::remote_assignment_model::{
-    TaskBoardRemoteAssignmentRecord, TaskBoardRemoteMutationOutcome, canonical_time, concurrent,
-    nonblank, to_i64,
+    TaskBoardRemoteAssignmentRecord, canonical_time, concurrent, nonblank, to_i64,
 };
-use super::remote_start_receipts::{
-    durable_start_receipt_run_matches, receipt_matches_permit, start_receipt,
-};
-use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
+use super::remote_start_receipts::{durable_start_receipt_run_matches, receipt_matches_permit};
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardRemoteAssignmentState;
 
@@ -60,231 +54,6 @@ pub(crate) struct TaskBoardRemoteExecutorStartAuthority {
     pub(crate) sha256: String,
     pub(crate) acquired_at: String,
     pub(crate) identity: TaskBoardRemoteExecutorIdentity,
-}
-
-impl AsyncDaemonDb {
-    pub(crate) async fn claim_task_board_remote_executor_start_authority(
-        &self,
-        assignment_id: &str,
-        host_instance_id: &str,
-        authority_at: &str,
-    ) -> Result<Option<TaskBoardRemoteExecutorStartAuthority>, CliError> {
-        <Self as RemoteExecutionQueries>::claim_task_board_remote_executor_start_authority(
-            self,
-            assignment_id,
-            host_instance_id,
-            authority_at,
-        )
-        .await
-    }
-
-    pub(crate) async fn adopt_task_board_remote_executor_start(
-        &self,
-        permit: &TaskBoardRemoteExecutorStartIoPermit,
-        project_dir: &Path,
-        started_at: &str,
-    ) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
-        let record = self
-            .task_board_remote_assignment(&permit.assignment_id)
-            .await?
-            .ok_or_else(|| db_error("remote executor start assignment disappeared"))?;
-        let owner_instance_id = record
-            .claimed_host_instance_id
-            .ok_or_else(|| db_error("remote executor start has no claimed host"))?;
-        self.adopt_task_board_remote_executor_start_owned(
-            permit,
-            project_dir,
-            started_at,
-            &owner_instance_id,
-            started_at,
-        )
-        .await
-    }
-
-    #[expect(
-        clippy::cognitive_complexity,
-        reason = "fenced transaction guard chain; each guard settles the transaction before returning"
-    )]
-    pub(crate) async fn adopt_task_board_remote_executor_start_owned(
-        &self,
-        permit: &TaskBoardRemoteExecutorStartIoPermit,
-        project_dir: &Path,
-        started_at: &str,
-        owner_instance_id: &str,
-        owner_at: &str,
-    ) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
-        let started = canonical_time(started_at, "remote executor durable start time")?;
-        nonblank(
-            owner_instance_id,
-            "remote executor lifecycle owner instance",
-        )?;
-        let owner_at_time = canonical_time(owner_at, "remote executor lifecycle owner time")?;
-        let project_dir = project_dir.to_string_lossy().into_owned();
-        let mut transaction = self
-            .begin_immediate_transaction("task board remote executor start adoption")
-            .await?;
-        let record = require_assignment(&mut transaction, &permit.assignment_id).await?;
-        if record.executor_stop_pending.is_some() {
-            commit_noop(
-                transaction,
-                "remote executor start is permanently stop-only",
-            )
-            .await?;
-            return Ok(TaskBoardRemoteMutationOutcome::Stale(record));
-        }
-        if start_adoption_replays(&record, permit, &project_dir, started_at, &mut transaction)
-            .await?
-        {
-            commit_noop(transaction, "replayed remote executor start adoption").await?;
-            return Ok(TaskBoardRemoteMutationOutcome::Replayed(record));
-        }
-        let Some(current) = executor_start_io_permit(&record)? else {
-            commit_noop(transaction, "stale remote executor start adoption").await?;
-            return Ok(TaskBoardRemoteMutationOutcome::Stale(record));
-        };
-        if current != *permit {
-            commit_noop(transaction, "stale durable remote executor start").await?;
-            return Ok(TaskBoardRemoteMutationOutcome::Stale(record));
-        }
-        if !executor_settings_still_match(&mut transaction, &record).await? {
-            commit_noop(
-                transaction,
-                "remote executor settings changed before start adoption",
-            )
-            .await?;
-            return Ok(TaskBoardRemoteMutationOutcome::Stale(record));
-        }
-        let authority_at =
-            canonical_time(&permit.permitted_at, "remote executor start authority time")?;
-        if started < authority_at || owner_at_time < started {
-            commit_noop(
-                transaction,
-                "stale durable remote executor start chronology",
-            )
-            .await?;
-            return Ok(TaskBoardRemoteMutationOutcome::Stale(record));
-        }
-        let owner_expires_at = lifecycle_owner_expiry(owner_at)?;
-        let initial_owner = super::remote_start_receipts::InitialLifecycleOwner {
-            instance_id: owner_instance_id,
-            acquired_at: owner_at,
-            expires_at: &owner_expires_at,
-        };
-        let receipt = start_receipt(&record, permit, &project_dir, started_at, &initial_owner)?;
-        if !durable_start_receipt_run_matches(&mut transaction, &record, &receipt).await? {
-            commit_noop(transaction, "stale durable remote executor start").await?;
-            return Ok(TaskBoardRemoteMutationOutcome::Stale(record));
-        }
-        persist_start_adoption_in_tx(
-            &mut transaction,
-            &record,
-            permit,
-            &receipt,
-            start_adoption::TaskBoardRemoteStartAdoptionContext {
-                started_at,
-                owner_instance_id,
-                owner_at,
-                owner_expires_at: &owner_expires_at,
-            },
-        )
-        .await?;
-        finish_mutation(
-            transaction,
-            &record.assignment_id,
-            "executor start adoption",
-        )
-        .await
-    }
-
-    #[expect(
-        clippy::cognitive_complexity,
-        reason = "fenced transaction guard chain; each guard settles the transaction before returning"
-    )]
-    pub(crate) async fn expire_task_board_remote_executor_start_without_run(
-        &self,
-        authority: &TaskBoardRemoteExecutorStartAuthority,
-        reason: &str,
-        observed_at: &str,
-    ) -> Result<TaskBoardRemoteMutationOutcome, CliError> {
-        nonblank(reason, "remote executor start expiry reason")?;
-        canonical_time(observed_at, "remote executor start expiry time")?;
-        let mut transaction = self
-            .begin_immediate_transaction("task board remote executor start expiry")
-            .await?;
-        let record = require_assignment(&mut transaction, &authority.assignment_id).await?;
-        if record.executor_stop_pending.is_some()
-            || executor_start_authority(&record)?.as_ref() != Some(authority)
-            || executor_start_io_permit(&record)?.is_some()
-        {
-            commit_noop(transaction, "stale remote executor start expiry").await?;
-            return Ok(TaskBoardRemoteMutationOutcome::Stale(record));
-        }
-        let observed = canonical_time(observed_at, "remote executor start expiry time")?;
-        let lease = canonical_time(
-            record
-                .lease_expires_at
-                .as_deref()
-                .ok_or_else(|| db_error("remote executor start has no lease expiry"))?,
-            "remote executor lease expiry",
-        )?;
-        let deadline = canonical_time(
-            record
-                .deadline_at
-                .as_deref()
-                .ok_or_else(|| db_error("remote executor start has no deadline"))?,
-            "remote executor deadline",
-        )?;
-        if observed < lease && observed < deadline {
-            commit_noop(transaction, "early remote executor start expiry").await?;
-            return Ok(TaskBoardRemoteMutationOutcome::Stale(record));
-        }
-        let run_exists =
-            query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM codex_runs WHERE run_id = ?1 UNION ALL SELECT 1 FROM agent_turn_runs WHERE run_id = ?1)")
-                .bind(&authority.identity.run_id)
-                .fetch_one(transaction.as_mut())
-                .await
-                .map_err(|error| db_error(format!("check remote executor start run: {error}")))?;
-        let session_exists =
-            query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM sessions WHERE session_id = ?1)")
-                .bind(&authority.identity.session_id)
-                .fetch_one(transaction.as_mut())
-                .await
-                .map_err(|error| {
-                    db_error(format!("check remote executor start session: {error}"))
-                })?;
-        if run_exists || session_exists {
-            return Err(concurrent(
-                "remote executor start authority has durable provisioning evidence",
-            ));
-        }
-        let rows = query(
-            "UPDATE task_board_remote_assignments
-             SET state = 'unknown', error = ?2,
-                 executor_start_authority_sha256 = NULL,
-                 executor_start_authority_at = NULL, updated_at = ?3
-             WHERE assignment_id = ?1 AND fencing_epoch = ?4 AND state = 'claimed'
-               AND executor_start_authority_sha256 = ?5
-               AND executor_start_authority_at = ?6
-               AND executor_start_io_permit_sha256 IS NULL
-               AND executor_start_io_permit_at IS NULL
-               AND NOT EXISTS(SELECT 1 FROM sessions WHERE session_id = ?7)",
-        )
-        .bind(&record.assignment_id)
-        .bind(reason)
-        .bind(observed_at)
-        .bind(to_i64(record.fencing_epoch, "assignment fencing epoch")?)
-        .bind(&authority.sha256)
-        .bind(&authority.acquired_at)
-        .bind(&authority.identity.session_id)
-        .execute(transaction.as_mut())
-        .await
-        .map_err(|error| db_error(format!("expire remote executor start: {error}")))?
-        .rows_affected();
-        if rows != 1 {
-            return Err(concurrent("remote executor start expiry lost its fence"));
-        }
-        finish_mutation(transaction, &record.assignment_id, "executor start expiry").await
-    }
 }
 
 #[expect(

@@ -1,8 +1,8 @@
 use std::collections::{BTreeSet, VecDeque};
 use std::path::PathBuf;
 use std::process::Child;
-use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
+use std::sync::{Arc, Mutex};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -73,6 +73,10 @@ pub(super) struct BridgeActiveTui {
     pub(super) launch_spec: AgentTuiStartSpec,
     pub(super) created_at: String,
     pub(super) exit_info: Option<BridgeTuiExitInfo>,
+    /// Filled in by the deferred-join thread when startup went wrong. The
+    /// sandboxed daemon only ever sees this TUI through bridge snapshots, so
+    /// this is the only way the problem reaches the user.
+    pub(super) startup_error: Arc<Mutex<Option<String>>>,
 }
 
 #[derive(Debug, Clone)]

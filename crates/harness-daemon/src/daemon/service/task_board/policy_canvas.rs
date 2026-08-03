@@ -15,6 +15,7 @@ use crate::task_board::policy_graph::{self, PolicyCanvasWorkspace};
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::policy_canvas_response::policy_canvas_workspace_response;
+use crate::daemon::db::prelude::*;
 
 #[cfg(test)]
 mod tests;

@@ -38,9 +38,6 @@ extension ReviewsFilesListResponse {
       pullRequestID: wire.pullRequestId,
       number: wire.number,
       headRefOid: wire.headRefOid,
-      headRefName: wire.headRefName,
-      baseRefOid: wire.baseRefOid,
-      baseRefName: wire.baseRefName,
       repositoryFullName: wire.repositoryFullName,
       viewerCanMarkViewed: wire.viewerCanMarkViewed,
       files: wire.files.map(ReviewFile.init(wire:)),
@@ -94,12 +91,7 @@ extension ReviewsFilesPatchRequestWire {
       headRefOidExpected: model.headRefOidExpected,
       paths: model.paths,
       number: model.number,
-      repositoryFullName: model.repositoryFullName,
-      baseRefOidExpected: model.baseRefOidExpected,
-      headRefName: model.headRefName,
-      baseRefName: model.baseRefName,
-      largeDiffStrategy: model.largeDiffStrategy
-        .map { FilesLargeDiffStrategyWire(rawValue: $0.rawValue) ?? .autoLocalClone }
+      repositoryFullName: model.repositoryFullName
     )
   }
 }
@@ -145,11 +137,6 @@ extension ReviewsFilesPreviewRequestWire {
       paths: model.paths,
       number: model.number,
       repositoryFullName: model.repositoryFullName,
-      baseRefOidExpected: model.baseRefOidExpected,
-      headRefName: model.headRefName,
-      baseRefName: model.baseRefName,
-      largeDiffStrategy: model.largeDiffStrategy
-        .map { FilesLargeDiffStrategyWire(rawValue: $0.rawValue) ?? .autoLocalClone },
       lineLimit: model.lineLimit
     )
   }
@@ -214,19 +201,6 @@ extension ReviewsFilesBlobResponse {
       isTooLarge: wire.isTooLarge,
       fetchedAt: wire.fetchedAt,
       rateLimitSnapshot: wire.rateLimitSnapshot.map(ReviewsRateLimitSnapshot.init(wire:))
-    )
-  }
-}
-
-extension ReviewLocalCloneEntry {
-  init(wire: LocalCloneListEntryWire) {
-    self.init(
-      repoFullName: wire.repoFullName,
-      repoKeySegment: wire.repoKeySegment,
-      sizeBytes: wire.sizeBytes,
-      createdAt: wire.createdAt,
-      lastUsedAt: wire.lastUsedAt,
-      lastFetchedAt: wire.lastFetchedAt
     )
   }
 }

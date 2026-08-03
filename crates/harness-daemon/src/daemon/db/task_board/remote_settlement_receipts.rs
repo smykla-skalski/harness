@@ -3,12 +3,12 @@ use sqlx::{Sqlite, Transaction, query, query_as};
 
 use super::remote_assignment_lease::require_assignment;
 use super::remote_assignment_model::{canonical_time, concurrent, nonblank, phase_label, to_i64};
-use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::remote_wire::wire::{
     RemoteAssignmentWireState, RemoteSettledRequest, RemoteSettledResponse,
     TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
+use crate::daemon::db::prelude::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TaskBoardRemoteSettlementReceipt {
@@ -25,23 +25,6 @@ impl TaskBoardRemoteSettlementReceipt {
         authenticated_principal: &str,
     ) -> bool {
         self.request == *request && self.authenticated_principal == authenticated_principal
-    }
-}
-
-impl AsyncDaemonDb {
-    pub(crate) async fn settle_task_board_remote_assignment(
-        &self,
-        request: &RemoteSettledRequest,
-        authenticated_principal: &str,
-        settled_at: &str,
-    ) -> Result<TaskBoardRemoteSettlementReceipt, CliError> {
-        <Self as RemoteExecutionQueries>::settle_task_board_remote_assignment(
-            self,
-            request,
-            authenticated_principal,
-            settled_at,
-        )
-        .await
     }
 }
 
@@ -122,16 +105,6 @@ async fn screen_settlement_collision_in_tx(
         _ => Err(concurrent(
             "remote settlement identity has multiple receipt collisions",
         )),
-    }
-}
-
-impl AsyncDaemonDb {
-    pub(crate) async fn task_board_remote_settlement_receipt(
-        &self,
-        assignment_id: &str,
-    ) -> Result<Option<TaskBoardRemoteSettlementReceipt>, CliError> {
-        <Self as RemoteExecutionQueries>::task_board_remote_settlement_receipt(self, assignment_id)
-            .await
     }
 }
 

@@ -1,4 +1,5 @@
 use super::*;
+use crate::daemon::db::prelude::*;
 
 #[test]
 fn create_task_db_direct_bootstraps_file_backed_session() {

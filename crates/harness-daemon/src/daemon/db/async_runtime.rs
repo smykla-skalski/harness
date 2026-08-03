@@ -2,7 +2,7 @@ use sqlx::{QueryBuilder, Sqlite, query, query_as, query_scalar};
 
 use super::{
     AgentTuiLiveRefreshState, AgentTuiSize, AgentTuiSnapshot, AgentTuiStatus, AsyncDaemonDb,
-    CliError, CodexRunSnapshot, TerminalScreenSnapshot, db_error,
+    AsyncDaemonTransactions, CliError, CodexRunSnapshot, TerminalScreenSnapshot, db_error,
 };
 use crate::daemon::db::runtime::{
     codex_mode_as_str, codex_mode_from_str, codex_status_as_str, codex_status_from_str,
@@ -103,12 +103,48 @@ const AGENT_TUI_LIVE_REFRESH_STATE_SQL: &str = "SELECT status, updated_at
  FROM agent_tuis
  WHERE tui_id = ?1";
 
-impl AsyncDaemonDb {
-    /// Save or update a Codex controller run snapshot through the canonical async DB.
-    ///
+/// Async mirror of `runtime::RuntimeSnapshotQueries`: Codex controller run
+/// and managed terminal-agent snapshot persistence through the canonical
+/// async daemon DB.
+pub(crate) trait AsyncRuntimeSnapshotQueries: Send + Sync {
     /// # Errors
     /// Returns [`CliError`] on SQL or serialization failures.
-    pub(crate) async fn save_codex_run(&self, snapshot: &CodexRunSnapshot) -> Result<(), CliError> {
+    async fn save_codex_run(&self, snapshot: &CodexRunSnapshot) -> Result<(), CliError>;
+
+    /// # Errors
+    /// Returns [`CliError`] on SQL or parse failures.
+    async fn codex_run(&self, run_id: &str) -> Result<Option<CodexRunSnapshot>, CliError>;
+
+    /// # Errors
+    /// Returns [`CliError`] on SQL or parse failures.
+    async fn codex_runs_by_ids(&self, run_ids: &[&str]) -> Result<Vec<CodexRunSnapshot>, CliError>;
+
+    /// # Errors
+    /// Returns [`CliError`] on SQL or parse failures.
+    async fn list_codex_runs(&self, session_id: &str) -> Result<Vec<CodexRunSnapshot>, CliError>;
+
+    /// # Errors
+    /// Returns [`CliError`] on SQL or serialization failures.
+    async fn save_agent_tui(&self, snapshot: &AgentTuiSnapshot) -> Result<(), CliError>;
+
+    /// # Errors
+    /// Returns [`CliError`] on SQL or parse failures.
+    async fn agent_tui(&self, tui_id: &str) -> Result<Option<AgentTuiSnapshot>, CliError>;
+
+    /// # Errors
+    /// Returns [`CliError`] on SQL or parse failures.
+    async fn agent_tui_live_refresh_state(
+        &self,
+        tui_id: &str,
+    ) -> Result<Option<AgentTuiLiveRefreshState>, CliError>;
+
+    /// # Errors
+    /// Returns [`CliError`] on SQL or parse failures.
+    async fn list_agent_tuis(&self, session_id: &str) -> Result<Vec<AgentTuiSnapshot>, CliError>;
+}
+
+impl AsyncRuntimeSnapshotQueries for AsyncDaemonDb {
+    async fn save_codex_run(&self, snapshot: &CodexRunSnapshot) -> Result<(), CliError> {
         let pending_approvals_json = serde_json::to_string(&snapshot.pending_approvals)
             .map_err(|error| db_error(format!("serialize async codex approvals: {error}")))?;
         let resolved_approvals_json =
@@ -180,14 +216,7 @@ impl AsyncDaemonDb {
             .map_err(|error| db_error(format!("commit async codex run: {error}")))
     }
 
-    /// Load one Codex controller run snapshot from the canonical async DB.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL or parse failures.
-    pub(crate) async fn codex_run(
-        &self,
-        run_id: &str,
-    ) -> Result<Option<CodexRunSnapshot>, CliError> {
+    async fn codex_run(&self, run_id: &str) -> Result<Option<CodexRunSnapshot>, CliError> {
         query_as::<_, AsyncCodexRunRow>(CODEX_RUN_SQL)
             .bind(run_id)
             .fetch_optional(self.pool())
@@ -197,14 +226,7 @@ impl AsyncDaemonDb {
             .transpose()
     }
 
-    /// Load Codex controller runs matching the supplied ids.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL or parse failures.
-    pub(crate) async fn codex_runs_by_ids(
-        &self,
-        run_ids: &[&str],
-    ) -> Result<Vec<CodexRunSnapshot>, CliError> {
+    async fn codex_runs_by_ids(&self, run_ids: &[&str]) -> Result<Vec<CodexRunSnapshot>, CliError> {
         if run_ids.is_empty() {
             return Ok(Vec::new());
         }
@@ -226,14 +248,7 @@ impl AsyncDaemonDb {
             .collect()
     }
 
-    /// List Codex controller runs for a session, newest first, from the canonical async DB.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL or parse failures.
-    pub(crate) async fn list_codex_runs(
-        &self,
-        session_id: &str,
-    ) -> Result<Vec<CodexRunSnapshot>, CliError> {
+    async fn list_codex_runs(&self, session_id: &str) -> Result<Vec<CodexRunSnapshot>, CliError> {
         let rows = query_as::<_, AsyncCodexRunRow>(LIST_CODEX_RUNS_SQL)
             .bind(session_id)
             .fetch_all(self.pool())
@@ -244,11 +259,7 @@ impl AsyncDaemonDb {
             .collect()
     }
 
-    /// Save or update a terminal agent snapshot through the canonical async DB.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL or serialization failures.
-    pub(crate) async fn save_agent_tui(&self, snapshot: &AgentTuiSnapshot) -> Result<(), CliError> {
+    async fn save_agent_tui(&self, snapshot: &AgentTuiSnapshot) -> Result<(), CliError> {
         let argv_json = serde_json::to_string(&snapshot.argv)
             .map_err(|error| db_error(format!("serialize async terminal agent argv: {error}")))?;
         query(UPSERT_AGENT_TUI_SQL)
@@ -276,14 +287,7 @@ impl AsyncDaemonDb {
         Ok(())
     }
 
-    /// Load one managed terminal agent snapshot from the canonical async DB.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL or parse failures.
-    pub(crate) async fn agent_tui(
-        &self,
-        tui_id: &str,
-    ) -> Result<Option<AgentTuiSnapshot>, CliError> {
+    async fn agent_tui(&self, tui_id: &str) -> Result<Option<AgentTuiSnapshot>, CliError> {
         query_as::<_, AsyncAgentTuiRow>(AGENT_TUI_SQL)
             .bind(tui_id)
             .fetch_optional(self.pool())
@@ -293,11 +297,7 @@ impl AsyncDaemonDb {
             .transpose()
     }
 
-    /// Load the minimal freshness state needed to guard live-refresh persists.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL or parse failures.
-    pub(crate) async fn agent_tui_live_refresh_state(
+    async fn agent_tui_live_refresh_state(
         &self,
         tui_id: &str,
     ) -> Result<Option<AgentTuiLiveRefreshState>, CliError> {
@@ -314,14 +314,7 @@ impl AsyncDaemonDb {
             .transpose()
     }
 
-    /// List managed terminal agent snapshots for a session, newest first, from the canonical async DB.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL or parse failures.
-    pub(crate) async fn list_agent_tuis(
-        &self,
-        session_id: &str,
-    ) -> Result<Vec<AgentTuiSnapshot>, CliError> {
+    async fn list_agent_tuis(&self, session_id: &str) -> Result<Vec<AgentTuiSnapshot>, CliError> {
         let rows = query_as::<_, AsyncAgentTuiRow>(LIST_AGENT_TUIS_SQL)
             .bind(session_id)
             .fetch_all(self.pool())

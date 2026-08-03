@@ -13,6 +13,7 @@ use crate::task_board::TaskBoardTriageEscalationVerdictOutcome;
 use super::super::openapi::DaemonErrorBody;
 use super::super::response::{extract_request_id, timed_json};
 use super::super::{DaemonHttpState, require_async_db};
+use crate::daemon::db::task_board::prelude::*;
 
 /// No control-plane session auth: the caller is the daemon's own spawned
 /// escalation worker, authenticated entirely by `verdict_token` matching the

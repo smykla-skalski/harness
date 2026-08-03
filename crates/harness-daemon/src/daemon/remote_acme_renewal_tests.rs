@@ -1,3 +1,4 @@
+use crate::daemon::remote_identity_queries::RemoteIdentitySyncQueries;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -18,6 +19,7 @@ use crate::daemon::remote_acme::{
     RemoteCertificateBundle,
 };
 use crate::daemon::remote_acme_cleanup::RemoteAcmeCleanupTracker;
+use crate::daemon::remote_acme_queries::RemoteAcmeQueries;
 use crate::daemon::remote_identity::RemoteAuditOutcome;
 use crate::daemon::remote_tls::RemoteTlsConfigHandle;
 use crate::daemon::test_liveness::LIVENESS;

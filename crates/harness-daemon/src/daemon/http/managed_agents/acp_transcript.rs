@@ -14,6 +14,8 @@ use super::super::auth::require_auth;
 use super::super::openapi::DaemonErrorBody;
 use super::super::response::{extract_request_id, timed_json};
 use super::ensure_acp_enabled;
+#[cfg(test)]
+use crate::daemon::db::prelude::*;
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]

@@ -11,6 +11,7 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::super::DaemonHttpState;
 use super::handle_run_once_result;
+use crate::daemon::db::task_board::prelude::*;
 
 pub(super) async fn run_once_durable(
     state: &DaemonHttpState,

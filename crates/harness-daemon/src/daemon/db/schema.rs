@@ -1,5 +1,7 @@
 use super::schema_sql::CREATE_SCHEMA;
 use super::{CliError, Connection, DaemonDb, Path, db_error};
+use crate::daemon::db::timeline::DaemonDbTimeline;
+use crate::daemon::remote_identity_queries::RemoteIdentitySyncQueries;
 use rusqlite::ffi::ErrorCode;
 use rusqlite::{Transaction, TransactionBehavior};
 use std::cell::RefCell;
@@ -26,6 +28,7 @@ use migration_steps::{
     migrate_v37_to_v38, migrate_v38_to_v39, migrate_v39_to_v40, migrate_v40_to_v41,
     migrate_v41_to_v42, migrate_v42_to_v43,
 };
+use crate::daemon::db::prelude::*;
 
 static SCHEMA_MIGRATION_LOCK: Mutex<()> = Mutex::new(());
 

@@ -26,6 +26,7 @@ use crate::session::types::SessionRole;
 use crate::workspace::utc_now;
 
 use self::support::{WAIT_TIMEOUT, wait_until, with_agent_tui_home};
+use crate::daemon::db::prelude::*;
 
 #[test]
 fn manager_starts_registers_steers_and_stops_tui() {

@@ -21,6 +21,7 @@ mod cas_screen;
 mod update;
 use cas_screen::{WorkflowExecutionCasScreen, screen_workflow_execution_cas_in_tx};
 pub(super) use update::update_execution_in_tx;
+use crate::daemon::db::prelude::*;
 
 const SELECT_EXECUTION: &str = "SELECT * FROM task_board_workflow_executions
     WHERE execution_id = ?1";
@@ -63,125 +64,127 @@ fn validate_new_workflow_execution_input(
     Ok(())
 }
 
-impl AsyncDaemonDb {
-    pub(crate) async fn create_or_load_task_board_workflow_execution(
-        &self,
-        proposed: &TaskBoardWorkflowExecutionRecord,
-    ) -> Result<TaskBoardWorkflowExecutionCreateOutcome, CliError> {
-        validate_new_workflow_execution_input(proposed)?;
-        let mut transaction = self
-            .begin_immediate_transaction("task board workflow execution create")
-            .await?;
-        if let Some(execution) =
-            load_active_execution_in_tx(&mut transaction, &proposed.item_id).await?
-        {
-            validate_active_execution_adoption(&execution, proposed)?;
-            transaction.commit().await.map_err(|error| {
-                db_error(format!("commit workflow execution create no-op: {error}"))
-            })?;
-            return Ok(TaskBoardWorkflowExecutionCreateOutcome {
-                execution,
-                created: false,
-            });
-        }
-        write_new_workflow_execution_in_tx(&mut transaction, proposed).await?;
-        transaction.commit().await.map_err(|error| {
-            db_error(format!(
-                "commit task board workflow execution create: {error}"
-            ))
-        })?;
-        Ok(TaskBoardWorkflowExecutionCreateOutcome {
-            execution: proposed.clone(),
-            created: true,
-        })
-    }
-
-    pub(crate) async fn task_board_workflow_execution(
-        &self,
-        execution_id: &str,
-    ) -> Result<Option<TaskBoardWorkflowExecutionRecord>, CliError> {
-        let mut transaction = self
-            .pool()
-            .begin()
-            .await
-            .map_err(|error| db_error(format!("begin workflow execution load: {error}")))?;
-        let execution = load_execution_in_tx(&mut transaction, execution_id).await?;
+pub(super) async fn create_or_load_task_board_workflow_execution(
+    db: &AsyncDaemonDb,
+    proposed: &TaskBoardWorkflowExecutionRecord,
+) -> Result<TaskBoardWorkflowExecutionCreateOutcome, CliError> {
+    validate_new_workflow_execution_input(proposed)?;
+    let mut transaction = db
+        .begin_immediate_transaction("task board workflow execution create")
+        .await?;
+    if let Some(execution) = load_active_execution_in_tx(&mut transaction, &proposed.item_id).await?
+    {
+        validate_active_execution_adoption(&execution, proposed)?;
         transaction
             .commit()
             .await
-            .map_err(|error| db_error(format!("commit workflow execution load: {error}")))?;
-        Ok(execution)
+            .map_err(|error| db_error(format!("commit workflow execution create no-op: {error}")))?;
+        return Ok(TaskBoardWorkflowExecutionCreateOutcome {
+            execution,
+            created: false,
+        });
     }
-
-    pub(crate) async fn active_task_board_workflow_execution(
-        &self,
-        item_id: &str,
-    ) -> Result<Option<TaskBoardWorkflowExecutionRecord>, CliError> {
-        let mut transaction =
-            self.pool().begin().await.map_err(|error| {
-                db_error(format!("begin active workflow execution load: {error}"))
-            })?;
-        let execution = load_active_execution_in_tx(&mut transaction, item_id).await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit active workflow execution load: {error}")))?;
-        Ok(execution)
-    }
-
-    pub(crate) async fn compare_and_set_task_board_workflow_execution(
-        &self,
-        expected: &TaskBoardWorkflowExecutionCas,
-        updated: &TaskBoardWorkflowExecutionRecord,
-    ) -> Result<TaskBoardWorkflowExecutionCasOutcome, CliError> {
-        let mut transaction = self
-            .begin_immediate_transaction("task board workflow execution CAS")
-            .await?;
-        // The screen only reads, so a refusal reaches the commit below with
-        // nothing written and an empty commit leaves the same state as the
-        // rollback it replaces. Routing the persist arm through that same exit
-        // keeps the per-refusal commit messages from outliving the branches
-        // that produced them.
-        // Both halves must stay boxed. Awaited inline they fold their frames
-        // into this future, which the read-only coordinator, the remote
-        // controller and the transport controller all await transitively; that
-        // pushes more than twenty of those awaits past the 16384-byte threshold
-        // of `clippy::large_futures`, which is denied here. `cargo check` will
-        // not tell you, because the limit is a lint rather than a compile error.
-        let outcome = match Box::pin(screen_workflow_execution_cas_in_tx(
-            &mut transaction,
-            expected,
-            updated,
+    write_new_workflow_execution_in_tx(&mut transaction, proposed).await?;
+    transaction.commit().await.map_err(|error| {
+        db_error(format!(
+            "commit task board workflow execution create: {error}"
         ))
-        .await?
-        {
-            WorkflowExecutionCasScreen::Settled(outcome) => outcome,
-            WorkflowExecutionCasScreen::Persist(persisted) => {
-                Box::pin(persist_workflow_execution_cas_in_tx(
-                    &mut transaction,
-                    expected,
-                    persisted,
-                ))
-                .await?
-            }
-        };
-        transaction.commit().await.map_err(|error| {
-            db_error(format!("commit task board workflow execution CAS: {error}"))
-        })?;
-        Ok(outcome)
-    }
+    })?;
+    Ok(TaskBoardWorkflowExecutionCreateOutcome {
+        execution: proposed.clone(),
+        created: true,
+    })
+}
 
-    pub(crate) async fn task_board_configuration_revision(&self) -> Result<u64, CliError> {
-        let revision = query_scalar::<_, i64>(
-            "SELECT COALESCE((SELECT revision FROM task_board_orchestrator_settings
-             WHERE singleton = 1), 0)",
-        )
-        .fetch_one(self.pool())
+pub(super) async fn task_board_workflow_execution(
+    db: &AsyncDaemonDb,
+    execution_id: &str,
+) -> Result<Option<TaskBoardWorkflowExecutionRecord>, CliError> {
+    let mut transaction = db
+        .pool()
+        .begin()
         .await
-        .map_err(|error| db_error(format!("read task board configuration revision: {error}")))?;
-        u64::try_from(revision)
-            .map_err(|_| db_error("task board configuration revision is out of range"))
-    }
+        .map_err(|error| db_error(format!("begin workflow execution load: {error}")))?;
+    let execution = load_execution_in_tx(&mut transaction, execution_id).await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit workflow execution load: {error}")))?;
+    Ok(execution)
+}
+
+pub(super) async fn active_task_board_workflow_execution(
+    db: &AsyncDaemonDb,
+    item_id: &str,
+) -> Result<Option<TaskBoardWorkflowExecutionRecord>, CliError> {
+    let mut transaction = db
+        .pool()
+        .begin()
+        .await
+        .map_err(|error| db_error(format!("begin active workflow execution load: {error}")))?;
+    let execution = load_active_execution_in_tx(&mut transaction, item_id).await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit active workflow execution load: {error}")))?;
+    Ok(execution)
+}
+
+pub(super) async fn compare_and_set_task_board_workflow_execution(
+    db: &AsyncDaemonDb,
+    expected: &TaskBoardWorkflowExecutionCas,
+    updated: &TaskBoardWorkflowExecutionRecord,
+) -> Result<TaskBoardWorkflowExecutionCasOutcome, CliError> {
+    let mut transaction = db
+        .begin_immediate_transaction("task board workflow execution CAS")
+        .await?;
+    // The screen only reads, so a refusal reaches the commit below with
+    // nothing written and an empty commit leaves the same state as the
+    // rollback it replaces. Routing the persist arm through that same exit
+    // keeps the per-refusal commit messages from outliving the branches
+    // that produced them.
+    // Both halves must stay boxed. Awaited inline they fold their frames
+    // into this future, which the read-only coordinator, the remote
+    // controller and the transport controller all await transitively; that
+    // pushes more than twenty of those awaits past the 16384-byte threshold
+    // of `clippy::large_futures`, which is denied here. `cargo check` will
+    // not tell you, because the limit is a lint rather than a compile error.
+    let outcome = match Box::pin(screen_workflow_execution_cas_in_tx(
+        &mut transaction,
+        expected,
+        updated,
+    ))
+    .await?
+    {
+        WorkflowExecutionCasScreen::Settled(outcome) => outcome,
+        WorkflowExecutionCasScreen::Persist(persisted) => {
+            Box::pin(persist_workflow_execution_cas_in_tx(
+                &mut transaction,
+                expected,
+                persisted,
+            ))
+            .await?
+        }
+    };
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit task board workflow execution CAS: {error}")))?;
+    Ok(outcome)
+}
+
+pub(super) async fn task_board_configuration_revision(
+    db: &AsyncDaemonDb,
+) -> Result<u64, CliError> {
+    let revision = query_scalar::<_, i64>(
+        "SELECT COALESCE((SELECT revision FROM task_board_orchestrator_settings
+         WHERE singleton = 1), 0)",
+    )
+    .fetch_one(db.pool())
+    .await
+    .map_err(|error| db_error(format!("read task board configuration revision: {error}")))?;
+    u64::try_from(revision)
+        .map_err(|_| db_error("task board configuration revision is out of range"))
 }
 
 async fn persist_workflow_execution_cas_in_tx(

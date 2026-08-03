@@ -1,4 +1,5 @@
 use super::super::*;
+use crate::daemon::db::prelude::*;
 
 mod voice;
 

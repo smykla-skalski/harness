@@ -53,6 +53,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
     instanceID: "recording-task-board"
   )
   let taskBoardItemsReadGate = RecordingTaskBoardItemsReadGate()
+  var taskBoardItemsDelay: Duration?
   var queuedTaskBoardItemSnapshots: [[TaskBoardItem]] = []
   var taskBoardSyncStub = RecordingTaskBoardSyncStub()
   var taskBoardSyncDelay: Duration?
@@ -173,6 +174,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var acpStartError: (any Error)?
   var queuedAcpStartErrors: [any Error] = []
   var agentTuiStartError: (any Error)?
+  var agentTuiStartErrorAfterRecord: (any Error)?
   var hostBridgeReconfigureError: (any Error)?
   var hostBridgeStatusReport = BridgeStatusReport(running: false)
   var globalStreamEvents: [DaemonPushEvent] = []

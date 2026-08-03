@@ -12,6 +12,7 @@ use crate::task_board::{
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::DaemonHttpState;
+use crate::daemon::db::task_board::prelude::*;
 
 pub(super) async fn start_and_complete_delivered_worker(
     state: &DaemonHttpState,

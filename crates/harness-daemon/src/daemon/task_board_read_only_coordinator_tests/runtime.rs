@@ -23,6 +23,7 @@ use super::fixture::{FROZEN_HEAD, NOW};
 mod planned_report;
 
 pub(super) use planned_report::PlannedReport;
+use crate::daemon::db::prelude::*;
 
 enum HeadBehavior {
     Exact(String),

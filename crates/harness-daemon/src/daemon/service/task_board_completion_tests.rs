@@ -8,6 +8,7 @@ use crate::daemon::protocol::{
 };
 use crate::session::types::{CONTROL_PLANE_ACTOR_ID, SessionRole, TaskSeverity};
 use crate::task_board::TaskBoardItem;
+use crate::daemon::db::prelude::*;
 
 #[test]
 fn linked_item_completion_requires_real_review_state() {

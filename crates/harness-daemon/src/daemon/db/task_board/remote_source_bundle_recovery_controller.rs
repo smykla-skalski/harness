@@ -1,18 +1,20 @@
 use sqlx::{Sqlite, Transaction};
 
+#[path = "remote_source_bundle_recovery_operations.rs"]
+mod operations;
+
 use super::ORCHESTRATOR_CHANGE_SCOPE;
 use super::items::bump_change_in_tx;
 use super::remote_assignment_lease::require_assignment;
 use super::remote_assignment_model::{concurrent, nonblank};
 use super::remote_operation_trust::{
-    TaskBoardRemoteOperationKind, TaskBoardRemoteOperationTrustFence,
-    consume_controller_operation_trust_in_tx, consume_successor_recovery_operation_trust_in_tx,
-    require_source_recovery_operation_fence_in_tx,
+    TaskBoardRemoteOperationTrustFence, require_source_recovery_operation_fence_in_tx,
 };
 use super::remote_source_bundle_abandonment::{
     TaskBoardRemoteSourceBundleAbandonment, insert_abandonment_in_tx,
     load_abandonment_collisions_in_tx, load_abandonment_in_tx,
 };
+use super::remote_source_bundle_queries::RemoteSourceBundleQueries;
 use super::remote_source_bundles::{
     TaskBoardRemoteSourceBundle, insert_source_bundle_in_tx, load_source_bundle_collisions_in_tx,
     load_source_bundle_in_tx,
@@ -23,74 +25,79 @@ use crate::task_board::remote_wire::wire::{
     RemoteSourceBundleAbandonResponse, RemoteSourceBundleReceiptVerificationResponse,
     RemoteSourceBundleUploadRequest, RemoteSourceBundleUploadResponse,
 };
-impl AsyncDaemonDb {
-    pub(crate) async fn adopt_verified_task_board_remote_source_bundle_receipt(
-        &self,
-        request: &RemoteSourceBundleUploadRequest,
-        verification: &RemoteSourceBundleReceiptVerificationResponse,
-        authenticated_principal: &str,
-        trust: &TaskBoardRemoteOperationTrustFence,
-    ) -> Result<Option<TaskBoardRemoteSourceBundle>, CliError> {
-        validate_verified_receipt_input(request, verification, authenticated_principal, trust)?;
-        let mut transaction = self
-            .begin_immediate_transaction("task board verified source upload receipt")
-            .await?;
-        let (receipt, context) = adopt_verified_receipt_in_tx(
-            &mut transaction,
-            request,
-            verification,
-            authenticated_principal,
-            trust,
-        )
-        .await?;
-        commit(transaction, context).await?;
-        Ok(receipt)
-    }
+use operations::{
+    consume_abandonment_operation, consume_upload_operation, require_upload_operation,
+    require_upload_operation_for_abandonment, settle_abandonment_operation_if_present,
+    settle_upload_operation_if_present,
+};
+use crate::daemon::db::prelude::*;
 
-    pub(crate) async fn record_task_board_remote_source_bundle_abandonment(
-        &self,
-        request: &RemoteSourceBundleAbandonRequest,
-        response: &RemoteSourceBundleAbandonResponse,
-        authenticated_principal: &str,
-        trust: &TaskBoardRemoteOperationTrustFence,
-    ) -> Result<TaskBoardRemoteSourceBundleAbandonment, CliError> {
-        response
-            .validate(request)
-            .map_err(|error| db_error(format!("validate source abandonment response: {error}")))?;
-        nonblank(authenticated_principal, "source abandonment principal")?;
-        let mut transaction = self
-            .begin_immediate_transaction("task board source abandonment response")
-            .await?;
-        let (stored, context) = record_abandonment_in_tx(
-            &mut transaction,
-            request,
-            response,
-            authenticated_principal,
-            trust,
-        )
+pub(super) async fn adopt_verified_task_board_remote_source_bundle_receipt(
+    db: &AsyncDaemonDb,
+    request: &RemoteSourceBundleUploadRequest,
+    verification: &RemoteSourceBundleReceiptVerificationResponse,
+    authenticated_principal: &str,
+    trust: &TaskBoardRemoteOperationTrustFence,
+) -> Result<Option<TaskBoardRemoteSourceBundle>, CliError> {
+    validate_verified_receipt_input(request, verification, authenticated_principal, trust)?;
+    let mut transaction = db
+        .begin_immediate_transaction("task board verified source upload receipt")
         .await?;
-        commit(transaction, context).await?;
-        Ok(stored)
-    }
+    let (receipt, context) = adopt_verified_receipt_in_tx(
+        &mut transaction,
+        request,
+        verification,
+        authenticated_principal,
+        trust,
+    )
+    .await?;
+    commit(transaction, context).await?;
+    Ok(receipt)
+}
 
-    pub(crate) async fn reassign_rejected_task_board_remote_source_bundle_offer(
-        &self,
-        reassignment: &super::remote_source_bundle_reassignment::TaskBoardRemoteSourceOfferReassignment<
-            '_,
-        >,
-        predecessor: &RemoteOfferRequest,
-        rejection: &RemoteOfferResponse,
-    ) -> Result<TaskBoardRemoteOfferOutcome, CliError> {
-        Box::pin(self.reassign_task_board_remote_source_bundle_offer(
-            reassignment,
-            super::remote_source_bundle_reassignment_evidence::SourceReassignmentEvidence::OfferRejection {
-                request: predecessor,
-                response: rejection,
-                observed_at: reassignment.offered_at,
-            },
-        ))
-        .await
-    }
+pub(super) async fn record_task_board_remote_source_bundle_abandonment(
+    db: &AsyncDaemonDb,
+    request: &RemoteSourceBundleAbandonRequest,
+    response: &RemoteSourceBundleAbandonResponse,
+    authenticated_principal: &str,
+    trust: &TaskBoardRemoteOperationTrustFence,
+) -> Result<TaskBoardRemoteSourceBundleAbandonment, CliError> {
+    response
+        .validate(request)
+        .map_err(|error| db_error(format!("validate source abandonment response: {error}")))?;
+    nonblank(authenticated_principal, "source abandonment principal")?;
+    let mut transaction = db
+        .begin_immediate_transaction("task board source abandonment response")
+        .await?;
+    let (stored, context) = record_abandonment_in_tx(
+        &mut transaction,
+        request,
+        response,
+        authenticated_principal,
+        trust,
+    )
+    .await?;
+    commit(transaction, context).await?;
+    Ok(stored)
+}
+
+pub(super) async fn reassign_rejected_task_board_remote_source_bundle_offer(
+    db: &AsyncDaemonDb,
+    reassignment: &super::remote_source_bundle_reassignment::TaskBoardRemoteSourceOfferReassignment<
+        '_,
+    >,
+    predecessor: &RemoteOfferRequest,
+    rejection: &RemoteOfferResponse,
+) -> Result<TaskBoardRemoteOfferOutcome, CliError> {
+    Box::pin(db.reassign_task_board_remote_source_bundle_offer(
+        reassignment,
+        super::remote_source_bundle_reassignment_evidence::SourceReassignmentEvidence::OfferRejection {
+            request: predecessor,
+            response: rejection,
+            observed_at: reassignment.offered_at,
+        },
+    ))
+    .await
 }
 
 async fn adopt_verified_receipt_in_tx(
@@ -369,138 +376,3 @@ fn exact_abandonment(
     }
 }
 
-fn require_upload_operation(
-    assignment: &super::TaskBoardRemoteAssignmentRecord,
-    request: &RemoteSourceBundleUploadRequest,
-) -> Result<(), CliError> {
-    let exact = assignment
-        .controller_operation
-        .as_ref()
-        .is_some_and(|operation| {
-            operation.kind == TaskBoardRemoteOperationKind::UploadSourceBundle.as_str()
-                && operation.request_sha256 == request.request_sha256
-        });
-    if exact {
-        Ok(())
-    } else {
-        Err(concurrent(
-            "verified source receipt lost its pending upload operation",
-        ))
-    }
-}
-
-fn require_upload_operation_for_abandonment(
-    assignment: &super::TaskBoardRemoteAssignmentRecord,
-    request: &RemoteSourceBundleAbandonRequest,
-) -> Result<(), CliError> {
-    let exact = assignment
-        .controller_operation
-        .as_ref()
-        .is_some_and(|operation| {
-            operation.kind == TaskBoardRemoteOperationKind::UploadSourceBundle.as_str()
-                && operation.request_sha256 == request.upload_request_sha256
-        });
-    if exact {
-        Ok(())
-    } else {
-        Err(concurrent(
-            "source abandonment lost its pending upload operation",
-        ))
-    }
-}
-
-async fn settle_upload_operation_if_present(
-    transaction: &mut Transaction<'_, Sqlite>,
-    request: &RemoteSourceBundleUploadRequest,
-    principal: &str,
-    trust: &TaskBoardRemoteOperationTrustFence,
-) -> Result<bool, CliError> {
-    let assignment = require_assignment(transaction, &request.offer.binding.assignment_id).await?;
-    if assignment.controller_operation.is_none() {
-        return Ok(false);
-    }
-    super::remote_source_bundle_controller::require_upload_assignment(
-        &assignment,
-        request,
-        principal,
-    )?;
-    require_upload_operation(&assignment, request)?;
-    consume_upload_operation(transaction, &assignment, request, trust).await?;
-    Ok(true)
-}
-
-async fn settle_abandonment_operation_if_present(
-    transaction: &mut Transaction<'_, Sqlite>,
-    request: &RemoteSourceBundleAbandonRequest,
-    principal: &str,
-    trust: &TaskBoardRemoteOperationTrustFence,
-) -> Result<bool, CliError> {
-    let assignment = require_assignment(transaction, &request.offer.binding.assignment_id).await?;
-    if assignment.controller_operation.is_none() {
-        return Ok(false);
-    }
-    super::remote_source_bundle_controller::require_upload_assignment_without_content(
-        &assignment,
-        &request.offer,
-        principal,
-    )?;
-    require_upload_operation_for_abandonment(&assignment, request)?;
-    consume_abandonment_operation(transaction, &assignment, request, trust).await?;
-    Ok(true)
-}
-
-async fn consume_upload_operation(
-    transaction: &mut Transaction<'_, Sqlite>,
-    assignment: &super::TaskBoardRemoteAssignmentRecord,
-    request: &RemoteSourceBundleUploadRequest,
-    trust: &TaskBoardRemoteOperationTrustFence,
-) -> Result<(), CliError> {
-    if assignment.target_host_instance_id.as_deref()
-        == Some(trust.observed_host_instance_id.as_str())
-    {
-        consume_controller_operation_trust_in_tx(
-            transaction,
-            assignment,
-            TaskBoardRemoteOperationKind::UploadSourceBundle,
-            &request.request_sha256,
-        )
-        .await
-    } else {
-        consume_successor_recovery_operation_trust_in_tx(
-            transaction,
-            assignment,
-            TaskBoardRemoteOperationKind::UploadSourceBundle,
-            &request.request_sha256,
-            trust,
-        )
-        .await
-    }
-}
-
-async fn consume_abandonment_operation(
-    transaction: &mut Transaction<'_, Sqlite>,
-    assignment: &super::TaskBoardRemoteAssignmentRecord,
-    request: &RemoteSourceBundleAbandonRequest,
-    trust: &TaskBoardRemoteOperationTrustFence,
-) -> Result<(), CliError> {
-    if assignment.target_host_instance_id.as_deref()
-        == Some(trust.observed_host_instance_id.as_str())
-    {
-        consume_controller_operation_trust_in_tx(
-            transaction,
-            assignment,
-            TaskBoardRemoteOperationKind::UploadSourceBundle,
-            &request.upload_request_sha256,
-        )
-        .await
-    } else {
-        consume_successor_recovery_operation_trust_in_tx(
-            transaction,
-            assignment,
-            TaskBoardRemoteOperationKind::UploadSourceBundle,
-            &request.upload_request_sha256,
-            trust,
-        )
-        .await
-    }
-}

@@ -10,6 +10,7 @@ use crate::daemon::db::{TaskBoardRemoteMutationOutcome, utc_now};
 use crate::task_board::{
     TASK_BOARD_EXECUTION_TARGET_RESOURCE, TaskBoardAttemptState, TaskBoardRemoteAssignmentState,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 #[tokio::test]
 async fn offer_authority_fences_stop_until_response_settlement() {

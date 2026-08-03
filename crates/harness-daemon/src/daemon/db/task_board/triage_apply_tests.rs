@@ -9,6 +9,8 @@ use crate::task_board::{
     TaskBoardLaneOrigin, TaskBoardPriority, TaskBoardStatus, TaskBoardTriageDecision, TriageCause,
     TriageReasonCode, TriageVerdict,
 };
+use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
+use crate::daemon::db::prelude::*;
 
 pub(super) async fn connect() -> (tempfile::TempDir, AsyncDaemonDb) {
     let directory = tempdir().expect("tempdir");

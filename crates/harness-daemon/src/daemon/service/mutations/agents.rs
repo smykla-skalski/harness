@@ -4,6 +4,7 @@ use super::super::{
     refresh_signal_index_for_db, session_detail, session_detail_from_daemon_db, session_not_found,
     session_service, slice, utc_now,
 };
+use crate::daemon::db::prelude::*;
 
 /// Change an agent role through the shared session service.
 ///

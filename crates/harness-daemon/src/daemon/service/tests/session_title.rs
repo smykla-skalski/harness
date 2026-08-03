@@ -1,4 +1,5 @@
 use super::*;
+use crate::daemon::db::prelude::*;
 
 #[test]
 fn update_session_title_db_direct_updates_sqlite() {

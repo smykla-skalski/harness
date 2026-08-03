@@ -20,7 +20,7 @@ pub fn run(conn: &Connection) -> Result<(), CliError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use harness_daemon::daemon::db::{AsyncDaemonDb, DaemonDb};
+    use harness_daemon::daemon::db::{AsyncDaemonDb, DaemonDb, schema_query_test_support};
     use harness_task_board::TaskBoardItem;
     use tempfile::tempdir;
 
@@ -77,12 +77,15 @@ mod tests {
         let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
             .await
             .expect("database");
-        db.create_task_board_item(TaskBoardItem::new(
-            "task-schema-intent".into(),
-            "Task".into(),
-            String::new(),
-            "2026-07-16T10:00:00Z".into(),
-        ))
+        schema_query_test_support::create_task_board_item(
+            &db,
+            TaskBoardItem::new(
+                "task-schema-intent".into(),
+                "Task".into(),
+                String::new(),
+                "2026-07-16T10:00:00Z".into(),
+            ),
+        )
         .await
         .expect("create item");
 

@@ -2,6 +2,8 @@
 //! `FILES_PAGE_CAP` pages have been visited. Supports `If-None-Match`
 //! conditional revalidation so callers can short-circuit on cached `ETags`.
 
+#![allow(dead_code)]
+
 use reqwest::Method;
 use reqwest::header::{ETAG, HeaderMap, HeaderValue, IF_NONE_MATCH};
 use std::error::Error;

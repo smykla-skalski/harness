@@ -12,6 +12,7 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 use super::task_board_workflow_execution::{
     canonical_time, guarded_execution, require_human, stale_outcome,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 pub(crate) async fn record_workflow_reviewer_outcome(
     db: &AsyncDaemonDb,

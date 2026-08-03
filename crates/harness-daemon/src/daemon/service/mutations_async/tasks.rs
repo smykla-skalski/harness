@@ -8,6 +8,7 @@ use super::super::{
 use super::{append_log, bump_session, persist_task_signal_effects, resolved_session_for_mutation};
 use crate::infra::io::validate_safe_segment;
 use crate::session::types::{SessionState, TaskStatus, WorkItem};
+use crate::daemon::db::prelude::*;
 
 struct DeleteRollback<'a> {
     project_id: &'a str,

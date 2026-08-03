@@ -4,6 +4,8 @@ use super::{
 };
 #[cfg(test)]
 use super::{CliErrorKind, session_not_found};
+#[cfg(test)]
+use crate::daemon::db::timeline::DaemonDbTimeline;
 use crate::session::service::ResolvedRuntimeSessionAgent;
 use harness_protocol::daemon::summaries::AcpTranscriptResponse;
 #[cfg(test)]
@@ -28,6 +30,7 @@ pub(crate) use liveness::{
     reconcile_active_session_liveness_background_async,
 };
 use liveness::{reconcile_active_session_liveness_for_reads, reconcile_session_liveness_for_read};
+use crate::daemon::db::prelude::*;
 
 /// List discovered projects known to the daemon.
 ///

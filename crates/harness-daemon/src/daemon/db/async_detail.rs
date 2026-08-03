@@ -22,15 +22,30 @@ FROM signal_index
 WHERE session_id = ?1 AND status = 'pending'
 ORDER BY created_at DESC";
 
-impl AsyncDaemonDb {
-    /// Load indexed session signals from the canonical async daemon DB.
-    ///
+/// Async mirror of `signals::SignalIndexQueries`'s reads, plus the cached
+/// agent-activity read, through the canonical async daemon DB.
+pub(crate) trait AsyncSignalReadQueries: Send + Sync {
     /// # Errors
     /// Returns [`CliError`] on query or JSON parse failure.
-    pub(crate) async fn load_signals(
+    async fn load_signals(&self, session_id: &str) -> Result<Vec<SessionSignalRecord>, CliError>;
+
+    /// # Errors
+    /// Returns [`CliError`] on query or JSON parse failure.
+    async fn load_agent_activity(
         &self,
         session_id: &str,
-    ) -> Result<Vec<SessionSignalRecord>, CliError> {
+    ) -> Result<Vec<daemon_protocol::AgentToolActivitySummary>, CliError>;
+
+    /// # Errors
+    /// Returns [`CliError`] on query or JSON parse failure.
+    async fn load_expired_pending_signals(
+        &self,
+        session_id: &str,
+    ) -> Result<Vec<ExpiredPendingSignalIndexRecord>, CliError>;
+}
+
+impl AsyncSignalReadQueries for AsyncDaemonDb {
+    async fn load_signals(&self, session_id: &str) -> Result<Vec<SessionSignalRecord>, CliError> {
         let rows = query_as::<_, AsyncSignalRow>(LOAD_SIGNALS_SQL)
             .bind(session_id)
             .fetch_all(self.pool())
@@ -39,11 +54,7 @@ impl AsyncDaemonDb {
         rows.into_iter().map(AsyncSignalRow::into_record).collect()
     }
 
-    /// Load cached agent activity summaries from the canonical async daemon DB.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on query or JSON parse failure.
-    pub(crate) async fn load_agent_activity(
+    async fn load_agent_activity(
         &self,
         session_id: &str,
     ) -> Result<Vec<daemon_protocol::AgentToolActivitySummary>, CliError> {
@@ -65,11 +76,7 @@ impl AsyncDaemonDb {
             .collect()
     }
 
-    /// Load only pending indexed signals whose effective status has expired.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on query or JSON parse failure.
-    pub(crate) async fn load_expired_pending_signals(
+    async fn load_expired_pending_signals(
         &self,
         session_id: &str,
     ) -> Result<Vec<ExpiredPendingSignalIndexRecord>, CliError> {

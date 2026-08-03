@@ -7,6 +7,7 @@ use crate::task_board::{
 };
 
 use super::remote_viewer_support::get_http_json;
+use crate::daemon::db::task_board::prelude::*;
 
 pub(super) async fn seed_review_report(
     state: &crate::daemon::http::DaemonHttpState,

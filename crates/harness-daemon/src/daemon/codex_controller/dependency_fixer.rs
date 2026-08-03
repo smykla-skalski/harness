@@ -17,6 +17,7 @@ use harness_task_board::{
 };
 
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::protocol::{CodexRunMode, CodexRunRequest, CodexRunStatus};
 use crate::session::types::{CONTROL_PLANE_ACTOR_ID, SessionRole};
 

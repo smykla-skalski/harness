@@ -10,6 +10,7 @@ use super::super::{
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
 use crate::daemon::index::ResolvedSession;
 use harness_kernel::errors::CliError;
+use crate::daemon::db::prelude::*;
 
 pub(super) fn reconcile_active_session_liveness_for_reads(
     _include_all: bool,

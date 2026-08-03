@@ -45,8 +45,6 @@ struct ReviewsFilesRerouteContractTests {
     #expect(response.pullRequestID == "PR_kwReview1")
     #expect(response.number == 42)
     #expect(response.headRefOid == "abc123")
-    #expect(response.headRefName == "feature/x")
-    #expect(response.baseRefOid == "def456")
     #expect(response.viewerCanMarkViewed)
     #expect(response.fetchedAt == "2026-05-22T10:00:00Z")
     #expect(response.paginationComplete)
@@ -111,7 +109,7 @@ struct ReviewsFilesRerouteContractTests {
     let patch = response.patches.first
     #expect(patch?.path == "src/main.rs")
     #expect(patch?.status == .modified)
-    #expect(patch?.servedBy == .localClone)
+    #expect(patch?.servedBy == .githubRest)
     #expect(patch?.additions == 1)
     #expect(patch?.deletions == 1)
     #expect(patch?.etag == "abc-etag")
@@ -190,7 +188,7 @@ struct ReviewsFilesRerouteContractTests {
     let preview = response.previews.first
     #expect(preview?.path == "src/lib.rs")
     #expect(preview?.status == .modified)
-    #expect(preview?.servedBy == .localClone)
+    #expect(preview?.servedBy == .githubRest)
     #expect(preview?.lineCount == 3)
     #expect(preview?.lineLimit == 1000)
     #expect(preview?.hasMore == false)
@@ -215,40 +213,6 @@ struct ReviewsFilesRerouteContractTests {
     #expect(response.byteSize == 1024)
     #expect(response.isTruncated == false)
     #expect(response.rateLimitSnapshot?.remaining == 4600)
-  }
-
-  @Test("HTTP client decodes the local clones listing through the wire types")
-  func httpLocalClonesListReroute() async throws {
-    TaskBoardURLProtocol.reset()
-    let client = try makeHTTPClient()
-
-    let clones = try await client.listReviewLocalClones()
-
-    assertLocalClones(clones)
-  }
-
-  @Test("WebSocket transport decodes the local clones listing through the wire types")
-  func webSocketLocalClonesListReroute() async throws {
-    let probe = RPCProbe()
-    let transport = try makeWebSocketTransport(probe: probe)
-
-    let clones = try await transport.listReviewLocalClones()
-
-    assertLocalClones(clones)
-
-    let methods = await probe.calls.map(\.method)
-    #expect(methods == [.reviewsFilesLocalClonesList])
-  }
-
-  private func assertLocalClones(_ clones: [ReviewLocalCloneEntry]) {
-    #expect(clones.count == 1)
-    let clone = clones.first
-    #expect(clone?.repoFullName == "kumahq/kuma")
-    #expect(clone?.repoKeySegment == "kumahq-kuma")
-    #expect(clone?.sizeBytes == 20480)
-    #expect(clone?.createdAt == "2026-05-20T09:00:00Z")
-    #expect(clone?.lastUsedAt == "2026-05-22T10:00:00Z")
-    #expect(clone?.lastFetchedAt == "2026-05-22T09:30:00Z")
   }
 
   private func makeHTTPClient() throws -> HarnessMonitorAPIClient {

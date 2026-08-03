@@ -1,16 +1,19 @@
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
-use crate::agents::runtime::{AgentRuntime, InitialPromptDelivery, runtime_for_name};
 use crate::daemon::agent_tui::{
     AgentTuiAttachState, AgentTuiInputWorker, AgentTuiProcess, AgentTuiSnapshot, AgentTuiStatus,
-    deliver_deferred_prompts, snapshot_from_process, spawn_agent_tui_process,
+    deliver_deferred_prompts, signal_readiness_ready, snapshot_from_process,
+    spawn_agent_tui_process,
 };
 use crate::daemon::state::HostBridgeCapabilityManifest;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
+use super::agent_tui_launch::{
+    bridge_deferred_auto_join, ensure_agent_tui_running, ensure_same_agent_tui_launch,
+};
 use super::core::{
     BridgeActiveTui, BridgeAgentTuiMetadata, BridgeSnapshotContext, BridgeTuiExitInfo,
 };
@@ -50,8 +53,10 @@ impl BridgeServer {
             spec.effort.as_deref(),
         )?;
         let deferred_prompt = bridge_deferred_auto_join(&spec.profile.runtime, spec.prompt.clone());
+        let deferred_user_prompt = spec.user_prompt.clone().filter(|value| !value.is_empty());
         let deferred_runtime = spec.profile.runtime.clone();
         let deferred_tui_id = spec.tui_id.clone();
+        let startup_error = Arc::new(Mutex::new(None));
         let process = Arc::new(process);
         let stop_flag = Arc::new(AtomicBool::new(false));
         let input_worker = AgentTuiInputWorker::spawn(Arc::clone(&process), Arc::clone(&stop_flag));
@@ -75,6 +80,7 @@ impl BridgeServer {
                 launch_spec: spec,
                 created_at: snapshot.created_at.clone(),
                 exit_info: None,
+                startup_error: Arc::clone(&startup_error),
             },
         );
         drop(active_tuis);
@@ -82,17 +88,23 @@ impl BridgeServer {
 
         // Send PTY-delivered prompts in background so the bridge response
         // returns immediately. CLI-injected runtimes already received the
-        // prompt in argv and must not be sent the same join command again.
-        if let Some(prompt) = deferred_prompt {
+        // auto-join in argv and must not be sent the same join command again,
+        // but their user prompt still has to wait for readiness.
+        if deferred_prompt.is_some() || deferred_user_prompt.is_some() {
             let process = Arc::clone(&self.active_tui(&deferred_tui_id)?.process);
             thread::spawn(move || {
-                deliver_deferred_prompts(
+                let problem = deliver_deferred_prompts(
                     &process,
                     &deferred_runtime,
                     &deferred_tui_id,
-                    &prompt,
-                    None,
+                    deferred_prompt.as_deref(),
+                    deferred_user_prompt.as_deref(),
                 );
+                if let Some(problem) = problem
+                    && let Ok(mut slot) = startup_error.lock()
+                {
+                    *slot = Some(problem);
+                }
             });
         }
 
@@ -111,7 +123,27 @@ impl BridgeServer {
         snapshot.created_at = active.created_at;
         snapshot.exit_code = exit_code;
         snapshot.signal = signal;
+        snapshot.error = active
+            .startup_error
+            .lock()
+            .ok()
+            .and_then(|slot| slot.clone());
         Ok(snapshot)
+    }
+
+    /// Release the deferred join for a bridge-hosted terminal agent.
+    ///
+    /// The sandboxed daemon holds no process handle, so the `SessionStart`
+    /// readiness callback has to travel here. Without it nothing signals the
+    /// PTY-side condvar for runtimes that have no readiness pattern, and the
+    /// join is typed blind once the readiness timeout elapses.
+    pub(super) fn signal_agent_tui_ready(
+        &self,
+        tui_id: &str,
+    ) -> Result<AgentTuiSnapshot, CliError> {
+        let active = self.active_tui(tui_id)?;
+        signal_readiness_ready(&active.process.readiness_signal());
+        self.get_agent_tui(tui_id)
     }
 
     /// Return the cached exit info for `tui_id`, detecting fresh exits via
@@ -191,50 +223,12 @@ impl BridgeServer {
     }
 }
 
-fn ensure_same_agent_tui_launch(
-    active: &AgentTuiStartSpec,
-    requested: &AgentTuiStartSpec,
-) -> Result<(), CliError> {
-    if active == requested {
-        return Ok(());
-    }
-    Err(CliErrorKind::workflow_io(format!(
-        "terminal agent '{}' already belongs to a different host-bridge launch",
-        requested.tui_id
-    ))
-    .into())
-}
-
-fn ensure_agent_tui_running(snapshot: &AgentTuiSnapshot) -> Result<(), CliError> {
-    if matches!(
-        snapshot.status,
-        AgentTuiStatus::Starting | AgentTuiStatus::Running
-    ) {
-        return Ok(());
-    }
-    Err(CliErrorKind::workflow_io(format!(
-        "terminal agent '{}' has already completed in the host bridge",
-        snapshot.tui_id
-    ))
-    .into())
-}
-
-fn bridge_deferred_auto_join(runtime: &str, prompt: Option<String>) -> Option<String> {
-    let delivery = runtime_for_name(runtime).map_or(
-        InitialPromptDelivery::PtySend,
-        AgentRuntime::initial_prompt_delivery,
-    );
-    match delivery {
-        InitialPromptDelivery::PtySend => prompt.filter(|value| !value.is_empty()),
-        InitialPromptDelivery::CliPositional | InitialPromptDelivery::CliFlag(_) => None,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
     use std::sync::Arc;
     use std::sync::Barrier;
+    use std::sync::Mutex;
     use std::sync::atomic::AtomicBool;
     use std::time::Duration;
 
@@ -287,6 +281,7 @@ mod tests {
             transcript_path: transcript_path.clone(),
             size,
             prompt: None,
+            user_prompt: None,
             effort: None,
         };
         let spec =
@@ -309,6 +304,7 @@ mod tests {
             launch_spec,
             created_at: "2026-04-22T09:00:00Z".into(),
             exit_info: None,
+            startup_error: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -347,6 +343,62 @@ mod tests {
         assert_eq!(second.status, AgentTuiStatus::Exited);
         assert_eq!(second.exit_code, first.exit_code);
         assert_eq!(second.tui_id, tui_id);
+    }
+
+    /// A sandboxed daemon reads a bridge-hosted TUI only through these
+    /// snapshots, so a startup problem that never lands on one is invisible.
+    #[test]
+    fn get_agent_tui_surfaces_a_recorded_startup_error() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let server = make_test_server(tmp.path());
+        let tui_id = "bridge-tui-startup-error".to_string();
+        let active = spawn_quick_exit_tui(tmp.path(), &tui_id);
+        let startup_error = Arc::clone(&active.startup_error);
+        server
+            .active_tuis
+            .lock()
+            .expect("active lock")
+            .insert(tui_id.clone(), active);
+
+        assert_eq!(
+            server.get_agent_tui(&tui_id).expect("clean get").error,
+            None
+        );
+
+        *startup_error.lock().expect("startup error lock") =
+            Some("terminal agent never signaled readiness".to_string());
+
+        assert_eq!(
+            server
+                .get_agent_tui(&tui_id)
+                .expect("get after failure")
+                .error
+                .as_deref(),
+            Some("terminal agent never signaled readiness")
+        );
+    }
+
+    #[test]
+    fn signal_agent_tui_ready_releases_the_deferred_join() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let server = make_test_server(tmp.path());
+        let tui_id = "bridge-tui-ready".to_string();
+        let active = spawn_quick_exit_tui(tmp.path(), &tui_id);
+        let process = Arc::clone(&active.process);
+        server
+            .active_tuis
+            .lock()
+            .expect("active lock")
+            .insert(tui_id.clone(), active);
+
+        server
+            .signal_agent_tui_ready(&tui_id)
+            .expect("signal readiness over the bridge");
+
+        assert!(
+            process.wait_ready(Duration::from_millis(0)),
+            "the bridge-held PTY must be marked ready without waiting out the timeout"
+        );
     }
 
     #[test]
@@ -388,6 +440,7 @@ mod tests {
             transcript_path: tmp.path().join("transcript.raw"),
             size: AgentTuiSize { rows: 24, cols: 80 },
             prompt: None,
+            user_prompt: None,
             effort: None,
         };
         ensure_same_agent_tui_launch(&spec, &spec).expect("matching launch is reusable");
@@ -422,6 +475,7 @@ mod tests {
             transcript_path: tmp.path().join("concurrent-transcript.raw"),
             size: AgentTuiSize { rows: 8, cols: 40 },
             prompt: None,
+            user_prompt: None,
             effort: None,
         };
         let barrier = Arc::new(Barrier::new(2));

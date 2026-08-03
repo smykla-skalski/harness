@@ -20,6 +20,7 @@ use super::{
     codex_worker_request, managed_worker_id, settle_claimed_task_board_worker,
     start_worker_for_applied_task,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 mod read_only_start_revision_support;
 
@@ -28,6 +29,7 @@ use read_only_start_revision_support::{
     bump_settings_revision, codex_run_count, current_intent_claim, engage_spawn_kill_switch,
     intent_compensation_pending, workflow_execution_count,
 };
+use crate::daemon::db::prelude::*;
 
 #[tokio::test]
 async fn workflow_dispatch_persists_before_any_codex_start() {

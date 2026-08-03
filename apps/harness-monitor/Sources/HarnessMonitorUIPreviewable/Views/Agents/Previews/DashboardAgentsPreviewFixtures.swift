@@ -245,6 +245,12 @@ enum DashboardAgentsPreviewFixtures {
       checkoutID: spec.checkoutID
     )
     let path = "/Users/example/Projects/\(spec.projectName)/\(spec.checkoutName)"
+    let sessionAgentID: String? =
+      switch spec.runtime {
+      case .acp: "preview-acp-worker"
+      case .codex: "preview-codex-worker"
+      case .terminal: "preview-terminal-worker"
+      }
     return DashboardAgentSummary(
       identity: DashboardAgentIdentity(
         workspace: workspaceIdentity,
@@ -258,7 +264,7 @@ enum DashboardAgentsPreviewFixtures {
         checkoutRoot: path
       ),
       sessionID: "opaque-preview-correlation",
-      sessionAgentID: spec.runtime == .acp ? "preview-acp-worker" : nil,
+      sessionAgentID: sessionAgentID,
       displayName: spec.name,
       lifecycle: spec.lifecycle,
       summary: spec.summary,

@@ -18,6 +18,7 @@ use crate::daemon::task_board_managed_agents::{
 use crate::daemon::task_board_read_only_coordinator::reconcile_task_board_read_only_workflows;
 use crate::task_board::managed_worker_id;
 use harness_kernel::errors::CliError;
+use crate::daemon::db::task_board::prelude::*;
 
 const RECOVERY_INTERVAL: Duration = Duration::from_secs(1);
 const MAX_RECOVERIES_PER_TICK: usize = 16;

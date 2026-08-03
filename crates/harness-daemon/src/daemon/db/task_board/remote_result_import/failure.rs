@@ -18,6 +18,7 @@ use crate::task_board::{
     TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionRecord,
     validate_task_board_attempt_update, validate_task_board_workflow_execution,
 };
+use crate::daemon::db::prelude::*;
 
 const BLOCKED_REASON: &str = "remote_result_import_manual_required";
 

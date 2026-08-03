@@ -8,12 +8,12 @@ use sqlx::{Sqlite, Transaction, query, query_as};
 use super::POLICY_RUNTIME_CHANGE_SCOPE;
 use super::items::bump_change_in_tx;
 use super::mapper::{parse_json, to_json};
-use super::policy_runtime_queries::PolicyRuntimeQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::policy_runtime::handoff_outbox::HandoffRecord;
 use crate::task_board::policy_runtime::models::PolicyWorkflowEvent;
 use crate::task_board::policy_runtime::notification::NotificationRecord;
 use crate::task_board::policy_runtime::task_creation::TaskCreationRecord;
+use crate::daemon::db::prelude::*;
 
 const RETENTION_SECONDS: i64 = 3_600;
 
@@ -39,69 +39,6 @@ const TASK_CREATION_SQL: OutboxSql = OutboxSql {
     delete: "DELETE FROM policy_task_creation_outbox",
     insert: "INSERT INTO policy_task_creation_outbox (recorded_at, payload_json) VALUES (?1, ?2)",
 };
-
-impl AsyncDaemonDb {
-    pub(crate) async fn publish_policy_event_at(
-        &self,
-        event: PolicyWorkflowEvent,
-        now: DateTime<Utc>,
-    ) -> Result<i64, CliError> {
-        <Self as PolicyRuntimeQueries>::publish_policy_event_at(self, event, now).await
-    }
-
-    pub(crate) async fn pending_policy_events(&self) -> Result<Vec<PolicyWorkflowEvent>, CliError> {
-        <Self as PolicyRuntimeQueries>::pending_policy_events(self).await
-    }
-
-    pub(crate) async fn remove_delivered_policy_events_at(
-        &self,
-        delivered: &[PolicyWorkflowEvent],
-        now: DateTime<Utc>,
-    ) -> Result<i64, CliError> {
-        <Self as PolicyRuntimeQueries>::remove_delivered_policy_events_at(self, delivered, now)
-            .await
-    }
-
-    pub(crate) async fn record_policy_handoff_at(
-        &self,
-        record: HandoffRecord,
-        now: DateTime<Utc>,
-    ) -> Result<i64, CliError> {
-        <Self as PolicyRuntimeQueries>::record_policy_handoff_at(self, record, now).await
-    }
-
-    pub(crate) async fn policy_handoff_records(&self) -> Result<Vec<HandoffRecord>, CliError> {
-        <Self as PolicyRuntimeQueries>::policy_handoff_records(self).await
-    }
-
-    pub(crate) async fn record_policy_notification_at(
-        &self,
-        record: NotificationRecord,
-        now: DateTime<Utc>,
-    ) -> Result<i64, CliError> {
-        <Self as PolicyRuntimeQueries>::record_policy_notification_at(self, record, now).await
-    }
-
-    pub(crate) async fn policy_notification_records(
-        &self,
-    ) -> Result<Vec<NotificationRecord>, CliError> {
-        <Self as PolicyRuntimeQueries>::policy_notification_records(self).await
-    }
-
-    pub(crate) async fn record_policy_task_creation_at(
-        &self,
-        record: TaskCreationRecord,
-        now: DateTime<Utc>,
-    ) -> Result<i64, CliError> {
-        <Self as PolicyRuntimeQueries>::record_policy_task_creation_at(self, record, now).await
-    }
-
-    pub(crate) async fn policy_task_creation_records(
-        &self,
-    ) -> Result<Vec<TaskCreationRecord>, CliError> {
-        <Self as PolicyRuntimeQueries>::policy_task_creation_records(self).await
-    }
-}
 
 /// Real implementations behind the matching [`PolicyRuntimeQueries`] methods,
 /// called from the single consolidated trait impl in

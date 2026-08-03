@@ -8,6 +8,9 @@ use crate::task_board::{
     TaskBoardItem, TaskBoardLaneOrigin, TaskBoardPriority, TaskBoardStatus, TaskBoardSyncStore,
     build_dispatch_plans_with_policy,
 };
+use crate::daemon::db::task_board::dispatch_admission_queries::DispatchAdmissionQueries;
+use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
+use crate::daemon::db::task_board::lane_placement_queries::LanePlacementQueries;
 
 #[tokio::test]
 async fn explicit_slots_shift_collisions_then_reset_and_tombstone_compacts() {

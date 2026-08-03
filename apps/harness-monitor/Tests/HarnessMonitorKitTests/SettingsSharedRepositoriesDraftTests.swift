@@ -27,6 +27,36 @@ struct SettingsSharedRepositoriesDraftTests {
     #expect(draft.index(for: "example/shared") == 1)
   }
 
+  @Test("Task Board scope can isolate one repository")
+  func taskBoardScopeCanIsolateOneRepository() {
+    var draft = makeDraft(
+      reviewsRepositories: ["example/alpha"],
+      taskBoardRepositories: ["example/alpha", "example/beta", "example/gamma"]
+    )
+
+    draft.enableOnlyForTaskBoard(rowID: "example/beta")
+
+    #expect(draft.taskBoardEnabledCount == 1)
+    #expect(draft.taskBoardRepositories == ["example/beta"])
+    #expect(draft.reviewsRepositories == ["example/alpha"])
+  }
+
+  @Test("Task Board scope can enable and disable every repository")
+  func taskBoardScopeCanEnableAndDisableEveryRepository() {
+    var draft = makeDraft(
+      reviewsRepositories: ["example/alpha", "example/beta"],
+      taskBoardRepositories: ["example/alpha"]
+    )
+
+    draft.setTaskBoardEnabledForAll(true)
+    #expect(draft.taskBoardEnabledCount == 2)
+
+    draft.setTaskBoardEnabledForAll(false)
+    #expect(draft.taskBoardEnabledCount == 0)
+    #expect(draft.taskBoardRepositories.isEmpty)
+    #expect(draft.reviewsRepositories == ["example/alpha", "example/beta"])
+  }
+
   @Test("Repository catalog preserves disabled rows and order across reloads")
   func repositoryCatalogPreservesDisabledRowsAndOrderAcrossReloads() throws {
     let catalog = ["example/omega", "example/disabled", "example/alpha"]

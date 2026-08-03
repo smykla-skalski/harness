@@ -29,6 +29,8 @@ use super::task_board_orchestrator_control::task_board_orchestrator_status_db;
 use super::task_board_orchestrator_execution::{
     run_dispatch_phase, run_evaluation_phase, run_publish_phase,
 };
+use crate::daemon::db::task_board::prelude::*;
+use super::task_board_repository_scope::{scoped_task_board_item_db, scoped_task_board_items_db};
 
 pub(crate) async fn run_task_board_orchestrator_once_db(
     db: &AsyncDaemonDb,
@@ -307,9 +309,9 @@ async fn items_for_input(
     input: &TaskBoardOrchestratorDispatchInput,
 ) -> Result<Vec<TaskBoardItem>, CliError> {
     let items = if let Some(item_id) = input.item_id.as_deref() {
-        vec![db.task_board_item(item_id).await?]
+        vec![scoped_task_board_item_db(db, item_id).await?]
     } else {
-        db.list_task_board_items(input.status).await?
+        scoped_task_board_items_db(db, input.status).await?
     };
     let machine = task_board_host_local_db(db).await.ok();
     Ok(items

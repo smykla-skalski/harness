@@ -10,12 +10,32 @@ INSERT OR REPLACE INTO signal_index (
     signal_json, ack_json, file_path, indexed_at
 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)";
 
-impl AsyncDaemonDb {
+/// Async mirror of `signals::SignalIndexQueries`'s writes, through the
+/// canonical async daemon DB.
+pub(crate) trait AsyncSignalIndexQueries: Send + Sync {
     /// Replace one session's signal index from the canonical async daemon DB.
     ///
     /// # Errors
     /// Returns [`CliError`] on SQL or JSON serialization failures.
-    pub(crate) async fn sync_signal_index(
+    async fn sync_signal_index(
+        &self,
+        session_id: &str,
+        signals: &[SessionSignalRecord],
+    ) -> Result<(), CliError>;
+
+    /// Merge updated signal records into the existing session index.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when loading or writing the signal index fails.
+    async fn merge_signal_records(
+        &self,
+        session_id: &str,
+        records: &[SessionSignalRecord],
+    ) -> Result<(), CliError>;
+}
+
+impl AsyncSignalIndexQueries for AsyncDaemonDb {
+    async fn sync_signal_index(
         &self,
         session_id: &str,
         signals: &[SessionSignalRecord],
@@ -43,11 +63,7 @@ impl AsyncDaemonDb {
         Ok(())
     }
 
-    /// Merge updated signal records into the existing session index.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] when loading or writing the signal index fails.
-    pub(crate) async fn merge_signal_records(
+    async fn merge_signal_records(
         &self,
         _session_id: &str,
         records: &[SessionSignalRecord],

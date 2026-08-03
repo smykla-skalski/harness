@@ -6,6 +6,7 @@ use crate::task_board::{TaskBoardItem, TaskBoardStatus, TriageVerdict};
 
 use super::remote_viewer_support::ws_rpc;
 use super::remote_viewer_task_board::{VIEWER_ID, assert_remote_write_denied};
+use crate::daemon::db::task_board::prelude::*;
 
 pub(super) const TRIAGE_ITEM_ID: &str = "remote-triage-item";
 const TRIAGE_OVERRIDE_ACTOR: &str = "operator-secret-override-actor";

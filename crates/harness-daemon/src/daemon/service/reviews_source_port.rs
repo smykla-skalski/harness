@@ -1,6 +1,7 @@
 use crate::reviews::{
-    ReviewItem, ReviewsActionResponse, ReviewsApproveRequest, ReviewsBodyRequest,
-    ReviewsFilesListRequest, ReviewsFilesPatchRequest, ReviewsQueryRequest, ReviewsQueryResponse,
+    ReviewFile, ReviewFilePatch, ReviewItem, ReviewsActionResponse, ReviewsApproveRequest,
+    ReviewsBodyRequest, ReviewsFilesListRequest, ReviewsFilesPatchRequest, ReviewsQueryRequest,
+    ReviewsQueryResponse,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
 
@@ -63,34 +64,19 @@ pub(crate) async fn immutable_pull_request_content(
         )
         .into());
     }
-    let exact_diff = super::reviews_files::exact_patch_review_files(&ReviewsFilesPatchRequest {
+    let patches_response = super::reviews_files::patch_review_files(&ReviewsFilesPatchRequest {
         pull_request_id: pull_request.pull_request_id.clone(),
         head_ref_oid_expected: expected_head.to_string(),
         paths: files.files.iter().map(|file| file.path.clone()).collect(),
         number: Some(number),
         repository_full_name: Some(repository.to_string()),
-        base_ref_oid_expected: files.base_ref_oid.clone(),
-        head_ref_name: files.head_ref_name.clone(),
-        base_ref_name: files.base_ref_name.clone(),
-        large_diff_strategy: None,
     })
     .await?;
-    let patches = &exact_diff.response;
+    let patches = &patches_response;
     if patches.drifted || patches.current_head_ref_oid != expected_head {
         return Err(source_changed(expected_head, &patches.current_head_ref_oid));
     }
-    let exact_files = files.files.iter().all(|file| {
-        patches.patches.iter().any(|patch| {
-            patch.path == file.path
-                && patch.status == file.change_type
-                && patch.additions == file.additions
-                && patch.deletions == file.deletions
-                && !patch.truncated
-                && patch.head_ref_oid == expected_head
-                && !patch.patch.trim().is_empty()
-        })
-    });
-    if patches.patches.len() != files.files.len() || !exact_files {
+    if !patches_exactly_match_files(&files.files, &patches.patches, expected_head) {
         return Err(
             CliErrorKind::invalid_transition("exact pull request diff is unavailable").into(),
         );
@@ -104,7 +90,6 @@ pub(crate) async fn immutable_pull_request_content(
     let content = serde_json::to_string(&serde_json::json!({
         "pull_request": pull_request,
         "description": description.body,
-        "merge_base_oid": exact_diff.merge_base_oid,
         "files": files.files,
         "patches": patches.patches,
     }))
@@ -124,6 +109,25 @@ pub(crate) async fn immutable_pull_request_content(
     Ok(content)
 }
 
+fn patches_exactly_match_files(
+    files: &[ReviewFile],
+    patches: &[ReviewFilePatch],
+    expected_head: &str,
+) -> bool {
+    patches.len() == files.len()
+        && files.iter().all(|file| {
+            patches.iter().any(|patch| {
+                patch.path == file.path
+                    && patch.status == file.change_type
+                    && patch.additions == file.additions
+                    && patch.deletions == file.deletions
+                    && !patch.truncated
+                    && patch.head_ref_oid == expected_head
+                    && !patch.patch.trim().is_empty()
+            })
+        })
+}
+
 fn source_changed(expected: &str, actual: &str) -> CliError {
     CliErrorKind::invalid_transition(format!(
         "pull request head changed while freezing review input: expected '{expected}', found '{actual}'"
@@ -135,4 +139,43 @@ pub(crate) async fn approve_pull_requests(
     request: &ReviewsApproveRequest,
 ) -> Result<ReviewsActionResponse, CliError> {
     super::reviews::approve_reviews(request).await
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::reviews::{
+        HarnessCodeLanguage, ReviewFile, ReviewFileChangeType, ReviewFilePatch,
+        ReviewFileServedBy, ReviewFileViewedState,
+    };
+
+    use super::patches_exactly_match_files;
+
+    #[test]
+    fn truncated_patch_is_not_exact_immutable_review_content() {
+        let files = vec![ReviewFile {
+            path: "src/lib.rs".to_string(),
+            previous_path: None,
+            change_type: ReviewFileChangeType::Modified,
+            additions: 2,
+            deletions: 1,
+            viewer_viewed_state: ReviewFileViewedState::Unviewed,
+            is_binary: false,
+            language_hint: HarnessCodeLanguage::Rust,
+            mode_change: None,
+        }];
+        let patches = vec![ReviewFilePatch {
+            path: "src/lib.rs".to_string(),
+            patch: "@@ -1 +1 @@".to_string(),
+            status: ReviewFileChangeType::Modified,
+            additions: 2,
+            deletions: 1,
+            truncated: true,
+            etag: None,
+            served_by: ReviewFileServedBy::GithubRest,
+            fetched_at: String::new(),
+            head_ref_oid: "abc123".to_string(),
+        }];
+
+        assert!(!patches_exactly_match_files(&files, &patches, "abc123"));
+    }
 }

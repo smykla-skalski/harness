@@ -22,6 +22,8 @@ use crate::task_board::{
     TaskBoardPhaseVerdict, TaskBoardRemoteAssignmentState, TaskBoardReviewResult,
     TaskBoardReviewerOutcome, TaskBoardWorkflowKind,
 };
+use crate::daemon::db::task_board::orchestrator_settings_queries::OrchestratorSettingsQueries;
+use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 
 pub(super) const TERMINAL_AT: &str = "2026-07-19T10:00:30Z";
 const RESULT_HEAD: &str = "2222222222222222222222222222222222222222";

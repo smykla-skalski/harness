@@ -170,18 +170,6 @@ fn review_routes_ws_parity_part_3() -> Vec<(HttpRouteMethod, &'static str, &'sta
         ),
         (
             HttpRouteMethod::Post,
-            http_paths::REVIEWS_FILES_LOCAL_CLONES,
-            ws_methods::REVIEWS_FILES_LOCAL_CLONES_LIST,
-            true,
-        ),
-        (
-            HttpRouteMethod::Post,
-            http_paths::REVIEWS_FILES_LOCAL_CLONES_DELETE,
-            ws_methods::REVIEWS_FILES_LOCAL_CLONES_DELETE,
-            true,
-        ),
-        (
-            HttpRouteMethod::Post,
             http_paths::REVIEWS_AVATAR,
             ws_methods::REVIEWS_AVATAR,
             true,

@@ -1,5 +1,6 @@
 use super::super::*;
 use super::CONTROL_PLANE_ACTOR_ID;
+use crate::daemon::db::prelude::*;
 
 #[test]
 fn create_task_db_direct_writes_to_sqlite() {

@@ -113,10 +113,6 @@ public protocol HarnessMonitorReviewsClientProtocol: Sendable {
   func fetchReviewFileBlob(
     request: ReviewsFilesBlobRequest
   ) async throws -> ReviewsFilesBlobResponse
-  func listReviewLocalClones() async throws -> [ReviewLocalCloneEntry]
-  func deleteReviewLocalClone(
-    repoKeySegment: String
-  ) async throws
   func fetchReviewTimeline(
     request: ReviewsTimelineRequest
   ) async throws -> ReviewsTimelineResponse
@@ -253,14 +249,6 @@ extension HarnessMonitorReviewsClientProtocol {
   public func fetchReviewFileBlob(
     request _: ReviewsFilesBlobRequest
   ) async throws -> ReviewsFilesBlobResponse {
-    throw HarnessMonitorAPIError.server(code: 501, message: "Reviews unavailable")
-  }
-
-  public func listReviewLocalClones() async throws -> [ReviewLocalCloneEntry] {
-    throw HarnessMonitorAPIError.server(code: 501, message: "Reviews unavailable")
-  }
-
-  public func deleteReviewLocalClone(repoKeySegment _: String) async throws {
     throw HarnessMonitorAPIError.server(code: 501, message: "Reviews unavailable")
   }
 

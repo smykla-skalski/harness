@@ -5,6 +5,7 @@ use super::remote_assignment_recovery_queue::{
     CONTROLLER_PROGRESSION_QUARANTINE_CODE, RawRecoveryCandidate,
     quarantine_remote_recovery_failure_in_tx,
 };
+use crate::daemon::db::task_board::remote_assignment_executor_lifecycle_queries::RemoteAssignmentExecutorLifecycleQueries;
 use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 
@@ -17,6 +18,7 @@ use cursor::{
     clear_cycle, clear_named_cursor, load_named_cursor, load_scan_row, require_pending_cursor,
     scan_error, select_cycle_page, store_named_cursor,
 };
+use crate::daemon::db::prelude::*;
 
 const CONTROLLER_QUEUE: &str = "task_board_remote_controller";
 const CONTROLLER_CYCLE_END_QUEUE: &str = "task_board_remote_controller_cycle_end";
@@ -55,31 +57,34 @@ struct ScanRow {
     lease_id: Option<String>,
 }
 
-impl AsyncDaemonDb {
-    pub(crate) async fn next_task_board_remote_controller_assignment(
-        &self,
-        now: &str,
-    ) -> Result<Option<TaskBoardRemoteControllerScanStep>, CliError> {
-        <Self as RemoteExecutionQueries>::next_task_board_remote_controller_assignment(self, now)
-            .await
-    }
-
-    async fn claim_next_controller_scan_cursor(
-        &self,
-        now: &str,
-    ) -> Result<Option<ScanRow>, CliError> {
-        let mut transaction = self
-            .begin_immediate_transaction("remote controller assignment scan")
-            .await?;
-        let cursor = next_scan_item_in_tx(&mut transaction, now).await?;
-        transaction.commit().await.map_err(|error| {
-            db_error(format!("commit remote controller assignment scan: {error}"))
-        })?;
-        Ok(cursor)
-    }
-
+pub(crate) trait RemoteAssignmentControllerScanQueries: Send + Sync {
     /// Acknowledges one attempted controller generation and advances the durable cycle.
-    pub(crate) async fn complete_task_board_remote_controller_assignment_scan(
+    async fn complete_task_board_remote_controller_assignment_scan(
+        &self,
+        item: &TaskBoardRemoteControllerScanItem,
+        now: &str,
+    ) -> Result<bool, CliError>;
+
+    async fn clear_task_board_remote_controller_progression_quarantine(
+        &self,
+        item: &TaskBoardRemoteControllerScanItem,
+    ) -> Result<(), CliError>;
+
+    /// Defers one exact generation after a transient controller operation fails.
+    ///
+    /// The quarantine snapshot prevents the failed row from monopolizing the
+    /// finite scan cycle, while the foreground caller remains fail-closed.
+    async fn defer_task_board_remote_controller_assignment_scan(
+        &self,
+        item: &TaskBoardRemoteControllerScanItem,
+        now: &str,
+    ) -> Result<bool, CliError>;
+
+    async fn task_board_remote_controller_progression_is_blocked(&self) -> Result<bool, CliError>;
+}
+
+impl RemoteAssignmentControllerScanQueries for AsyncDaemonDb {
+    async fn complete_task_board_remote_controller_assignment_scan(
         &self,
         item: &TaskBoardRemoteControllerScanItem,
         now: &str,
@@ -95,7 +100,7 @@ impl AsyncDaemonDb {
         Ok(incomplete)
     }
 
-    pub(crate) async fn clear_task_board_remote_controller_progression_quarantine(
+    async fn clear_task_board_remote_controller_progression_quarantine(
         &self,
         item: &TaskBoardRemoteControllerScanItem,
     ) -> Result<(), CliError> {
@@ -114,11 +119,7 @@ impl AsyncDaemonDb {
         .map_err(|error| db_error(format!("clear remote controller quarantine: {error}")))
     }
 
-    /// Defers one exact generation after a transient controller operation fails.
-    ///
-    /// The quarantine snapshot prevents the failed row from monopolizing the
-    /// finite scan cycle, while the foreground caller remains fail-closed.
-    pub(crate) async fn defer_task_board_remote_controller_assignment_scan(
+    async fn defer_task_board_remote_controller_assignment_scan(
         &self,
         item: &TaskBoardRemoteControllerScanItem,
         now: &str,
@@ -142,9 +143,7 @@ impl AsyncDaemonDb {
         Ok(incomplete)
     }
 
-    pub(crate) async fn task_board_remote_controller_progression_is_blocked(
-        &self,
-    ) -> Result<bool, CliError> {
+    async fn task_board_remote_controller_progression_is_blocked(&self) -> Result<bool, CliError> {
         query_scalar(
             "SELECT EXISTS (
                  SELECT 1
@@ -208,32 +207,48 @@ impl AsyncDaemonDb {
         })
     }
 
-    async fn quarantine_controller_scan_decode(
-        &self,
-        cursor: ScanRow,
-        now: &str,
-        error: CliError,
-    ) -> Result<TaskBoardRemoteControllerScanStep, CliError> {
-        self.quarantine_remote_recovery_failure(&cursor.recovery_candidate(), now, &error)
-            .await?;
-        let mut transaction = self
-            .begin_immediate_transaction("remote controller decode failure completion")
-            .await?;
-        let scan_incomplete = complete_scan_item_in_tx(&mut transaction, &cursor, now).await?;
-        transaction.commit().await.map_err(|commit_error| {
-            db_error(format!(
-                "commit remote controller decode quarantine: {commit_error}"
-            ))
-        })?;
-        Ok(TaskBoardRemoteControllerScanStep::Quarantined(
-            TaskBoardRemoteControllerScanFailure {
-                assignment_id: cursor.assignment_id,
-                code: error.code().to_owned(),
-                message: error.to_string(),
-                scan_incomplete,
-            },
+}
+
+async fn claim_next_controller_scan_cursor(
+    db: &AsyncDaemonDb,
+    now: &str,
+) -> Result<Option<ScanRow>, CliError> {
+    let mut transaction = db
+        .begin_immediate_transaction("remote controller assignment scan")
+        .await?;
+    let cursor = next_scan_item_in_tx(&mut transaction, now).await?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| db_error(format!("commit remote controller assignment scan: {error}")))?;
+    Ok(cursor)
+}
+
+async fn quarantine_controller_scan_decode(
+    db: &AsyncDaemonDb,
+    cursor: ScanRow,
+    now: &str,
+    error: CliError,
+) -> Result<TaskBoardRemoteControllerScanStep, CliError> {
+    db.quarantine_remote_recovery_failure(&cursor.recovery_candidate(), now, &error)
+        .await?;
+    let mut transaction = db
+        .begin_immediate_transaction("remote controller decode failure completion")
+        .await?;
+    let scan_incomplete = complete_scan_item_in_tx(&mut transaction, &cursor, now).await?;
+    transaction.commit().await.map_err(|commit_error| {
+        db_error(format!(
+            "commit remote controller decode quarantine: {commit_error}"
         ))
-    }
+    })?;
+    Ok(TaskBoardRemoteControllerScanStep::Quarantined(
+        TaskBoardRemoteControllerScanFailure {
+            assignment_id: cursor.assignment_id,
+            code: error.code().to_owned(),
+            message: error.to_string(),
+            scan_incomplete,
+        },
+    ))
 }
 
 /// Claims one restart-replayable controller generation for remote verification.
@@ -242,7 +257,7 @@ pub(super) async fn next_task_board_remote_controller_assignment(
     now: &str,
 ) -> Result<Option<TaskBoardRemoteControllerScanStep>, CliError> {
     canonical_time(now, "remote controller scan time")?;
-    let Some(cursor) = db.claim_next_controller_scan_cursor(now).await? else {
+    let Some(cursor) = claim_next_controller_scan_cursor(db, now).await? else {
         return Ok(None);
     };
     match db.task_board_remote_assignment(&cursor.assignment_id).await {
@@ -251,24 +266,23 @@ pub(super) async fn next_task_board_remote_controller_assignment(
                 Box::new(TaskBoardRemoteControllerScanItem { assignment, cursor }),
             )))
         }
-        Ok(Some(_)) => db
-            .quarantine_controller_scan_decode(
-                cursor,
-                now,
-                db_error("remote controller scan cursor contradicts immutable offer time"),
-            )
-            .await
-            .map(Some),
-        Ok(None) => db
-            .quarantine_controller_scan_decode(
-                cursor,
-                now,
-                db_error("scanned remote controller assignment disappeared"),
-            )
-            .await
-            .map(Some),
-        Err(error) => db
-            .quarantine_controller_scan_decode(cursor, now, error)
+        Ok(Some(_)) => quarantine_controller_scan_decode(
+            db,
+            cursor,
+            now,
+            db_error("remote controller scan cursor contradicts immutable offer time"),
+        )
+        .await
+        .map(Some),
+        Ok(None) => quarantine_controller_scan_decode(
+            db,
+            cursor,
+            now,
+            db_error("scanned remote controller assignment disappeared"),
+        )
+        .await
+        .map(Some),
+        Err(error) => quarantine_controller_scan_decode(db, cursor, now, error)
             .await
             .map(Some),
     }

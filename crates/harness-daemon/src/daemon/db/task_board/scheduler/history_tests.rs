@@ -10,6 +10,7 @@ use crate::task_board::{
     TaskBoardAutomationHistoryRequest, TaskBoardAutomationRunOutcome, TaskBoardAutomationRunStage,
     TaskBoardAutomationRunTrigger,
 };
+use crate::daemon::db::task_board::scheduler::queries::TaskBoardAutomationSchedulerQueries;
 
 #[tokio::test]
 async fn history_limit_and_tie_cursor_are_stable() {

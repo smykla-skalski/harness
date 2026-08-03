@@ -11,6 +11,7 @@ use super::audit::{broadcast_automation_audits, insert_automation_audit, parse_s
 use super::runs::TaskBoardAutomationRunLease;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardAutomationRunStage;
+use crate::daemon::db::prelude::*;
 
 #[derive(Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -19,82 +20,72 @@ struct StoredStageSummary {
     stages: Vec<TaskBoardAutomationRunStage>,
 }
 
-impl AsyncDaemonDb {
-    pub(crate) async fn upsert_task_board_automation_run_stage(
-        &self,
-        lease: &TaskBoardAutomationRunLease,
-        stage: &TaskBoardAutomationRunStage,
-        now: DateTime<Utc>,
-    ) -> Result<u64, CliError> {
-        let run_id = &lease.run_id;
-        validate_stage(stage, run_id)?;
-        let mut transaction = self
-            .begin_immediate_transaction("task board automation run stage upsert")
-            .await?;
-        let (stored, scope_json, revision) = query_as::<_, (String, String, i64)>(
-            "SELECT stage_summary_json, scope_json, revision
-             FROM task_board_orchestrator_runs
-             WHERE run_id = ?1 AND lease_owner = ?2 AND lease_epoch = ?3
-               AND state IN ('running', 'cancelling') AND lease_expires_at > ?4",
-        )
-        .bind(run_id)
-        .bind(&lease.lease_owner)
-        .bind(i64::try_from(lease.lease_epoch).unwrap_or(i64::MAX))
-        .bind(now.to_rfc3339())
-        .fetch_optional(transaction.as_mut())
-        .await
-        .map_err(|error| {
-            db_error(format!(
-                "load task board automation run stage summary '{run_id}': {error}"
-            ))
-        })?
-        .ok_or_else(|| {
-            db_error(format!(
-                "task board automation run '{run_id}' lost its stage-write lease"
-            ))
-        })?;
-        let stored = updated_stage_summary(&stored, stage, run_id)?;
-        let next_revision = revision.checked_add(1).ok_or_else(|| {
-            db_error(format!(
-                "task board automation run '{run_id}' revision overflow"
-            ))
-        })?;
-        update_stage_summary(
-            &mut transaction,
-            lease,
-            &stored,
-            revision,
-            next_revision,
-            now,
-        )
+pub(super) async fn upsert_task_board_automation_run_stage(
+    db: &AsyncDaemonDb,
+    lease: &TaskBoardAutomationRunLease,
+    stage: &TaskBoardAutomationRunStage,
+    now: DateTime<Utc>,
+) -> Result<u64, CliError> {
+    let run_id = &lease.run_id;
+    validate_stage(stage, run_id)?;
+    let mut transaction = db
+        .begin_immediate_transaction("task board automation run stage upsert")
         .await?;
-        bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
-        let scope = parse_scope(&scope_json, run_id)?;
-        let event = insert_automation_audit(
-            &mut transaction,
-            &format!("task_board.automation.stage.{}", stage.state),
-            run_id,
-            &scope,
-            &stage.recorded_at,
-            serde_json::to_value(stage).map_err(|error| {
-                db_error(format!(
-                    "serialize task board automation run stage '{run_id}': {error}"
-                ))
-            })?,
-        )
-        .await?;
-        transaction.commit().await.map_err(|error| {
+    let (stored, scope_json, revision) = query_as::<_, (String, String, i64)>(
+        "SELECT stage_summary_json, scope_json, revision
+         FROM task_board_orchestrator_runs
+         WHERE run_id = ?1 AND lease_owner = ?2 AND lease_epoch = ?3
+           AND state IN ('running', 'cancelling') AND lease_expires_at > ?4",
+    )
+    .bind(run_id)
+    .bind(&lease.lease_owner)
+    .bind(i64::try_from(lease.lease_epoch).unwrap_or(i64::MAX))
+    .bind(now.to_rfc3339())
+    .fetch_optional(transaction.as_mut())
+    .await
+    .map_err(|error| {
+        db_error(format!(
+            "load task board automation run stage summary '{run_id}': {error}"
+        ))
+    })?
+    .ok_or_else(|| {
+        db_error(format!(
+            "task board automation run '{run_id}' lost its stage-write lease"
+        ))
+    })?;
+    let stored = updated_stage_summary(&stored, stage, run_id)?;
+    let next_revision = revision.checked_add(1).ok_or_else(|| {
+        db_error(format!(
+            "task board automation run '{run_id}' revision overflow"
+        ))
+    })?;
+    update_stage_summary(&mut transaction, lease, &stored, revision, next_revision, now).await?;
+    bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+    let scope = parse_scope(&scope_json, run_id)?;
+    let event = insert_automation_audit(
+        &mut transaction,
+        &format!("task_board.automation.stage.{}", stage.state),
+        run_id,
+        &scope,
+        &stage.recorded_at,
+        serde_json::to_value(stage).map_err(|error| {
             db_error(format!(
-                "commit task board automation run stage update '{run_id}': {error}"
+                "serialize task board automation run stage '{run_id}': {error}"
             ))
-        })?;
-        broadcast_automation_audits(slice::from_ref(&event));
-        u64::try_from(next_revision).map_err(|error| {
-            db_error(format!(
-                "parse task board automation run revision '{run_id}': {error}"
-            ))
-        })
-    }
+        })?,
+    )
+    .await?;
+    transaction.commit().await.map_err(|error| {
+        db_error(format!(
+            "commit task board automation run stage update '{run_id}': {error}"
+        ))
+    })?;
+    broadcast_automation_audits(slice::from_ref(&event));
+    u64::try_from(next_revision).map_err(|error| {
+        db_error(format!(
+            "parse task board automation run revision '{run_id}': {error}"
+        ))
+    })
 }
 
 async fn update_stage_summary(

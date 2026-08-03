@@ -17,6 +17,8 @@ use crate::task_board::remote_wire::wire::RemoteOfferRequest;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::RemoteWorkerIdentity;
+use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db::prelude::*;
 
 /// The action the loop plans from durable state before it has authority to
 /// execute it. Only [`Start`](Self::Start)/[`Probe`](Self::Probe) can reach a

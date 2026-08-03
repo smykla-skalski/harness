@@ -9,6 +9,7 @@
 
 use std::collections::HashMap;
 
+use super::conversation::DaemonDbConversation;
 use super::{
     CliError, ConversationEvent, DaemonDb, daemon_protocol, daemon_snapshot, db_error, i64_from_u64,
 };
@@ -23,7 +24,7 @@ pub(super) struct ActivityFoldEntry {
 /// In-memory activity folds keyed by `(session_id, agent_id)`.
 pub(super) type ActivityFoldCache = HashMap<(String, String), ActivityFoldEntry>;
 
-impl DaemonDb {
+pub(crate) trait DaemonDbActivityFold {
     /// Build the activity summary for a just-appended batch.
     ///
     /// When the cached fold reflects exactly the stored prefix (its last folded
@@ -36,7 +37,48 @@ impl DaemonDb {
     ///
     /// # Errors
     /// Returns [`CliError`] when the stored transcript cannot be loaded.
-    pub(super) fn fold_or_rebuild_activity(
+    fn fold_or_rebuild_activity(
+        &self,
+        session_id: &str,
+        agent_id: &str,
+        runtime: &str,
+        events: &[ConversationEvent],
+        stored_max_before: i64,
+    ) -> Result<daemon_protocol::AgentToolActivitySummary, CliError>;
+
+    fn rebuild_activity_fold(
+        &self,
+        session_id: &str,
+        agent_id: &str,
+        runtime: &str,
+    ) -> Result<daemon_protocol::AgentToolActivitySummary, CliError>;
+
+    /// Drop cached activity fold state when a path replaces or deletes stored
+    /// conversation rows for a session (optionally narrowed to a single agent).
+    /// Replace paths force the next append to rebuild from the freshly written
+    /// transcript; session deletion cascades away the `agent_activity_cache`
+    /// rows, so evicting here keeps the in-memory fold from outliving the data.
+    fn invalidate_activity_fold(&self, session_id: &str, agent_id: Option<&str>);
+
+    /// Highest stored conversation sequence for an agent, or `-1` when the agent
+    /// has no stored events. O(log n) via the `(session_id, agent_id, sequence)`
+    /// primary key, unlike a counting scan.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on query failure.
+    fn conversation_event_max_sequence(
+        &self,
+        session_id: &str,
+        agent_id: &str,
+    ) -> Result<i64, CliError>;
+
+    /// Number of cached activity folds, for tests asserting eviction.
+    #[cfg(test)]
+    fn activity_fold_entry_count(&self) -> usize;
+}
+
+impl DaemonDbActivityFold for DaemonDb {
+    fn fold_or_rebuild_activity(
         &self,
         session_id: &str,
         agent_id: &str,
@@ -89,12 +131,7 @@ impl DaemonDb {
         Ok(summary)
     }
 
-    /// Drop cached activity fold state when a path replaces or deletes stored
-    /// conversation rows for a session (optionally narrowed to a single agent).
-    /// Replace paths force the next append to rebuild from the freshly written
-    /// transcript; session deletion cascades away the `agent_activity_cache`
-    /// rows, so evicting here keeps the in-memory fold from outliving the data.
-    pub(super) fn invalidate_activity_fold(&self, session_id: &str, agent_id: Option<&str>) {
+    fn invalidate_activity_fold(&self, session_id: &str, agent_id: Option<&str>) {
         let mut cache = self.activity_fold.borrow_mut();
         match agent_id {
             Some(agent_id) => {
@@ -104,13 +141,7 @@ impl DaemonDb {
         }
     }
 
-    /// Highest stored conversation sequence for an agent, or `-1` when the agent
-    /// has no stored events. O(log n) via the `(session_id, agent_id, sequence)`
-    /// primary key, unlike a counting scan.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on query failure.
-    pub(super) fn conversation_event_max_sequence(
+    fn conversation_event_max_sequence(
         &self,
         session_id: &str,
         agent_id: &str,
@@ -126,9 +157,8 @@ impl DaemonDb {
             .map_err(|error| db_error(format!("load conversation max sequence: {error}")))
     }
 
-    /// Number of cached activity folds, for tests asserting eviction.
     #[cfg(test)]
-    pub(crate) fn activity_fold_entry_count(&self) -> usize {
+    fn activity_fold_entry_count(&self) -> usize {
         self.activity_fold.borrow().len()
     }
 }

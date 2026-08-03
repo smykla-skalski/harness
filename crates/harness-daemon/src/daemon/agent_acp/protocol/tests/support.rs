@@ -1,4 +1,5 @@
 use super::*;
+use crate::daemon::db::prelude::*;
 
 /// `std::process::Child` has no `Drop`, so a placeholder supervisor process
 /// would outlive a test that returns early or panics. Harness structs hold this

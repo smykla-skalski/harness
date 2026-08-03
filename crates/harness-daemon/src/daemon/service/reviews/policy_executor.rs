@@ -20,6 +20,8 @@ use crate::task_board::policy_runtime::providers::PolicyProviderRegistry;
 use crate::task_board::policy_runtime::task_creation::TaskCreationPolicyProvider;
 use harness_kernel::errors::CliError;
 use harness_kernel::errors::CliErrorKind;
+#[cfg(test)]
+use crate::daemon::db::task_board::prelude::PolicyRuntimeQueries;
 
 pub(crate) struct DaemonReviewsPolicyExecutor {
     client: ReviewsGitHubClient,

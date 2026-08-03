@@ -13,6 +13,7 @@ use crate::task_board::{
 };
 
 use crate::daemon::service::task_board_workflow_test_support::{TestDatabase, reviewers};
+use crate::daemon::db::task_board::prelude::*;
 
 pub(super) const NOW: &str = "2026-07-17T10:00:00Z";
 pub(super) const RETRY_AT: &str = "2026-07-17T10:05:00Z";

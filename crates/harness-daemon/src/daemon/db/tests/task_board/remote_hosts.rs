@@ -12,6 +12,7 @@ use crate::task_board::{
     TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowKind, TaskBoardWorkflowSnapshot,
     TaskBoardWorkflowTransitionState,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 #[tokio::test]
 async fn settings_sync_preserves_the_local_executor_self_row() {

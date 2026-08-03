@@ -45,8 +45,22 @@ pub(crate) struct TaskBoardRemoteOutboundSource {
     pub(crate) content_pruned_at: Option<String>,
 }
 
-impl AsyncDaemonDb {
-    pub(crate) async fn task_board_remote_outbound_source_upload(
+pub(crate) trait RemoteOutboundSourceQueries: Send + Sync {
+    async fn task_board_remote_outbound_source_upload(
+        &self,
+        assignment_id: &str,
+        fencing_epoch: u64,
+    ) -> Result<Option<RemoteSourceBundleUploadRequest>, CliError>;
+
+    async fn task_board_remote_source_recovery_owns_offer(
+        &self,
+        assignment_id: &str,
+        fencing_epoch: u64,
+    ) -> Result<bool, CliError>;
+}
+
+impl RemoteOutboundSourceQueries for AsyncDaemonDb {
+    async fn task_board_remote_outbound_source_upload(
         &self,
         assignment_id: &str,
         fencing_epoch: u64,
@@ -71,7 +85,7 @@ impl AsyncDaemonDb {
             .transpose()
     }
 
-    pub(crate) async fn task_board_remote_source_recovery_owns_offer(
+    async fn task_board_remote_source_recovery_owns_offer(
         &self,
         assignment_id: &str,
         fencing_epoch: u64,

@@ -14,6 +14,7 @@ use crate::task_board::{
     TASK_BOARD_REMOTE_CANCEL_IO_AUTHORITY_RESOURCE, TaskBoardAttemptState,
     TaskBoardRemoteAssignmentState,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 #[tokio::test]
 async fn status_authority_wins_before_cancel_and_cancel_performs_zero_io() {

@@ -19,6 +19,7 @@ use crate::task_board::{
     TaskBoardExecutionAttemptCas, TaskBoardExecutionState, TaskBoardWorkflowExecutionCas,
     TaskBoardWorkflowExecutionRecord,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 const CLAIMED_AT: &str = "2026-07-19T10:00:01Z";
 

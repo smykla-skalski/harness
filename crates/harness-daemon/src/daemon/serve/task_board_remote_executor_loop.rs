@@ -17,6 +17,7 @@ use std::time::Duration;
 use tokio::sync::watch;
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
+use crate::daemon::db::task_board::prelude::*;
 #[path = "task_board_remote_executor_loop/adoption.rs"]
 mod adoption;
 #[path = "task_board_remote_executor_loop/cleanup.rs"]

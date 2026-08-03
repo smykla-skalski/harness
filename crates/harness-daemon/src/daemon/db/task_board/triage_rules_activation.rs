@@ -11,71 +11,69 @@ use crate::task_board::{
     TriageRuleSetValidationReport, validate_triage_rule_set,
 };
 use harness_kernel::errors::CliErrorKind;
+use crate::daemon::db::prelude::*;
 
-impl AsyncDaemonDb {
-    /// CAS-activate `candidate`, or deactivate back to the `BuiltInV1`
-    /// default when `candidate` is `None`. Validates first: an invalid
-    /// candidate is rejected atomically with a typed `activation_rejected`
-    /// audit row and never reaches the revision table or touches a single
-    /// item. A successful activation supersedes whatever was active,
-    /// appends one new immutable revision, and bulk-reevaluates every
-    /// triage-eligible item against it, all inside the one immediate
-    /// transaction this function owns -- no partially written revision or
-    /// partially applied evaluator identity is ever observable to a
-    /// concurrent reader, and any failure after the CAS check rolls the
-    /// whole activation back with no side effect at all.
-    pub(crate) async fn activate_task_board_triage_rules(
-        &self,
-        candidate: Option<TriageRuleSetV1>,
-        actor: String,
-        expected_active_revision: Option<i64>,
-    ) -> Result<TriageRuleSetActivationResult, CliError> {
-        if !is_canonical_triage_rule_set_actor(&actor) {
-            return Err(db_error(
-                "triage rule set activation actor is not canonical",
-            ));
-        }
-        let validation = candidate
-            .as_ref()
-            .map(validate_triage_rule_set)
-            .unwrap_or_default();
-        let now = utc_now();
-        let mut transaction = self
-            .begin_immediate_transaction("task board triage rules activation")
-            .await?;
-        let current_active_revision = current_active_revision_in_tx(&mut transaction).await?;
-        if current_active_revision != expected_active_revision {
-            return Err(CliErrorKind::concurrent_modification(format!(
-                "active task board triage rule set revision changed from {expected_active_revision:?} to {current_active_revision:?}"
-            ))
-            .into());
-        }
-        if !validation.is_valid() {
-            return commit_rule_set_rejection(
-                transaction,
-                validation,
-                current_active_revision,
-                &actor,
-                &now,
-            )
-            .await;
-        }
-        let (new_revision, reevaluated_item_count) = apply_rule_set_activation_in_tx(
-            &mut transaction,
-            candidate.as_ref(),
+/// CAS-activate `candidate`, or deactivate back to the `BuiltInV1` default
+/// when `candidate` is `None`. Validates first: an invalid candidate is
+/// rejected atomically with a typed `activation_rejected` audit row and
+/// never reaches the revision table or touches a single item. A successful
+/// activation supersedes whatever was active, appends one new immutable
+/// revision, and bulk-reevaluates every triage-eligible item against it, all
+/// inside the one immediate transaction this function owns -- no partially
+/// written revision or partially applied evaluator identity is ever
+/// observable to a concurrent reader, and any failure after the CAS check
+/// rolls the whole activation back with no side effect at all.
+pub(super) async fn activate_task_board_triage_rules(
+    db: &AsyncDaemonDb,
+    candidate: Option<TriageRuleSetV1>,
+    actor: String,
+    expected_active_revision: Option<i64>,
+) -> Result<TriageRuleSetActivationResult, CliError> {
+    if !is_canonical_triage_rule_set_actor(&actor) {
+        return Err(db_error(
+            "triage rule set activation actor is not canonical",
+        ));
+    }
+    let validation = candidate
+        .as_ref()
+        .map(validate_triage_rule_set)
+        .unwrap_or_default();
+    let now = utc_now();
+    let mut transaction = db
+        .begin_immediate_transaction("task board triage rules activation")
+        .await?;
+    let current_active_revision = current_active_revision_in_tx(&mut transaction).await?;
+    if current_active_revision != expected_active_revision {
+        return Err(CliErrorKind::concurrent_modification(format!(
+            "active task board triage rule set revision changed from {expected_active_revision:?} to {current_active_revision:?}"
+        ))
+        .into());
+    }
+    if !validation.is_valid() {
+        return commit_rule_set_rejection(
+            transaction,
+            validation,
             current_active_revision,
             &actor,
             &now,
         )
-        .await?;
-        commit(transaction, "task board triage rules activation").await?;
-        Ok(TriageRuleSetActivationResult {
-            validation,
-            activated: true,
-            revision: new_revision,
-            reevaluated_item_count,
-        })
+        .await;
     }
+    let (new_revision, reevaluated_item_count) = apply_rule_set_activation_in_tx(
+        &mut transaction,
+        candidate.as_ref(),
+        current_active_revision,
+        &actor,
+        &now,
+    )
+    .await?;
+    commit(transaction, "task board triage rules activation").await?;
+    Ok(TriageRuleSetActivationResult {
+        validation,
+        activated: true,
+        revision: new_revision,
+        reevaluated_item_count,
+    })
 }
 
 /// Rejects atomically: the typed `activation_rejected` audit row and the

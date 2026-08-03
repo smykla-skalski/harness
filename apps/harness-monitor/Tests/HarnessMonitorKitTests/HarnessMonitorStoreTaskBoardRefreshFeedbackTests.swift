@@ -123,6 +123,57 @@ struct HarnessMonitorStoreTaskBoardRefreshFeedbackTests {
     #expect(store.taskBoardSyncPhase == .idle)
   }
 
+  @Test("Stop releases a sync waiting on an in-flight board snapshot")
+  func stopReleasesInFlightBoardSnapshotWait() async {
+    let client = RecordingHarnessClient()
+    let store = await makeBootstrappedStore(client: client)
+    await client.blockNextTaskBoardItemsRead()
+
+    let refresh = Task { @MainActor in
+      await store.refreshTaskBoardDashboard()
+    }
+    await client.waitUntilTaskBoardItemsReadIsBlocked()
+
+    #expect(store.taskBoardSyncPhase == .syncing)
+    #expect(await store.cancelTaskBoardSync())
+    #expect(
+      await waitUntil {
+        store.taskBoardSyncPhase == .idle
+      }
+    )
+    #expect(store.currentSuccessFeedbackMessage == "Task source refresh stopped")
+
+    await client.releaseTaskBoardItemsRead()
+    await refresh.value
+  }
+
+  @Test("Stop acknowledgment does not wait for its replacement board snapshot")
+  func stopAcknowledgmentDoesNotWaitForReplacementSnapshot() async {
+    let client = RecordingHarnessClient()
+    let store = await makeBootstrappedStore(client: client)
+    await client.blockNextTaskBoardItemsRead()
+
+    let refresh = Task { @MainActor in
+      await store.refreshTaskBoardDashboard()
+    }
+    await client.waitUntilTaskBoardItemsReadIsBlocked()
+    client.configureTaskBoardItemsDelay(.seconds(2))
+
+    #expect(await store.cancelTaskBoardSync())
+    let clock = ContinuousClock()
+    let start = clock.now
+    #expect(
+      await waitUntil(timeout: .milliseconds(300)) {
+        store.taskBoardSyncPhase == .idle
+      }
+    )
+    #expect(start.duration(to: clock.now) < .milliseconds(300))
+    #expect(store.currentSuccessFeedbackMessage == "Task source refresh stopped")
+
+    await client.releaseTaskBoardItemsRead()
+    await refresh.value
+  }
+
   @Test("Background source refresh leaves the board responsive")
   func backgroundSourceRefreshLeavesBoardResponsive() async {
     let client = RecordingHarnessClient()

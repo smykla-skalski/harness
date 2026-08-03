@@ -16,6 +16,8 @@ use crate::task_board::{
     ExternalSyncOptions, ExternalTask, ExternalTaskRef, TaskBoardItem,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
+use crate::daemon::db::task_board::import_lifecycle_queries::ImportLifecycleQueries;
+use crate::daemon::db::task_board::provider_queries::ProviderQueries;
 
 #[tokio::test]
 async fn concurrent_scope_claims_admit_exactly_one_attempt() {

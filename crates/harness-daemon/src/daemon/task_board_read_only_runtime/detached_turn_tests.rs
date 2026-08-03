@@ -14,6 +14,7 @@ use crate::agents::acp::catalog::{
 };
 use crate::daemon::agent_acp::{AcpAgentManagerHandle, AcpAgentStartRequest};
 use crate::daemon::db::{AgentTurnRunSnapshot, AgentTurnRunStatus, AsyncDaemonDb};
+use crate::daemon::db::prelude::*;
 
 const SESSION_ID: &str = "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc";
 const AUTHENTICATION_DETAIL: &str = "OpenRouter rejected its credential: HTTP 401 unauthorized";

@@ -15,6 +15,7 @@ use super::super::task_board_read_only_runtime::TaskBoardReadOnlyRuntime;
 use super::attempts::{invalid_transition, require_human, set_execution_state};
 use super::report_starts::start_new_report_run;
 use super::requests::attempt_run_identity;
+use crate::daemon::db::task_board::prelude::*;
 
 #[expect(
     clippy::cognitive_complexity,

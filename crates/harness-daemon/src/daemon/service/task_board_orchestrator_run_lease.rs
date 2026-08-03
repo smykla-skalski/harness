@@ -12,6 +12,7 @@ use crate::task_board::TaskBoardAutomationRunOutcome;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::task_board_db::{TaskBoardSyncCoordinatorFence, TaskBoardSyncCoordinatorFenceDecision};
+use crate::daemon::db::task_board::prelude::*;
 
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(10);
 

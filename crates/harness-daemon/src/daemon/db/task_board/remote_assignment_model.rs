@@ -2,7 +2,6 @@ use chrono::{DateTime, SecondsFormat, Utc};
 use sqlx::{Sqlite, Transaction, query_as};
 
 use super::remote_claim_receipts::TaskBoardRemoteClaimReceipt;
-use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::remote_wire::wire::{
     RemoteAssignmentWireState, RemoteOfferRequest, RemoteStatusResponse,
@@ -104,21 +103,6 @@ impl TaskBoardRemoteAssignmentRecord {
             TaskBoardRemoteAssignmentState::Unknown => RemoteAssignmentWireState::Unknown,
             TaskBoardRemoteAssignmentState::Superseded => RemoteAssignmentWireState::Superseded,
         }
-    }
-}
-
-impl AsyncDaemonDb {
-    /// `pub`, not `pub(crate)`: `harness-db-schema`'s own v43 tombstone
-    /// migration test asserts a superseded legacy assignment is invisible
-    /// through this typed loader.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on SQL failures.
-    pub async fn task_board_remote_assignment(
-        &self,
-        assignment_id: &str,
-    ) -> Result<Option<TaskBoardRemoteAssignmentRecord>, CliError> {
-        <Self as RemoteExecutionQueries>::task_board_remote_assignment(self, assignment_id).await
     }
 }
 

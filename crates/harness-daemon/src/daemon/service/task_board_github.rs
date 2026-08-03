@@ -13,6 +13,7 @@ use crate::task_board::{
     normalize_repository_slug, task_board_read_only_execution_repository,
 };
 use harness_kernel::errors::CliError;
+use crate::daemon::db::task_board::prelude::*;
 
 mod support;
 mod workflow;

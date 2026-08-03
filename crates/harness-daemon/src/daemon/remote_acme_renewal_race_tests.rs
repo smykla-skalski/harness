@@ -1,3 +1,4 @@
+use crate::daemon::remote_identity_queries::RemoteIdentitySyncQueries;
 use std::io::{self, Write};
 use std::sync::{Arc, Mutex};
 
@@ -15,6 +16,7 @@ use crate::daemon::remote_acme::{
     RemoteAcmeAutomaticRenewalIssuer, RemoteAcmeRenewalRequest, RemoteCertificateBundle,
 };
 use crate::daemon::remote_acme_cleanup::RemoteAcmeCleanupTracker;
+use crate::daemon::remote_acme_queries::RemoteAcmeQueries;
 use crate::daemon::remote_tls::RemoteTlsConfigHandle;
 
 #[tokio::test]

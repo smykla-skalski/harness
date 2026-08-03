@@ -9,6 +9,7 @@ use crate::daemon::db::{AsyncDaemonDb, ReservedTaskBoardDispatch};
 use crate::task_board::{
     TaskBoardItem, TaskBoardStatus, TaskBoardWorkflowStatus, build_dispatch_plans_with_policy,
 };
+use crate::daemon::db::task_board::prelude::*;
 
 #[tokio::test]
 async fn task_board_dispatch_reservation_precedes_links_and_is_reclaimable() {
