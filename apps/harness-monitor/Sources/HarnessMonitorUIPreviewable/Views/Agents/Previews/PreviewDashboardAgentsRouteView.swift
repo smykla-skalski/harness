@@ -74,6 +74,11 @@ public enum DashboardAgentsPreviewRenderer {
         largestIndex: largestIndex,
         directory: directory
       )
+      && renderTerminalStates(
+        defaultIndex: defaultIndex,
+        largestIndex: largestIndex,
+        directory: directory
+      )
   }
 
   @MainActor
@@ -167,12 +172,13 @@ public enum DashboardAgentsPreviewRenderer {
   }
 
   @MainActor
-  private static func render(
+  static func render(
     name: String,
     state: DashboardAgentBrowserViewState,
     textSizeIndex: Int,
     directory: String,
     selectedIdentity: DashboardAgentIdentity? = nil,
+    initialTerminalDetail: DashboardTerminalAgentDetail? = nil,
     initialAcpDetail: DashboardAcpAgentDetail? = nil,
     initialCodexDetail: DashboardCodexAgentDetail? = nil
   ) -> Bool {
@@ -180,6 +186,7 @@ public enum DashboardAgentsPreviewRenderer {
     let hosted = DashboardAgentsPreviewSurface(
       state: state,
       selectedIdentity: selectedIdentity,
+      initialTerminalDetail: initialTerminalDetail,
       initialAcpDetail: initialAcpDetail,
       initialCodexDetail: initialCodexDetail
     )
@@ -280,7 +287,7 @@ public enum DashboardAgentsPreviewRenderer {
   }
 
   @MainActor
-  private static func renderSheet<Content: View>(
+  static func renderSheet<Content: View>(
     name: String,
     textSizeIndex: Int,
     directory: String,
@@ -320,6 +327,7 @@ public enum DashboardAgentsPreviewRenderer {
 
 struct DashboardAgentsPreviewSurface: View {
   let state: DashboardAgentBrowserViewState
+  let initialTerminalDetail: DashboardTerminalAgentDetail?
   let initialAcpDetail: DashboardAcpAgentDetail?
   let initialCodexDetail: DashboardCodexAgentDetail?
   private let store: HarnessMonitorStore
@@ -330,10 +338,12 @@ struct DashboardAgentsPreviewSurface: View {
   init(
     state: DashboardAgentBrowserViewState,
     selectedIdentity: DashboardAgentIdentity? = nil,
+    initialTerminalDetail: DashboardTerminalAgentDetail? = nil,
     initialAcpDetail: DashboardAcpAgentDetail? = nil,
     initialCodexDetail: DashboardCodexAgentDetail? = nil
   ) {
     self.state = state
+    self.initialTerminalDetail = initialTerminalDetail
     self.initialAcpDetail = initialAcpDetail
     self.initialCodexDetail = initialCodexDetail
     let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .dashboardLoaded)
@@ -356,6 +366,7 @@ struct DashboardAgentsPreviewSurface: View {
       isRouteVisible: true,
       refreshesAutomatically: false,
       initialState: state,
+      initialTerminalDetail: initialTerminalDetail,
       initialAcpDetail: initialAcpDetail,
       initialCodexDetail: initialCodexDetail,
       selectionDefaults: selectionDefaults

@@ -106,6 +106,31 @@ public enum HarnessMonitorAccessibility {
   public static let dashboardAgentDetail = "harness.dashboard.agents.detail"
   public static let dashboardAgentsRefreshButton = "harness.dashboard.agents.refresh"
   public static let dashboardAgentsLoadState = "harness.dashboard.agents.load-state"
+  public static let dashboardTerminalCreateButton = "harness.dashboard.agents.terminal.create"
+  public static let dashboardTerminalCreateSheet =
+    "harness.dashboard.agents.terminal.create.sheet"
+  public static let dashboardTerminalWorkspacePicker =
+    "harness.dashboard.agents.terminal.create.workspace"
+  public static let dashboardTerminalRuntimePicker =
+    "harness.dashboard.agents.terminal.create.runtime"
+  public static let dashboardTerminalNameField =
+    "harness.dashboard.agents.terminal.create.name"
+  public static let dashboardTerminalPromptField =
+    "harness.dashboard.agents.terminal.create.prompt"
+  public static let dashboardTerminalStartButton =
+    "harness.dashboard.agents.terminal.create.start"
+  public static let dashboardTerminalInputField = "harness.dashboard.agents.terminal.input"
+  public static let dashboardTerminalSendButton = "harness.dashboard.agents.terminal.send"
+  public static let dashboardTerminalControlCButton = "harness.dashboard.agents.terminal.ctrl-c"
+  public static let dashboardTerminalSignalCommandField =
+    "harness.dashboard.agents.terminal.signal.command"
+  public static let dashboardTerminalSignalMessageField =
+    "harness.dashboard.agents.terminal.signal.message"
+  public static let dashboardTerminalSignalSendButton =
+    "harness.dashboard.agents.terminal.signal.send"
+  public static let dashboardTerminalOutput = "harness.dashboard.agents.terminal.output"
+  public static let dashboardTerminalStopButton = "harness.dashboard.agents.terminal.stop"
+  public static let dashboardTerminalRemoveButton = "harness.dashboard.agents.terminal.remove"
   public static let dashboardCodexCreateButton = "harness.dashboard.agents.codex.create"
   public static let dashboardCodexCreateSheet = "harness.dashboard.agents.codex.create.sheet"
   public static let dashboardCodexWorkspacePicker =

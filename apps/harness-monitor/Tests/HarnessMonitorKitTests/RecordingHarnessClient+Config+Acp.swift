@@ -79,6 +79,10 @@ extension RecordingHarnessClient {
     lock.withLock { agentTuiStartError = error }
   }
 
+  func configureAgentTuiStartErrorAfterRecord(_ error: (any Error)?) {
+    lock.withLock { agentTuiStartErrorAfterRecord = error }
+  }
+
   func configureHostBridgeReconfigureError(_ error: (any Error)?) {
     lock.withLock { hostBridgeReconfigureError = error }
   }
@@ -103,6 +107,10 @@ extension RecordingHarnessClient {
 
   func configuredAgentTuiStartError() -> (any Error)? {
     lock.withLock { agentTuiStartError }
+  }
+
+  func configuredAgentTuiStartErrorAfterRecord() -> (any Error)? {
+    lock.withLock { agentTuiStartErrorAfterRecord }
   }
 
   func dequeueConfiguredAcpStartError() -> (any Error)? {

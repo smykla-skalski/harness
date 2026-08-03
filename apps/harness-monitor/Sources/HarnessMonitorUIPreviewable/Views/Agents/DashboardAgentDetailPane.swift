@@ -4,23 +4,37 @@ import SwiftUI
 struct DashboardAgentDetailPane: View {
   let store: HarnessMonitorStore
   let agent: DashboardAgentSummary?
+  let loadsTerminalDetailAutomatically: Bool
   let loadsAcpDetailAutomatically: Bool
   let loadsCodexDetailAutomatically: Bool
+  let onTerminalMembershipRemoved: () -> Void
+  @State private var terminalState: DashboardTerminalAgentDetailState
   @State private var acpState: DashboardAcpAgentDetailState
   @State private var codexState: DashboardCodexAgentDetailState
 
   init(
     store: HarnessMonitorStore,
     agent: DashboardAgentSummary?,
+    loadsTerminalDetailAutomatically: Bool = true,
     loadsAcpDetailAutomatically: Bool = true,
     loadsCodexDetailAutomatically: Bool = true,
+    initialTerminalDetail: DashboardTerminalAgentDetail? = nil,
     initialAcpDetail: DashboardAcpAgentDetail? = nil,
-    initialCodexDetail: DashboardCodexAgentDetail? = nil
+    initialCodexDetail: DashboardCodexAgentDetail? = nil,
+    onTerminalMembershipRemoved: @escaping () -> Void = {}
   ) {
     self.store = store
     self.agent = agent
+    self.loadsTerminalDetailAutomatically = loadsTerminalDetailAutomatically
     self.loadsAcpDetailAutomatically = loadsAcpDetailAutomatically
     self.loadsCodexDetailAutomatically = loadsCodexDetailAutomatically
+    self.onTerminalMembershipRemoved = onTerminalMembershipRemoved
+    _terminalState = State(
+      initialValue: DashboardTerminalAgentDetailState(
+        detail: initialTerminalDetail,
+        agentID: agent?.managedAgentID
+      )
+    )
     _acpState = State(initialValue: DashboardAcpAgentDetailState(detail: initialAcpDetail))
     _codexState = State(initialValue: DashboardCodexAgentDetailState(detail: initialCodexDetail))
   }
@@ -28,7 +42,15 @@ struct DashboardAgentDetailPane: View {
   var body: some View {
     Group {
       if let agent {
-        if agent.runtimeKind == .acp {
+        if agent.runtimeKind == .terminal {
+          DashboardTerminalAgentDetailView(
+            store: store,
+            agent: agent,
+            state: terminalState,
+            loadsAutomatically: loadsTerminalDetailAutomatically,
+            onMembershipRemoved: onTerminalMembershipRemoved
+          )
+        } else if agent.runtimeKind == .acp {
           DashboardAcpAgentDetailView(
             store: store,
             agent: agent,

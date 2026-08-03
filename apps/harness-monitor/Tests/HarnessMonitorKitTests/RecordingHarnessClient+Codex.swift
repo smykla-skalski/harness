@@ -186,6 +186,9 @@ extension RecordingHarnessClient {
       cols: request.cols
     )
     recordAgentTui(tui)
+    if let error = configuredAgentTuiStartErrorAfterRecord() {
+      throw error
+    }
     return tui
   }
 
