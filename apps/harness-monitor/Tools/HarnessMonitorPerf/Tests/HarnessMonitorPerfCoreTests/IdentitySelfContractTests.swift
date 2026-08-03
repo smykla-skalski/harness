@@ -61,6 +61,34 @@ final class IdentitySelfContractTests: XCTestCase {
         "Self.maxConcurrentRange",
         // Duration picker presets are curated fixed arrays of unique seconds.
         "presets",
+        // Audit filter option values are collected through a Set and sorted,
+        // so every string is unique before it reaches the picker.
+        "optionValues(",
+        // Fixed ordered reason-code strings; the policy-model contract also
+        // asserts membership in the unique accepted set.
+        "PolicyCanvasReasonCode.ordered",
+        // Fixed unique autosave seconds declared by PolicyCanvasAutosaveDefaults.
+        "PolicyCanvasAutosaveDefaults.presetSeconds",
+        // Lane symbols are inserted through a Set before the display array is
+        // returned, preserving the first occurrence of each unique symbol.
+        "Self.symbolOptions(for:",
+        // Position identity for potentially duplicated display-only values.
+        // Each token is collection-specific so a generic `.indices` loop
+        // elsewhere still requires review.
+        "event.relatedURLs.indices",
+        "diagnosticValueIndices",
+        "activityMessageIndices",
+        "jumpTargets.indices",
+        "visibleLabels.indices",
+        "visibleNames.indices",
+        "provenanceWarnings.indices",
+        "visibleRepositories.indices",
+        "reviewLabelIndices",
+        "automationValues.indices",
+        "tooltipTitles.indices",
+        "catalogRepositories.indices",
+        "availableRuleIDs.indices",
+        "availableKinds.indices",
         // Markdown table row and column loops use structural indices over an
         // immutable parsed table for the render pass.
         "table.rows.indices",

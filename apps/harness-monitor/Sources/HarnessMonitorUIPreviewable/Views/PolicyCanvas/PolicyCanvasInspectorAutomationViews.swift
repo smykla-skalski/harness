@@ -116,7 +116,7 @@ extension PolicyCanvasEditForm {
 
   private func automationToggleGroup<Value>(
     title: String,
-    values: [Value],
+    values automationValues: [Value],
     contains: @escaping (Value) -> Bool,
     set: @escaping (Value, Bool) -> Void
   ) -> some View where Value: Hashable, Value: PolicyCanvasAutomationTitledValue {
@@ -124,7 +124,8 @@ extension PolicyCanvasEditForm {
       Text(title)
         .scaledFont(.caption.weight(.semibold))
         .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
-      ForEach(values, id: \.self) { value in
+      ForEach(automationValues.indices, id: \.self) { index in
+        let value = automationValues[index]
         Toggle(
           value.title,
           isOn: Binding(get: { contains(value) }, set: { set(value, $0) })
@@ -302,7 +303,7 @@ extension PolicyCanvasEditForm {
   func automationPickerField<Value>(
     label: String,
     title: String,
-    values: [Value],
+    values automationValues: [Value],
     selection: Value,
     set: @escaping (Value) -> Void
   ) -> some View where Value: Hashable, Value: PolicyCanvasAutomationTitledValue {
@@ -314,7 +315,8 @@ extension PolicyCanvasEditForm {
           set: { set($0) }
         )
       ) {
-        ForEach(values, id: \.self) { value in
+        ForEach(automationValues.indices, id: \.self) { index in
+          let value = automationValues[index]
           Text(value.title).tag(value)
         }
       }

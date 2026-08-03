@@ -276,6 +276,7 @@ private struct DashboardReviewLastActionRow: View {
   let entry: DashboardReviewActivityEntry
 
   var body: some View {
+    let activityMessageIndices = entry.messages.indices
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
       HStack(spacing: HarnessMonitorTheme.spacingSM) {
         DashboardReviewStatusPill(
@@ -295,8 +296,8 @@ private struct DashboardReviewLastActionRow: View {
         .scaledFont(.callout)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         .fixedSize(horizontal: false, vertical: true)
-      ForEach(entry.messages, id: \.self) { message in
-        Text(message)
+      ForEach(activityMessageIndices, id: \.self) { index in
+        Text(entry.messages[index])
           .scaledFont(.caption)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           .fixedSize(horizontal: false, vertical: true)

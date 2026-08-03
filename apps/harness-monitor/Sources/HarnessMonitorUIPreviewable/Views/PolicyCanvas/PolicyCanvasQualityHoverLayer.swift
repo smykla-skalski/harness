@@ -38,7 +38,7 @@ struct PolicyCanvasQualityHoverLayer: View {
             )
         }
         if let anchor = tooltipAnchor(for: active) {
-          PolicyCanvasQualityHoverTooltip(titles: tooltipTitles(for: active))
+          PolicyCanvasQualityHoverTooltip(tooltipTitles: tooltipTitles(for: active))
             .position(anchor)
         }
       }
@@ -74,12 +74,12 @@ struct PolicyCanvasQualityHoverLayer: View {
 /// Small floating label that names every defect under the pointer, one title per
 /// line. Rendered inside the content-space hover layer and positioned by it.
 private struct PolicyCanvasQualityHoverTooltip: View {
-  let titles: [String]
+  let tooltipTitles: [String]
 
   var body: some View {
     VStack(alignment: .leading, spacing: 2) {
-      ForEach(titles, id: \.self) { title in
-        Text(title)
+      ForEach(tooltipTitles.indices, id: \.self) { index in
+        Text(tooltipTitles[index])
           .font(.caption2.weight(.medium))
           .foregroundStyle(PolicyCanvasVisualStyle.primaryText)
       }

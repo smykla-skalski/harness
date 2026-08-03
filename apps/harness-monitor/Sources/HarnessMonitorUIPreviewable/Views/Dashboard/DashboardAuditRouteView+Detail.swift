@@ -133,7 +133,8 @@ struct DashboardAuditDetailPane: View {
       VStack(alignment: .leading, spacing: 8) {
         Text("Related")
           .scaledFont(.headline)
-        ForEach(event.relatedURLs, id: \.self) { rawURL in
+        ForEach(event.relatedURLs.indices, id: \.self) { index in
+          let rawURL = event.relatedURLs[index]
           Button {
             if let url = URL(string: rawURL) {
               NSWorkspace.shared.open(url)

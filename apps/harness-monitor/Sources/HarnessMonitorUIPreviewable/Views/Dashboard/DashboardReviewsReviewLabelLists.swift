@@ -159,6 +159,7 @@ struct DashboardReviewLabelStrip: View {
   }
 
   var body: some View {
+    let reviewLabelIndices = labels.indices
     if labels.isEmpty {
       Text("No labels applied")
         .scaledFont(.callout)
@@ -168,7 +169,8 @@ struct DashboardReviewLabelStrip: View {
         spacing: HarnessMonitorTheme.spacingSM,
         lineSpacing: HarnessMonitorTheme.spacingSM
       ) {
-        ForEach(labels, id: \.self) { name in
+        ForEach(reviewLabelIndices, id: \.self) { index in
+          let name = labels[index]
           DashboardReviewLabelChip(
             name: name,
             descriptor: labelByName[name]

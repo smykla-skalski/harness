@@ -57,8 +57,8 @@ extension Calendar {
 /// free-form string in storage and the rule catalog is per-policy.
 public struct AuditTimelineFilterControls: View {
   @Bindable var state: AuditTimelineFilterState
-  let ruleIDs: [String]
-  let kinds: [SupervisorEvent.Kind]
+  let availableRuleIDs: [String]
+  let availableKinds: [SupervisorEvent.Kind]
 
   public init(
     state: AuditTimelineFilterState,
@@ -66,8 +66,8 @@ public struct AuditTimelineFilterControls: View {
     kinds: [SupervisorEvent.Kind] = SupervisorEvent.Kind.allCases
   ) {
     self.state = state
-    self.ruleIDs = ruleIDs
-    self.kinds = kinds
+    availableRuleIDs = ruleIDs
+    availableKinds = kinds
   }
 
   public var body: some View {
@@ -94,7 +94,8 @@ public struct AuditTimelineFilterControls: View {
           state.clearRuleIDs()
         }
         Divider()
-        ForEach(ruleIDs, id: \.self) { ruleID in
+        ForEach(availableRuleIDs.indices, id: \.self) { index in
+          let ruleID = availableRuleIDs[index]
           Button {
             state.toggleRuleID(ruleID)
           } label: {
@@ -125,7 +126,8 @@ public struct AuditTimelineFilterControls: View {
   private var kindChip: some View {
     Menu {
       Section("Kind") {
-        ForEach(kinds, id: \.self) { kind in
+        ForEach(availableKinds.indices, id: \.self) { index in
+          let kind = availableKinds[index]
           Button {
             toggleKindDraft(kind)
           } label: {

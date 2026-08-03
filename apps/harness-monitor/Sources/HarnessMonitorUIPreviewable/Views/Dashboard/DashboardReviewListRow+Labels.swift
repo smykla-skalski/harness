@@ -42,7 +42,8 @@ struct DashboardReviewListRowLabelsStrip: View {
       spacing: HarnessMonitorTheme.spacingXS,
       lineSpacing: HarnessMonitorTheme.spacingXS
     ) {
-      ForEach(visibleLabels, id: \.self) { label in
+      ForEach(visibleLabels.indices, id: \.self) { index in
+        let label = visibleLabels[index]
         DashboardReviewLabelChip(
           name: label,
           descriptor: labelByName[label],

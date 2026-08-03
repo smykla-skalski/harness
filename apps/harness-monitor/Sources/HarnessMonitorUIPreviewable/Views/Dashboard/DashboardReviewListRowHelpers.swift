@@ -280,9 +280,9 @@ struct DashboardReviewRequiredFailedCheckStrip: View {
       spacing: HarnessMonitorTheme.spacingXS,
       lineSpacing: HarnessMonitorTheme.spacingXS
     ) {
-      ForEach(visibleNames, id: \.self) { name in
+      ForEach(visibleNames.indices, id: \.self) { index in
         DashboardReviewStatusPill(
-          label: name,
+          label: visibleNames[index],
           tint: HarnessMonitorTheme.danger,
           systemImage: "xmark.circle",
           isQuiet: true

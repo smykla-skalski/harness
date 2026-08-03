@@ -98,12 +98,14 @@ struct DashboardReviewsProvenancePopover: View {
   }
 
   private var warningsSection: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+    let provenanceWarnings = snapshot.warnings
+    return VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       Text("Warnings")
         .scaledFont(.caption.weight(.semibold))
         .textCase(.uppercase)
         .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
-      ForEach(snapshot.warnings, id: \.self) { message in
+      ForEach(provenanceWarnings.indices, id: \.self) { index in
+        let message = provenanceWarnings[index]
         Label(message, systemImage: "exclamationmark.triangle")
           .scaledFont(.callout.weight(.medium))
           .foregroundStyle(HarnessMonitorTheme.caution)
@@ -130,8 +132,8 @@ struct DashboardReviewsProvenancePopover: View {
         spacing: HarnessMonitorTheme.spacingXS,
         lineSpacing: HarnessMonitorTheme.spacingXS
       ) {
-        ForEach(visibleRepositories, id: \.self) { name in
-          Text(name)
+        ForEach(visibleRepositories.indices, id: \.self) { index in
+          Text(visibleRepositories[index])
             .scaledFont(.caption.weight(.medium))
             .foregroundStyle(tint)
             .padding(.horizontal, 8)

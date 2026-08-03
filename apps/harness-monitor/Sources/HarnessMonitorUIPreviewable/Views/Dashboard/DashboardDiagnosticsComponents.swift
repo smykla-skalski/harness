@@ -47,6 +47,7 @@ struct DashboardDiagnosticsRecordStrip: View {
   let values: [String]
 
   var body: some View {
+    let diagnosticValueIndices = values.indices
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       Text(title)
         .scaledFont(.caption.weight(.semibold))
@@ -55,8 +56,8 @@ struct DashboardDiagnosticsRecordStrip: View {
         spacing: HarnessMonitorTheme.spacingSM,
         lineSpacing: HarnessMonitorTheme.spacingSM
       ) {
-        ForEach(values, id: \.self) { value in
-          Text(value)
+        ForEach(diagnosticValueIndices, id: \.self) { index in
+          Text(values[index])
             .scaledFont(.caption.weight(.semibold))
             .harnessPillPadding()
             .harnessContentPill()

@@ -151,16 +151,16 @@ extension SettingsRepositoriesSection {
     .accessibilityIdentifier(HarnessMonitorAccessibility.settingsRepositoriesCatalogStatus)
   }
 
-  private func catalogRepositoryList(_ repositories: [String]) -> some View {
+  private func catalogRepositoryList(_ catalogRepositories: [String]) -> some View {
     ScrollView {
       LazyVStack(spacing: 0) {
-        let firstRepository = repositories.first
-        ForEach(repositories, id: \.self) { repository in
-          catalogRepositoryListRow(repository, isFirst: repository == firstRepository)
+        ForEach(catalogRepositories.indices, id: \.self) { index in
+          let repository = catalogRepositories[index]
+          catalogRepositoryListRow(repository, isFirst: index == catalogRepositories.startIndex)
         }
       }
     }
-    .frame(height: catalogListHeight(visibleCount: repositories.count))
+    .frame(height: catalogListHeight(visibleCount: catalogRepositories.count))
     .background(tableBackground)
     .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     .overlay {
