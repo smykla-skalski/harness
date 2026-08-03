@@ -25,6 +25,8 @@ final class DashboardOCRSystemScreenshotFolderStore {
 
   private let fileURL: URL
   private let fileManager: FileManager
+  private let decoder = JSONDecoder()
+  private let encoder = JSONEncoder()
 
   init(
     fileURL: URL = HarnessMonitorPaths.generatedCacheRoot()
@@ -38,7 +40,7 @@ final class DashboardOCRSystemScreenshotFolderStore {
   func load() -> DashboardOCRSystemScreenshotFolderSelection? {
     guard
       let data = try? Data(contentsOf: fileURL),
-      let record = try? JSONDecoder().decode(ScreenshotFolderBookmarkRecord.self, from: data)
+      let record = try? decoder.decode(ScreenshotFolderBookmarkRecord.self, from: data)
     else {
       return nil
     }
@@ -75,7 +77,7 @@ final class DashboardOCRSystemScreenshotFolderStore {
       displayName: folderURL.lastPathComponent,
       path: folderURL.path
     )
-    let data = try JSONEncoder().encode(record)
+    let data = try encoder.encode(record)
     try data.write(to: fileURL, options: .atomic)
     return DashboardOCRSystemScreenshotFolderSelection(url: folderURL)
   }

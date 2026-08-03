@@ -6,6 +6,13 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 extension DashboardPolicyCanvasRouteView {
+  @MainActor private static let exportEncoder: JSONEncoder = {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+    return encoder
+  }()
+  @MainActor private static let importDecoder = JSONDecoder()
+
   // MARK: - Canvas selection preview
 
   @MainActor
@@ -73,9 +80,7 @@ extension DashboardPolicyCanvasRouteView {
     guard let destination = Self.runExportSavePanel(suggestedFilename: filename) else { return }
     guard let response = await store.exportPolicyCanvas(canvasId: canvasId)
     else { return }
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-    guard let data = try? encoder.encode(response.document) else { return }
+    guard let data = try? Self.exportEncoder.encode(response.document) else { return }
     try? data.write(to: destination)
   }
 
@@ -85,7 +90,7 @@ extension DashboardPolicyCanvasRouteView {
     guard let data = try? Data(contentsOf: source) else { return }
     let title = source.deletingPathExtension().lastPathComponent
     guard
-      let document = try? JSONDecoder().decode(PolicyPipelineDocument.self, from: data)
+      let document = try? Self.importDecoder.decode(PolicyPipelineDocument.self, from: data)
     else { return }
     _ = await store.importPolicyCanvas(document: document, title: title)
   }

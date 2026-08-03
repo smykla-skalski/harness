@@ -21,6 +21,8 @@ final class DashboardOCRRecentImageStore {
   private let manifestURL: URL
   private let maxItems: Int
   private let fileManager: FileManager
+  private let decoder = JSONDecoder()
+  private let encoder = JSONEncoder()
 
   init(
     directoryURL: URL = HarnessMonitorPaths.generatedCacheRoot()
@@ -143,7 +145,7 @@ final class DashboardOCRRecentImageStore {
   private func readManifest() -> DashboardOCRRecentImageManifest {
     guard
       let data = try? Data(contentsOf: manifestURL),
-      let manifest = try? JSONDecoder().decode(DashboardOCRRecentImageManifest.self, from: data)
+      let manifest = try? decoder.decode(DashboardOCRRecentImageManifest.self, from: data)
     else {
       return DashboardOCRRecentImageManifest(items: [])
     }
@@ -152,7 +154,7 @@ final class DashboardOCRRecentImageStore {
 
   private func writeManifest(_ manifest: DashboardOCRRecentImageManifest) {
     ensureDirectoryExists()
-    guard let data = try? JSONEncoder().encode(manifest) else {
+    guard let data = try? encoder.encode(manifest) else {
       return
     }
     try? data.write(to: manifestURL, options: .atomic)

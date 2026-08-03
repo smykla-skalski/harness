@@ -183,6 +183,12 @@ enum TaskBoardLaneAppearancePreferences {
   @MainActor private static var memoizedRawValue: String?
   @MainActor private static var memoizedOverrides:
     [TaskBoardInboxLane: TaskBoardLaneAppearanceOverride] = [:]
+  @MainActor private static let decoder = JSONDecoder()
+  @MainActor private static let encoder: JSONEncoder = {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys]
+    return encoder
+  }()
 
   @MainActor
   static func overrides(
@@ -206,7 +212,7 @@ enum TaskBoardLaneAppearancePreferences {
       return [:]
     }
     let decoded =
-      (try? JSONDecoder()
+      (try? decoder
         .decode([String: TaskBoardLaneAppearanceOverride].self, from: data)) ?? [:]
     var overrides: [TaskBoardInboxLane: TaskBoardLaneAppearanceOverride] = [:]
     for (key, value) in decoded where key != "umbrella" && key != "backlog" && !value.isEmpty {
@@ -224,6 +230,7 @@ enum TaskBoardLaneAppearancePreferences {
     return overrides
   }
 
+  @MainActor
   static func rawValue(
     for overrides: [TaskBoardInboxLane: TaskBoardLaneAppearanceOverride]
   ) -> String {
@@ -235,8 +242,6 @@ enum TaskBoardLaneAppearancePreferences {
     let encodable = Dictionary(
       uniqueKeysWithValues: filtered.map { ($0.key.rawValue, $0.value) }
     )
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys]
     guard
       let data = try? encoder.encode(encodable),
       let rawValue = String(data: data, encoding: .utf8)
@@ -253,6 +258,7 @@ enum TaskBoardLaneAppearancePreferences {
     overrides(from: userDefaults.string(forKey: storageKey) ?? emptyRawValue)
   }
 
+  @MainActor
   static func save(
     _ overrides: [TaskBoardInboxLane: TaskBoardLaneAppearanceOverride],
     to userDefaults: UserDefaults = .standard

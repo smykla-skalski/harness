@@ -9,8 +9,12 @@ actor DashboardReviewsPresentationWorker {
     category: "perf"
   )
 
-  private var isoFormatterStorage: ISO8601DateFormatter?
-  private var relativeFormatterStorage: RelativeDateTimeFormatter?
+  private let isoFormatter = ISO8601DateFormatter()
+  private let relativeFormatter: RelativeDateTimeFormatter = {
+    let formatter = RelativeDateTimeFormatter()
+    formatter.unitsStyle = .short
+    return formatter
+  }()
   private var cachedListInput: DashboardReviewsListPresentationInput?
   private var cachedListPresentation = DashboardReviewsListPresentation.empty
   private var relativeLabelCache: [DashboardReviewsRelativeLabelCacheKey: String] = [:]
@@ -189,25 +193,6 @@ actor DashboardReviewsPresentationWorker {
     }
     pruneRelativeLabelCacheIfNeeded()
     return result
-  }
-
-  private var isoFormatter: ISO8601DateFormatter {
-    if let isoFormatterStorage {
-      return isoFormatterStorage
-    }
-    let formatter = ISO8601DateFormatter()
-    isoFormatterStorage = formatter
-    return formatter
-  }
-
-  private var relativeFormatter: RelativeDateTimeFormatter {
-    if let relativeFormatterStorage {
-      return relativeFormatterStorage
-    }
-    let formatter = RelativeDateTimeFormatter()
-    formatter.unitsStyle = .short
-    relativeFormatterStorage = formatter
-    return formatter
   }
 
   private func relativeUpdatedLabel(

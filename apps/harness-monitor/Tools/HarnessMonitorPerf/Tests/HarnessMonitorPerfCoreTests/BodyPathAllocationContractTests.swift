@@ -54,6 +54,7 @@ final class BodyPathAllocationContractTests: XCTestCase {
         // HarnessMonitorFormatters.swift and DecisionRow.swift.
         "@MainActor private let ",
         "@MainActor public let ",
+        "@MainActor let ",
         "@MainActor static let ",
         "@MainActor private static let ",
         // `nonisolated(unsafe)` variants used for parsers that must be reachable
@@ -72,37 +73,6 @@ final class BodyPathAllocationContractTests: XCTestCase {
     /// cache is impractical, and (b) confirmation the call site is NOT in
     /// `body`, a computed view property, or a per-row helper.
     private static let knownAcceptedSites: [KnownSite] = [
-        // Drag-and-drop payload encode for `TaskBoardItemDragPayload`. Runs
-        // once per drag event from `itemProvider()` — not a render path.
-        KnownSite(
-            relativePath:
-                "Sources/HarnessMonitorUIPreviewable/Views/TaskBoard/TaskBoardLaneViews.swift",
-            line: 20,
-            constructor: "JSONEncoder"
-        ),
-        // Drop completion handler decoding the same payload. Runs once per
-        // drop event from `loadFirst(from:completion:)`.
-        KnownSite(
-            relativePath:
-                "Sources/HarnessMonitorUIPreviewable/Views/TaskBoard/TaskBoardLaneViews.swift",
-            line: 49,
-            constructor: "JSONDecoder"
-        ),
-        // Drag-and-drop payload encode for `TaskBoardInboxItemDragPayload`.
-        // Same one-per-event story as line 20.
-        KnownSite(
-            relativePath:
-                "Sources/HarnessMonitorUIPreviewable/Views/TaskBoard/TaskBoardLaneViews.swift",
-            line: 107,
-            constructor: "JSONEncoder"
-        ),
-        // Drop completion handler for the inbox payload. One per drop event.
-        KnownSite(
-            relativePath:
-                "Sources/HarnessMonitorUIPreviewable/Views/TaskBoard/TaskBoardLaneViews.swift",
-            line: 136,
-            constructor: "JSONDecoder"
-        ),
         // Default-parameter sentinel on
         // `DecisionAuditTrailPayloadPresentation.init`. Callers on the per-row
         // path (`SessionDecisionRuntime`) already inject a shared decoder so
@@ -110,24 +80,8 @@ final class BodyPathAllocationContractTests: XCTestCase {
         KnownSite(
             relativePath:
                 "Sources/HarnessMonitorUIPreviewable/Views/Decisions/DecisionAuditTrailTab.swift",
-            line: 179,
+            line: 202,
             constructor: "JSONDecoder"
-        ),
-        // SceneStorage codec helper. `decodePipelineStateMap` runs when the
-        // scene state restores, not on view body re-evaluation.
-        KnownSite(
-            relativePath:
-                "Sources/HarnessMonitorUIPreviewable/Views/PolicyCanvas/PolicyCanvasView+SceneStorage.swift",
-            line: 134,
-            constructor: "JSONDecoder"
-        ),
-        // Same SceneStorage codec, encode side. Fires on scene-state writes,
-        // not per frame.
-        KnownSite(
-            relativePath:
-                "Sources/HarnessMonitorUIPreviewable/Views/PolicyCanvas/PolicyCanvasView+SceneStorage.swift",
-            line: 147,
-            constructor: "JSONEncoder"
         ),
         // Date formatting cache for timeline row materialisation. This struct
         // is created inside the presentation worker compute, not from SwiftUI

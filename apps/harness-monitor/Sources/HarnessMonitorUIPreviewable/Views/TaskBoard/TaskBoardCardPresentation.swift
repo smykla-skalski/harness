@@ -64,25 +64,25 @@ struct TaskBoardCardPresentation: Equatable, Sendable {
 /// tests) - it caches one `@MainActor` instance instead of allocating per call, since that
 /// fallback is still reachable during body evaluation.
 struct TaskBoardCardDateParser {
-  private let fractional: ISO8601DateFormatter
-  private let standard: ISO8601DateFormatter
-  private let spaceSeparated: DateFormatter
-
-  init() {
+  private let fractional: ISO8601DateFormatter = {
     let fractional = ISO8601DateFormatter()
     fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    self.fractional = fractional
+    return fractional
+  }()
 
+  private let standard: ISO8601DateFormatter = {
     let standard = ISO8601DateFormatter()
     standard.formatOptions = [.withInternetDateTime]
-    self.standard = standard
+    return standard
+  }()
 
+  private let spaceSeparated: DateFormatter = {
     let spaceSeparated = DateFormatter()
     spaceSeparated.locale = Locale(identifier: "en_US_POSIX")
     spaceSeparated.timeZone = TimeZone(secondsFromGMT: 0)
     spaceSeparated.dateFormat = "yyyy-MM-dd HH:mm:ss"
-    self.spaceSeparated = spaceSeparated
-  }
+    return spaceSeparated
+  }()
 
   func parse(_ value: String) -> Date? {
     fractional.date(from: value)

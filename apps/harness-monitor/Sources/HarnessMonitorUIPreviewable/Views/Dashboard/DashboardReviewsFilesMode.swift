@@ -49,15 +49,18 @@ public struct DashboardReviewsHistorySelection: Hashable, Sendable {
 }
 
 struct DashboardReviewsFileSelectionStorage: Codable, Equatable {
+  private static let decoder = JSONDecoder()
+  private static let encoder = JSONEncoder()
+
   var selectedPathByPullRequestID: [String: String] = [:]
 
   static func decode(_ raw: String) -> Self {
     guard let data = raw.data(using: .utf8) else { return Self() }
-    return (try? JSONDecoder().decode(Self.self, from: data)) ?? Self()
+    return (try? decoder.decode(Self.self, from: data)) ?? Self()
   }
 
   func encoded() -> String {
-    guard let data = try? JSONEncoder().encode(self) else { return "" }
+    guard let data = try? Self.encoder.encode(self) else { return "" }
     return String(data: data, encoding: .utf8) ?? ""
   }
 

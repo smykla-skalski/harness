@@ -69,6 +69,8 @@ enum DashboardReviewAttentionBadgeKind: String, Identifiable {
   }
 }
 
+nonisolated(unsafe) private let dashboardReviewAttentionDateParser = ISO8601DateFormatter()
+
 struct DashboardReviewAttentionBadges: Equatable {
   let hasRequiredChecks: Bool
   let hasFailingChecks: Bool
@@ -84,8 +86,7 @@ struct DashboardReviewAttentionBadges: Equatable {
     hasMergeConflicts = item.mergeable == .conflicting
 
     if let threshold = slaThresholdHours, threshold > 0 {
-      let formatter = ISO8601DateFormatter()
-      if let createdDate = formatter.date(from: item.createdAt) {
+      if let createdDate = dashboardReviewAttentionDateParser.date(from: item.createdAt) {
         let ageInHours = currentDate.timeIntervalSince(createdDate) / 3600
         hasSlaBreach = ageInHours > Double(threshold)
       } else {

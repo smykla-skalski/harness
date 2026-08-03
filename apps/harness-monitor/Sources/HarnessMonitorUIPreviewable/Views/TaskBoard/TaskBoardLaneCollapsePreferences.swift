@@ -10,6 +10,12 @@ enum TaskBoardLaneCollapsePreferences {
 
   @MainActor private static var memoizedRawValue: String?
   @MainActor private static var memoizedOverrides: [TaskBoardInboxLane: Bool] = [:]
+  @MainActor private static let decoder = JSONDecoder()
+  @MainActor private static let encoder: JSONEncoder = {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys]
+    return encoder
+  }()
 
   @MainActor
   static func overrides(from rawValue: String) -> [TaskBoardInboxLane: Bool] {
@@ -28,7 +34,7 @@ enum TaskBoardLaneCollapsePreferences {
     guard let data = rawValue.data(using: .utf8) else {
       return [:]
     }
-    let decoded = (try? JSONDecoder().decode([String: Bool].self, from: data)) ?? [:]
+    let decoded = (try? decoder.decode([String: Bool].self, from: data)) ?? [:]
     var overrides: [TaskBoardInboxLane: Bool] = decoded.reduce(into: [:]) { result, entry in
       guard entry.key != "umbrella" && entry.key != "backlog" else {
         return
@@ -46,6 +52,7 @@ enum TaskBoardLaneCollapsePreferences {
     return overrides
   }
 
+  @MainActor
   static func rawValue(for overrides: [TaskBoardInboxLane: Bool]) -> String {
     guard !overrides.isEmpty else {
       return emptyRawValue
@@ -54,8 +61,6 @@ enum TaskBoardLaneCollapsePreferences {
     let encodable = Dictionary(
       uniqueKeysWithValues: overrides.map { ($0.key.rawValue, $0.value) }
     )
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys]
     guard
       let data = try? encoder.encode(encodable),
       let rawValue = String(data: data, encoding: .utf8)
@@ -70,6 +75,7 @@ enum TaskBoardLaneCollapsePreferences {
     overrides(from: userDefaults.string(forKey: storageKey) ?? emptyRawValue)
   }
 
+  @MainActor
   static func save(
     _ overrides: [TaskBoardInboxLane: Bool],
     to userDefaults: UserDefaults = .standard

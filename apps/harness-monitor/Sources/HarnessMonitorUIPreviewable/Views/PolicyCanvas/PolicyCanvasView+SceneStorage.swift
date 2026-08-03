@@ -40,6 +40,9 @@ struct PolicyCanvasPipelineSceneState: Codable, Equatable {
 }
 
 extension PolicyCanvasView {
+  @MainActor private static let sceneStateDecoder = JSONDecoder()
+  @MainActor private static let sceneStateEncoder = JSONEncoder()
+
   /// Restore zoom + selection from SceneStorage, keyed by the current
   /// `pipelineIdentity`. `nil` identity means no document has loaded yet (or
   /// the daemon has no policy trace id) - skip restoration entirely so two
@@ -189,7 +192,7 @@ extension PolicyCanvasView {
       return [:]
     }
     return
-      (try? JSONDecoder().decode(
+      (try? sceneStateDecoder.decode(
         [String: PolicyCanvasPipelineSceneState].self,
         from: data
       )) ?? [:]
@@ -202,7 +205,7 @@ extension PolicyCanvasView {
     _ map: [String: PolicyCanvasPipelineSceneState]
   ) -> String {
     guard
-      let data = try? JSONEncoder().encode(map),
+      let data = try? sceneStateEncoder.encode(map),
       let raw = String(data: data, encoding: .utf8)
     else {
       return ""
