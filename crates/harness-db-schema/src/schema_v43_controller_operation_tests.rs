@@ -7,8 +7,8 @@ use super::tests::{
 };
 use super::*;
 use harness_daemon::daemon::db::{
-    AsyncDaemonDb, DaemonDb, TaskBoardRemoteHostTrustFence, TaskBoardRemoteLifecycleTrustSnapshot,
-    schema_query_test_support,
+    AsyncDaemonDb, DaemonDb, DaemonDbOpen, TaskBoardRemoteHostTrustFence,
+    TaskBoardRemoteLifecycleTrustSnapshot, schema_query_test_support,
 };
 use harness_task_board::TaskBoardExecutionHostConfig;
 use harness_task_board::remote_wire::wire::RemoteOfferRequest;

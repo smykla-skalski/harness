@@ -4,6 +4,7 @@ use sqlx::query_scalar;
 use tempfile::tempdir;
 
 use super::{AsyncDaemonDb, DaemonDb, RemotePairingRevokeOutcome};
+use crate::daemon::db_open::DaemonDbOpen;
 use crate::daemon::remote::{RemoteAccessScope, RemoteRole};
 use crate::daemon::remote_identity::{
     RemoteAuditEvent, RemoteAuditOutcome, RemoteAuditScopeDecision, RemoteClientRegistration,

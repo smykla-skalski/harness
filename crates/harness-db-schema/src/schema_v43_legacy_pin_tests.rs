@@ -3,7 +3,7 @@ use sqlx::{Row, query_scalar};
 use tempfile::tempdir;
 
 use super::tests::legacy_v40_fixture_at;
-use harness_daemon::daemon::db::{AsyncDaemonDb, DaemonDb};
+use harness_daemon::daemon::db::{AsyncDaemonDb, DaemonDb, DaemonDbOpen};
 use harness_task_board::{
     TaskBoardOrchestratorSettings, remote_spki_pin, validate_execution_host_configs,
 };

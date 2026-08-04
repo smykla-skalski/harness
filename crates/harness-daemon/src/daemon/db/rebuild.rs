@@ -146,6 +146,7 @@ impl TaskReviewRebuild for DaemonDb {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::daemon::db_open::DaemonDbOpen;
     use crate::session::types::{ReviewPoint, ReviewPointState, ReviewVerdict};
 
     fn seed_session(db: &DaemonDb) {

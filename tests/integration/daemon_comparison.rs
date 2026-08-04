@@ -1,6 +1,6 @@
 use tempfile::tempdir;
 
-use harness::daemon::db::{DaemonDb, DaemonDbImports};
+use harness::daemon::db::{DaemonDb, DaemonDbImports, DaemonDbOpen};
 use harness::daemon::service;
 use harness::daemon::state::{self, DaemonManifest, DaemonOwnership, HostBridgeManifest};
 use harness::session::service as session_service;

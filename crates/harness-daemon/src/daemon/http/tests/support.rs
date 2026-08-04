@@ -26,6 +26,7 @@ use crate::session::types::{
 
 use super::super::response::map_json;
 use super::DaemonHttpState;
+use crate::daemon::db_open::DaemonDbOpen;
 use harness_kernel::errors::CliError;
 
 pub(in crate::daemon::http) async fn response_body(

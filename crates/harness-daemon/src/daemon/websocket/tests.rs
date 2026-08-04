@@ -18,6 +18,7 @@ use crate::daemon::agent_acp::AcpAgentManagerHandle;
 use crate::daemon::agent_tui::AgentTuiManagerHandle;
 use crate::daemon::codex_controller::CodexControllerHandle;
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db_open::DaemonDbOpen;
 use crate::daemon::http::{AsyncDaemonDbSlot, DaemonHttpState};
 use crate::daemon::protocol::{
     SessionJoinRequest, SessionStartRequest, WsRequest, WsResponse, mapped_ws_methods, ws_methods,

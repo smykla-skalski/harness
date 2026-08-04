@@ -2,7 +2,7 @@ use sqlx::query_scalar;
 use tempfile::tempdir;
 
 use super::{run, shape_needs_repair};
-use harness_daemon::daemon::db::{AsyncDaemonDb, DaemonDb, SCHEMA_VERSION};
+use harness_daemon::daemon::db::{AsyncDaemonDb, DaemonDb, DaemonDbOpen, SCHEMA_VERSION};
 
 #[test]
 fn fresh_schema_includes_v44_lane_ordering() {

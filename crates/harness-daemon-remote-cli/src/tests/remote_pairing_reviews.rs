@@ -1,6 +1,6 @@
 use clap::Parser;
 
-use harness_daemon::daemon::db::DaemonDb;
+use harness_daemon::daemon::db::{DaemonDb, DaemonDbOpen};
 use harness_remote_trust::remote_pairing::RemotePairingCode;
 
 use super::super::{DaemonRemoteCommand, DaemonRemotePairCommand};

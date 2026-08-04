@@ -1,7 +1,6 @@
 use super::remote_identity::prune_remote_audit_events;
 use super::schema_sql::CREATE_SCHEMA;
-use super::{CliError, Connection, DaemonDb, Path, db_error};
-use crate::daemon::db::timeline::DaemonDbTimeline;
+use super::{CliError, Connection, DaemonDb, Path, SessionState, db_error};
 use rusqlite::ffi::ErrorCode;
 use rusqlite::{Transaction, TransactionBehavior};
 use std::cell::RefCell;
@@ -17,7 +16,6 @@ pub(crate) use test_support::set_schema_init_hook;
 
 #[path = "schema_migration_steps.rs"]
 mod migration_steps;
-use crate::daemon::db::prelude::*;
 use migration_steps::{
     migrate_v9_to_v10, migrate_v10_to_v11, migrate_v11_to_v12, migrate_v12_to_v13,
     migrate_v13_to_v14, migrate_v14_to_v15, migrate_v15_to_v16, migrate_v16_to_v17,
@@ -32,13 +30,28 @@ use migration_steps::{
 
 static SCHEMA_MIGRATION_LOCK: Mutex<()> = Mutex::new(());
 
+/// Session/timeline repair callbacks the migration chain needs.
+///
+/// This file constructs [`DaemonDb`] and is the part of `db` slated to move
+/// into its own crate, so it never calls a `harness-daemon` extension trait
+/// (`SessionWriteQueries`/`DaemonDbTimeline`) by name - a caller supplies
+/// the callbacks instead, keeping this file's only dependency on the rest
+/// of the crate an explicit function argument.
+pub(crate) struct SchemaRepairHooks {
+    pub(crate) sync_session: fn(&DaemonDb, &str, &SessionState) -> Result<(), CliError>,
+    pub(crate) backfill_legacy_timelines: fn(&DaemonDb) -> Result<(), CliError>,
+}
+
 impl DaemonDb {
     /// Open the daemon database at `path`, applying pragmas and running any
     /// pending schema migrations.
     ///
     /// # Errors
     /// Returns [`CliError`] on SQL failures.
-    pub fn open(path: &Path) -> Result<Self, CliError> {
+    pub(crate) fn open_with_hooks(
+        path: &Path,
+        hooks: &SchemaRepairHooks,
+    ) -> Result<Self, CliError> {
         let conn = Connection::open(path)
             .map_err(|error| db_error(format!("open daemon database: {error}")))?;
         init::apply_pragmas(&conn)?;
@@ -47,7 +60,7 @@ impl DaemonDb {
             path: Some(path.to_path_buf()),
             activity_fold: RefCell::new(super::activity_fold::ActivityFoldCache::new()),
         };
-        db.ensure_schema()?;
+        db.ensure_schema(hooks)?;
         prune_remote_audit_events(&db)?;
         Ok(db)
     }
@@ -62,7 +75,7 @@ impl DaemonDb {
     // bootstrap, so its dev-dependency on this crate needs this reachable
     // outside `harness-daemon`'s own test build too.
     #[cfg(any(test, feature = "test-support"))]
-    pub fn open_in_memory() -> Result<Self, CliError> {
+    pub(crate) fn open_in_memory_with_hooks(hooks: &SchemaRepairHooks) -> Result<Self, CliError> {
         let conn = Connection::open_in_memory()
             .map_err(|error| db_error(format!("open in-memory database: {error}")))?;
         init::apply_pragmas(&conn)?;
@@ -71,7 +84,7 @@ impl DaemonDb {
             path: None,
             activity_fold: RefCell::new(super::activity_fold::ActivityFoldCache::new()),
         };
-        db.ensure_schema()?;
+        db.ensure_schema(hooks)?;
         prune_remote_audit_events(&db)?;
         Ok(db)
     }
@@ -99,7 +112,7 @@ impl DaemonDb {
         &self.conn
     }
 
-    fn ensure_schema(&self) -> Result<(), CliError> {
+    fn ensure_schema(&self, hooks: &SchemaRepairHooks) -> Result<(), CliError> {
         let transaction = Transaction::new_unchecked(&self.conn, TransactionBehavior::Immediate)
             .map_err(|error| db_error(format!("begin schema bootstrap transaction: {error}")))?;
         if !init::schema_exists(&transaction)? {
@@ -108,10 +121,10 @@ impl DaemonDb {
         transaction
             .commit()
             .map_err(|error| db_error(format!("commit schema bootstrap transaction: {error}")))?;
-        self.run_migrations()
+        self.run_migrations(hooks)
     }
 
-    fn run_migrations(&self) -> Result<(), CliError> {
+    fn run_migrations(&self, hooks: &SchemaRepairHooks) -> Result<(), CliError> {
         let _schema_migration_guard = SCHEMA_MIGRATION_LOCK
             .lock()
             .map_err(|error| db_error(format!("lock schema migrations: {error}")))?;
@@ -120,7 +133,7 @@ impl DaemonDb {
         if version_number < 7 {
             let should_reclaim_space =
                 super::schema_migrations::run_pre_v7_migrations(&self.conn, version.as_str())?;
-            self.run_post_v7_migrations(version.as_str())?;
+            self.run_post_v7_migrations(version.as_str(), hooks)?;
             harness_db_schema::schema_repairs::repair_current_schema_shape(
                 &self.conn,
                 super::SCHEMA_VERSION,
@@ -129,7 +142,7 @@ impl DaemonDb {
                 init::reclaim_unused_pages(&self.conn)?;
             }
         } else {
-            self.run_post_v7_migrations(version.as_str())?;
+            self.run_post_v7_migrations(version.as_str(), hooks)?;
             harness_db_schema::schema_repairs::repair_current_schema_shape(
                 &self.conn,
                 super::SCHEMA_VERSION,
@@ -137,17 +150,25 @@ impl DaemonDb {
         }
         harness_db_schema::schema_repairs::repair_noncanonical_session_state_wire(
             &self.conn,
-            |project_id, state| self.sync_session(project_id, state),
+            |project_id, state| (hooks.sync_session)(self, project_id, state),
         )?;
         Ok(())
     }
 
-    fn run_post_v7_migrations(&self, version: &str) -> Result<(), CliError> {
-        self.apply_pending_migrations(init::parse_and_check_schema_version(version)?)
+    fn run_post_v7_migrations(
+        &self,
+        version: &str,
+        hooks: &SchemaRepairHooks,
+    ) -> Result<(), CliError> {
+        self.apply_pending_migrations(init::parse_and_check_schema_version(version)?, hooks)
     }
 
-    fn apply_pending_migrations(&self, version_number: u8) -> Result<(), CliError> {
-        self.apply_pending_migrations_v8_to_v24(version_number)?;
+    fn apply_pending_migrations(
+        &self,
+        version_number: u8,
+        hooks: &SchemaRepairHooks,
+    ) -> Result<(), CliError> {
+        self.apply_pending_migrations_v8_to_v24(version_number, hooks)?;
         self.apply_pending_migrations_v25_to_v45(version_number)?;
         self.apply_pending_migrations_v46(version_number)?;
         self.apply_pending_migrations_v47(version_number)?;
@@ -172,12 +193,16 @@ impl DaemonDb {
         clippy::cognitive_complexity,
         reason = "sequential migration chain has one if-guard per schema version step"
     )]
-    fn apply_pending_migrations_v8_to_v24(&self, version_number: u8) -> Result<(), CliError> {
+    fn apply_pending_migrations_v8_to_v24(
+        &self,
+        version_number: u8,
+        hooks: &SchemaRepairHooks,
+    ) -> Result<(), CliError> {
         if version_number <= 7 {
-            self.migrate_v7_to_v8()?;
+            self.migrate_v7_to_v8(hooks)?;
         }
         if version_number <= 8 {
-            self.migrate_v8_to_v9()?;
+            self.migrate_v8_to_v9(hooks)?;
         }
         if version_number <= 9 {
             migrate_v9_to_v10(&self.conn)?;
@@ -417,12 +442,12 @@ impl DaemonDb {
         Ok(())
     }
 
-    fn migrate_v7_to_v8(&self) -> Result<(), CliError> {
+    fn migrate_v7_to_v8(&self, hooks: &SchemaRepairHooks) -> Result<(), CliError> {
         // v7 databases created before the backfill shipped have empty ledger
         // rows even when the legacy source tables still hold conversation
         // history. Rebuild every session's ledger, then stamp v8 so the
         // upgrade is one-shot and idempotent across restarts.
-        self.backfill_legacy_timelines()?;
+        (hooks.backfill_legacy_timelines)(self)?;
         self.conn
             .execute(
                 "UPDATE schema_meta SET value = '8' WHERE key = 'version'",
@@ -432,10 +457,10 @@ impl DaemonDb {
         Ok(())
     }
 
-    fn migrate_v8_to_v9(&self) -> Result<(), CliError> {
+    fn migrate_v8_to_v9(&self, hooks: &SchemaRepairHooks) -> Result<(), CliError> {
         harness_db_schema::schema_repairs::repair_stale_active_sessions_without_leader(
             &self.conn,
-            |project_id, state| self.sync_session(project_id, state),
+            |project_id, state| (hooks.sync_session)(self, project_id, state),
         )?;
         self.conn
             .execute(

@@ -1,4 +1,4 @@
-use harness_daemon::daemon::db::{DaemonDb, RemoteIdentitySyncQueries};
+use harness_daemon::daemon::db::{DaemonDb, DaemonDbOpen, RemoteIdentitySyncQueries};
 use harness_remote_trust::remote::{RemoteAccessScope, RemoteRole};
 use harness_remote_trust::remote_identity::RemoteClientRegistration;
 

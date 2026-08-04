@@ -1,4 +1,5 @@
 use crate::daemon::db::DaemonDb;
+use crate::daemon::db_open::DaemonDbOpen;
 use crate::daemon::remote::RemoteRole;
 use crate::daemon::remote_identity::RemoteClientRegistration;
 use crate::daemon::remote_identity_queries::RemoteIdentitySyncQueries;

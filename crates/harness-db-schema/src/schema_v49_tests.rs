@@ -1,6 +1,6 @@
 use tempfile::tempdir;
 
-use harness_daemon::daemon::db::{AsyncDaemonDb, DaemonDb};
+use harness_daemon::daemon::db::{AsyncDaemonDb, DaemonDb, DaemonDbOpen};
 
 const DROP_V49_SQL: &str = "
 ALTER TABLE task_board_triage_decisions RENAME TO task_board_triage_decisions_v49;

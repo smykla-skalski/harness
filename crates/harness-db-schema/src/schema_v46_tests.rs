@@ -3,7 +3,7 @@ use tempfile::tempdir;
 
 use super::super::schema_repairs_triage::shape_needs_repair;
 use super::run;
-use harness_daemon::daemon::db::{AsyncDaemonDb, DaemonDb};
+use harness_daemon::daemon::db::{AsyncDaemonDb, DaemonDb, DaemonDbOpen};
 
 const DROP_V46_SQL: &str = "
 DROP INDEX task_board_triage_decisions_item_history;

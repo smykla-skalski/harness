@@ -1,7 +1,7 @@
 use tempfile::tempdir;
 
 use super::tests::legacy_v40_fixture_at;
-use harness_daemon::daemon::db::DaemonDb;
+use harness_daemon::daemon::db::{DaemonDb, DaemonDbOpen};
 use harness_task_board::TASK_BOARD_LEGACY_LOCAL_TARGET_ADOPTION_V43;
 
 const LEGACY_ACTION: &str = "implementation:1";

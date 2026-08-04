@@ -5,7 +5,9 @@ use harness_testkit::with_isolated_harness_env;
 use rcgen::{CertificateParams, KeyPair};
 
 use harness_daemon::app::{AppContext, Execute};
-use harness_daemon::daemon::db::{DaemonDb, RemoteAcmeQueries, RemoteIdentitySyncQueries};
+use harness_daemon::daemon::db::{
+    DaemonDb, DaemonDbOpen, RemoteAcmeQueries, RemoteIdentitySyncQueries,
+};
 use harness_daemon::daemon::remote::{RemoteAcmeChallenge, RemoteDaemonServeConfig};
 use harness_daemon::daemon::remote_acme::{RemoteAcmeAccountCredentials, RemoteCertificateBundle};
 use harness_daemon::daemon::state;

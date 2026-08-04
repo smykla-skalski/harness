@@ -1,5 +1,5 @@
 use super::repair_current_schema_shape;
-use harness_daemon::daemon::db::{DaemonDb, SCHEMA_VERSION};
+use harness_daemon::daemon::db::{DaemonDb, DaemonDbOpen, SCHEMA_VERSION};
 
 /// The repair chain stamps `SCHEMA_VERSION` unconditionally, so it has to
 /// replay every version up to it. A migration left out of the chain marks a

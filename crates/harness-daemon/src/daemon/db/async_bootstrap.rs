@@ -2,6 +2,7 @@ use sqlx::migrate::{Migration, Migrator};
 use sqlx::{SqlitePool, query, query_as, query_scalar};
 
 use super::{CliError, Connection, DaemonDb, Path, db_error};
+use crate::daemon::db_open::DaemonDbOpen;
 
 const TABLE_EXISTS_SQL: &str =
     "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name = ?1";

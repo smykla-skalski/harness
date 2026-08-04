@@ -1,7 +1,7 @@
 use rusqlite::Connection;
 use tempfile::tempdir;
 
-use harness_daemon::daemon::db::{AsyncDaemonDb, DaemonDb};
+use harness_daemon::daemon::db::{AsyncDaemonDb, DaemonDb, DaemonDbOpen};
 use harness_task_board::project_color::TaskBoardProjectColor;
 
 const DROP_V52_SQL: &str = "

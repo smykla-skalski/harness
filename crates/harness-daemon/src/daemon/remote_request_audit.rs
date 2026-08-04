@@ -365,6 +365,7 @@ mod tests {
     use tempfile::tempdir;
 
     use super::super::db::DaemonDb;
+    use crate::daemon::db_open::DaemonDbOpen;
     use crate::daemon::remote_identity_queries::RemoteIdentitySyncQueries;
 
     #[test]

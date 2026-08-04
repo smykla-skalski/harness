@@ -13,7 +13,7 @@ mod tests {
     use rusqlite::{Connection, Result as SqlResult, params};
 
     use super::run;
-    use harness_daemon::daemon::db::{DaemonDb, SCHEMA_VERSION};
+    use harness_daemon::daemon::db::{DaemonDb, DaemonDbOpen, SCHEMA_VERSION};
 
     const NOW: &str = "2026-07-17T10:00:00Z";
     const LATER: &str = "2026-07-17T10:15:00Z";

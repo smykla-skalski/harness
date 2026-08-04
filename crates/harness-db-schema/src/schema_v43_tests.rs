@@ -1,5 +1,5 @@
 use super::*;
-use harness_daemon::daemon::db::DaemonDb;
+use harness_daemon::daemon::db::{DaemonDb, DaemonDbOpen};
 
 #[path = "schema_v43_strict_fixture.rs"]
 mod strict_fixture;

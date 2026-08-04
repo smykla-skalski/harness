@@ -3,6 +3,7 @@ use super::{
     CodexRunMode, CodexRunSnapshot, CodexRunStatus, DaemonDb, ErrorKind, IoError, Mutex, OnceLock,
     OptionalExtension, TerminalScreenSnapshot, Type, db_error, state,
 };
+use crate::daemon::db_open::DaemonDbOpen;
 
 pub(crate) fn ensure_shared_db(
     db_slot: &Arc<OnceLock<Arc<Mutex<DaemonDb>>>>,
