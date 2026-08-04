@@ -110,6 +110,22 @@ struct TaskBoardCardPresentationContractTests {
     #expect(glyphSource.contains(".rotationEffect(glyphRotation)"))
   }
 
+  @Test("Manual lane placement remains metadata without rendering a badge")
+  func manualLanePlacementRemainsMetadataWithoutRenderingBadge() throws {
+    let laneSource = try taskBoardSource("TaskBoardLaneViews.swift")
+    let item = contractTaskBoardItem(
+      laneOrigin: .manual(actor: "Harness Monitor")
+    )
+
+    guard case .manual(let actor) = item.laneOrigin else {
+      Issue.record("Expected manual lane-origin metadata")
+      return
+    }
+    #expect(actor == "Harness Monitor")
+    #expect(!laneSource.contains("label: \"Manual\""))
+    #expect(!laneSource.contains("Manually placed in this lane"))
+  }
+
   @Test("Card rows accept an explicit cardPresentation argument")
   func cardRowsAcceptExplicitCardPresentation() {
     // Compile-level proof: `var` (not `let`) so this stays passable via the memberwise init.
@@ -212,7 +228,9 @@ struct TaskBoardCardPresentationContractTests {
     #expect(decisionSource.contains("actions.openDecision(decision)"))
   }
 
-  private func contractTaskBoardItem() -> TaskBoardItem {
+  private func contractTaskBoardItem(
+    laneOrigin: TaskBoardLaneOrigin? = nil
+  ) -> TaskBoardItem {
     TaskBoardItem(
       schemaVersion: 1,
       id: "contract-item",
@@ -229,6 +247,7 @@ struct TaskBoardCardPresentationContractTests {
       sessionId: nil,
       workItemId: nil,
       usage: TaskBoardUsage(),
+      laneOrigin: laneOrigin,
       createdAt: "2026-07-13T10:00:00Z",
       updatedAt: "2026-07-13T10:01:00Z",
       deletedAt: nil

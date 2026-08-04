@@ -92,16 +92,11 @@ extension HarnessMonitorUITestAccessibilityRegistryMoreTests {
       )
     )
     #expect(dashboardToolbar.contains("struct DashboardWindowToolbar: ToolbarContent"))
-    #expect(
-      dashboardToolbar.contains(
-        "ToolbarItem(id: \"dashboard.new-session\", placement: .primaryAction)"
-      )
-    )
-    #expect(
-      dashboardToolbar.contains(
-        "ToolbarItem(id: \"dashboard.open-folder\", placement: .primaryAction)"
-      )
-    )
+    #expect(!dashboardToolbar.contains("dashboard.new-session"))
+    #expect(!dashboardToolbar.contains("dashboard.open-folder"))
+    #expect(!dashboardToolbar.contains("private var newSessionButton"))
+    #expect(!dashboardToolbar.contains("private var openFolderButton"))
+    #expect(!dashboardWindow.contains("showsQuickActions:"))
     #expect(dashboardToolbar.contains("ToolbarSpacer(.fixed, placement: .primaryAction)"))
     #expect(!dashboardToolbar.contains("ToolbarItemGroup(placement: .secondaryAction)"))
     #expect(dashboardToolbar.contains(".sharedBackgroundVisibility(.hidden)"))

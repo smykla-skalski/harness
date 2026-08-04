@@ -219,7 +219,6 @@ public struct DashboardWindowView: View {
           DashboardWindowToolbar(
             store: store,
             navigation: windowNavigationState,
-            showsQuickActions: route == .taskBoard,
             inspector: route.inspectorToolbarPresentation,
             sleepPreventionPresentation: SleepPreventionToolbarPresentation(
               isEnabled: store.contentUI.toolbar.sleepPreventionEnabled

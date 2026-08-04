@@ -43,15 +43,12 @@ private struct TaskBoardAutomationControlsPreview: View {
     .frame(width: 620, alignment: .topLeading)
     .background(Color(nsColor: .windowBackgroundColor))
     .toolbar {
-      ToolbarItemGroup(placement: .primaryAction) {
-        SleepPreventionToolbarButton(
-          store: store,
-          presentation: SleepPreventionToolbarPresentation(isEnabled: false)
-        )
-      }
-      ToolbarSpacer(.fixed, placement: .primaryAction)
-        .sharedBackgroundVisibility(.hidden)
-      AutomationKillSwitchToolbarGroup(store: store)
+      DashboardWindowToolbar(
+        store: store,
+        navigation: WindowNavigationState(),
+        inspector: nil,
+        sleepPreventionPresentation: SleepPreventionToolbarPresentation(isEnabled: false)
+      )
     }
   }
 

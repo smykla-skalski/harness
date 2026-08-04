@@ -45,10 +45,36 @@ private struct TaskBoardLaneAlignmentPreviewSurface: View {
     )
   }
 
+  private var manuallyPlacedItem: TaskBoardItem {
+    TaskBoardItem(
+      schemaVersion: 1,
+      id: "preview-manual-placement",
+      title: "Keep manual placement metadata",
+      body: "Placement metadata remains available to automation",
+      status: .humanRequired,
+      priority: .medium,
+      tags: ["monitor"],
+      projectId: "smykla-skalski/harness",
+      agentMode: .headless,
+      externalRefs: [],
+      planning: TaskBoardPlanningState(),
+      workflow: nil,
+      sessionId: nil,
+      workItemId: nil,
+      usage: TaskBoardUsage(),
+      lanePosition: 0,
+      laneOrigin: .manual(actor: "Harness Monitor"),
+      laneSetAt: "2026-08-04T10:00:00Z",
+      createdAt: "2026-08-04T09:00:00Z",
+      updatedAt: "2026-08-04T10:00:00Z",
+      deletedAt: nil
+    )
+  }
+
   var body: some View {
     TaskBoardLaneUnifiedColumn(
       lane: .humanRequired,
-      apiItems: [],
+      apiItems: [manuallyPlacedItem],
       inboxItems: [],
       decisions: [previewDecision],
       apiCardPresentations: [:],
@@ -77,6 +103,7 @@ private struct TaskBoardLaneAlignmentPreviewSurface: View {
       alignment: .topLeading
     )
     .harnessPreviewSceneAppearance(textSizeIndex: textSizeIndex)
+    .environment(TaskBoardRelativeTimeClock())
   }
 }
 
