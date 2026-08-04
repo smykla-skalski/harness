@@ -5,11 +5,11 @@ use super::disabled_tests::{
 };
 use super::source::install_remote_session_creation_barrier;
 use super::{prepare_remote_workspace, reconcile_remote_executor_assignment};
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{
     TaskBoardRemoteMutationOutcome, remote_executor_fixture, remote_executor_identity,
 };
 use crate::task_board::TaskBoardRemoteAssignmentState;
-use crate::daemon::db::task_board::prelude::*;
 
 #[tokio::test]
 async fn settings_can_win_during_provisioning_and_force_exact_cleanup() {

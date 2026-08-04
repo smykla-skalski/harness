@@ -42,10 +42,8 @@ impl AsyncSignalStorage for AsyncDaemonDb {
         F: FnOnce(&mut SessionState) -> Result<T, CliError> + Send,
         T: Send,
     {
-        <Self as AsyncSessionStateQueries>::update_session_state_immediate(
-            self, session_id, update,
-        )
-        .await
+        <Self as AsyncSessionStateQueries>::update_session_state_immediate(self, session_id, update)
+            .await
     }
 
     async fn append_log_entry(&self, entry: &SessionLogEntry) -> Result<(), CliError> {
@@ -131,10 +129,8 @@ impl AsyncSignalStorage for AsyncDaemonDb {
         &self,
         session_id: &str,
     ) -> Result<Vec<harness_protocol::timeline::TimelineEntry>, CliError> {
-        <Self as AsyncTimelineWindowQueries>::load_session_acp_transcript_entries(
-            self, session_id,
-        )
-        .await
+        <Self as AsyncTimelineWindowQueries>::load_session_acp_transcript_entries(self, session_id)
+            .await
     }
 
     async fn list_liveness_candidate_ids(&self) -> Result<Vec<String>, CliError> {

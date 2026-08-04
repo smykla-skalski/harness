@@ -7,6 +7,7 @@ pub(super) mod settings_fence;
 mod start_adoption;
 mod start_io_permit;
 
+use crate::daemon::db::prelude::*;
 pub(super) use evidence::start_authority_digest;
 pub(crate) use evidence::{
     executor_lifecycle_settings_still_compatible, executor_settings_still_match,
@@ -25,7 +26,6 @@ pub(crate) use start_io_permit::{
     TaskBoardRemoteExecutorStartIoPermit, TaskBoardRemoteExecutorStartIoPermitOutcome,
     executor_start_io_permit,
 };
-use crate::daemon::db::prelude::*;
 
 pub(crate) const EXECUTOR_RESTARTED_BEFORE_START: &str =
     "remote executor restarted before worker start";

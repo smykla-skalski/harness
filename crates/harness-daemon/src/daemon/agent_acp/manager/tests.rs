@@ -17,8 +17,8 @@ use crate::daemon::agent_acp::manager::test_support::{
     write_executable, write_sleeping_acp_agent,
 };
 use crate::daemon::agent_acp::permission_bridge::DEFAULT_PERMISSION_CAP;
-use crate::session::types::ManagedAgentRef;
 use crate::daemon::db::prelude::*;
+use crate::session::types::ManagedAgentRef;
 
 fn manager() -> AcpAgentManagerHandle {
     seeded_manager()

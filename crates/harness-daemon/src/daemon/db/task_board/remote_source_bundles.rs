@@ -20,9 +20,9 @@ use crate::task_board::remote_wire::wire::{
 mod coordinates;
 #[path = "remote_source_bundles/row.rs"]
 mod row;
+use crate::daemon::db::prelude::*;
 pub(super) use coordinates::source_bundle_coordinates;
 use row::RemoteSourceBundleRow;
-use crate::daemon::db::prelude::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TaskBoardRemoteSourceBundle {

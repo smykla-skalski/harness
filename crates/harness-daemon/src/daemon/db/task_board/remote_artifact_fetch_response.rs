@@ -8,11 +8,11 @@ use super::remote_assignment_model::{canonical_time, concurrent, nonblank};
 use super::remote_operation_trust::{
     TaskBoardRemoteOperationKind, consume_controller_operation_trust_in_tx,
 };
+use crate::daemon::db::prelude::*;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::remote_wire::wire::{
     RemoteArtifactFetchRequest, RemoteArtifactFetchResponse,
 };
-use crate::daemon::db::prelude::*;
 
 /// Atomically adopts authenticated artifact bytes and consumes the exact
 /// current host-trust token that authorized their network fetch.

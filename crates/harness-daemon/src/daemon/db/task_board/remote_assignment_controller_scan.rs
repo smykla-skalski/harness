@@ -14,11 +14,11 @@ mod sql;
 use sql::SCAN_CYCLE_MAX;
 
 mod cursor;
+use crate::daemon::db::prelude::*;
 use cursor::{
     clear_cycle, clear_named_cursor, load_named_cursor, load_scan_row, require_pending_cursor,
     scan_error, select_cycle_page, store_named_cursor,
 };
-use crate::daemon::db::prelude::*;
 
 const CONTROLLER_QUEUE: &str = "task_board_remote_controller";
 const CONTROLLER_CYCLE_END_QUEUE: &str = "task_board_remote_controller_cycle_end";
@@ -206,7 +206,6 @@ impl RemoteAssignmentControllerScanQueries for AsyncDaemonDb {
             ))
         })
     }
-
 }
 
 async fn claim_next_controller_scan_cursor(

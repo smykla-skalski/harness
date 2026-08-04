@@ -144,8 +144,8 @@ pub(crate) async fn approve_pull_requests(
 #[cfg(test)]
 mod tests {
     use crate::reviews::{
-        HarnessCodeLanguage, ReviewFile, ReviewFileChangeType, ReviewFilePatch,
-        ReviewFileServedBy, ReviewFileViewedState,
+        HarnessCodeLanguage, ReviewFile, ReviewFileChangeType, ReviewFilePatch, ReviewFileServedBy,
+        ReviewFileViewedState,
     };
 
     use super::patches_exactly_match_files;

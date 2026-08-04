@@ -5,12 +5,12 @@ use tokio::sync::Barrier;
 
 use super::test_support::{database, instant};
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::task_board::scheduler::queries::TaskBoardAutomationSchedulerQueries;
 use crate::task_board::{
     TaskBoardAutomationWakeEntityKind, TaskBoardAutomationWakePayload,
     TaskBoardAutomationWakeRecoveryReason, TaskBoardAutomationWakeRequest,
 };
 use harness_kernel::errors::CliError;
-use crate::daemon::db::task_board::scheduler::queries::TaskBoardAutomationSchedulerQueries;
 
 #[tokio::test]
 async fn pending_wake_batch_is_bounded_and_stable_by_sequence() {

@@ -43,9 +43,7 @@ pub use liveness::{
     session_liveness_refresh_due_now, stale_session_ids_for_liveness_refresh,
     stale_session_ids_for_liveness_refresh_now,
 };
-pub use mutations::{
-    end_session, end_session_async, transfer_leader, transfer_leader_async,
-};
+pub use mutations::{end_session, end_session_async, transfer_leader, transfer_leader_async};
 pub use observe::{
     apply_heuristic_gap_tasks_async, apply_issue_tasks, apply_issue_tasks_async, observe_actor_id,
     task_severity_for_issue,

@@ -132,7 +132,8 @@ async fn resolve_patch_head(
     repository: &str,
     number: u64,
 ) -> Result<String, CliError> {
-    let pull_request = super::super::reviews::resolve_exact_pull_request(repository, number).await?;
+    let pull_request =
+        super::super::reviews::resolve_exact_pull_request(repository, number).await?;
     if pull_request.pull_request_id != pull_request_id {
         return Err(CliErrorKind::invalid_transition(format!(
             "reviews files patch target mismatch: expected '{pull_request_id}', found '{}'",
@@ -147,7 +148,10 @@ fn head_drifted(expected: &str, current: &str) -> bool {
     !expected.trim().eq_ignore_ascii_case(current.trim())
 }
 
-fn drifted_response(pull_request_id: &str, current_head_ref_oid: String) -> ReviewsFilesPatchResponse {
+fn drifted_response(
+    pull_request_id: &str,
+    current_head_ref_oid: String,
+) -> ReviewsFilesPatchResponse {
     ReviewsFilesPatchResponse {
         pull_request_id: pull_request_id.to_string(),
         patches: Vec::new(),

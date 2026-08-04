@@ -2,9 +2,9 @@ use sqlx::query_scalar;
 
 use super::super::{TaskBoardTriageOverrideClearInput, TaskBoardTriageOverrideSetInput};
 use super::*;
-use crate::task_board::{TaskBoardStatus, TriageVerdict};
 use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
 use crate::daemon::db::task_board::triage_queries::TriageQueries;
+use crate::task_board::{TaskBoardStatus, TriageVerdict};
 
 #[tokio::test]
 async fn clear_audit_identifies_a_fresh_automatic_decision_generation() {

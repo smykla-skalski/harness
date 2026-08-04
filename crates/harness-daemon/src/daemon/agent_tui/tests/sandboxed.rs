@@ -7,10 +7,10 @@ use crate::daemon::agent_tui::{
     AgentTuiStatus, TerminalScreenSnapshot,
 };
 use crate::daemon::db::DaemonDb;
+use crate::daemon::db::prelude::*;
 use crate::session::service as session_service;
 use crate::session::types::SessionRole;
 use crate::workspace::utc_now;
-use crate::daemon::db::prelude::*;
 
 #[test]
 fn sandboxed_stop_without_bridge_falls_back_to_local_cleanup() {

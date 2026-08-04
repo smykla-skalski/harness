@@ -14,6 +14,7 @@ use super::client::{
 use super::controller::{
     RemoteExecutionControllerClient, lifecycle_response_may_be_lost, renewal_response_may_be_lost,
 };
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{
     RemoteControllerFixture, TaskBoardRemoteMutationOutcome, TaskBoardRemoteOfferOutcome,
     remote_controller_fixture,
@@ -28,7 +29,6 @@ use crate::task_board::{
     TaskBoardExecutionHostAdvertisement, TaskBoardPhaseCapabilityProfile,
     TaskBoardRemoteAssignmentState, TaskBoardWorkflowExecutionCas,
 };
-use crate::daemon::db::task_board::prelude::*;
 
 pub(super) const HOST_ID: &str = "executor-a";
 pub(super) const TOKEN_ENV: &str = "HARNESS_REMOTE_CONTROLLER_TEST_TOKEN";

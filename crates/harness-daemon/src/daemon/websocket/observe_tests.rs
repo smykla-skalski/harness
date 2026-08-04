@@ -10,13 +10,13 @@ use super::tests::{
     init_git_project, join_async_worker, leader_id_for_session, start_async_session,
     test_websocket_state_with_empty_async_db, test_websocket_state_with_sync_db_only,
 };
+use crate::daemon::db::prelude::*;
 use crate::daemon::index;
 use crate::daemon::protocol::WsRequest;
 use crate::session::types::SessionRole;
 use crate::session::{service as session_service, storage as session_storage};
 use crate::workspace::project_context_dir;
 use harness_testkit::with_isolated_harness_env;
-use crate::daemon::db::prelude::*;
 
 fn append_project_ledger_entry(project_dir: &std::path::Path) {
     let ledger_path = project_context_dir(project_dir)

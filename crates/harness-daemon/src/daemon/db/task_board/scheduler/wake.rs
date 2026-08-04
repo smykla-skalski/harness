@@ -6,6 +6,7 @@ use sqlx::{QueryBuilder, Sqlite, query, query_as};
 use super::super::ORCHESTRATOR_CHANGE_SCOPE;
 use super::super::items::bump_change_in_tx;
 use super::super::mapper::{parse_json, to_json};
+use crate::daemon::db::prelude::*;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::{
     TASK_BOARD_AUTOMATION_WAKE_BATCH_LIMIT, TASK_BOARD_AUTOMATION_WAKE_PAYLOAD_SCHEMA_VERSION,
@@ -13,7 +14,6 @@ use crate::task_board::{
     TaskBoardAutomationWakeCause, TaskBoardAutomationWakeEvent, TaskBoardAutomationWakePayload,
     TaskBoardAutomationWakeRequest,
 };
-use crate::daemon::db::prelude::*;
 
 const PROCESSED_WAKE_RETENTION_LIMIT: i64 = 500;
 

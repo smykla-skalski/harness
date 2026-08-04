@@ -51,9 +51,8 @@ pub use file_comment::{
     ReviewsFileCommentKind, ReviewsFileCommentRequest, ReviewsFileCommentResponse,
 };
 pub use files::{
-    HarnessCodeLanguage, ReviewFile,
-    ReviewFileChangeType, ReviewFilePatch, ReviewFilePreview, ReviewFileServedBy,
-    ReviewFileViewedOutcome, ReviewFileViewedState, ReviewFilesViewedResult,
+    HarnessCodeLanguage, ReviewFile, ReviewFileChangeType, ReviewFilePatch, ReviewFilePreview,
+    ReviewFileServedBy, ReviewFileViewedOutcome, ReviewFileViewedState, ReviewFilesViewedResult,
     ReviewFilesViewedTarget, ReviewImageMime, ReviewsFilesBlobRequest, ReviewsFilesBlobResponse,
     ReviewsFilesListRequest, ReviewsFilesListResponse, ReviewsFilesPatchRequest,
     ReviewsFilesPatchResponse, ReviewsFilesPreviewRequest, ReviewsFilesPreviewResponse,

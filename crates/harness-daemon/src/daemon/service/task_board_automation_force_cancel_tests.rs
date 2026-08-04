@@ -1,4 +1,5 @@
 use super::task_board_automation_force_cancel::force_cancel_task_board_automation_db;
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{
     AsyncAuditQueries, accept_remote_controller, claim_remote_controller,
     remote_controller_fixture, seed_cancelable_controller_targets,
@@ -13,7 +14,6 @@ use crate::task_board::{
     TaskBoardAutomationWakeRecoveryReason, TaskBoardAutomationWakeRequest, TaskBoardExecutionState,
     TaskBoardItem,
 };
-use crate::daemon::db::task_board::prelude::*;
 const REASON: &str = "operator requested exact remote cancellation";
 
 #[tokio::test]

@@ -3,12 +3,12 @@ use sqlx::{query, query_as};
 
 use super::super::super::test_support::database;
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::task_board::scheduler::queries::TaskBoardAutomationSchedulerQueries;
 use crate::task_board::{
     TaskBoardAutomationEffectiveState, TaskBoardAutomationWakeEntityKind,
     TaskBoardAutomationWakePayload, TaskBoardAutomationWakeRecoveryReason,
     TaskBoardAutomationWakeRequest,
 };
-use crate::daemon::db::task_board::scheduler::queries::TaskBoardAutomationSchedulerQueries;
 
 #[tokio::test]
 async fn wake_projection_uses_sequence_order_and_is_read_only() {

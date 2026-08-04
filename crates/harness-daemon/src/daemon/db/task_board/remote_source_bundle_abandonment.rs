@@ -20,11 +20,11 @@ use crate::task_board::remote_wire::wire::{
 
 #[path = "remote_source_bundle_abandonment/storage.rs"]
 mod storage;
+use crate::daemon::db::prelude::*;
 pub(super) use storage::{
     insert_abandonment_in_tx, load_abandonment_collisions_in_tx, load_abandonment_in_tx,
     source_offer_is_abandoned_in_tx,
 };
-use crate::daemon::db::prelude::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TaskBoardRemoteSourceBundleAbandonment {
@@ -81,12 +81,9 @@ pub(super) async fn exact_task_board_remote_source_bundle_abandonment(
         .begin()
         .await
         .map_err(|error| db_error(format!("begin source abandonment lookup: {error}")))?;
-    let collisions = load_abandonment_collisions_in_tx(
-        &mut transaction,
-        &upload.offer,
-        &upload.request_sha256,
-    )
-    .await?;
+    let collisions =
+        load_abandonment_collisions_in_tx(&mut transaction, &upload.offer, &upload.request_sha256)
+            .await?;
     let stored = exact_upload_abandonment(&collisions, upload, authenticated_principal)?;
     transaction
         .commit()

@@ -24,8 +24,7 @@ use crate::daemon::db::{AsyncDaemonDb, DaemonDb, canonical_db_unavailable};
 use crate::daemon::remote_pairing::{RemotePairingRateLimiter, RemotePairingStatusRateLimiter};
 use crate::daemon::server_state;
 use crate::daemon::service::{
-    WakeDispatch, register_task_board_working_copy_progress_sender,
-    run_task_board_working_copy_gc,
+    WakeDispatch, register_task_board_working_copy_progress_sender, run_task_board_working_copy_gc,
 };
 use crate::telemetry::{apply_parent_context_from_headers, current_trace_id, with_active_baggage};
 use harness_kernel::errors::{CliError, CliErrorKind};

@@ -11,12 +11,12 @@ use super::items::bump_change_in_tx;
 use super::lane_order::{
     LaneTransitionKind, record_lane_transition_audit_in_tx, replace_with_lane_transition_in_tx,
 };
+use crate::daemon::db::prelude::*;
 use crate::daemon::db::{AsyncDaemonDb, CliError, CliErrorKind, db_error, utc_now};
 use crate::infra::io;
 use crate::task_board::TaskBoardItem;
 use crate::task_board::dispatch::DispatchLifecycle;
 use crate::task_board::{DispatchAppliedTask, TaskBoardStatus, TaskBoardWorkflowStatus};
-use crate::daemon::db::prelude::*;
 
 const CLAIM_LEASE_SECONDS: i64 = 30;
 

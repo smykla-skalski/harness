@@ -5,6 +5,7 @@ use super::client::{RemoteExecutionHttpClient, RemoteExecutionHttpError};
 use super::controller_cancel_replay::durable_cancel_response;
 use super::controller_clock::ControllerClock;
 use crate::daemon::db::TaskBoardRemoteIoAuthority;
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{
     AsyncDaemonDb, TaskBoardRemoteArtifact, TaskBoardRemoteAssignmentRecord,
     TaskBoardRemoteHostTrustFence, TaskBoardRemoteMutationOutcome, TaskBoardRemoteOperationKind,
@@ -17,7 +18,6 @@ use crate::task_board::remote_wire::wire::{
     RemoteStatusResponse,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
-use crate::daemon::db::task_board::prelude::*;
 
 /// Authenticated, pinned controller-side connection to one configured executor.
 ///

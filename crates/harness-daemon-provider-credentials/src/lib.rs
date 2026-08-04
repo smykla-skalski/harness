@@ -304,9 +304,6 @@ mod tests {
 
     #[test]
     fn client_handoff_mode_never_loads_from_keychain() {
-        load_provider_credentials(
-            "instance-a",
-            ProviderCredentialStartupMode::ClientHandoff,
-        );
+        load_provider_credentials("instance-a", ProviderCredentialStartupMode::ClientHandoff);
     }
 }

@@ -8,11 +8,11 @@ use crate::daemon::agent_acp::AcpAgentManagerHandle;
 use crate::daemon::agent_tui::AgentTuiManagerHandle;
 use crate::daemon::codex_controller::CodexControllerHandle;
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::http::{AsyncDaemonDbSlot, DaemonHttpState, ManagedAgentMutationLocks};
 use crate::daemon::state::{DaemonManifest, HostBridgeManifest};
 use crate::daemon::websocket::ReplayBuffer;
 use crate::task_board::{TaskBoardItem, TaskBoardStatus, TaskBoardTriageEscalationConfig};
-use crate::daemon::db::task_board::prelude::*;
 
 #[test]
 fn sanitized_segment_keeps_safe_characters_and_replaces_the_rest() {

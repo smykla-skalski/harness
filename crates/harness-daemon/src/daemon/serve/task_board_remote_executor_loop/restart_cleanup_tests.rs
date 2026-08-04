@@ -6,12 +6,12 @@ use super::disabled_tests::{
     load_assignment, request_for_revision,
 };
 use super::{prepare_remote_workspace, reconcile_remote_executor_assignment};
+use crate::daemon::db::prelude::*;
 use crate::daemon::db::{
     RemoteExecutorFixture, TaskBoardRemoteAssignmentRecord, TaskBoardRemoteExecutorStartAuthority,
     remote_executor_fixture, remote_executor_identity,
 };
 use crate::task_board::TaskBoardRemoteAssignmentState;
-use crate::daemon::db::prelude::*;
 
 const SUCCESSOR_INSTANCE: &str = "instance-b";
 

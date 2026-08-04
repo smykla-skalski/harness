@@ -1,11 +1,11 @@
 use super::controller::{
     RemoteExecutionControllerClient, RemoteExecutionControllerError, binding_error,
 };
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{
     AsyncDaemonDb, TaskBoardRemoteHostTrustFence, TaskBoardRemoteMutationOutcome,
 };
 use crate::task_board::remote_wire::wire::{RemoteLeaseRenewRequest, RemoteLeaseRenewResponse};
-use crate::daemon::db::task_board::prelude::*;
 
 impl RemoteExecutionControllerClient {
     pub(crate) async fn reconcile_pending_renewal(

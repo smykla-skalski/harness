@@ -5,15 +5,15 @@ use super::remote_assignment_test_support::{
     HOST, INSTANCE, NOW, PRINCIPAL, REPOSITORY, SOURCE_REVISION, detached_offer, executor_fixture,
 };
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::prelude::*;
+use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
+use crate::daemon::db::task_board::remote_source_bundle_queries::RemoteSourceBundleQueries;
 use crate::task_board::remote_wire::wire::{
     RemoteArtifactEntry, RemoteArtifactManifest, RemoteOfferRequest,
     RemoteSourceBundleAbandonRequest, RemoteSourceBundleUploadRequest, RemoteSourceMaterial,
     test_codex_launch,
 };
 use crate::task_board::{TaskBoardExecutionPhase, TaskBoardWorkflowKind};
-use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
-use crate::daemon::db::task_board::remote_source_bundle_queries::RemoteSourceBundleQueries;
-use crate::daemon::db::prelude::*;
 
 // The prior phase's own base; the bundle result revision must equal the current
 // binding's base_revision (SOURCE_REVISION) or the upload seal rejects it.

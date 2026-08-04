@@ -6,13 +6,13 @@ use super::status::{
 };
 use super::test_support::{database, instant};
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::task_board::scheduler::queries::TaskBoardAutomationSchedulerQueries;
+use crate::daemon::reviews_store::PolicyGraphQueries;
 use crate::task_board::policy_graph::{PolicyCanvasWorkspace, PolicyGraphMode};
 use crate::task_board::{
     TaskBoardAutomationEffectiveState, TaskBoardAutomationWakePayload,
     TaskBoardAutomationWakeRecoveryReason, TaskBoardAutomationWakeRequest,
 };
-use crate::daemon::db::task_board::scheduler::queries::TaskBoardAutomationSchedulerQueries;
-use crate::daemon::reviews_store::PolicyGraphQueries;
 
 #[tokio::test]
 async fn lean_policy_revision_matches_active_live_policy_semantics() {

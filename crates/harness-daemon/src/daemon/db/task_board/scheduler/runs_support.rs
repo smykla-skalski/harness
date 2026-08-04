@@ -74,7 +74,9 @@ fn admission_is_open(
         || control.admission_state == TaskBoardAutomationAdmissionState::Accepting
 }
 
-pub(in super::super) const fn run_trigger_label(trigger: TaskBoardAutomationRunTrigger) -> &'static str {
+pub(in super::super) const fn run_trigger_label(
+    trigger: TaskBoardAutomationRunTrigger,
+) -> &'static str {
     match trigger {
         TaskBoardAutomationRunTrigger::Scheduled => "scheduled",
         TaskBoardAutomationRunTrigger::Event => "event",
@@ -83,7 +85,9 @@ pub(in super::super) const fn run_trigger_label(trigger: TaskBoardAutomationRunT
     }
 }
 
-pub(in super::super) const fn run_outcome_label(outcome: TaskBoardAutomationRunOutcome) -> &'static str {
+pub(in super::super) const fn run_outcome_label(
+    outcome: TaskBoardAutomationRunOutcome,
+) -> &'static str {
     match outcome {
         TaskBoardAutomationRunOutcome::Completed => "completed",
         TaskBoardAutomationRunOutcome::Noop => "noop",

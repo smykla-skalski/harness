@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use tempfile::tempdir;
 
 use super::super::*;
+use crate::daemon::db::task_board::prelude::*;
 use crate::task_board::{
     AgentMode, TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION, TASK_BOARD_REMOTE_PROTOCOL_VERSION,
     TaskBoardExecutionHostAdvertisement, TaskBoardExecutionHostConfig, TaskBoardExecutionOwnership,
@@ -12,7 +13,6 @@ use crate::task_board::{
     TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowKind, TaskBoardWorkflowSnapshot,
     TaskBoardWorkflowTransitionState,
 };
-use crate::daemon::db::task_board::prelude::*;
 
 #[tokio::test]
 async fn settings_sync_preserves_the_local_executor_self_row() {

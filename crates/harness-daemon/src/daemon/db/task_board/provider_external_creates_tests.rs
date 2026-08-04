@@ -2,15 +2,15 @@ use tempfile::tempdir;
 
 use super::ORCHESTRATOR_CHANGE_SCOPE;
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::prelude::*;
+use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
+use crate::daemon::db::task_board::provider_queries::ProviderQueries;
 use crate::task_board::{
     ExternalCreateOutcome, ExternalProvider, ExternalRefSyncState, ExternalSyncField,
     ExternalTaskRef, TaskBoardExternalCreateBegin, TaskBoardExternalCreateExisting,
     TaskBoardExternalCreateIntent, TaskBoardExternalCreateIntentState, TaskBoardItem,
     TaskBoardStatus,
 };
-use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
-use crate::daemon::db::task_board::provider_queries::ProviderQueries;
-use crate::daemon::db::prelude::*;
 
 #[tokio::test]
 async fn concurrent_begin_admits_one_create_and_reuses_immutable_cross_scope_snapshot() {

@@ -3,12 +3,12 @@ use std::collections::HashMap;
 use sqlx::query;
 use tempfile::tempdir;
 
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{
     AsyncDaemonDb, ReservedTaskBoardDispatch, TASK_BOARD_PREPARATION_MAX_ATTEMPTS,
     TaskBoardPreparationClaim, TaskBoardPreparationUnavailable,
 };
 use crate::task_board::{SpawnGateSwitches, TaskBoardItem, build_dispatch_plans_with_policy};
-use crate::daemon::db::task_board::prelude::*;
 
 async fn test_db() -> (AsyncDaemonDb, tempfile::TempDir) {
     let directory = tempdir().expect("tempdir");

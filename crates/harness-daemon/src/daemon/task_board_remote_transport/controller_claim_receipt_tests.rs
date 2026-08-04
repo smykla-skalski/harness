@@ -2,6 +2,8 @@ use tokio::net::TcpListener;
 
 use super::controller::RemoteExecutionControllerClient;
 use super::controller_tests::{pinned_client, test_tls_material};
+use crate::daemon::db::prelude::*;
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{
     AsyncDaemonDb, REMOTE_EXECUTOR_PRINCIPAL, RemoteControllerFixture,
     TaskBoardRemoteAssignmentRecord, TaskBoardRemoteMutationOutcome, TaskBoardRemoteOfferOutcome,
@@ -14,8 +16,6 @@ use crate::task_board::remote_wire::wire::{
     RemoteOfferDisposition, RemoteOfferResponse, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
 use crate::task_board::{TaskBoardExecutionAttemptCas, TaskBoardWorkflowExecutionCas};
-use crate::daemon::db::task_board::prelude::*;
-use crate::daemon::db::prelude::*;
 
 const HOST: &str = "executor-a";
 const CLAIMED_AT: &str = "2026-07-19T10:00:10Z";

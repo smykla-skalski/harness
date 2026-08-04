@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use std::future::Future;
 
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::task_board::prelude::*;
 use crate::task_board::{
     TaskBoardExecutionAttemptCas, TaskBoardExecutionAttemptCasOutcome,
     TaskBoardExecutionAttemptCreateOutcome, TaskBoardExecutionAttemptRecord,
@@ -20,7 +21,6 @@ use harness_kernel::errors::CliError;
 #[cfg(test)]
 use harness_kernel::errors::CliErrorKind;
 use harness_task_board_workflow_execution::WorkflowExecutionStore;
-use crate::daemon::db::task_board::prelude::*;
 
 struct WorkflowExecutionDb<'a>(&'a AsyncDaemonDb);
 

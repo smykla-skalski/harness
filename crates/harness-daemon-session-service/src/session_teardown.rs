@@ -1,6 +1,6 @@
+use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_session::storage as session_storage;
 use harness_session::types::SessionState;
-use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_workspace::workspace::harness_data_root;
 use harness_workspace::workspace::layout::{
     SessionLayout, sessions_root as workspace_sessions_root,

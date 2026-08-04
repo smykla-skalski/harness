@@ -22,8 +22,8 @@ use super::fixture::{FROZEN_HEAD, NOW};
 #[path = "runtime/planned_report.rs"]
 mod planned_report;
 
-pub(super) use planned_report::PlannedReport;
 use crate::daemon::db::prelude::*;
+pub(super) use planned_report::PlannedReport;
 
 enum HeadBehavior {
     Exact(String),

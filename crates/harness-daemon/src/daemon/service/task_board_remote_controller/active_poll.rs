@@ -1,6 +1,7 @@
 use std::future::Future;
 
 use super::{canonical_now, controller_database_error, requests};
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{
     AsyncDaemonDb, TaskBoardRemoteAssignmentRecord, TaskBoardRemoteMutationOutcome,
 };
@@ -12,7 +13,6 @@ use crate::task_board::remote_wire::wire::RemoteLeaseRenewRequest;
 use crate::task_board::remote_wire::wire::RemoteStatusRequest;
 use harness_kernel::errors::CliError;
 use harness_kernel::errors::CliErrorKind;
-use crate::daemon::db::task_board::prelude::*;
 
 pub(super) async fn poll_active_assignment(
     db: &AsyncDaemonDb,

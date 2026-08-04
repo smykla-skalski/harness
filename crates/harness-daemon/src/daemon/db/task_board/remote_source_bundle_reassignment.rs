@@ -30,6 +30,7 @@ use super::remote_source_bundle_reassignment_evidence::{
 };
 use super::workflow_execution_fencing::WorkflowExecutionFencing;
 use super::workflow_executions::{load_execution_in_tx, update_execution_in_tx};
+use crate::daemon::db::prelude::*;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::remote_wire::wire::{
     RemoteOfferRequest, RemoteSourceBundleAbandonRequest, RemoteSourceBundleAbandonResponse,
@@ -45,7 +46,6 @@ use validation::{
     replacement_parent, require_preclaim_predecessor, validate_reassignment_input,
     validate_replacement,
 };
-use crate::daemon::db::prelude::*;
 
 pub(crate) struct TaskBoardRemoteSourceOfferReassignment<'a> {
     pub(crate) expected_execution: &'a TaskBoardWorkflowExecutionCas,
@@ -356,4 +356,3 @@ async fn settle_predecessor_offer_authority_in_tx(
             concurrent("source reassignment execution disappeared after offer settlement")
         })
 }
-

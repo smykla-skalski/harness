@@ -1,6 +1,7 @@
 use chrono::{Duration, SecondsFormat, Utc};
 
 use super::controller_authority_test_support::HOST_ID;
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{PreparedRemoteOffer, TaskBoardRemoteOfferOutcome, prepare_remote_offer};
 use crate::task_board::remote_wire::wire::{
     RemoteClaimRequest, RemoteClaimResponse, RemoteLease, RemoteLeaseRenewRequest,
@@ -14,7 +15,6 @@ use crate::task_board::{
     TaskBoardPhaseCapabilityProfile, TaskBoardPhaseVerdict, TaskBoardReviewResult,
     TaskBoardReviewerOutcome, TaskBoardWorkflowExecutionCas,
 };
-use crate::daemon::db::task_board::prelude::*;
 
 pub(super) struct PreparedLifecycle {
     pub(super) prepared: PreparedRemoteOffer,

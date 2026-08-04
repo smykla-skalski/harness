@@ -5,6 +5,8 @@ use futures_util::FutureExt;
 use tokio::task::{JoinError, spawn_blocking};
 use tokio::time::sleep;
 
+use crate::daemon::db::prelude::*;
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{
     AsyncDaemonDb, ClaimedTaskBoardDispatchPreparation, ReservedTaskBoardDispatch,
     TaskBoardPreparationClaim, TaskBoardPreparationUnavailable,
@@ -25,8 +27,6 @@ use crate::task_board::{
 use crate::workspace::layout::SessionLayout;
 use crate::workspace::worktree::WorktreeController;
 use harness_kernel::errors::{CliError, CliErrorKind};
-use crate::daemon::db::task_board::prelude::*;
-use crate::daemon::db::prelude::*;
 
 const PREPARATION_HEARTBEAT_INTERVAL: Duration = Duration::from_secs(10);
 

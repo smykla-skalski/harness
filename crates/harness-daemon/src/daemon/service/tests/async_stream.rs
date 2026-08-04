@@ -1,6 +1,6 @@
 use super::*;
-use crate::daemon::test_liveness::LIVENESS;
 use crate::daemon::db::prelude::*;
+use crate::daemon::test_liveness::LIVENESS;
 
 #[test]
 fn global_stream_initial_events_async_include_current_session_index() {

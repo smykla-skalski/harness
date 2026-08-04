@@ -3,12 +3,12 @@ use std::path::Path;
 use tempfile::tempdir;
 
 use super::*;
+use crate::daemon::db::prelude::*;
 use crate::daemon::protocol::{
     SessionJoinRequest, SessionStartRequest, TaskBoardUpdateItemRequest, TaskCreateRequest,
 };
 use crate::session::types::{CONTROL_PLANE_ACTOR_ID, SessionRole, TaskSeverity};
 use crate::task_board::TaskBoardItem;
-use crate::daemon::db::prelude::*;
 
 #[test]
 fn linked_item_completion_requires_real_review_state() {

@@ -13,8 +13,8 @@ use crate::task_board::{
 };
 
 use super::fixture::{FROZEN_HEAD, Fixture, NOW, seed_settings};
-use crate::daemon::service::task_board_workflow_test_support::TestDatabase;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::service::task_board_workflow_test_support::TestDatabase;
 
 pub(super) async fn seed_dispatched_initial_report(label: &str) -> Fixture {
     let test = TestDatabase::open().await;

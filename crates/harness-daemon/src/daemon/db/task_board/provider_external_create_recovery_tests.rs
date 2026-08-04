@@ -1,13 +1,13 @@
 use tempfile::tempdir;
 
 use super::provider_external_creates_tests::{begin, connect, create_item, item, record};
+use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
+use crate::daemon::db::task_board::provider_queries::ProviderQueries;
 use crate::task_board::{
     ExternalCreateOutcome, ExternalProvider, ExternalRef, ExternalRefSyncState, ExternalSyncField,
     ExternalTaskRef, TaskBoardExternalCreateBegin, TaskBoardExternalCreateFinalizeDisposition,
     TaskBoardExternalCreateIntent, TaskBoardStatus,
 };
-use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
-use crate::daemon::db::task_board::provider_queries::ProviderQueries;
 
 #[tokio::test]
 async fn begin_derives_create_fields_from_the_atomic_snapshot() {

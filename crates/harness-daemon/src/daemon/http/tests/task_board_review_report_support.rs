@@ -1,4 +1,5 @@
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::task_board::prelude::*;
 use crate::task_board::{
     AgentMode, TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION, TaskBoardAttemptState,
     TaskBoardExecutionAttemptCas, TaskBoardExecutionAttemptRecord, TaskBoardExecutionState,
@@ -6,7 +7,6 @@ use crate::task_board::{
     TaskBoardWorkflowExecutionArtifacts, TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowKind,
     TaskBoardWorkflowSnapshot, TaskBoardWorkflowStatus, start_task_board_workflow,
 };
-use crate::daemon::db::task_board::prelude::*;
 
 pub(super) async fn seed_running_execution(
     db: &AsyncDaemonDb,

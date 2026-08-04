@@ -2,9 +2,9 @@ use super::super::TriageOutcome;
 use super::{
     TaskBoardItemTxExt, apply_builtin_v1_triage_in_tx, connect, inbox_item, seed_decided_todo_item,
 };
-use crate::task_board::{BUILTIN_V1_EVALUATOR_IDENTITY, TaskBoardLaneOrigin, TaskBoardStatus};
-use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
 use crate::daemon::db::prelude::*;
+use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
+use crate::task_board::{BUILTIN_V1_EVALUATOR_IDENTITY, TaskBoardLaneOrigin, TaskBoardStatus};
 
 #[tokio::test]
 async fn same_evidence_with_missing_builtin_placement_reapplies_and_reports_retained_effect() {

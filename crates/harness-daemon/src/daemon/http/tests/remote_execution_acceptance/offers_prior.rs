@@ -4,6 +4,7 @@ use super::lifecycle::{
     with_acceptance_environment,
 };
 use super::offers::assert_accepted_without_claim;
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::task_board_remote_transport::controller_authority_test_support::{
     TestTlsMaterial, test_tls_material,
 };
@@ -13,7 +14,6 @@ use crate::task_board::{
     TaskBoardExecutionState, TaskBoardPhaseCapabilityProfile, TaskBoardWorkflowExecutionCas,
     TaskBoardWorkflowKind, advance_task_board_workflow,
 };
-use crate::daemon::db::task_board::prelude::*;
 
 #[test]
 fn authenticated_two_daemon_offer_acceptance_uses_adopted_default_task_prior_bundle_for_review() {

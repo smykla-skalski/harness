@@ -3,17 +3,17 @@ use sqlx::query;
 use super::completion_evidence_tests::intent_status;
 use super::ledger_kind_state;
 use crate::daemon::db::task_board::TaskBoardRemoteResultAdoptionOutcome;
+use crate::daemon::db::task_board::prelude::*;
 use crate::task_board::remote_wire::wire::RemoteTypedResult;
 use crate::task_board::{
     TASK_BOARD_EXECUTION_TARGET_RESOURCE, TaskBoardAttemptState, TaskBoardExecutionDiagnostic,
     TaskBoardExecutionState, TaskBoardFailureClass, TaskBoardWorkflowExecutionCas,
 };
-use crate::daemon::db::task_board::prelude::*;
 
 #[path = "admission_dispatch_remote_result_adoption_support.rs"]
 mod support;
-use support::*;
 use crate::daemon::db::prelude::*;
+use support::*;
 
 #[tokio::test]
 async fn completed_result_adopts_once_and_settles_prepared_start_before_target_clear() {

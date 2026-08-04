@@ -21,10 +21,10 @@ use super::{control, history, metrics, recovery, runs, stages, status};
 use crate::daemon::db::{AsyncDaemonDb, CliError};
 use crate::task_board::{
     TaskBoardAutomationCancelTarget, TaskBoardAutomationDesiredMode,
-    TaskBoardAutomationHistoryRequest, TaskBoardAutomationHistoryResponse, TaskBoardAutomationMetrics,
-    TaskBoardAutomationRunDetail, TaskBoardAutomationRunInfo, TaskBoardAutomationRunOutcome,
-    TaskBoardAutomationSnapshot, TaskBoardAutomationWakeEvent, TaskBoardAutomationWakeRequest,
-    TaskBoardOrchestratorSettings,
+    TaskBoardAutomationHistoryRequest, TaskBoardAutomationHistoryResponse,
+    TaskBoardAutomationMetrics, TaskBoardAutomationRunDetail, TaskBoardAutomationRunInfo,
+    TaskBoardAutomationRunOutcome, TaskBoardAutomationSnapshot, TaskBoardAutomationWakeEvent,
+    TaskBoardAutomationWakeRequest, TaskBoardOrchestratorSettings,
 };
 
 pub(crate) trait TaskBoardAutomationSchedulerQueries: Send + Sync {

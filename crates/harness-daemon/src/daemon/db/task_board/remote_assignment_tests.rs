@@ -3,6 +3,10 @@ use super::{
     TaskBoardRemoteMutationOutcome, TaskBoardRemoteOfferOutcome,
     TaskBoardRemoteOfferReceiptDisposition,
 };
+use crate::daemon::db::prelude::*;
+use crate::daemon::db::task_board::orchestrator_settings_queries::OrchestratorSettingsQueries;
+use crate::daemon::db::task_board::remote_assignment_terminal::RemoteAssignmentTerminalQueries;
+use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::task_board::remote_wire::wire::{
     RemoteArtifactManifest, RemoteAssignmentWireState, RemoteLease, RemoteOfferRequest,
     RemoteSourceMaterial, RemoteStatusRequest, RemoteStatusResponse, RemoteTypedResult,
@@ -14,10 +18,6 @@ use crate::task_board::{
     TaskBoardRemoteAssignmentState, TaskBoardReviewResult, TaskBoardReviewerOutcome,
     TaskBoardWorkflowKind,
 };
-use crate::daemon::db::task_board::orchestrator_settings_queries::OrchestratorSettingsQueries;
-use crate::daemon::db::task_board::remote_assignment_terminal::RemoteAssignmentTerminalQueries;
-use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
-use crate::daemon::db::prelude::*;
 
 const FORK_REPOSITORY: &str = "contributor/harness";
 

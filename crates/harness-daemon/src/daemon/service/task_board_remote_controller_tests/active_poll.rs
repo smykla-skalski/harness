@@ -2,6 +2,7 @@ use std::future::ready;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{
     TaskBoardRemoteAssignmentRecord, TaskBoardRemoteControllerOperationToken,
     TaskBoardRemoteMutationOutcome, TaskBoardRemoteOfferOutcome, remote_controller_fixture,
@@ -9,7 +10,6 @@ use crate::daemon::db::{
 use crate::task_board::{
     TaskBoardExecutionAttemptCas, TaskBoardRemoteAssignmentState, TaskBoardWorkflowExecutionCas,
 };
-use crate::daemon::db::task_board::prelude::*;
 
 #[tokio::test]
 async fn due_active_poll_observes_completed_and_failed_before_renewal() {

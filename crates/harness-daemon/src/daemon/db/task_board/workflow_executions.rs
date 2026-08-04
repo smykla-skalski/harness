@@ -19,9 +19,9 @@ use crate::task_board::{
 mod cas_screen;
 #[path = "workflow_executions/update.rs"]
 mod update;
+use crate::daemon::db::prelude::*;
 use cas_screen::{WorkflowExecutionCasScreen, screen_workflow_execution_cas_in_tx};
 pub(super) use update::update_execution_in_tx;
-use crate::daemon::db::prelude::*;
 
 const SELECT_EXECUTION: &str = "SELECT * FROM task_board_workflow_executions
     WHERE execution_id = ?1";
@@ -72,13 +72,13 @@ pub(super) async fn create_or_load_task_board_workflow_execution(
     let mut transaction = db
         .begin_immediate_transaction("task board workflow execution create")
         .await?;
-    if let Some(execution) = load_active_execution_in_tx(&mut transaction, &proposed.item_id).await?
+    if let Some(execution) =
+        load_active_execution_in_tx(&mut transaction, &proposed.item_id).await?
     {
         validate_active_execution_adoption(&execution, proposed)?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit workflow execution create no-op: {error}")))?;
+        transaction.commit().await.map_err(|error| {
+            db_error(format!("commit workflow execution create no-op: {error}"))
+        })?;
         return Ok(TaskBoardWorkflowExecutionCreateOutcome {
             execution,
             created: false,
@@ -173,9 +173,7 @@ pub(super) async fn compare_and_set_task_board_workflow_execution(
     Ok(outcome)
 }
 
-pub(super) async fn task_board_configuration_revision(
-    db: &AsyncDaemonDb,
-) -> Result<u64, CliError> {
+pub(super) async fn task_board_configuration_revision(db: &AsyncDaemonDb) -> Result<u64, CliError> {
     let revision = query_scalar::<_, i64>(
         "SELECT COALESCE((SELECT revision FROM task_board_orchestrator_settings
          WHERE singleton = 1), 0)",

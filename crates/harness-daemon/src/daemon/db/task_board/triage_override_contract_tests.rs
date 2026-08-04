@@ -5,9 +5,9 @@ use super::super::{
     current_triage_override_in_tx,
 };
 use super::*;
-use crate::task_board::{TaskBoardTriageEffectiveSource, TriageVerdict};
 use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
 use crate::daemon::db::task_board::triage_queries::TriageQueries;
+use crate::task_board::{TaskBoardTriageEffectiveSource, TriageVerdict};
 
 #[tokio::test]
 async fn clear_without_an_active_override_is_rejected() {

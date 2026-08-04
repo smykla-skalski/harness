@@ -3,14 +3,14 @@ use super::remote_assignment_generation_tests::{
     accept_controller, claim_controller, running_status, status_request,
 };
 use super::remote_assignment_test_support::*;
+use crate::daemon::db::task_board::remote_assignment_authority_queries::RemoteAssignmentAuthorityQueries;
+use crate::daemon::db::task_board::remote_assignment_executor_lifecycle_queries::RemoteAssignmentExecutorLifecycleQueries;
+use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::task_board::TaskBoardRemoteAssignmentState;
 use crate::task_board::remote_wire::wire::{
     RemoteLease, RemoteLeaseRenewRequest, RemoteLeaseRenewResponse,
     TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
-use crate::daemon::db::task_board::remote_assignment_authority_queries::RemoteAssignmentAuthorityQueries;
-use crate::daemon::db::task_board::remote_assignment_executor_lifecycle_queries::RemoteAssignmentExecutorLifecycleQueries;
-use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 
 #[tokio::test]
 async fn lost_renewal_response_replay_converges_before_expiry_without_restarting() {

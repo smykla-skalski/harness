@@ -17,8 +17,8 @@ use super::{
     executor_settings_still_match, executor_start_authority, executor_start_io_permit,
     start_adoption_replays,
 };
-use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::daemon::db::prelude::*;
+use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 
 pub(in super::super) async fn adopt_task_board_remote_executor_start(
     db: &AsyncDaemonDb,

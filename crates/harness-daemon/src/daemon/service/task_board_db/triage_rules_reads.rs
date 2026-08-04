@@ -1,4 +1,5 @@
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::protocol::{
     TASK_BOARD_TRIAGE_RULES_LIST_DEFAULT_LIMIT, TaskBoardActivateTriageRulesRequest,
     TaskBoardPreviewTriageRulesRequest, TaskBoardSaveTriageRulesDraftRequest,
@@ -9,7 +10,6 @@ use crate::task_board::{
     TriageRuleSetActivationResult, TriageRuleSetDraftSaveResult, TriageRuleSetPreviewResult,
 };
 use harness_kernel::errors::CliError;
-use crate::daemon::db::task_board::prelude::*;
 
 pub(crate) async fn get_task_board_triage_rules_draft_db(
     db: &AsyncDaemonDb,

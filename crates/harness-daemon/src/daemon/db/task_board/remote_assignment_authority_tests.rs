@@ -1,5 +1,10 @@
 use super::remote_assignment_test_support::*;
 use super::{TaskBoardRemoteMutationOutcome, TaskBoardRemoteOfferOutcome};
+use crate::daemon::db::prelude::*;
+use crate::daemon::db::task_board::remote_assignment_authority_queries::RemoteAssignmentAuthorityQueries;
+use crate::daemon::db::task_board::remote_assignment_start_settlement_queries::RemoteAssignmentStartSettlementQueries;
+use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
+use crate::daemon::db::task_board::workflow_execution_queries::WorkflowExecutionQueries;
 use crate::task_board::remote_wire::wire::{
     RemoteLease, RemoteOfferDisposition, RemoteOfferResponse, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
@@ -10,11 +15,6 @@ use crate::task_board::{
     TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionCasOutcome,
 };
 use harness_kernel::errors::CliError;
-use crate::daemon::db::task_board::remote_assignment_authority_queries::RemoteAssignmentAuthorityQueries;
-use crate::daemon::db::task_board::remote_assignment_start_settlement_queries::RemoteAssignmentStartSettlementQueries;
-use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
-use crate::daemon::db::task_board::workflow_execution_queries::WorkflowExecutionQueries;
-use crate::daemon::db::prelude::*;
 
 #[tokio::test]
 async fn offer_authority_fences_stop_until_atomic_settlement() {

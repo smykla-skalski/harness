@@ -2,12 +2,12 @@ use tempfile::tempdir;
 
 use super::super::triage_apply::placement_matches_verdict;
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
+use crate::daemon::db::task_board::triage_queries::TriageQueries;
 use crate::task_board::{
     AGENT_V1_EVALUATOR_IDENTITY, TaskBoardItem, TaskBoardLaneOrigin, TaskBoardStatus,
     TaskBoardTriageEscalationConfig, TaskBoardTriageEscalationVerdictOutcome, TriageVerdict,
 };
-use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
-use crate::daemon::db::task_board::triage_queries::TriageQueries;
 
 async fn connect() -> (tempfile::TempDir, AsyncDaemonDb) {
     let directory = tempdir().expect("tempdir");

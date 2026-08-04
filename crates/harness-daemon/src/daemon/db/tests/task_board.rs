@@ -1,6 +1,7 @@
 use tempfile::tempdir;
 
 use super::*;
+use crate::daemon::db::task_board::prelude::*;
 use crate::task_board::policy_graph::PolicyWaitCondition;
 use crate::task_board::policy_runtime::handoff_outbox::HandoffRecord;
 use crate::task_board::policy_runtime::models::{
@@ -13,7 +14,6 @@ use crate::task_board::{
     ExternalRef, ExternalRefProvider, Machine, TaskBoardGitRuntimeConfig, TaskBoardItem,
     TaskBoardOrchestratorSettings, TaskBoardOrchestratorState, TaskBoardStatus,
 };
-use crate::daemon::db::task_board::prelude::*;
 
 mod admission_compensation;
 mod admission_dispatch;

@@ -5,13 +5,13 @@ use super::triage_rules_reevaluation::reevaluate_all_triage_eligible_items_in_tx
 use super::triage_rules_store::{
     is_canonical_triage_rule_set_actor, record_triage_rule_set_audit_in_tx,
 };
+use crate::daemon::db::prelude::*;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
 use crate::task_board::{
     TriageRuleSetActivationResult, TriageRuleSetAuditKind, TriageRuleSetV1,
     TriageRuleSetValidationReport, validate_triage_rule_set,
 };
 use harness_kernel::errors::CliErrorKind;
-use crate::daemon::db::prelude::*;
 
 /// CAS-activate `candidate`, or deactivate back to the `BuiltInV1` default
 /// when `candidate` is `None`. Validates first: an invalid candidate is

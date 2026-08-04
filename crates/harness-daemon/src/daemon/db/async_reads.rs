@@ -194,7 +194,9 @@ async fn unchanged_timeline_window_response(
     entry_count: usize,
     limit: usize,
 ) -> Result<Option<TimelineWindowResponse>, CliError> {
-    if request.known_revision != Some(revision) || request.before.is_some() || request.after.is_some()
+    if request.known_revision != Some(revision)
+        || request.before.is_some()
+        || request.after.is_some()
     {
         return Ok(None);
     }

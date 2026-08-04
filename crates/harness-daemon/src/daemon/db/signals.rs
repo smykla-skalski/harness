@@ -61,10 +61,8 @@ pub trait SignalIndexQueries {
     ///
     /// # Errors
     /// Returns [`CliError`] on query failure.
-    fn session_has_shared_runtime_signal_dir(
-        &self,
-        state: &SessionState,
-    ) -> Result<bool, CliError>;
+    fn session_has_shared_runtime_signal_dir(&self, state: &SessionState)
+    -> Result<bool, CliError>;
 }
 
 impl SignalIndexQueries for DaemonDb {

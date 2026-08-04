@@ -1,7 +1,7 @@
 use super::*;
+use crate::daemon::db::prelude::*;
 use crate::daemon::http::sessions::post_session_archive;
 use crate::daemon::protocol::SessionArchiveRequest;
-use crate::daemon::db::prelude::*;
 
 #[test]
 fn delete_session_removes_worktree_and_returns_204() {

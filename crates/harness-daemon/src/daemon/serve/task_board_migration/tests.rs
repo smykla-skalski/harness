@@ -2,9 +2,9 @@ use harness_testkit::with_isolated_harness_env;
 use tempfile::tempdir;
 
 use super::*;
+use crate::daemon::reviews_store::PolicyGraphQueries;
 use crate::task_board::policy_graph::{PolicyCanvasWorkspace, PolicyGraph, PolicyGraphMode};
 use crate::task_board::{TaskBoardGitRuntimeProfile, TaskBoardItem, TaskBoardStore};
-use crate::daemon::reviews_store::PolicyGraphQueries;
 
 #[tokio::test]
 async fn managed_cutover_recovers_stage_and_archives_after_database_commit() {

@@ -9,10 +9,10 @@ use super::{
     start_daemon_observe_loop, sync_resolved_liveness_async,
 };
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::prelude::*;
 use crate::daemon::index::ResolvedSession;
 use crate::observe::types::Issue;
 use crate::session::observe::{should_observe, should_tick_liveness};
-use crate::daemon::db::prelude::*;
 
 const SWEEP_CYCLE_COUNT: u64 = 100;
 

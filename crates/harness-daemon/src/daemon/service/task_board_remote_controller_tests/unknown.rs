@@ -1,5 +1,6 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{
     RemoteControllerFixture, TaskBoardRemoteAssignmentRecord, TaskBoardRemoteMutationOutcome,
     accept_remote_controller, claim_remote_controller, remote_controller_fixture,
@@ -16,7 +17,6 @@ use crate::task_board::{
     TaskBoardAttemptState, TaskBoardExecutionState, TaskBoardStatus, TaskBoardWorkflowStatus,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
-use crate::daemon::db::task_board::prelude::*;
 
 const HOST: &str = "executor-a";
 const STATUS_AT: &str = "2026-07-19T10:02:01Z";

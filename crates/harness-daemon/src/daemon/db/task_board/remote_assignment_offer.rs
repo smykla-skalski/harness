@@ -36,13 +36,13 @@ mod capacity;
 mod screen;
 #[path = "remote_assignment_offer/types.rs"]
 mod types;
+use crate::daemon::db::prelude::*;
 use capacity::host_has_capacity;
 use screen::{
     OfferPreparationScreen, ScreenRemoteOfferAdmissionInput, screen_remote_offer_admission_in_tx,
 };
 pub(crate) use types::TaskBoardRemoteOfferWindow;
 use types::{OfferPreparation, OfferTimes};
-use crate::daemon::db::prelude::*;
 
 pub(crate) trait RemoteAssignmentOfferQueries: Send + Sync {
     async fn offer_task_board_remote_assignment_with_source(

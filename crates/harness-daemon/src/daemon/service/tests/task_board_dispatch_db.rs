@@ -4,12 +4,12 @@ use crate::daemon::db::{ReservedTaskBoardDispatch, approved_write_item};
 use crate::daemon::protocol::SessionStartRequest;
 use std::collections::HashMap;
 
+use crate::daemon::db::prelude::*;
+use crate::daemon::db::task_board::prelude::*;
 use crate::task_board::{
     AgentMode, HARNESS_GITHUB_TOKEN_ENV, TaskBoardGitHubProjectConfig, TaskBoardItem,
     TaskBoardWorkflowKind, build_dispatch_plans_with_policy,
 };
-use crate::daemon::db::task_board::prelude::*;
-use crate::daemon::db::prelude::*;
 
 struct CrashedDispatchPreparation {
     db: crate::daemon::db::AsyncDaemonDb,

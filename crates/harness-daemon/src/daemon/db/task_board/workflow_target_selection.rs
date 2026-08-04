@@ -7,6 +7,7 @@ use super::workflow_execution_attempts::{
     attempt_cas_matches, update_attempt_in_tx, validate_attempt_phase,
 };
 use super::workflow_executions::{cas_mismatch, load_execution_in_tx, update_execution_in_tx};
+use crate::daemon::db::prelude::*;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::{
     TASK_BOARD_EXECUTION_TARGET_ACTION_RESOURCE, TASK_BOARD_EXECUTION_TARGET_ATTEMPT_RESOURCE,
@@ -16,7 +17,6 @@ use crate::task_board::{
     validate_task_board_attempt_update, validate_task_board_execution_target_update,
     validate_task_board_workflow_execution,
 };
-use crate::daemon::db::prelude::*;
 
 pub(super) async fn select_task_board_local_execution_target(
     db: &AsyncDaemonDb,

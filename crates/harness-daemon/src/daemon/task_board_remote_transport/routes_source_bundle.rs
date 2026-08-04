@@ -5,6 +5,7 @@ use axum::response::Response;
 
 use super::DaemonHttpState;
 use super::routes_support::{assignment_route, map_route_result, wire_error};
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::utc_now;
 use crate::daemon::server_state::DaemonErrorBody;
 use crate::task_board::remote_wire::wire::{
@@ -13,7 +14,6 @@ use crate::task_board::remote_wire::wire::{
 use crate::task_board::remote_wire::wire::{
     RemoteSourceBundleAbandonResponse, RemoteSourceBundleReceiptVerificationResponse,
 };
-use crate::daemon::db::task_board::prelude::*;
 
 #[utoipa::path(
     post,

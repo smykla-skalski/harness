@@ -14,8 +14,8 @@ use super::test_support::{
     controller_with_session_state, sample_session_state_with_open_task,
     sample_session_state_with_open_task_and_codex_agent, with_isolated_async_harness_env,
 };
-use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::prelude::*;
+use crate::daemon::db::task_board::prelude::*;
 
 const SESSION_ID: &str = "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc";
 

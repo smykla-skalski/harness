@@ -11,6 +11,7 @@ use super::routes_support::{
     active_assignments, assignment_route, concurrent, load_assignment, local_host, map_route_error,
     map_route_result, offer_response, record_lease, route_error, verify_route_identity, wire_error,
 };
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::utc_now;
 use crate::daemon::http::{require_async_db, require_execution_remote_client};
 use crate::daemon::server_state::DaemonErrorBody;
@@ -29,7 +30,6 @@ use crate::task_board::remote_wire::wire_limits::{
     MAX_REMOTE_SOURCE_ABANDON_JSON_BYTES, MAX_REMOTE_SOURCE_BUNDLE_JSON_BYTES,
 };
 use harness_kernel::errors::CliErrorKind;
-use crate::daemon::db::task_board::prelude::*;
 
 pub(crate) const ADVERTISE_PATH: &str = "/v1/task-board-execution/advertise";
 pub(crate) const OFFER_PATH: &str = "/v1/task-board-execution/offers";

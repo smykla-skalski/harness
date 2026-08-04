@@ -4,9 +4,9 @@ use super::remote_assignment_test_support::{
     CLAIMED_AT, ExecutorFixture, PRINCIPAL, accept_executor, claim_request, detached_offer,
     executor_fixture,
 };
-use crate::daemon::db::{AsyncDaemonDb, TaskBoardRemoteMutationOutcome};
 use crate::daemon::db::task_board::remote_assignment_executor_lifecycle_queries::RemoteAssignmentExecutorLifecycleQueries;
 use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
+use crate::daemon::db::{AsyncDaemonDb, TaskBoardRemoteMutationOutcome};
 
 const RUNNING_AT: &str = "2026-07-19T10:00:30Z";
 const TERMINAL_AT: &str = "2026-07-19T10:00:40Z";

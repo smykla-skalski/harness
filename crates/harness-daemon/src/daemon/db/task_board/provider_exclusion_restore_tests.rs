@@ -1,14 +1,14 @@
 use sqlx::query_scalar;
 
 use super::{clean_restore_patch, connect, exclusion_context, pre_dispatch_item, restored_item};
+use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
+use crate::daemon::db::task_board::provider_queries::ProviderQueries;
 use crate::task_board::store::TaskBoardItemPatch;
 use crate::task_board::types::{ExternalRef, ExternalRefProvider, ExternalRefSyncState};
 use crate::task_board::{
     ProviderExclusionAuditContext, ProviderExclusionRestoreOutcome, TaskBoardLaneOrigin,
     matched_exclusion_label,
 };
-use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
-use crate::daemon::db::task_board::provider_queries::ProviderQueries;
 
 #[path = "provider_exclusion_restore_parent_tests.rs"]
 mod parent_tests;

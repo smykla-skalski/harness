@@ -4,9 +4,9 @@ use super::controller_prepared_test_support::{
 };
 use super::routes_status::status_response as route_status_response;
 use crate::daemon::db::TaskBoardRemoteMutationOutcome;
+use crate::daemon::db::task_board::prelude::*;
 use crate::task_board::remote_wire::wire::RemoteStatusResponse;
 use crate::task_board::{TaskBoardFailureClass, TaskBoardRemoteAssignmentState};
-use crate::daemon::db::task_board::prelude::*;
 
 #[tokio::test]
 async fn failed_route_echoes_exact_durable_failure_class_and_refuses_absence() {

@@ -1,8 +1,8 @@
 use std::collections::BTreeSet;
 
 use super::*;
-use crate::session::storage;
 use crate::daemon::db::prelude::*;
+use crate::session::storage;
 
 #[test]
 fn list_sessions_reads_cached_liveness_state_within_ttl() {

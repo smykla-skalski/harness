@@ -12,6 +12,7 @@ use super::remote_assignment_model::{
 use super::remote_claim_receipts::{
     claim_receipt_values, claim_response_for_record, exact_claim_response,
 };
+use crate::daemon::db::prelude::*;
 use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardRemoteAssignmentState;
@@ -20,7 +21,6 @@ use crate::task_board::remote_wire::wire::TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION;
 use crate::task_board::remote_wire::wire::{
     RemoteAttemptBinding, RemoteClaimRequest, RemoteLeaseRenewRequest,
 };
-use crate::daemon::db::prelude::*;
 
 pub(crate) trait RemoteAssignmentLeaseQueries: Send + Sync {
     async fn mark_task_board_remote_assignment_running(

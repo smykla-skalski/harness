@@ -1,6 +1,7 @@
 use std::future::Future;
 
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::task_board::prelude::*;
 use crate::task_board::TaskBoardResolvedReviewer;
 use crate::task_board::{
     AgentMode, DispatchAppliedTask, PlanApprovalGate, TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION,
@@ -13,7 +14,6 @@ use crate::task_board::{
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_workspace::git::mutation::pin_github_pull_request_worktree;
 use tokio::task::{spawn, spawn_blocking};
-use crate::daemon::db::task_board::prelude::*;
 
 /// Reviewer runtimes a local write workflow can dispatch. Only Codex has a
 /// durable write execution path; the provider runtimes accepted by the

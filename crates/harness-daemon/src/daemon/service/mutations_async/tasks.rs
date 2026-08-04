@@ -6,9 +6,9 @@ use super::super::{
     db::AsyncDaemonDb, session_not_found, session_service, sync_file_state_from_async_db, utc_now,
 };
 use super::{append_log, bump_session, persist_task_signal_effects, resolved_session_for_mutation};
+use crate::daemon::db::prelude::*;
 use crate::infra::io::validate_safe_segment;
 use crate::session::types::{SessionState, TaskStatus, WorkItem};
-use crate::daemon::db::prelude::*;
 
 struct DeleteRollback<'a> {
     project_id: &'a str,

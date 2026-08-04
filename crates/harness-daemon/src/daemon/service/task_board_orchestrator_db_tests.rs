@@ -3,6 +3,7 @@ use super::{
     run_publish_phase, should_sync_github_tasks,
 };
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::protocol::TaskBoardOrchestratorRunOnceRequest;
 use crate::task_board::github::GitHubAutomation;
 use crate::task_board::{
@@ -10,7 +11,6 @@ use crate::task_board::{
     TaskBoardAutomationRunTrigger, TaskBoardAutomationScope, TaskBoardOrchestratorDispatchInput,
     TaskBoardOrchestratorSettings, TaskBoardStatus,
 };
-use crate::daemon::db::task_board::prelude::*;
 
 /// The default settings already enable `SyncTaskBoard`, so this is the
 /// configuration the tests below vary one field at a time from.

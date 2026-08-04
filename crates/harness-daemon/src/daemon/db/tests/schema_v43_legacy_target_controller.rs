@@ -9,6 +9,7 @@
 use sqlx::{query, query_scalar};
 
 use super::*;
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::task_board::remote_assignment_test_support::controller_fixture;
 use crate::task_board::{
     TASK_BOARD_EXECUTION_TARGET_ACTION_RESOURCE, TASK_BOARD_EXECUTION_TARGET_ATTEMPT_RESOURCE,
@@ -19,7 +20,6 @@ use crate::task_board::{
     TaskBoardExecutionAttemptCas, TaskBoardExecutionState, TaskBoardWorkflowExecutionCas,
     TaskBoardWorkflowExecutionRecord,
 };
-use crate::daemon::db::task_board::prelude::*;
 
 const CLAIMED_AT: &str = "2026-07-19T10:00:01Z";
 

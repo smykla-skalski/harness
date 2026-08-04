@@ -4,8 +4,8 @@ use super::TaskBoardRemoteMutationOutcome;
 use super::remote_assignment_test_support::{
     CLAIMED_AT, INSTANCE, PRINCIPAL, accept_executor, claim_request, executor_fixture,
 };
-use crate::task_board::TaskBoardRemoteAssignmentState;
 use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
+use crate::task_board::TaskBoardRemoteAssignmentState;
 
 #[tokio::test]
 async fn executor_start_before_the_durable_claim_is_rejected_without_mutation() {

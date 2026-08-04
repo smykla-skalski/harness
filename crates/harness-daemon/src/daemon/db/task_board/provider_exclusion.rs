@@ -14,6 +14,7 @@ use super::lane_order::LaneTransitionKind;
 use super::triage_apply::reapply_active_override_outcome_in_tx;
 use super::triage_apply_rules::apply_active_triage_in_tx;
 use super::triage_audit::ProviderExclusionConflictAudit;
+use crate::daemon::db::prelude::*;
 use crate::daemon::db::{AsyncDaemonDb, CliError, CliErrorKind, db_error};
 use crate::infra::io;
 use crate::task_board::store::TaskBoardItemPatch;
@@ -24,7 +25,6 @@ use crate::task_board::{
     TaskBoardTriageOverride, canonicalize_labels, is_exclusion_label,
 };
 use harness_task_board_provider_sync::replace_open_sync_conflicts_in_connection;
-use crate::daemon::db::prelude::*;
 
 /// Real implementation behind [`ProviderQueries::hide_task_board_item_for_provider_exclusion`],
 /// called from the single consolidated trait impl in `provider_queries.rs`

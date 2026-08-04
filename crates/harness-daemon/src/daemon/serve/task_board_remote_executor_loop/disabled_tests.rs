@@ -9,6 +9,8 @@ use super::{prepare_remote_workspace, reconcile_remote_executor_assignment};
 use crate::daemon::agent_acp::AcpAgentManagerHandle;
 use crate::daemon::agent_tui::AgentTuiManagerHandle;
 use crate::daemon::codex_controller::CodexControllerHandle;
+use crate::daemon::db::prelude::*;
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{
     AsyncDaemonDb, DaemonDb, REMOTE_EXECUTOR_CLAIMED_AT, REMOTE_EXECUTOR_PRINCIPAL,
     RemoteExecutorFixture, TaskBoardRemoteAssignmentRecord, TaskBoardRemoteExecutorStartAuthority,
@@ -24,8 +26,6 @@ use crate::daemon::state::DaemonManifest;
 use crate::daemon::websocket::ReplayBuffer;
 use crate::task_board::TaskBoardRemoteAssignmentState;
 use crate::task_board::remote_wire::wire::{RemoteOfferRequest, RemoteSourceMaterial};
-use crate::daemon::db::task_board::prelude::*;
-use crate::daemon::db::prelude::*;
 
 pub(super) const EXECUTOR_INSTANCE: &str = "instance-a";
 const EXECUTOR_REPOSITORY: &str = "example/harness";

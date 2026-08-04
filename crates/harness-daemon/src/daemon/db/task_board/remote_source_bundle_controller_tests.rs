@@ -4,13 +4,13 @@ use super::remote_assignment_test_support::{
     DEADLINE, HOST, LEASE_EXPIRES, NOW, REPOSITORY, controller_fixture,
 };
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::task_board::remote_assignment_authority_queries::RemoteAssignmentAuthorityQueries;
+use crate::daemon::db::task_board::remote_source_bundle_queries::RemoteSourceBundleQueries;
 use crate::task_board::TaskBoardWorkflowKind;
 use crate::task_board::remote_wire::wire::{
     RemoteArtifactEntry, RemoteArtifactManifest, RemoteSourceBundleUploadRequest,
     RemoteSourceBundleUploadResponse, RemoteSourceMaterial,
 };
-use crate::daemon::db::task_board::remote_assignment_authority_queries::RemoteAssignmentAuthorityQueries;
-use crate::daemon::db::task_board::remote_source_bundle_queries::RemoteSourceBundleQueries;
 
 const BASE: &str = "1111111111111111111111111111111111111111";
 const RESULT: &str = "2222222222222222222222222222222222222222";

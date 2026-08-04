@@ -98,7 +98,8 @@ pub(crate) trait ItemCoreQueries: Send + Sync {
     ) -> Result<bool, CliError>;
 
     /// List Task Board items including tombstones.
-    async fn list_task_board_items_including_deleted(&self) -> Result<Vec<TaskBoardItem>, CliError>;
+    async fn list_task_board_items_including_deleted(&self)
+    -> Result<Vec<TaskBoardItem>, CliError>;
 
     /// Like [`ItemCoreQueries::list_task_board_items_including_deleted`], but
     /// keeps each item's row revision, for a batch caller that needs to CAS
@@ -245,11 +246,18 @@ impl ItemCoreQueries for AsyncDaemonDb {
         item_revision: i64,
         items_change_seq: i64,
     ) -> Result<bool, CliError> {
-        items_reads::task_board_item_snapshot_is_current(self, item_id, item_revision, items_change_seq)
-            .await
+        items_reads::task_board_item_snapshot_is_current(
+            self,
+            item_id,
+            item_revision,
+            items_change_seq,
+        )
+        .await
     }
 
-    async fn list_task_board_items_including_deleted(&self) -> Result<Vec<TaskBoardItem>, CliError> {
+    async fn list_task_board_items_including_deleted(
+        &self,
+    ) -> Result<Vec<TaskBoardItem>, CliError> {
         items_reads::list_task_board_items_including_deleted(self).await
     }
 

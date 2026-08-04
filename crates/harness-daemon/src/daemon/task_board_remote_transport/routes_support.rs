@@ -3,6 +3,7 @@ use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse as _, Response};
 
 use super::DaemonHttpState;
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{
     AsyncDaemonDb, TaskBoardRemoteAssignmentRecord, TaskBoardRemoteOfferOutcome,
     TaskBoardRemoteOfferReceipt, TaskBoardRemoteOfferReceiptDisposition,
@@ -17,7 +18,6 @@ use crate::task_board::{
     TaskBoardRemoteAssignmentState, validate_local_execution_host_config,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
-use crate::daemon::db::task_board::prelude::*;
 
 pub(super) async fn assignment_route<'a>(
     headers: &HeaderMap,

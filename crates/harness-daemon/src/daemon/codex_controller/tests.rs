@@ -23,8 +23,8 @@ use self::test_support::{
     codex_approval_request, codex_run_snapshot, controller_with_db, controller_with_session_state,
     sample_session_state_with_codex_agent,
 };
-use harness_kernel::errors::CliError;
 use crate::daemon::db::prelude::*;
+use harness_kernel::errors::CliError;
 
 const OTHER_SESSION_ID: &str = "78e20780-1723-4a72-bdd6-a66f976723b3";
 

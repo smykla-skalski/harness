@@ -8,6 +8,7 @@ use super::{
     remote_executor_identity, start_authority_eligible,
 };
 use crate::daemon::db::TaskBoardRemoteAssignmentRecord;
+use crate::daemon::db::prelude::*;
 use crate::daemon::db::task_board::remote_assignment_lease::{
     commit_noop, finish_mutation, require_assignment,
 };
@@ -16,7 +17,6 @@ use crate::daemon::db::task_board::remote_assignment_model::{
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardRemoteAssignmentState;
-use crate::daemon::db::prelude::*;
 
 const SETTINGS_CHANGED_BEFORE_START: &str = "remote executor settings changed before worker start";
 use super::EXECUTOR_RESTARTED_BEFORE_START;

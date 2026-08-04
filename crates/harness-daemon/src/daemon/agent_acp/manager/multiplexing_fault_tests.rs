@@ -10,9 +10,9 @@ use crate::daemon::agent_acp::manager::test_support::{
     ACP_CONDITION_DEADLINE, assert_ok, assert_some, seeded_manager_with_events,
     write_exiting_acp_agent,
 };
+use crate::daemon::db::prelude::*;
 use crate::feature_flags;
 use crate::session::types::ManagedAgentRef;
-use crate::daemon::db::prelude::*;
 
 fn manager_with_events() -> (
     AcpAgentManagerHandle,

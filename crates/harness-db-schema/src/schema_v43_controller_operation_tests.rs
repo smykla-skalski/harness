@@ -165,12 +165,10 @@ async fn corrupt_controller_operation_tokens_fail_closed_after_reopen() {
         let db = AsyncDaemonDb::connect(&path)
             .await
             .expect("reopen structurally valid v43 database");
-        let error = schema_query_test_support::task_board_remote_assignment_exists(
-            &db,
-            "assignment-a",
-        )
-        .await
-        .expect_err("corrupt controller operation token must not decode");
+        let error =
+            schema_query_test_support::task_board_remote_assignment_exists(&db, "assignment-a")
+                .await
+                .expect_err("corrupt controller operation token must not decode");
         assert!(error.to_string().contains(diagnostic), "{suffix}: {error}");
     }
 }

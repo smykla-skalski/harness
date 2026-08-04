@@ -9,9 +9,9 @@ use super::*;
 use crate::daemon::agent_acp::AcpAgentManagerHandle;
 use crate::daemon::agent_tui::AgentTuiManagerHandle;
 use crate::daemon::codex_controller::CodexControllerHandle;
+use crate::daemon::db::prelude::*;
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
 use crate::daemon::state::DaemonManifest;
-use crate::daemon::db::prelude::*;
 
 mod managed_agents;
 mod sessions;

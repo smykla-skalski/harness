@@ -9,15 +9,15 @@ use super::{
     TaskBoardRemoteExecutorStartAuthority, TaskBoardRemoteExecutorStopAuthority,
     TaskBoardRemoteExecutorStopReason, TaskBoardRemoteMutationOutcome,
 };
-use crate::task_board::TaskBoardRemoteAssignmentState;
-use crate::task_board::remote_wire::wire::{
-    RemoteLeaseRenewRequest, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
-};
+use crate::daemon::db::prelude::*;
 use crate::daemon::db::task_board::remote_assignment_executor_lifecycle_queries::RemoteAssignmentExecutorLifecycleQueries;
 use crate::daemon::db::task_board::remote_assignment_lease::RemoteAssignmentLeaseQueries;
 use crate::daemon::db::task_board::remote_assignment_start_settlement_queries::RemoteAssignmentStartSettlementQueries;
 use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
-use crate::daemon::db::prelude::*;
+use crate::task_board::TaskBoardRemoteAssignmentState;
+use crate::task_board::remote_wire::wire::{
+    RemoteLeaseRenewRequest, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
+};
 
 #[tokio::test]
 async fn renewed_claim_can_acquire_exact_start_authority_once() {

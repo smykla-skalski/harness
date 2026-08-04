@@ -3,6 +3,7 @@ use std::path::Path;
 use sha2::{Digest, Sha256};
 use tokio::task::spawn_blocking;
 
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{
     AsyncDaemonDb, REMOTE_IMPLEMENTATION_BUNDLE_MEDIA_TYPE, REMOTE_IMPLEMENTATION_BUNDLE_PATH,
     REMOTE_RESULT_ARTIFACT_MEDIA_TYPE, REMOTE_RESULT_ARTIFACT_PATH,
@@ -19,7 +20,6 @@ use crate::task_board::{
 };
 use crate::workspace::utc_now;
 use harness_kernel::errors::{CliError, CliErrorKind};
-use crate::daemon::db::task_board::prelude::*;
 
 const MAX_TERMINAL_ARTIFACT_BYTES: u64 = 32 * 1024 * 1024;
 

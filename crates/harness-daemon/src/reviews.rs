@@ -61,9 +61,8 @@ pub(crate) use files::preview_from_patch;
 #[cfg(any(test, feature = "daemon-runtime"))]
 pub(crate) use files::viewed::{ViewedMutation, classify_outcome};
 pub use files::{
-    HarnessCodeLanguage, ReviewFile,
-    ReviewFileChangeType, ReviewFilePatch, ReviewFilePreview, ReviewFileServedBy,
-    ReviewFileViewedOutcome, ReviewFileViewedState, ReviewFilesViewedResult,
+    HarnessCodeLanguage, ReviewFile, ReviewFileChangeType, ReviewFilePatch, ReviewFilePreview,
+    ReviewFileServedBy, ReviewFileViewedOutcome, ReviewFileViewedState, ReviewFilesViewedResult,
     ReviewFilesViewedTarget, ReviewImageMime, ReviewsFilesBlobRequest, ReviewsFilesBlobResponse,
     ReviewsFilesListRequest, ReviewsFilesListResponse, ReviewsFilesPatchRequest,
     ReviewsFilesPatchResponse, ReviewsFilesPreviewRequest, ReviewsFilesPreviewResponse,

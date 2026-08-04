@@ -20,15 +20,15 @@ use crate::workspace::utc_now;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::task_board::load_live_spawn_grants;
-use crate::daemon::db::task_board::prelude::*;
 use super::task_board_repository_scope::{
     TaskBoardRepositoryScope, scoped_task_board_item_db, scoped_task_board_items_db,
 };
+use crate::daemon::db::task_board::prelude::*;
 
+use crate::daemon::reviews_store::PolicyGraphQueries;
 pub(crate) use crate::task_board::external::{
     TaskBoardSyncCoordinatorFence, TaskBoardSyncCoordinatorFenceDecision,
 };
-use crate::daemon::reviews_store::PolicyGraphQueries;
 
 #[cfg(test)]
 mod external_ref_tests;

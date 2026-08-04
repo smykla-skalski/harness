@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::ops::Deref;
 
-use tempfile::{TempDir, tempdir};
 use crate::daemon::db::task_board::prelude::*;
+use tempfile::{TempDir, tempdir};
 
 #[path = "admission_dispatch_completion_evidence.rs"]
 mod completion_evidence_tests;
@@ -31,6 +31,7 @@ mod startup_reconciliation_tests;
 #[path = "admission_dispatch_write_workflow.rs"]
 mod write_workflow_tests;
 
+use crate::daemon::db::prelude::*;
 use crate::daemon::db::task_board::write_workflow_fixture::{
     approved_write_item, complete_write_preparation,
 };
@@ -43,7 +44,6 @@ use crate::task_board::{
     bind_plan_approval, build_dispatch_plans_with_policy, build_planning_result,
     resolve_task_board_reviewers,
 };
-use crate::daemon::db::prelude::*;
 
 #[tokio::test]
 async fn admission_reservation_is_all_or_none_and_idempotent() {

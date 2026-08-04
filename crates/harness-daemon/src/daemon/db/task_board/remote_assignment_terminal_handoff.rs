@@ -12,13 +12,13 @@ use super::remote_assignment_model::{
     to_i64,
 };
 use super::workflow_executions::load_execution_in_tx;
+use crate::daemon::db::prelude::*;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::{
     TaskBoardAttemptState, TaskBoardExecutionState, TaskBoardRemoteAssignmentState,
     TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionRecord,
     task_board_remote_execution_target,
 };
-use crate::daemon::db::prelude::*;
 
 pub(super) async fn record_task_board_remote_terminal_cleanup_handoff(
     db: &AsyncDaemonDb,

@@ -1,3 +1,4 @@
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{
     AsyncDaemonDb, CliError, TaskBoardLaneMutationResult, TaskBoardLanePositionInput,
     TaskBoardLaneResetInput, db_error,
@@ -8,7 +9,6 @@ use crate::daemon::protocol::{
     TaskBoardShiftedItemRevision,
 };
 use crate::infra::io::validate_safe_segment;
-use crate::daemon::db::task_board::prelude::*;
 
 pub(crate) async fn get_task_board_item_position_snapshot_db(
     db: &AsyncDaemonDb,

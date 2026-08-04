@@ -19,6 +19,7 @@ pub(crate) use snapshot_resolve::{
     resolve_session_for_snapshot, resolve_session_for_snapshot_async,
 };
 
+use crate::daemon::db::prelude::*;
 #[cfg(test)]
 pub(crate) use liveness::clear_session_liveness_refresh_cache_entry;
 #[cfg(test)]
@@ -30,7 +31,6 @@ pub(crate) use liveness::{
     reconcile_active_session_liveness_background_async,
 };
 use liveness::{reconcile_active_session_liveness_for_reads, reconcile_session_liveness_for_read};
-use crate::daemon::db::prelude::*;
 
 /// List discovered projects known to the daemon.
 ///

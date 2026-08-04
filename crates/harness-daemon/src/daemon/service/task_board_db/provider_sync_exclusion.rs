@@ -1,4 +1,5 @@
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::task_board::prelude::*;
 use crate::task_board::external::TaskBoardSyncItemSnapshot;
 use crate::task_board::store::TaskBoardItemPatch;
 use crate::task_board::{
@@ -6,7 +7,6 @@ use crate::task_board::{
     TaskBoardSyncConflict,
 };
 use harness_kernel::errors::CliError;
-use crate::daemon::db::task_board::prelude::*;
 
 /// Tombstones an already-visible, pre-dispatch item because the provider now
 /// reports an exclusion label. Thin delegation to the dedicated DB-layer

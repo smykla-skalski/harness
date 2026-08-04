@@ -7,6 +7,7 @@ use tempfile::{TempDir, tempdir};
 use tokio::sync::broadcast;
 
 use crate::daemon::codex_controller::CodexControllerHandle;
+use crate::daemon::db::prelude::*;
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
 use crate::daemon::index::DiscoveredProject;
 use crate::daemon::protocol::{
@@ -20,7 +21,6 @@ use crate::session::types::{
     AgentRegistration, AgentStatus, CURRENT_VERSION, ManagedAgentRef, SessionMetrics, SessionRole,
     SessionState, SessionStatus, TaskSeverity, TaskSource,
 };
-use crate::daemon::db::prelude::*;
 
 static ASYNC_HARNESS_ENV_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 

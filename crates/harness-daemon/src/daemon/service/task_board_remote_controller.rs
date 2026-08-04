@@ -10,6 +10,7 @@ use tokio::task::spawn_blocking;
 use tokio::time::timeout;
 
 use crate::daemon::db::TaskBoardRemotePriorPhaseBundle;
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{
     AsyncDaemonDb, TaskBoardRemoteAssignmentRecord, TaskBoardRemoteHostTrustFence,
 };
@@ -26,7 +27,6 @@ use crate::task_board::{
 };
 use harness_kernel::errors::CliError;
 use harness_kernel::errors::CliErrorKind;
-use crate::daemon::db::task_board::prelude::*;
 
 #[path = "task_board_remote_controller/active_poll.rs"]
 mod active_poll;

@@ -45,7 +45,8 @@ pub trait SessionSummaryQueries {
     ///
     /// # Errors
     /// Returns [`CliError`] on query failure.
-    fn list_session_summaries_full(&self) -> Result<Vec<daemon_protocol::SessionSummary>, CliError>;
+    fn list_session_summaries_full(&self)
+    -> Result<Vec<daemon_protocol::SessionSummary>, CliError>;
 
     /// List session ids eligible for liveness reconciliation without parsing
     /// full session state. Mirrors the async pool query so both reconcile

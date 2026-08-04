@@ -9,10 +9,10 @@ use super::controller_prepared_test_support::{
     renewal_request, renewal_response,
 };
 use crate::daemon::db::TaskBoardRemoteMutationOutcome;
+use crate::daemon::db::task_board::prelude::*;
 use crate::task_board::{
     TaskBoardAttemptState, TaskBoardExecutionState, TaskBoardRemoteAssignmentState,
 };
-use crate::daemon::db::task_board::prelude::*;
 
 #[tokio::test]
 async fn claim_response_received_after_l1_expiry_never_exposes_running_state() {

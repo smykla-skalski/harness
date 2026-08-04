@@ -173,9 +173,14 @@ where
     )
     .await?;
     let before_triage = before.clone();
-    let write =
-        replace_with_lane_transition_in_tx(&mut transaction, before, revision, item, transition_kind)
-            .await?;
+    let write = replace_with_lane_transition_in_tx(
+        &mut transaction,
+        before,
+        revision,
+        item,
+        transition_kind,
+    )
+    .await?;
     let change_revision = bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
     let mutation_kind =
         (ingress != TaskBoardTriageIngress::None).then_some(TaskBoardMutationKind::Update);

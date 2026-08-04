@@ -101,10 +101,7 @@ impl AsyncDiagnosticsQueries for AsyncDaemonDb {
     }
 }
 
-async fn load_diagnostics_cache(
-    db: &AsyncDaemonDb,
-    key: &str,
-) -> Result<Option<String>, CliError> {
+async fn load_diagnostics_cache(db: &AsyncDaemonDb, key: &str) -> Result<Option<String>, CliError> {
     query_scalar::<_, String>(DIAGNOSTICS_CACHE_SQL)
         .bind(key)
         .fetch_optional(db.pool())

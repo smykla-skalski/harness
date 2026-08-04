@@ -1,4 +1,5 @@
 use super::{canonical_now, controller_database_error, missing_execution, requests};
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{
     AsyncDaemonDb, TaskBoardRemoteAssignmentRecord, TaskBoardRemoteMutationOutcome,
     TaskBoardRemoteOfferOutcome, TaskBoardRemoteOperationTrustFence,
@@ -16,7 +17,6 @@ use crate::task_board::{
     TaskBoardWorkflowExecutionRecord,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
-use crate::daemon::db::task_board::prelude::*;
 
 #[expect(
     clippy::cognitive_complexity,

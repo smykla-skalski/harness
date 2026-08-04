@@ -5,6 +5,8 @@ use tokio::task::spawn_blocking;
 use super::RemoteWorkerIdentity;
 use super::runtime::{stop_remote_run, validate_run_snapshot};
 use super::source_bundle::cleanup_prior_phase_import_ref;
+use crate::daemon::db::prelude::*;
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{
     AsyncDaemonDb, TaskBoardRemoteAssignmentRecord, TaskBoardRemoteExecutorRun,
     TaskBoardRemoteExecutorStartAuthority, TaskBoardRemoteExecutorStopReason,
@@ -22,8 +24,6 @@ use crate::workspace::project_resolver::resolve_name;
 use crate::workspace::utc_now;
 use crate::workspace::worktree::WorktreeController;
 use harness_kernel::errors::{CliError, CliErrorKind};
-use crate::daemon::db::task_board::prelude::*;
-use crate::daemon::db::prelude::*;
 
 pub(super) async fn reconcile_settled_executor_cleanup(
     state: &DaemonHttpState,

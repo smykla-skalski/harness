@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use sqlx::{query, query_as};
 use tempfile::tempdir;
 
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{
     AsyncDaemonDb, ClaimedTaskBoardDispatchPreparation, ReservedTaskBoardDispatch,
     TASK_BOARD_PREPARATION_MAX_ATTEMPTS,
@@ -11,7 +12,6 @@ use crate::task_board::{
     SpawnGateSwitches, TaskBoardItem, TaskBoardStatus, TaskBoardWorkflowStatus,
     build_dispatch_plans_with_policy,
 };
-use crate::daemon::db::task_board::prelude::*;
 
 /// Bounds every give-up loop below. Without it a preparation that never stops
 /// retrying hangs the test run instead of failing it.

@@ -14,13 +14,13 @@ use super::{
     ITEMS_CHANGE_SCOPE, MACHINES_CHANGE_SCOPE, ORCHESTRATOR_CHANGE_SCOPE,
     POLICY_RUNTIME_CHANGE_SCOPE, RUNTIME_CONFIG_CHANGE_SCOPE,
 };
+use crate::daemon::db::prelude::*;
 use crate::daemon::db::task_board::import_lifecycle_queries::ImportLifecycleQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
 use crate::task_board::legacy_import::LegacyTaskBoardSnapshot;
 use crate::task_board::{
     TaskBoardGitRuntimeConfig, sort_task_board_items, validate_task_board_lane_order,
 };
-use crate::daemon::db::prelude::*;
 
 pub(crate) const LEGACY_GLOBAL_SOURCE: &str = "legacy_global_board";
 pub(crate) const EMPTY_DATABASE_SOURCE: &str = "empty_database";

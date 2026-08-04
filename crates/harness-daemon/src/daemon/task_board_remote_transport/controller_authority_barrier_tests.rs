@@ -6,11 +6,11 @@ use super::controller_authority_test_support::{
     pinned_controller_with_times, prepare_stop, spawn_barrier_server, test_tls_material, try_stop,
 };
 use super::controller_authority_tests::assert_concurrent_database_error;
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{TaskBoardRemoteMutationOutcome, utc_now};
 use crate::task_board::{
     TASK_BOARD_EXECUTION_TARGET_RESOURCE, TaskBoardAttemptState, TaskBoardRemoteAssignmentState,
 };
-use crate::daemon::db::task_board::prelude::*;
 
 #[tokio::test]
 async fn offer_authority_fences_stop_until_response_settlement() {

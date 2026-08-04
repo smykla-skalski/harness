@@ -7,6 +7,11 @@ use super::remote_assignment_test_support::{
     controller_fixture, controller_fixture_with_retry_attempts,
 };
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::prelude::*;
+use crate::daemon::db::task_board::remote_assignment_authority_queries::RemoteAssignmentAuthorityQueries;
+use crate::daemon::db::task_board::remote_assignment_status::RemoteAssignmentStatusQueries;
+use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
+use crate::daemon::db::task_board::workflow_execution_queries::WorkflowExecutionQueries;
 use crate::task_board::remote_wire::wire::{
     RemoteArtifactManifest, RemoteAssignmentWireState, RemoteLease, RemoteStatusRequest,
     RemoteStatusResponse, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
@@ -15,11 +20,6 @@ use crate::task_board::{
     TASK_BOARD_EXECUTION_TARGET_RESOURCE, TaskBoardAttemptState, TaskBoardExecutionState,
     TaskBoardFailureClass, TaskBoardRemoteAssignmentState,
 };
-use crate::daemon::db::task_board::remote_assignment_authority_queries::RemoteAssignmentAuthorityQueries;
-use crate::daemon::db::task_board::remote_assignment_status::RemoteAssignmentStatusQueries;
-use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
-use crate::daemon::db::task_board::workflow_execution_queries::WorkflowExecutionQueries;
-use crate::daemon::db::prelude::*;
 
 #[tokio::test]
 async fn terminal_failure_is_provisional_and_immutable_across_restart() {

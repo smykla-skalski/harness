@@ -6,9 +6,9 @@ use tokio::task::JoinHandle;
 use tokio::time::{MissedTickBehavior, interval};
 
 use crate::daemon::db::AsyncDaemonDb;
-use crate::daemon::service;
 #[cfg(test)]
 use crate::daemon::db::task_board::prelude::OrchestratorSettingsQueries;
+use crate::daemon::service;
 
 const MIN_HEARTBEAT_INTERVAL: Duration = Duration::from_secs(15);
 const DEFAULT_HEARTBEAT_INTERVAL: Duration = Duration::from_mins(1);

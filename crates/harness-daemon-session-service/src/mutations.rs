@@ -5,9 +5,7 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_session::index::ResolvedSession;
 use harness_session::service as session_service;
 use harness_session::types::SessionTransition;
-use harness_session::wire::{
-    LeaderTransferRequest, SessionDetail, SessionEndRequest,
-};
+use harness_session::wire::{LeaderTransferRequest, SessionDetail, SessionEndRequest};
 use harness_workspace::workspace::utc_now;
 use tokio::task::spawn_blocking;
 

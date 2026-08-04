@@ -10,11 +10,11 @@ use super::controller_prepared_test_support::{
 };
 use super::controller_tests::{cancel_request, cancel_response};
 use crate::daemon::db::TaskBoardRemoteMutationOutcome;
+use crate::daemon::db::task_board::prelude::*;
 use crate::task_board::{
     TASK_BOARD_REMOTE_CANCEL_IO_AUTHORITY_RESOURCE, TaskBoardAttemptState,
     TaskBoardRemoteAssignmentState,
 };
-use crate::daemon::db::task_board::prelude::*;
 
 #[tokio::test]
 async fn status_authority_wins_before_cancel_and_cancel_performs_zero_io() {

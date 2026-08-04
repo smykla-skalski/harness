@@ -12,10 +12,10 @@ use super::remote_claim_receipts::{claim_receipt_values, exact_claim_response};
 use super::remote_operation_trust::{
     TaskBoardRemoteOperationKind, consume_controller_operation_trust_in_tx,
 };
+use crate::daemon::db::prelude::*;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardRemoteAssignmentState;
 use crate::task_board::remote_wire::wire::{RemoteClaimRequest, RemoteClaimResponse};
-use crate::daemon::db::prelude::*;
 
 pub(super) async fn record_task_board_remote_assignment_claim(
     db: &AsyncDaemonDb,

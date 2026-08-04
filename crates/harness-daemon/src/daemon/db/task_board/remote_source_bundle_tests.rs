@@ -6,6 +6,10 @@ use super::remote_assignment_test_support::{
     INSTANCE, NOW, PRINCIPAL, REPOSITORY, accept_executor, executor_fixture,
 };
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::task_board::orchestrator_settings_queries::OrchestratorSettingsQueries;
+use crate::daemon::db::task_board::remote_assignment_authority_queries::RemoteAssignmentAuthorityQueries;
+use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
+use crate::daemon::db::task_board::remote_source_bundle_queries::RemoteSourceBundleQueries;
 use crate::task_board::remote_wire::wire::{
     RemoteArtifactEntry, RemoteArtifactManifest, RemoteSourceBundleAbandonRequest,
     RemoteSourceBundleUploadRequest, RemoteSourceMaterial, test_codex_launch,
@@ -13,10 +17,6 @@ use crate::task_board::remote_wire::wire::{
 use crate::task_board::{
     TaskBoardExecutionPhase, TaskBoardPhaseCapabilityProfile, TaskBoardWorkflowKind,
 };
-use crate::daemon::db::task_board::orchestrator_settings_queries::OrchestratorSettingsQueries;
-use crate::daemon::db::task_board::remote_assignment_authority_queries::RemoteAssignmentAuthorityQueries;
-use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
-use crate::daemon::db::task_board::remote_source_bundle_queries::RemoteSourceBundleQueries;
 
 const BASE: &str = "1111111111111111111111111111111111111111";
 const RESULT: &str = "2222222222222222222222222222222222222222";

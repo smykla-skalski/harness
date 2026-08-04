@@ -22,8 +22,8 @@ use super::remote_assignment_lease::{commit_noop, finish_mutation, require_assig
 use super::remote_assignment_model::{
     TaskBoardRemoteMutationOutcome, canonical_time, concurrent, to_i64,
 };
-use crate::daemon::db::{AsyncDaemonDb, CliError, TaskBoardRemoteExecutorRun, db_error};
 use crate::daemon::db::prelude::*;
+use crate::daemon::db::{AsyncDaemonDb, CliError, TaskBoardRemoteExecutorRun, db_error};
 
 #[expect(
     clippy::cognitive_complexity,

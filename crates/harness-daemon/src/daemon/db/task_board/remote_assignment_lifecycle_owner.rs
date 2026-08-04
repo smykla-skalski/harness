@@ -12,9 +12,9 @@ use super::remote_assignment_start_authority::{
     executor_lifecycle_settings_still_compatible, remote_executor_identity,
 };
 use super::remote_start_receipts::durable_start_receipt_run_matches;
+use crate::daemon::db::prelude::*;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardRemoteAssignmentState;
-use crate::daemon::db::prelude::*;
 
 const LIFECYCLE_OWNER_DOMAIN: &str = "harness.task-board.remote-executor-lifecycle-owner.v1";
 const LIFECYCLE_OWNER_SECONDS: i64 = 30;

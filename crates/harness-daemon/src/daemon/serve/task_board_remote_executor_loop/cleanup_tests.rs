@@ -2,6 +2,8 @@ use std::path::{Path, PathBuf};
 
 use sqlx::query_scalar;
 
+use crate::daemon::db::prelude::*;
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{
     REMOTE_EXECUTOR_PRINCIPAL, RemoteExecutorFixture, TaskBoardRemoteAssignmentRecord,
     TaskBoardRemoteExecutorIdentity, TaskBoardRemoteMutationOutcome, accept_remote_executor,
@@ -17,8 +19,6 @@ use crate::task_board::{
     TaskBoardLocalAttemptResult, TaskBoardPhaseVerdict, TaskBoardReviewResult,
     TaskBoardReviewerOutcome,
 };
-use crate::daemon::db::task_board::prelude::*;
-use crate::daemon::db::prelude::*;
 
 pub(super) const CLAIMED_AT: &str = "2026-07-19T10:00:10Z";
 pub(super) const STARTED_AT: &str = "2026-07-19T10:00:20Z";

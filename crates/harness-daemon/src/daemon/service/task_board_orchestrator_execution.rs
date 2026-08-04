@@ -112,9 +112,7 @@ async fn load_candidate_items(
     Ok(items)
 }
 
-async fn ensure_active(
-    session: Option<&TaskBoardAutomationRunSession>,
-) -> Result<(), CliError> {
+async fn ensure_active(session: Option<&TaskBoardAutomationRunSession>) -> Result<(), CliError> {
     if let Some(session) = session {
         session.ensure_active().await?;
     }

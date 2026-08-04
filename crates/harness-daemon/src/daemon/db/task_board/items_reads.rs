@@ -34,7 +34,8 @@ pub(crate) async fn task_board_items_snapshot(
         .map_err(|error| db_error(format!("commit task board item snapshot: {error}")))?;
     let status = status.map(TaskBoardStatus::canonical_persisted_status);
     items.retain(|snapshot| {
-        !snapshot.item.is_deleted() && status.is_none_or(|expected| snapshot.item.status == expected)
+        !snapshot.item.is_deleted()
+            && status.is_none_or(|expected| snapshot.item.status == expected)
     });
     sort_item_snapshots(&mut items);
     Ok(TaskBoardItemsSnapshot {
@@ -83,13 +84,11 @@ pub(crate) async fn task_board_item_snapshot_is_current(
 pub(crate) async fn list_task_board_items_including_deleted(
     db: &AsyncDaemonDb,
 ) -> Result<Vec<TaskBoardItem>, CliError> {
-    Ok(
-        list_task_board_item_snapshots_including_deleted(db)
-            .await?
-            .into_iter()
-            .map(|snapshot| snapshot.item)
-            .collect(),
-    )
+    Ok(list_task_board_item_snapshots_including_deleted(db)
+        .await?
+        .into_iter()
+        .map(|snapshot| snapshot.item)
+        .collect())
 }
 
 pub(crate) async fn list_task_board_item_snapshots_including_deleted(

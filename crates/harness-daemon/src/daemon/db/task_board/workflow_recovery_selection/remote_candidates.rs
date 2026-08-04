@@ -4,9 +4,9 @@ use sqlx::{Sqlite, Transaction, query, query_as, query_scalar};
 
 use super::super::workflow_execution_candidates::load_candidates;
 use super::super::workflow_execution_rows::WorkflowExecutionRow;
+use crate::daemon::db::prelude::*;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardWorkflowExecutionRecord;
-use crate::daemon::db::prelude::*;
 
 const REMOTE_CANDIDATE_QUEUE: &str = "remote_target_candidates";
 const REMOTE_CANDIDATE_COUNT: &str = "SELECT COUNT(*) FROM task_board_workflow_executions

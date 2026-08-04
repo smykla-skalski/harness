@@ -1,3 +1,6 @@
+#[cfg(test)]
+use crate::daemon::reviews_store::PolicyGraphQueries;
+use crate::daemon::reviews_store::PolicyGraphSyncQueries;
 use crate::daemon::{db::DaemonDb, state};
 use crate::reviews::policy::review_target_policy_evidence;
 use crate::reviews::{
@@ -9,9 +12,6 @@ use crate::task_board::{
     PolicyGraphNodeKind, PolicyInput, PolicyReasonCode, PolicySubject,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
-use crate::daemon::reviews_store::PolicyGraphSyncQueries;
-#[cfg(test)]
-use crate::daemon::reviews_store::PolicyGraphQueries;
 
 const REVIEW_APPROVE_ACTION_ID: &str = "reviews.approve";
 const REVIEW_TEXT_PASTE_APPROVE_ACTION: &str = "approveReviewPullRequests";

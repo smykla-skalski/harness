@@ -3,8 +3,8 @@ use std::ops::Deref;
 use tempfile::{TempDir, tempdir};
 
 use crate::daemon::db::AsyncDaemonDb;
-use crate::task_board::TaskBoardItem;
 use crate::daemon::db::task_board::prelude::*;
+use crate::task_board::TaskBoardItem;
 
 struct TestDb {
     db: AsyncDaemonDb,

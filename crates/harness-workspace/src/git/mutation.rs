@@ -379,11 +379,7 @@ mod tests {
         let rewrite = format!("url.file://{}/.insteadOf", remote.display());
         git(
             &origin,
-            &[
-                "config",
-                &rewrite,
-                "https://github.com/acme/widgets.git",
-            ],
+            &["config", &rewrite, "https://github.com/acme/widgets.git"],
         );
         create_linked_worktree(&origin, "session-1", &session, "harness/session-1", &base)
             .expect("session worktree");

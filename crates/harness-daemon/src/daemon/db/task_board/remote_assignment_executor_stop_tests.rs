@@ -6,12 +6,12 @@ use super::{
     TaskBoardRemoteExecutorStopReason, TaskBoardRemoteMutationOutcome,
 };
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::protocol::CodexRunStatus;
 use crate::task_board::TaskBoardRemoteAssignmentState;
 use crate::task_board::remote_wire::wire::{
     RemoteCancelRequest, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
-use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 
 mod lifecycle;
 mod pre_permit;

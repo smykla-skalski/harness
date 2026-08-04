@@ -4,6 +4,7 @@ use tokio::task::spawn_blocking;
 
 use crate::agents::runtime::models;
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::service::{
     assess_provider_readiness, provider_prerequisite_reasons, runtime_requires_provider_credential,
 };
@@ -20,7 +21,6 @@ use crate::task_board::{
     validate_task_board_read_only_run_context,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
-use crate::daemon::db::task_board::prelude::*;
 
 #[cfg(test)]
 #[path = "read_only_workflow_launch/test_override.rs"]

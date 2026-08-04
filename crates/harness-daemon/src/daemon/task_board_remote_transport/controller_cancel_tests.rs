@@ -5,10 +5,10 @@ use super::controller_tests::{
     pinned_client, request_body, spawn_scripted_https_server, test_tls_material,
 };
 use crate::daemon::db::TaskBoardRemoteMutationOutcome;
+use crate::daemon::db::task_board::prelude::*;
 use crate::task_board::{
     TaskBoardAttemptState, TaskBoardExecutionState, TaskBoardRemoteAssignmentState,
 };
-use crate::daemon::db::task_board::prelude::*;
 
 #[tokio::test]
 async fn lost_cancel_response_retries_exactly_and_restarts_from_durable_response() {

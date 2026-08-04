@@ -25,10 +25,14 @@ use super::remote_assignment_executor_stop::{
 use super::remote_assignment_executor_terminal::{self, TaskBoardRemoteTerminalArtifact};
 use super::remote_assignment_lease_response;
 use super::remote_assignment_lifecycle_owner::TaskBoardRemoteExecutorLifecycleOwner;
-use super::remote_assignment_model::{TaskBoardRemoteAssignmentRecord, TaskBoardRemoteMutationOutcome};
+use super::remote_assignment_model::{
+    TaskBoardRemoteAssignmentRecord, TaskBoardRemoteMutationOutcome,
+};
 use super::remote_assignment_recovery_queue::{self, RawRecoveryCandidate};
 use super::remote_assignment_terminal_handoff;
-use crate::daemon::db::{AsyncDaemonDb, CliError, TaskBoardRemoteExecutorRun, TaskBoardRemoteHostTrustFence};
+use crate::daemon::db::{
+    AsyncDaemonDb, CliError, TaskBoardRemoteExecutorRun, TaskBoardRemoteHostTrustFence,
+};
 use crate::task_board::TaskBoardWorkflowExecutionCas;
 use crate::task_board::remote_wire::wire::{
     RemoteCancelRequest, RemoteCancelResponse, RemoteLeaseRenewRequest, RemoteLeaseRenewResponse,

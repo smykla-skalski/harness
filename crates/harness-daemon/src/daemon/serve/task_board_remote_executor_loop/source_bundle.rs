@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use tokio::task::spawn_blocking;
 
 use super::{RemoteWorkerIdentity, concurrent, invalid_transition};
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{AsyncDaemonDb, TaskBoardRemoteAssignmentRecord};
 use crate::git::GitError;
 use crate::git::bundle::{GitBundleImportPlan, GitBundleWorktreeState};
@@ -11,7 +12,6 @@ use crate::git::source_bundle_import::GitSourceBundleImportPlan;
 use crate::task_board::remote_wire::wire::RemoteSourceBundleUploadRequest;
 use crate::task_board::remote_wire::wire::{RemoteOfferRequest, RemoteSourceMaterial};
 use harness_kernel::errors::{CliError, CliErrorKind};
-use crate::daemon::db::task_board::prelude::*;
 
 pub(super) async fn materialize_repository_snapshot(
     db: &AsyncDaemonDb,

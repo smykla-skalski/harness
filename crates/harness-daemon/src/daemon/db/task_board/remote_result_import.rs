@@ -27,13 +27,13 @@ mod model;
 mod prepare;
 #[path = "remote_result_import/storage.rs"]
 mod storage;
+use crate::daemon::db::prelude::*;
 pub(in crate::daemon::db::task_board) use adoption::{
     load_and_finalize_remote_implementation_import_in_tx,
     require_adopted_remote_implementation_import_in_tx,
 };
 use evidence::{ImportMaterials, load_import_materials};
 use prepare::{LoadedResultImport, load_result_import_target_in_tx, resolve_result_import_in_tx};
-use crate::daemon::db::prelude::*;
 
 type ManualImportFuture<'a> =
     Pin<Box<dyn Future<Output = Result<TaskBoardRemoteResultImportRecord, CliError>> + Send + 'a>>;

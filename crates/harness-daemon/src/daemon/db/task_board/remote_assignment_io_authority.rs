@@ -31,12 +31,12 @@ pub(super) use request::{RemoteIoAuthorityClaim, RemoteIoAuthorityRequestEvidenc
 #[cfg(test)]
 #[path = "remote_assignment_io_authority_test_claims.rs"]
 mod test_claims;
+use crate::daemon::db::prelude::*;
 #[cfg(test)]
 pub(in crate::daemon::db::task_board) use test_claims::{
     claim_task_board_remote_cancel_io_authority, claim_task_board_remote_claim_io_authority,
     claim_task_board_remote_offer_io_authority, claim_task_board_remote_renew_io_authority,
 };
-use crate::daemon::db::prelude::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum TaskBoardRemoteIoAuthorityKind {

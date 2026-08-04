@@ -3,6 +3,8 @@ use std::path::Path;
 use sqlx::query_scalar;
 
 use super::{TerminalEvidence, completed_evidence, persist_terminal_snapshot};
+use crate::daemon::db::prelude::*;
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{
     AsyncDaemonDb, REMOTE_EXECUTOR_PRINCIPAL, RemoteExecutorFixture,
     TaskBoardRemoteMutationOutcome, accept_remote_executor, authorize_and_start_remote_executor,
@@ -17,8 +19,6 @@ use crate::task_board::{
     TaskBoardFailureClass, TaskBoardLocalAttemptResult, TaskBoardPhaseVerdict,
     TaskBoardRemoteAssignmentState, TaskBoardReviewResult, TaskBoardReviewerOutcome,
 };
-use crate::daemon::db::task_board::prelude::*;
-use crate::daemon::db::prelude::*;
 
 const OWNER: &str = "instance-a";
 

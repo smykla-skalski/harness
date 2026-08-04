@@ -13,6 +13,7 @@ use tokio::task::JoinHandle;
 use tokio_rustls::{TlsAcceptor, server::TlsStream};
 
 use super::super::test_http_state_with_db_path;
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{AsyncDaemonDb, TaskBoardRemoteAssignmentRecord, workflow_owner};
 use crate::daemon::http::{DaemonHttpAuthMode, DaemonHttpState};
 use crate::daemon::remote::{RemoteAccessScope, RemoteRole};
@@ -31,7 +32,6 @@ use crate::task_board::{
     TaskBoardWorkflowStatus, TaskBoardWorkflowTransitionState, bind_plan_approval,
     build_planning_result, resolve_task_board_reviewers,
 };
-use crate::daemon::db::task_board::prelude::*;
 
 pub(super) const HOST_ID: &str = "executor-a";
 pub(super) const HOST_INSTANCE: &str = "executor-acceptance-a";

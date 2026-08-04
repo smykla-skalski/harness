@@ -25,8 +25,8 @@ mod sync;
 pub(super) use sync::sync_remote_hosts_in_tx;
 #[path = "remote_hosts/row.rs"]
 mod row;
-use row::HostRow;
 use crate::daemon::db::prelude::*;
+use row::HostRow;
 
 pub(crate) const REMOTE_HOST_CHANGE_SCOPE: &str = "task_board:remote_hosts";
 

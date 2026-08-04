@@ -4,6 +4,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard};
 
+use crate::daemon::db::prelude::*;
 #[cfg(feature = "daemon-runtime")]
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
 #[cfg(feature = "daemon-runtime")]
@@ -11,7 +12,6 @@ use crate::session::types::{ManagedAgentRef, SessionState};
 #[cfg(feature = "daemon-runtime")]
 use crate::workspace::project_context_dir;
 use harness_kernel::errors::{CliError, CliErrorKind};
-use crate::daemon::db::prelude::*;
 
 pub(super) type Shared<T> = Arc<Mutex<T>>;
 

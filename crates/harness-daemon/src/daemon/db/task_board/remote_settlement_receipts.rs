@@ -3,12 +3,12 @@ use sqlx::{Sqlite, Transaction, query, query_as};
 
 use super::remote_assignment_lease::require_assignment;
 use super::remote_assignment_model::{canonical_time, concurrent, nonblank, phase_label, to_i64};
+use crate::daemon::db::prelude::*;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::remote_wire::wire::{
     RemoteAssignmentWireState, RemoteSettledRequest, RemoteSettledResponse,
     TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
-use crate::daemon::db::prelude::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TaskBoardRemoteSettlementReceipt {

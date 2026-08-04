@@ -11,13 +11,13 @@ use super::remote_assignment_model::{
     to_i64,
 };
 use super::remote_start_receipts::durable_start_receipt_run_matches;
+use crate::daemon::db::prelude::*;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::remote_wire::wire::{
     RemoteArtifactEntry, RemoteAssignmentWireState, RemoteStatusRequest, RemoteStatusResponse,
     TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
 use crate::task_board::{TaskBoardExecutionPhase, TaskBoardRemoteAssignmentState};
-use crate::daemon::db::prelude::*;
 
 pub(crate) const REMOTE_RESULT_ARTIFACT_PATH: &str = "result/attempt.json";
 pub(crate) const REMOTE_RESULT_ARTIFACT_MEDIA_TYPE: &str =

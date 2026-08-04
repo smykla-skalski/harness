@@ -11,18 +11,18 @@ use super::{
     TaskBoardRemoteAssignmentRecord, TaskBoardRemoteControllerScanStep,
     TaskBoardRemoteMutationOutcome, TaskBoardRemoteOfferOutcome,
 };
+use crate::daemon::db::prelude::*;
+use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
+use crate::daemon::db::task_board::remote_assignment_authority_queries::RemoteAssignmentAuthorityQueries;
+use crate::daemon::db::task_board::remote_assignment_controller_scan::RemoteAssignmentControllerScanQueries;
+use crate::daemon::db::task_board::remote_assignment_executor_lifecycle_queries::RemoteAssignmentExecutorLifecycleQueries;
+use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::task_board::remote_wire::wire::{
     RemoteAssignmentWireState, RemoteCancelRequest, RemoteCancelResponse, RemoteLease,
     RemoteOfferDisposition, RemoteOfferResponse, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
 use crate::task_board::{TaskBoardItem, TaskBoardRemoteAssignmentState};
 use sqlx::{query, query_scalar};
-use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
-use crate::daemon::db::task_board::remote_assignment_authority_queries::RemoteAssignmentAuthorityQueries;
-use crate::daemon::db::task_board::remote_assignment_controller_scan::RemoteAssignmentControllerScanQueries;
-use crate::daemon::db::task_board::remote_assignment_executor_lifecycle_queries::RemoteAssignmentExecutorLifecycleQueries;
-use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
-use crate::daemon::db::prelude::*;
 
 const SCAN_AT: &str = "2026-07-20T12:00:00Z";
 

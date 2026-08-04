@@ -20,10 +20,10 @@ use sqlx::{Sqlite, Transaction, query, query_as, query_scalar};
 
 use super::ITEMS_CHANGE_SCOPE;
 use super::item_tx_ext::TaskBoardItemTxExt;
+use super::items_reads;
 use super::lane_order::{LaneTransitionWrite, record_lane_transition_audit_in_tx};
 use super::mapper::item_from_rows;
 use super::rows::{ExternalRefRow, ItemRow};
-use super::items_reads;
 use super::triage_interface::Triage;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
 use crate::infra::io;
@@ -162,7 +162,8 @@ pub(crate) async fn list_task_board_items(
 ) -> Result<Vec<TaskBoardItem>, CliError> {
     let mut items = items_reads::list_task_board_items_including_deleted(db).await?;
     let status = status.map(TaskBoardStatus::canonical_persisted_status);
-    items.retain(|item| !item.is_deleted() && status.is_none_or(|expected| item.status == expected));
+    items
+        .retain(|item| !item.is_deleted() && status.is_none_or(|expected| item.status == expected));
     Ok(items)
 }
 

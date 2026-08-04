@@ -9,9 +9,9 @@ use super::super::ORCHESTRATOR_CHANGE_SCOPE;
 use super::super::items::bump_change_in_tx;
 use super::audit::{broadcast_automation_audits, insert_automation_audit, parse_scope};
 use super::runs::TaskBoardAutomationRunLease;
+use crate::daemon::db::prelude::*;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardAutomationRunStage;
-use crate::daemon::db::prelude::*;
 
 #[derive(Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -59,7 +59,15 @@ pub(super) async fn upsert_task_board_automation_run_stage(
             "task board automation run '{run_id}' revision overflow"
         ))
     })?;
-    update_stage_summary(&mut transaction, lease, &stored, revision, next_revision, now).await?;
+    update_stage_summary(
+        &mut transaction,
+        lease,
+        &stored,
+        revision,
+        next_revision,
+        now,
+    )
+    .await?;
     bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
     let scope = parse_scope(&scope_json, run_id)?;
     let event = insert_automation_audit(

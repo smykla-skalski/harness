@@ -5,10 +5,10 @@ use sqlx::{Sqlite, Transaction, query, query_as};
 use super::mapper::item_from_rows;
 use super::projects::ensure_project_in_tx;
 use super::rows::{ExternalRefRow, ItemRow};
+use crate::daemon::db::prelude::*;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardItem;
 use crate::task_board::project::{ItemProjectAttribution, item_attribution};
-use crate::daemon::db::prelude::*;
 
 /// Real implementation behind
 /// [`ProjectRegistryQueries::reattribute_unattributed_task_board_items`].

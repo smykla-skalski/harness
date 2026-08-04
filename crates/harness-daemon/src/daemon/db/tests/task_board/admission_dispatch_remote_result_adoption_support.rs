@@ -8,6 +8,7 @@ use super::super::remote_start_tests::{
     PreparedRemoteOffer, offer_remote, prepare_remote_offer_with_policy,
     prepare_remote_offer_with_retry,
 };
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::task_board::remote_assignment_test_support::claim_request;
 use crate::daemon::db::task_board::{
     TaskBoardRemoteArtifactStoreInput, TaskBoardRemoteMutationOutcome,
@@ -21,7 +22,6 @@ use crate::task_board::{
     TaskBoardFailureClass, TaskBoardLocalAttemptResult, TaskBoardPhaseVerdict,
     TaskBoardReviewResult, TaskBoardReviewerOutcome, TaskBoardWorkflowExecutionCas,
 };
-use crate::daemon::db::task_board::prelude::*;
 
 const PRINCIPAL: &str = "executor-a";
 pub(super) const RESULT_PATH: &str = "result/attempt.json";

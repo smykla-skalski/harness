@@ -13,9 +13,7 @@
 //! forward into the matching trait method, so nothing outside `db/task_board`
 //! has to change to keep calling them by the same name.
 
-use super::workflow_execution_audited_cancel::{
-    self, AuditedRemoteCancelCasOutcome,
-};
+use super::workflow_execution_audited_cancel::{self, AuditedRemoteCancelCasOutcome};
 use super::workflow_terminal::{self, TaskBoardWorkflowTerminalProjection};
 use super::{
     workflow_dispatch_settlement, workflow_execution_attempts, workflow_execution_candidates,

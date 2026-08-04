@@ -5,6 +5,8 @@ use super::disabled_tests::{
     request_for_revision,
 };
 use super::test_seam::{self, RuntimeSeamAction, RuntimeSeamCall};
+use crate::daemon::db::prelude::*;
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{
     REMOTE_EXECUTOR_PRINCIPAL, RemoteExecutorFixture, TaskBoardRemoteAssignmentRecord,
     TaskBoardRemoteMutationOutcome, TaskBoardRemoteOfferOutcome, remote_executor_claim_request,
@@ -20,8 +22,6 @@ use crate::task_board::{
     TaskBoardReviewResult, TaskBoardReviewerOutcome,
 };
 use chrono::{Duration, SecondsFormat, Utc};
-use crate::daemon::db::task_board::prelude::*;
-use crate::daemon::db::prelude::*;
 
 #[test]
 fn production_tick_uses_the_runtime_seam_for_start_then_active_probe() {

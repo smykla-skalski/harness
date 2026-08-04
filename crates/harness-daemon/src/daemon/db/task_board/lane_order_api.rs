@@ -10,13 +10,13 @@ use super::lane_order::{
 };
 use super::lane_order_audit::record_lane_position_audit_in_tx;
 use super::triage_apply::{override_implied_status, reapply_active_override_outcome_in_tx};
+use crate::daemon::db::prelude::*;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
 use crate::task_board::{
     TaskBoardItem, TaskBoardLaneOrigin, TaskBoardStatus, TaskBoardTriageOverride,
     validate_lane_placement,
 };
 use harness_kernel::errors::CliErrorKind;
-use crate::daemon::db::prelude::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TaskBoardLanePositionInput {

@@ -6,9 +6,9 @@ use super::remote_assignment_model::{
     nonblank, to_i64,
 };
 use super::remote_settlement_receipts::{load_settlement_in_tx, require_exact_terminal_assignment};
+use crate::daemon::db::prelude::*;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::remote_wire::wire::RemoteSettledRequest;
-use crate::daemon::db::prelude::*;
 
 pub(super) async fn complete_task_board_remote_assignment_cleanup(
     db: &AsyncDaemonDb,

@@ -6,6 +6,7 @@ use super::controller_authority_test_support::{
     test_tls_material, try_stop,
 };
 use super::controller_authority_tests::assert_concurrent_database_error;
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{AsyncDaemonDb, TaskBoardRemoteMutationOutcome, utc_now};
 use crate::task_board::TaskBoardRemoteAssignmentState;
 use crate::task_board::remote_wire::wire::{
@@ -13,7 +14,6 @@ use crate::task_board::remote_wire::wire::{
     RemoteLeaseRenewRequest, RemoteLeaseRenewResponse, RemoteOfferDisposition, RemoteOfferResponse,
     TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
-use crate::daemon::db::task_board::prelude::*;
 
 #[tokio::test]
 async fn accepted_offer_receipt_replays_original_l1_after_claim_renewal_and_terminal() {

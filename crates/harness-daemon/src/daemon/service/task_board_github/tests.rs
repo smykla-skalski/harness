@@ -18,10 +18,10 @@ const TEST_HOST_ID: &str = "host1234";
 #[path = "tests/fake_client.rs"]
 mod fake_client;
 use fake_client::FakeGitHubClient;
-#[path = "tests/write_publication.rs"]
-mod write_publication;
 #[path = "tests/cancellation.rs"]
 mod cancellation;
+#[path = "tests/write_publication.rs"]
+mod write_publication;
 
 #[tokio::test]
 async fn automation_opens_reviews_and_merges_prs() {

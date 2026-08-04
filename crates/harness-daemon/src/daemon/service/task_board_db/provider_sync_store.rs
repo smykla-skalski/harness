@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::task_board::prelude::*;
 use crate::task_board::external::{
     ExternalCreateOutcome, ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision,
     ExternalProviderScopeState, TaskBoardSyncItemSnapshot,
@@ -14,7 +15,6 @@ use crate::task_board::{
     TaskBoardSyncStore,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
-use crate::daemon::db::task_board::prelude::*;
 
 #[async_trait]
 impl TaskBoardExternalCreateStore for AsyncDaemonDb {

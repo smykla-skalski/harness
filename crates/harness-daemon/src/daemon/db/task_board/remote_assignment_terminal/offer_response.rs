@@ -2,6 +2,7 @@ use super::offer_screen::{
     OfferScreen, apply_offer_disposition, screen_offer_response_in_tx, validate_offer_request,
 };
 use super::{OFFER_RESPONSE_LABELS, response_binding_matches};
+use crate::daemon::db::prelude::*;
 use crate::daemon::db::task_board::remote_assignment_lease::{commit_noop, require_assignment};
 use crate::daemon::db::task_board::remote_assignment_model::TaskBoardRemoteMutationOutcome;
 use crate::daemon::db::task_board::remote_operation_trust::{
@@ -9,7 +10,6 @@ use crate::daemon::db::task_board::remote_operation_trust::{
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError};
 use crate::task_board::remote_wire::wire::RemoteOfferResponse;
-use crate::daemon::db::prelude::*;
 
 pub(crate) async fn record_task_board_remote_offer_response(
     db: &AsyncDaemonDb,

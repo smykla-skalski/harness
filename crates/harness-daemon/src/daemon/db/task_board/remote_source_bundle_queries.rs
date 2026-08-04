@@ -4,16 +4,16 @@ use std::pin::Pin;
 use super::remote_artifact_fetch_response;
 use super::remote_artifacts::{self, TaskBoardRemoteArtifact, TaskBoardRemoteArtifactStoreInput};
 use super::remote_operation_trust::TaskBoardRemoteOperationTrustFence;
-use super::remote_source_bundle_abandonment::{
-    self, TaskBoardRemoteSourceBundleAbandonment,
-};
+use super::remote_source_bundle_abandonment::{self, TaskBoardRemoteSourceBundleAbandonment};
 use super::remote_source_bundle_controller;
 use super::remote_source_bundle_prior::{self, TaskBoardRemotePriorPhaseBundle};
 use super::remote_source_bundle_reassignment::{self, TaskBoardRemoteSourceOfferReassignment};
 use super::remote_source_bundle_reassignment_evidence::SourceReassignmentEvidence;
 use super::remote_source_bundle_recovery_controller;
 use super::remote_source_bundles::{self, TaskBoardRemoteSourceBundle};
-use crate::daemon::db::{AsyncDaemonDb, CliError, TaskBoardRemoteAssignmentRecord, TaskBoardRemoteOfferOutcome};
+use crate::daemon::db::{
+    AsyncDaemonDb, CliError, TaskBoardRemoteAssignmentRecord, TaskBoardRemoteOfferOutcome,
+};
 use crate::task_board::remote_wire::wire::{
     RemoteArtifactFetchRequest, RemoteArtifactFetchResponse, RemoteOfferRequest,
     RemoteOfferResponse, RemoteSourceBundleAbandonRequest, RemoteSourceBundleAbandonResponse,

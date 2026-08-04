@@ -7,8 +7,7 @@ use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::task_board::prelude::*;
 use crate::task_board::github::{
     GitHubAutomation, GitHubBranchProtectionEvidence, GitHubCheckEvidence, GitHubMergeEvidence,
-    GitHubProjectConfig, GitHubPullRequestEvidence, GitHubPullRequestHandle,
-    GitHubReviewEvidence,
+    GitHubProjectConfig, GitHubPullRequestEvidence, GitHubPullRequestHandle, GitHubReviewEvidence,
 };
 use crate::task_board::{
     TaskBoardAutomationDesiredMode, TaskBoardAutomationRunTrigger, TaskBoardAutomationScope,
@@ -37,9 +36,12 @@ async fn stop_after_fresh_evidence_prevents_merge() {
     let db = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
         .await
         .expect("open database");
-    db.start_task_board_automation(TaskBoardAutomationDesiredMode::Continuous, chrono::Utc::now())
-        .await
-        .expect("start automation");
+    db.start_task_board_automation(
+        TaskBoardAutomationDesiredMode::Continuous,
+        chrono::Utc::now(),
+    )
+    .await
+    .expect("start automation");
     let start = super::super::super::TaskBoardAutomationRunSession::acquire(
         &db,
         TaskBoardAutomationRunTrigger::Manual,
@@ -54,7 +56,10 @@ async fn stop_after_fresh_evidence_prevents_merge() {
     };
 
     let mut config = GitHubProjectConfig::new("owner", "repo");
-    config.enabled_automations.enabled.push(GitHubAutomation::AutoMerge);
+    config
+        .enabled_automations
+        .enabled
+        .push(GitHubAutomation::AutoMerge);
     let mut item = TaskBoardItem::new(
         "cancel-before-merge".into(),
         "Cancel before merge".into(),

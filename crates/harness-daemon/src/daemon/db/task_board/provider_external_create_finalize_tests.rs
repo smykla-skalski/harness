@@ -4,13 +4,13 @@ use super::ITEMS_CHANGE_SCOPE;
 use super::provider_external_creates_tests::{
     assert_published, begin, connect, create_item, item, record, sequence,
 };
+use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
+use crate::daemon::db::task_board::provider_queries::ProviderQueries;
 use crate::task_board::{
     ExternalProvider, ExternalRefSyncState, ExternalTaskRef, TaskBoardExternalCreateBegin,
     TaskBoardExternalCreateExisting, TaskBoardExternalCreateFinalizeDisposition,
     TaskBoardExternalCreateIntentState, TaskBoardStatus,
 };
-use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
-use crate::daemon::db::task_board::provider_queries::ProviderQueries;
 
 #[tokio::test]
 async fn finalize_attaches_latest_item_and_retains_receipt() {

@@ -3,16 +3,16 @@ use sqlx::{query, query_as, query_scalar};
 
 use super::test_support::{database, seed_run};
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::prelude::*;
+use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
+use crate::daemon::db::task_board::scheduler::queries::TaskBoardAutomationSchedulerQueries;
+use crate::daemon::reviews_store::PolicyGraphQueries;
 use crate::task_board::policy_graph::PolicyCanvasWorkspace;
 use crate::task_board::{
     TaskBoardAutomationAdmissionState, TaskBoardAutomationDesiredMode,
     TaskBoardAutomationEffectiveState, TaskBoardAutomationQueueSummary,
     TaskBoardAutomationSchedulingSettings, TaskBoardItem, TaskBoardOrchestratorSettings,
 };
-use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
-use crate::daemon::db::task_board::scheduler::queries::TaskBoardAutomationSchedulerQueries;
-use crate::daemon::db::prelude::*;
-use crate::daemon::reviews_store::PolicyGraphQueries;
 
 #[tokio::test]
 async fn snapshot_is_consistent_bounded_and_read_only() {

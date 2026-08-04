@@ -7,13 +7,13 @@ use tokio::task::JoinHandle;
 use tokio::time::{MissedTickBehavior, interval};
 
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::http::{DaemonHttpState, task_board_route_executor};
 use crate::feature_flags::task_board_automation_v2_enabled_from_env;
 use crate::task_board::TaskBoardOrchestratorRunOnceRequest;
 #[cfg(test)]
 use crate::task_board::TaskBoardOrchestratorState;
 use harness_kernel::errors::CliError;
-use crate::daemon::db::task_board::prelude::*;
 
 struct AutonomousOrchestratorIntent {
     enabled: bool,

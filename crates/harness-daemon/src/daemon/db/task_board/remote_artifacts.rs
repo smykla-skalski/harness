@@ -9,13 +9,13 @@ use super::remote_operation_trust::{
     TaskBoardRemoteOperationKind, TaskBoardRemoteOperationTrustFence,
     claim_controller_operation_trust_in_tx,
 };
+use crate::daemon::db::prelude::*;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::remote_wire::wire::{
     RemoteArtifactEntry, RemoteArtifactFetchRequest, RemoteArtifactFetchResponse,
     RemoteArtifactManifest, RemoteAssignmentWireState, RemoteAttemptBinding,
     TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
-use crate::daemon::db::prelude::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TaskBoardRemoteArtifact {

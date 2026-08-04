@@ -1,6 +1,8 @@
 use super::task_board_automation_force_cancel::{
     AuditOutcome, apply_cancel, audit_event, force_cancel_task_board_automation_db,
 };
+use crate::daemon::db::prelude::*;
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{
     AsyncAuditQueries, accept_remote_controller, claim_remote_controller,
     remote_controller_fixture, remote_controller_running_status, remote_controller_status_request,
@@ -10,8 +12,6 @@ use crate::daemon::protocol::{
 };
 use crate::feature_flags::TASK_BOARD_AUTOMATION_V2_ENV;
 use crate::task_board::{TaskBoardAutomationDesiredMode, TaskBoardRemoteAssignmentState};
-use crate::daemon::db::task_board::prelude::*;
-use crate::daemon::db::prelude::*;
 
 const REASON: &str = "operator requested exact remote cancellation";
 

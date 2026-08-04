@@ -6,13 +6,13 @@
 //! `triage_apply_agent_tests.rs` under the repo's line cap.
 
 use super::{connect, decision_generation_count, lane_producer, seed_running_escalation};
+use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
+use crate::daemon::db::task_board::triage_queries::TriageQueries;
 use crate::task_board::{
     AGENT_V1_EVALUATOR_IDENTITY, TRIAGE_RULE_SET_SCHEMA_VERSION, TaskBoardPriority,
     TaskBoardStatus, TriagePriorityAction, TriageRule, TriageRuleCondition, TriageRuleOutcome,
     TriageRuleSetV1, TriageVerdict,
 };
-use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
-use crate::daemon::db::task_board::triage_queries::TriageQueries;
 
 async fn pending_escalation_count(db: &crate::daemon::db::AsyncDaemonDb, item_id: &str) -> i64 {
     sqlx::query_scalar(

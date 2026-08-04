@@ -1,14 +1,12 @@
 //! Unit tests for the reviews-files service endpoints.
 
 use crate::reviews::{
-    ReviewFileViewedState, ReviewFilesViewedTarget,
-    ReviewsFilesBlobRequest, ReviewsFilesListRequest, ReviewsFilesPatchRequest,
-    ReviewsFilesViewedRequest,
+    ReviewFileViewedState, ReviewFilesViewedTarget, ReviewsFilesBlobRequest,
+    ReviewsFilesListRequest, ReviewsFilesPatchRequest, ReviewsFilesViewedRequest,
 };
 
 use super::{
-    fetch_review_file_blob, list_review_files,
-    mark_review_files_viewed, patch_review_files,
+    fetch_review_file_blob, list_review_files, mark_review_files_viewed, patch_review_files,
 };
 
 #[tokio::test]

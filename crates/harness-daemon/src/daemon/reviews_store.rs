@@ -284,4 +284,3 @@ impl PolicyGraphSyncQueries for DaemonDb {
         load_policy_workspace_sync(self.connection())
     }
 }
-

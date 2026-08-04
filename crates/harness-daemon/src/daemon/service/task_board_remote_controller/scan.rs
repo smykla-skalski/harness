@@ -1,11 +1,11 @@
 use super::{
     CONTROLLER_SCAN_LIMIT, TaskBoardRemoteControllerReport, canonical_now, progress_assignment,
 };
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{
     AsyncDaemonDb, TaskBoardRemoteControllerScanItem, TaskBoardRemoteControllerScanStep,
 };
 use harness_kernel::errors::CliError;
-use crate::daemon::db::task_board::prelude::*;
 
 pub(super) async fn progress_existing_assignments(
     db: &AsyncDaemonDb,

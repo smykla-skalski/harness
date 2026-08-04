@@ -1,6 +1,6 @@
 use super::*;
-use crate::daemon::service::observe_async::{ObserveWatchState, process_incremental_observe};
 use crate::daemon::db::prelude::*;
+use crate::daemon::service::observe_async::{ObserveWatchState, process_incremental_observe};
 
 #[test]
 fn observe_session_with_db_persists_tasks_without_touching_state_file() {

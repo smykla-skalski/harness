@@ -1,5 +1,6 @@
 use sqlx::{Sqlite, Transaction, query, query_as, query_scalar};
 
+use crate::daemon::db::prelude::*;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
 use crate::task_board::{
     TriageRuleSetAuditEntry, TriageRuleSetAuditKind, TriageRuleSetDraft,
@@ -7,7 +8,6 @@ use crate::task_board::{
     TriageRuleSetV1, is_canonical_bounded_text, validate_triage_rule_set,
 };
 use harness_kernel::errors::CliErrorKind;
-use crate::daemon::db::prelude::*;
 
 const MAX_TRIAGE_RULE_SET_ACTOR_BYTES: usize = 256;
 pub(super) const TRIAGE_RULE_SET_LIST_MAX_LIMIT: u32 = 100;
@@ -105,10 +105,11 @@ pub(super) async fn save_task_board_triage_rules_draft(
     .execute(transaction.as_mut())
     .await
     .map_err(|error| db_error(format!("save task board triage rules draft: {error}")))?;
-    transaction
-        .commit()
-        .await
-        .map_err(|error| db_error(format!("commit task board triage rules draft save: {error}")))?;
+    transaction.commit().await.map_err(|error| {
+        db_error(format!(
+            "commit task board triage rules draft save: {error}"
+        ))
+    })?;
     Ok(TriageRuleSetDraftSaveResult {
         validation,
         persisted: true,
@@ -129,7 +130,11 @@ pub(super) async fn list_task_board_triage_rules_revisions(
     .bind(i64::from(limit))
     .fetch_all(db.pool())
     .await
-    .map_err(|error| db_error(format!("list task board triage rule set revisions: {error}")))?;
+    .map_err(|error| {
+        db_error(format!(
+            "list task board triage rule set revisions: {error}"
+        ))
+    })?;
     rows.into_iter().map(revision_summary_from_row).collect()
 }
 

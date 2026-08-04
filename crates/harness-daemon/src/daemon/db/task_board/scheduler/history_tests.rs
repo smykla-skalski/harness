@@ -3,6 +3,7 @@ use serde_json::json;
 use sqlx::{query, query_as, query_scalar};
 
 use super::test_support::{acquire_request, database, instant, seed_run};
+use crate::daemon::db::task_board::scheduler::queries::TaskBoardAutomationSchedulerQueries;
 use crate::daemon::db::{
     AsyncDaemonDb, TaskBoardAutomationRunAdmission, TaskBoardAutomationRunLease,
 };
@@ -10,7 +11,6 @@ use crate::task_board::{
     TaskBoardAutomationHistoryRequest, TaskBoardAutomationRunOutcome, TaskBoardAutomationRunStage,
     TaskBoardAutomationRunTrigger,
 };
-use crate::daemon::db::task_board::scheduler::queries::TaskBoardAutomationSchedulerQueries;
 
 #[tokio::test]
 async fn history_limit_and_tie_cursor_are_stable() {

@@ -15,12 +15,12 @@ use super::remote_settlement_receipts::{
     TaskBoardRemoteSettlementReceipt, load_settlement_in_tx, require_exact_terminal_assignment,
 };
 use super::workflow_executions::load_execution_in_tx;
+use crate::daemon::db::prelude::*;
 use crate::daemon::db::{AsyncDaemonDb, CliError, TaskBoardRemoteHostTrustFence, db_error};
 use crate::task_board::TaskBoardWorkflowExecutionCas;
 use crate::task_board::remote_wire::wire_cleanup::{
     RemoteCleanupObservationRequest, RemoteCleanupObservationResponse,
 };
-use crate::daemon::db::prelude::*;
 
 pub(super) async fn claim_task_board_remote_cleanup_observation_fenced(
     db: &AsyncDaemonDb,
@@ -84,7 +84,12 @@ pub(super) async fn record_task_board_remote_cleanup_observation(
         trust,
     )
     .await?;
-    finish_mutation(transaction, &assignment.assignment_id, "cleanup observation").await
+    finish_mutation(
+        transaction,
+        &assignment.assignment_id,
+        "cleanup observation",
+    )
+    .await
 }
 
 /// Either this exact claim already has a recorded response, or the

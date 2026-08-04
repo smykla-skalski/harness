@@ -15,9 +15,9 @@ use harness_kernel::errors::CliError;
 
 #[path = "admission_dispatch_remote_start_fixture.rs"]
 mod fixture;
+use crate::daemon::db::prelude::*;
 pub(crate) use fixture::{PreparedRemoteOffer, prepare_remote_offer};
 pub(super) use fixture::{prepare_remote_offer_with_policy, prepare_remote_offer_with_retry};
-use crate::daemon::db::prelude::*;
 
 #[tokio::test]
 async fn started_terminal_observation_keeps_committed_admission_and_remote_parent() {

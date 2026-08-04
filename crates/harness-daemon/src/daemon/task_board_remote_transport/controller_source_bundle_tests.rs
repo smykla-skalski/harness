@@ -5,13 +5,13 @@ use super::controller_authority_test_support::{
     BarrierServer, HOST_ID, TOKEN_ENV, pinned_controller, pinned_controller_for_host,
     spawn_barrier_server, test_tls_material,
 };
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{REMOTE_EXECUTOR_CLAIMED_AT, remote_controller_fixture};
 use crate::task_board::TaskBoardWorkflowKind;
 use crate::task_board::remote_wire::wire::{
     RemoteArtifactEntry, RemoteArtifactManifest, RemoteSourceBundleUploadRequest,
     RemoteSourceBundleUploadResponse, RemoteSourceMaterial,
 };
-use crate::daemon::db::task_board::prelude::*;
 
 const BASE: &str = "1111111111111111111111111111111111111111";
 const RESULT: &str = "2222222222222222222222222222222222222222";

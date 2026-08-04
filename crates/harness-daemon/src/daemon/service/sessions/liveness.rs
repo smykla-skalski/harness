@@ -7,10 +7,10 @@ use super::super::{
     liveness_project_dir_for_resolved, refresh_resolved_session_from_files_if_newer,
     sync_resolved_liveness,
 };
+use crate::daemon::db::prelude::*;
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
 use crate::daemon::index::ResolvedSession;
 use harness_kernel::errors::CliError;
-use crate::daemon::db::prelude::*;
 
 pub(super) fn reconcile_active_session_liveness_for_reads(
     _include_all: bool,

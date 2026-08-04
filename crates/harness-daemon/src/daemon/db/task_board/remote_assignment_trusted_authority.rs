@@ -10,12 +10,12 @@ use super::remote_operation_trust::{
 };
 use super::{TaskBoardRemoteIoAuthority, TaskBoardRemoteIoAuthorityKind};
 use crate::daemon::db::db_error;
+use crate::daemon::db::prelude::*;
 use crate::daemon::db::{AsyncDaemonDb, CliError, TaskBoardRemoteHostTrustFence};
 use crate::task_board::TaskBoardRemoteAssignmentState;
 use crate::task_board::remote_wire::wire::{
     RemoteCancelRequest, RemoteClaimRequest, RemoteLeaseRenewRequest, RemoteOfferRequest,
 };
-use crate::daemon::db::prelude::*;
 
 pub(super) async fn claim_task_board_remote_offer_io_authority_fenced(
     db: &AsyncDaemonDb,
@@ -116,7 +116,8 @@ pub(super) async fn require_pending_task_board_remote_renew_replay_authority_fen
         TaskBoardRemoteAssignmentState::Claimed
             | TaskBoardRemoteAssignmentState::Started
             | TaskBoardRemoteAssignmentState::Running
-    ) && assignment.offer.as_ref().map(|offer| &offer.binding) == Some(&request.binding)
+    ) && assignment.offer.as_ref().map(|offer| &offer.binding)
+        == Some(&request.binding)
         && assignment.request_sha256.as_deref() == Some(request.offer_request_sha256.as_str())
         && assignment.authenticated_principal.as_deref() == Some(authenticated_principal)
         && assignment.lease_id.as_deref() == Some(request.lease_id.as_str())

@@ -11,6 +11,7 @@ use super::controller::{
     RemoteExecutionControllerClient, RemoteExecutionControllerError, binding_error,
     lifecycle_response_may_be_lost, renewal_response_may_be_lost, require_io_authority,
 };
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{
     AsyncDaemonDb, TaskBoardRemoteMutationOutcome, TaskBoardRemoteOperationKind,
 };
@@ -19,7 +20,6 @@ use crate::task_board::remote_wire::wire::{
     RemoteCancelRequest, RemoteCancelResponse, RemoteLeaseRenewRequest, RemoteLeaseRenewResponse,
     RemoteOfferRequest, RemoteOfferResponse,
 };
-use crate::daemon::db::task_board::prelude::*;
 
 impl RemoteExecutionControllerClient {
     /// Returns the durable offer receipt for `request`, or `None` when the

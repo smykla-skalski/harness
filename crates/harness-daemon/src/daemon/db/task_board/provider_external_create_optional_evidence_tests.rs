@@ -1,8 +1,8 @@
 use tempfile::tempdir;
 
 use super::provider_external_creates_tests::{begin, connect, create_evidence, create_item, item};
-use crate::task_board::ExternalProvider;
 use crate::daemon::db::task_board::provider_queries::ProviderQueries;
+use crate::task_board::ExternalProvider;
 
 #[tokio::test]
 async fn github_recovery_accepts_none_revision_and_project_evidence() {

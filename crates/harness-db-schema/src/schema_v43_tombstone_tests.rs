@@ -336,12 +336,9 @@ async fn migrated_planning_and_reviewing_typed_loads_return_none() {
     // The base fixture seeds a planning row and a reviewing row; both migrate to
     // superseded legacy evidence and must be invisible to the typed loader.
     assert!(
-        !schema_query_test_support::task_board_remote_assignment_exists(
-            &db,
-            "legacy-assignment",
-        )
-        .await
-        .expect("load migrated planning assignment"),
+        !schema_query_test_support::task_board_remote_assignment_exists(&db, "legacy-assignment",)
+            .await
+            .expect("load migrated planning assignment"),
         "a migrated planning row must not load through the current typed path"
     );
     assert!(

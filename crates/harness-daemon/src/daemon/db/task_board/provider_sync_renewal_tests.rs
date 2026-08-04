@@ -1,11 +1,11 @@
 use tempfile::tempdir;
 
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::task_board::provider_queries::ProviderQueries;
 use crate::task_board::ExternalProvider;
 use crate::task_board::external::{
     ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision,
 };
-use crate::daemon::db::task_board::provider_queries::ProviderQueries;
 
 #[tokio::test]
 async fn renewed_scope_lease_blocks_replacement_after_original_deadline() {

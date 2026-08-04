@@ -102,9 +102,9 @@ mod runtime;
 pub use runtime::RuntimeSnapshotQueries;
 mod schema;
 mod schema_migrations;
-mod schema_sql;
 #[cfg(feature = "test-support")]
 pub mod schema_query_test_support;
+mod schema_sql;
 #[allow(dead_code)]
 pub(crate) mod task_board;
 mod task_board_sync_coordinator;
@@ -131,7 +131,7 @@ pub(crate) use task_board::write_workflow_fixture::{
 };
 #[allow(unused_imports)]
 pub(crate) use task_board::{
-    ClaimedTaskBoardDispatch, ClaimedTaskBoardDispatchPreparation,
+    AgentTurnStopTarget, ClaimedTaskBoardDispatch, ClaimedTaskBoardDispatchPreparation,
     ClaimedTaskBoardTriageEscalation, REMOTE_IMPLEMENTATION_BUNDLE_MEDIA_TYPE,
     REMOTE_IMPLEMENTATION_BUNDLE_PATH, REMOTE_RESULT_ARTIFACT_MEDIA_TYPE,
     REMOTE_RESULT_ARTIFACT_PATH, REMOTE_START_INTERRUPTED_WITHOUT_RUN_ERROR_CODE,

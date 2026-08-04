@@ -13,6 +13,7 @@ use crate::task_board::TaskBoardExecutionHostConfig;
 mod cleanup;
 #[path = "remote_operation_trust/operation.rs"]
 mod operation;
+use crate::daemon::db::prelude::*;
 pub(super) use cleanup::{
     claim_cleanup_observation_trust_in_tx, consume_cleanup_observation_trust_in_tx,
 };
@@ -22,7 +23,6 @@ pub(super) use operation::{
     persist_operation_trust_in_tx, require_generation_replay_trust_in_tx,
     require_pending_operation_replay_trust_in_tx,
 };
-use crate::daemon::db::prelude::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum TaskBoardRemoteOperationKind {
@@ -91,8 +91,7 @@ pub(super) async fn complete_task_board_remote_operation_trust(
         .begin_immediate_transaction("task board remote operation trust completion")
         .await?;
     let assignment =
-        super::remote_assignment_lease::require_assignment(&mut transaction, assignment_id)
-            .await?;
+        super::remote_assignment_lease::require_assignment(&mut transaction, assignment_id).await?;
     consume_controller_operation_trust_in_tx(&mut transaction, &assignment, kind, request_sha256)
         .await?;
     transaction
@@ -115,8 +114,7 @@ pub(super) async fn task_board_remote_lifecycle_operation_trust_fence(
         .begin_immediate_transaction("task board lifecycle operation trust")
         .await?;
     let assignment =
-        super::remote_assignment_lease::require_assignment(&mut transaction, assignment_id)
-            .await?;
+        super::remote_assignment_lease::require_assignment(&mut transaction, assignment_id).await?;
     let generation = load_generation_lifecycle_trust_in_tx(
         &mut transaction,
         assignment_id,

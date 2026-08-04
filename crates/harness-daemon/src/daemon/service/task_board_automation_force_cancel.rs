@@ -9,6 +9,7 @@ use crate::daemon::audit_events::{
     AuditEventStore, broadcast_audit_event, persist_audit_event_once_strict,
 };
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::protocol::{
     HarnessMonitorAuditEvent, TaskBoardAutomationForceCancelDisposition,
     TaskBoardAutomationForceCancelRequest, TaskBoardAutomationForceCancelResponse,
@@ -25,7 +26,6 @@ use crate::task_board::{
 };
 use crate::workspace::utc_now;
 use harness_kernel::errors::{CliError, CliErrorKind};
-use crate::daemon::db::task_board::prelude::*;
 
 pub(crate) async fn force_cancel_task_board_automation_db(
     db: &AsyncDaemonDb,

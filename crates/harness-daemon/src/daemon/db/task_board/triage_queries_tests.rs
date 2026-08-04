@@ -3,10 +3,10 @@ use tempfile::tempdir;
 use super::super::triage_decisions::record_triage_decision_in_tx;
 use super::*;
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::prelude::*;
+use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
 use crate::task_board::types::TaskBoardItemKind;
 use crate::task_board::{TaskBoardItem, TriageCause, TriageReasonCode, TriageVerdict};
-use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
-use crate::daemon::db::prelude::*;
 
 async fn connect() -> (tempfile::TempDir, AsyncDaemonDb) {
     let directory = tempdir().expect("tempdir");

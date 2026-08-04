@@ -19,6 +19,7 @@ use super::remote_source_bundles::{
     TaskBoardRemoteSourceBundle, insert_source_bundle_in_tx, load_source_bundle_collisions_in_tx,
     load_source_bundle_in_tx,
 };
+use crate::daemon::db::prelude::*;
 use crate::daemon::db::{AsyncDaemonDb, CliError, TaskBoardRemoteOfferOutcome, db_error};
 use crate::task_board::remote_wire::wire::{
     RemoteOfferRequest, RemoteOfferResponse, RemoteSourceBundleAbandonRequest,
@@ -30,7 +31,6 @@ use operations::{
     require_upload_operation_for_abandonment, settle_abandonment_operation_if_present,
     settle_upload_operation_if_present,
 };
-use crate::daemon::db::prelude::*;
 
 pub(super) async fn adopt_verified_task_board_remote_source_bundle_receipt(
     db: &AsyncDaemonDb,
@@ -375,4 +375,3 @@ fn exact_abandonment(
         )),
     }
 }
-

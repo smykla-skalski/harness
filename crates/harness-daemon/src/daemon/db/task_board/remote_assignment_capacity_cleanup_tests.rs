@@ -4,6 +4,13 @@ use super::remote_assignment_generation_tests::{accept_controller, claim_control
 use super::remote_assignment_test_support::*;
 use super::workflow_dispatch::workflow_owner;
 use super::{TaskBoardRemoteMutationOutcome, TaskBoardRemoteOfferOutcome};
+use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
+use crate::daemon::db::task_board::remote_assignment_authority_queries::RemoteAssignmentAuthorityQueries;
+use crate::daemon::db::task_board::remote_assignment_executor_lifecycle_queries::RemoteAssignmentExecutorLifecycleQueries;
+use crate::daemon::db::task_board::remote_assignment_start_settlement_queries::RemoteAssignmentStartSettlementQueries;
+use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
+use crate::daemon::db::task_board::remote_hosts::RemoteHostQueries;
+use crate::daemon::db::task_board::workflow_execution_queries::WorkflowExecutionQueries;
 use crate::task_board::remote_wire::wire::{
     RemoteAssignmentWireState, RemoteCancelRequest, RemoteCancelResponse, RemoteOfferRequest,
     RemoteSettledRequest, RemoteSettledResponse, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
@@ -16,13 +23,6 @@ use crate::task_board::{
     TaskBoardExecutionOwnership, TaskBoardRemoteAssignmentState, TaskBoardWorkflowExecutionCas,
     TaskBoardWorkflowExecutionRecord,
 };
-use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
-use crate::daemon::db::task_board::remote_assignment_authority_queries::RemoteAssignmentAuthorityQueries;
-use crate::daemon::db::task_board::remote_assignment_executor_lifecycle_queries::RemoteAssignmentExecutorLifecycleQueries;
-use crate::daemon::db::task_board::remote_assignment_start_settlement_queries::RemoteAssignmentStartSettlementQueries;
-use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
-use crate::daemon::db::task_board::remote_hosts::RemoteHostQueries;
-use crate::daemon::db::task_board::workflow_execution_queries::WorkflowExecutionQueries;
 
 const SETTLED_AT: &str = "2026-07-19T10:00:30Z";
 const CLEANED_AT: &str = "2026-07-19T10:00:50Z";

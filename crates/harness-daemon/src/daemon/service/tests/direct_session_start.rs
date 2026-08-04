@@ -6,10 +6,10 @@ use std::process::Command;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
+use crate::daemon::db::prelude::*;
 use crate::daemon::state::test_support::{
     install_fake_running_xdg_daemon, read_http_request, write_http_response,
 };
-use crate::daemon::db::prelude::*;
 
 #[test]
 fn start_session_direct_without_db_forwards_policy_preset_to_daemon_client() {

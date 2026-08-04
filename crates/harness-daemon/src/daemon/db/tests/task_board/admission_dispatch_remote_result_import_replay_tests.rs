@@ -1,7 +1,7 @@
 use super::*;
+use crate::daemon::db::prelude::*;
 use crate::daemon::db::task_board::TaskBoardRemoteResultAdoptionOutcome;
 use crate::task_board::{TaskBoardTerminalOutcome, TaskBoardTerminalOutcomeKind};
-use crate::daemon::db::prelude::*;
 
 #[tokio::test]
 async fn production_orchestration_imports_adopts_and_cleans_exactly_once() {

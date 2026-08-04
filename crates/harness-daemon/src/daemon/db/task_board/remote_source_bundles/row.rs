@@ -50,11 +50,10 @@ impl RemoteSourceBundleRow {
                 "remote source bundle columns contradict the sealed source material",
             ));
         }
-        let response =
-            serde_json::from_str::<RemoteSourceBundleUploadResponse>(&self.response_json)
-                .map_err(|error| {
-                    db_error(format!("decode remote source bundle response: {error}"))
-                })?;
+        let response = serde_json::from_str::<RemoteSourceBundleUploadResponse>(
+            &self.response_json,
+        )
+        .map_err(|error| db_error(format!("decode remote source bundle response: {error}")))?;
         response
             .validate_receipt(
                 &offer.binding,
@@ -73,8 +72,8 @@ impl RemoteSourceBundleRow {
             None => {
                 let request = RemoteSourceBundleUploadRequest::seal(offer.clone(), &self.content)
                     .map_err(|error| {
-                        db_error(format!("validate remote source bundle bytes: {error}"))
-                    })?;
+                    db_error(format!("validate remote source bundle bytes: {error}"))
+                })?;
                 if request.request_sha256 != self.upload_request_sha256 {
                     return Err(db_error(
                         "remote source bundle request digest is inconsistent",

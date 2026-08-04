@@ -2,6 +2,7 @@ use std::path::Path;
 
 use tokio::task::spawn_blocking;
 
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{
     AsyncDaemonDb, REMOTE_IMPLEMENTATION_BUNDLE_PATH, TaskBoardRemoteAssignmentRecord,
     TaskBoardRemoteResultAdoptionOutcome, TaskBoardRemoteResultImportRequest,
@@ -14,7 +15,6 @@ use crate::task_board::{
 };
 use crate::workspace::utc_now;
 use harness_kernel::errors::{CliError, CliErrorKind};
-use crate::daemon::db::task_board::prelude::*;
 
 #[expect(
     clippy::cognitive_complexity,

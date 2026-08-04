@@ -1,4 +1,5 @@
 use super::fixture::{AcceptanceFixture, FORK_REPOSITORY, HOST_ID, REPOSITORY, TOKEN_ENV};
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::http::DaemonHttpState;
 use crate::daemon::task_board_remote_transport::controller_authority_test_support::{
     TestTlsMaterial, remote_host_config,
@@ -8,7 +9,6 @@ use crate::task_board::{
     TaskBoardOrchestratorWorkflow, TaskBoardPhaseCapabilityProfile,
     TaskBoardRepositoryAutomationConfig,
 };
-use crate::daemon::db::task_board::prelude::*;
 
 impl AcceptanceFixture {
     pub(super) async fn configure_matrix_controller(

@@ -9,6 +9,7 @@ use super::{ProductionTaskBoardReadOnlyRuntime, TaskBoardReadOnlyRuntime};
 use crate::daemon::agent_acp::AcpAgentManagerHandle;
 use crate::daemon::agent_tui::AgentTuiManagerHandle;
 use crate::daemon::codex_controller::CodexControllerHandle;
+use crate::daemon::db::prelude::*;
 use crate::daemon::db::{AgentTurnRunSnapshot, AgentTurnRunStatus, AsyncDaemonDb, DaemonDb};
 use crate::daemon::http::{
     AsyncDaemonDbSlot, DaemonHttpAuthMode, DaemonHttpState, ManagedAgentMutationLocks,
@@ -17,7 +18,6 @@ use crate::daemon::http::{
 use crate::daemon::protocol::{CodexRunMode, CodexRunSnapshot, CodexRunStatus, StreamEvent};
 use crate::daemon::websocket::ReplayBuffer;
 use crate::session::types::{CURRENT_VERSION, SessionMetrics, SessionState, SessionStatus};
-use crate::daemon::db::prelude::*;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn production_load_reconciles_unattached_active_report_after_restart() {

@@ -6,6 +6,7 @@ use super::items::bump_change_in_tx;
 use super::remote_assignment_fencing::concurrent;
 use super::workflow_execution_rows::{ExecutionAttemptRow, attempt_artifact_json, label};
 use super::workflow_executions::load_execution_in_tx;
+use crate::daemon::db::prelude::*;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::{
     TASK_BOARD_EXECUTION_TARGET_ACTION_RESOURCE, TASK_BOARD_EXECUTION_TARGET_ATTEMPT_RESOURCE,
@@ -15,7 +16,6 @@ use crate::task_board::{
     TaskBoardWorkflowExecutionRecord, validate_task_board_attempt_update,
     validate_task_board_execution_attempt,
 };
-use crate::daemon::db::prelude::*;
 
 const SELECT_ATTEMPTS: &str = "SELECT * FROM task_board_execution_attempts
     WHERE execution_id = ?1 ORDER BY action_key, attempt";
@@ -117,13 +117,13 @@ pub(super) async fn compare_and_set_task_board_workflow_execution_and_attempt(
 mod atomic;
 #[path = "workflow_execution_attempts_validation.rs"]
 mod validation;
-use validation::{ensure_external_side_effect_uses_atomic_claim, validate_attempt_in_execution};
 #[cfg(test)]
 use validation::validate_completed_artifact;
 pub(crate) use validation::{
     attempt_cas_matches, attempt_identity_matches, validate_atomic_execution_attempt_update,
     validate_attempt_phase,
 };
+use validation::{ensure_external_side_effect_uses_atomic_claim, validate_attempt_in_execution};
 
 /// Validates the proposal is admissible against its exact parent state, then
 /// writes it and bumps the change ledger in one settle.

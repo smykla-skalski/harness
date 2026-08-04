@@ -15,6 +15,13 @@ use super::{
     TaskBoardRemoteAssignmentRecord, TaskBoardRemoteMutationOutcome, TaskBoardRemoteOfferOutcome,
 };
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::prelude::*;
+use crate::daemon::db::task_board::remote_assignment_authority_queries::RemoteAssignmentAuthorityQueries;
+use crate::daemon::db::task_board::remote_assignment_offer::RemoteAssignmentOfferQueries;
+use crate::daemon::db::task_board::remote_assignment_terminal::RemoteAssignmentTerminalQueries;
+use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
+use crate::daemon::db::task_board::remote_outbound_sources::RemoteOutboundSourceQueries;
+use crate::daemon::db::task_board::remote_source_bundle_queries::RemoteSourceBundleQueries;
 use crate::daemon::db::tests::task_board::{
     PreparedRemoteOffer, prepare_remote_implementation_offer,
 };
@@ -26,13 +33,6 @@ use crate::task_board::{
     TASK_BOARD_EXECUTION_TARGET_RESOURCE, TaskBoardRemoteAssignmentState,
     TaskBoardWorkflowExecutionCas,
 };
-use crate::daemon::db::task_board::remote_assignment_authority_queries::RemoteAssignmentAuthorityQueries;
-use crate::daemon::db::task_board::remote_assignment_offer::RemoteAssignmentOfferQueries;
-use crate::daemon::db::task_board::remote_assignment_terminal::RemoteAssignmentTerminalQueries;
-use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
-use crate::daemon::db::task_board::remote_outbound_sources::RemoteOutboundSourceQueries;
-use crate::daemon::db::task_board::remote_source_bundle_queries::RemoteSourceBundleQueries;
-use crate::daemon::db::prelude::*;
 
 const HANDOFF_AT: &str = "2026-07-19T10:00:10Z";
 const SUCCESSOR_LEASE_EXPIRES: &str = "2026-07-19T10:01:10Z";

@@ -5,7 +5,9 @@ use super::fixture::{
     AcceptanceFixture, HOST_INSTANCE, REPOSITORY, TOKEN, TOKEN_ENV, TlsRouterServer, assignment,
     git,
 };
+use crate::daemon::db::prelude::*;
 use crate::daemon::db::remote_executor_identity;
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::serve::test_support::{
     install_deterministic_runtime_seam, reconcile_task_board_remote_executor_tick,
 };
@@ -18,8 +20,6 @@ use crate::task_board::{
     TaskBoardExecutionState, TaskBoardImplementationResult, TaskBoardLocalAttemptResult,
     TaskBoardRemoteAssignmentState,
 };
-use crate::daemon::db::task_board::prelude::*;
-use crate::daemon::db::prelude::*;
 
 #[test]
 fn default_task_implementation_cross_daemon_lifecycle_imports_and_cleans_up() {

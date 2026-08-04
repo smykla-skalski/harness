@@ -1,11 +1,9 @@
 use sqlx::{Sqlite, Transaction, query};
 
 use super::evidence::load_import_materials;
-use super::model::{
-    TaskBoardRemoteImplementationImportEvidence, TaskBoardRemoteResultImportState,
-};
-use super::storage::load_import_in_tx;
+use super::model::{TaskBoardRemoteImplementationImportEvidence, TaskBoardRemoteResultImportState};
 use super::require_record_materials;
+use super::storage::load_import_in_tx;
 use crate::daemon::db::task_board::remote_assignment_model::{
     TaskBoardRemoteAssignmentRecord, canonical_time, concurrent, to_i64,
 };

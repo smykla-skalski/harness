@@ -2,14 +2,14 @@ use sqlx::query_scalar;
 use tempfile::tempdir;
 
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
+use crate::daemon::db::task_board::provider_queries::ProviderQueries;
 use crate::task_board::store::TaskBoardItemPatch;
 use crate::task_board::{
     BUILTIN_V1_EVALUATOR_IDENTITY, ExternalRef, ExternalRefProvider, ProviderExclusionAuditContext,
     ProviderExclusionRestoreOutcome, TaskBoardItem, TaskBoardLaneOrigin, TaskBoardStatus,
     TaskBoardTombstoneCause,
 };
-use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
-use crate::daemon::db::task_board::provider_queries::ProviderQueries;
 
 #[path = "provider_exclusion_restore_tests.rs"]
 mod restore_tests;

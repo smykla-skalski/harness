@@ -1,11 +1,11 @@
 use tempfile::{TempDir, tempdir};
 
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::reviews_store::PolicyGraphQueries;
 use crate::task_board::policy_graph::RecordedPolicyDecision;
 use crate::task_board::{
     PolicyAction, PolicyDecision, PolicyEvidence, PolicyInput, PolicyReasonCode, PolicySubject,
 };
-use crate::daemon::reviews_store::PolicyGraphQueries;
 
 async fn connect() -> (TempDir, AsyncDaemonDb) {
     let dir = tempdir().expect("tempdir");

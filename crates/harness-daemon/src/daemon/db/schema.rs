@@ -17,6 +17,7 @@ pub(crate) use test_support::set_schema_init_hook;
 
 #[path = "schema_migration_steps.rs"]
 mod migration_steps;
+use crate::daemon::db::prelude::*;
 use migration_steps::{
     migrate_v9_to_v10, migrate_v10_to_v11, migrate_v11_to_v12, migrate_v12_to_v13,
     migrate_v13_to_v14, migrate_v14_to_v15, migrate_v15_to_v16, migrate_v16_to_v17,
@@ -28,7 +29,6 @@ use migration_steps::{
     migrate_v37_to_v38, migrate_v38_to_v39, migrate_v39_to_v40, migrate_v40_to_v41,
     migrate_v41_to_v42, migrate_v42_to_v43,
 };
-use crate::daemon::db::prelude::*;
 
 static SCHEMA_MIGRATION_LOCK: Mutex<()> = Mutex::new(());
 

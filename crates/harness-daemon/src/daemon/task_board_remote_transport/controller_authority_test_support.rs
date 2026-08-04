@@ -12,6 +12,7 @@ use tokio_rustls::TlsAcceptor;
 
 use super::client::{RemoteExecutionHttpClient, RemoteExecutionHttpClientConfig};
 use super::controller::RemoteExecutionControllerClient;
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{
     RemoteControllerFixture, TaskBoardRemoteHostTrustFence, TaskBoardRemoteOfferOutcome,
     remote_controller_fixture,
@@ -27,7 +28,6 @@ use crate::task_board::{
     TaskBoardWorkflowExecutionRecord,
 };
 use harness_kernel::errors::CliError;
-use crate::daemon::db::task_board::prelude::*;
 
 pub(super) const HOST_ID: &str = "executor-a";
 pub(super) const TOKEN_ENV: &str = "HARNESS_REMOTE_AUTHORITY_TEST_TOKEN";

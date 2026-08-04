@@ -3,6 +3,7 @@ use super::{
     DaemonManifest, DaemonStatusReport, HealthResponse, LogLevelResponse, SHUTDOWN_SIGNAL,
     SetLogLevelRequest, StreamEvent, bridge, broadcast, index, launchd, state, utc_now,
 };
+use crate::daemon::db::prelude::*;
 use crate::daemon::db::{DaemonDb, DaemonDbDiagnostics};
 use crate::daemon::launchd::LaunchAgentStatus;
 use crate::daemon::protocol::GitHubApiDiagnostics;
@@ -11,7 +12,6 @@ use harness_daemon_acp_probe::probe_acp_agents_cached;
 use harness_kernel::redact::secrets;
 use harness_protocol::daemon::summaries::{DaemonTelemetryRequest, DaemonTelemetryResponse};
 use tokio::task::{JoinError, spawn_blocking};
-use crate::daemon::db::prelude::*;
 
 /// Build a point-in-time daemon status report.
 ///

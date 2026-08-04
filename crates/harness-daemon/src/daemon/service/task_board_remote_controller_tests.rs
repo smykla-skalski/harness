@@ -2,6 +2,7 @@ use chrono::{Duration, SecondsFormat, Utc};
 use sqlx::query_scalar;
 
 use super::{TaskBoardRemoteControllerReport, canonical_now, offer_remote_candidates};
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{
     AsyncDaemonDb, TaskBoardRemoteControllerScanStep, TaskBoardRemoteOfferOutcome,
     remote_controller_fixture,
@@ -12,7 +13,6 @@ use crate::task_board::{
     TaskBoardPhaseCapabilityProfile, TaskBoardWorkflowExecutionCas,
 };
 use harness_kernel::errors::CliErrorKind;
-use crate::daemon::db::task_board::prelude::*;
 
 #[path = "task_board_remote_controller_tests/active_poll.rs"]
 mod active_poll;

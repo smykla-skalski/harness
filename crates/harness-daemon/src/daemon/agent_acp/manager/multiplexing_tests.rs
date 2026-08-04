@@ -8,9 +8,9 @@ use crate::daemon::agent_acp::manager::test_support::{
     write_cancel_recording_acp_agent, write_exiting_acp_agent, write_prompt_delaying_acp_agent,
     write_sleeping_acp_agent,
 };
+use crate::daemon::db::prelude::*;
 use crate::session::types::ManagedAgentRef;
 use tempfile::TempDir;
-use crate::daemon::db::prelude::*;
 
 fn manager() -> AcpAgentManagerHandle {
     seeded_manager()

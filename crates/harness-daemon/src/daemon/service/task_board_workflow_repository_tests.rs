@@ -15,8 +15,8 @@ use super::task_board_workflow_execution::{
 use super::task_board_workflow_test_support::{
     CREATED_AT, TestDatabase, create_execution, reviewers,
 };
-use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::prelude::*;
+use crate::daemon::db::task_board::prelude::*;
 
 #[tokio::test]
 async fn active_execution_create_is_idempotent_and_rejects_competing_contracts() {

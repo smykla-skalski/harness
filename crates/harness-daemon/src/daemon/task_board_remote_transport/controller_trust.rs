@@ -6,13 +6,13 @@ use super::controller::{
 };
 use super::controller_clock::ControllerClock;
 use crate::daemon::db::TaskBoardRemoteOperationKind;
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{
     AsyncDaemonDb, TaskBoardRemoteHostSelection, TaskBoardRemoteHostTrustFence,
     TaskBoardRemoteOperationTrustFence,
 };
 use crate::task_board::TaskBoardExecutionHostConfig;
 use crate::task_board::remote_wire::wire_conversion::domain_host_advertisement;
-use crate::daemon::db::task_board::prelude::*;
 
 impl RemoteExecutionControllerClient {
     pub(crate) fn connect(

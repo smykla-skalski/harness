@@ -12,13 +12,13 @@ use super::remote_assignment_start_authority::refuse_settings_replacement_during
 use super::remote_hosts::sync_remote_hosts_in_tx;
 use super::rows::MachineRow;
 use super::{MACHINES_CHANGE_SCOPE, ORCHESTRATOR_CHANGE_SCOPE, RUNTIME_CONFIG_CHANGE_SCOPE};
+use crate::daemon::db::prelude::*;
 use crate::daemon::db::task_board::items::bump_change_in_tx;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
 use crate::task_board::{
     Machine, TaskBoardGitRuntimeConfig, TaskBoardOrchestratorSettings, TaskBoardOrchestratorState,
     validate_local_execution_host_config, validate_remote_execution_configuration,
 };
-use crate::daemon::db::prelude::*;
 
 pub(super) struct TaskBoardOrchestratorSettingsMutation {
     pub(super) row_revision: i64,

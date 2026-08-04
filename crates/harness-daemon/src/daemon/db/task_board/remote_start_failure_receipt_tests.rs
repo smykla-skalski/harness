@@ -9,13 +9,13 @@ use super::super::{
     TaskBoardRemoteMutationOutcome,
 };
 use super::{TaskBoardRemoteExecutorStartFailureReceipt, canonical_json, receipt_digest};
+use crate::daemon::db::task_board::remote_assignment_start_settlement_queries::RemoteAssignmentStartSettlementQueries;
+use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::task_board::remote_wire::wire::{
     RemoteArtifactManifest, RemoteAssignmentWireState, RemoteLease, RemoteStatusResponse,
     TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
 use crate::task_board::{TaskBoardFailureClass, TaskBoardRemoteAssignmentState};
-use crate::daemon::db::task_board::remote_assignment_start_settlement_queries::RemoteAssignmentStartSettlementQueries;
-use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 
 #[tokio::test]
 async fn failure_receipt_model_rejects_resealed_semantic_corruption() {

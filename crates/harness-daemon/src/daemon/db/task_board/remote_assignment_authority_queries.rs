@@ -27,12 +27,12 @@ use super::remote_assignment_cleanup_controller;
 #[cfg(test)]
 use super::remote_assignment_io_authority;
 use super::remote_assignment_io_authority::TaskBoardRemoteIoAuthority;
+use super::remote_assignment_model::TaskBoardRemoteMutationOutcome;
 use super::remote_assignment_trusted_authority;
 use super::remote_evidence_retention::{self, TaskBoardRemoteEvidencePruneResult};
 use super::remote_operation_trust::{
     self, TaskBoardRemoteOperationKind, TaskBoardRemoteOperationTrustFence,
 };
-use super::remote_assignment_model::TaskBoardRemoteMutationOutcome;
 use crate::daemon::db::{AsyncDaemonDb, CliError, TaskBoardRemoteHostTrustFence};
 use crate::task_board::remote_wire::wire::{
     RemoteCancelRequest, RemoteClaimRequest, RemoteLeaseRenewRequest, RemoteOfferRequest,
@@ -409,10 +409,8 @@ impl RemoteAssignmentAuthorityQueries for AsyncDaemonDb {
         &self,
         host_id: &str,
     ) -> Result<u32, CliError> {
-        remote_assignment_cleanup::task_board_remote_executor_active_assignment_count(
-            self, host_id,
-        )
-        .await
+        remote_assignment_cleanup::task_board_remote_executor_active_assignment_count(self, host_id)
+            .await
     }
 
     async fn claim_task_board_remote_cleanup_observation_fenced(

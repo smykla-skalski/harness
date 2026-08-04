@@ -1,6 +1,10 @@
 use super::{
     CLAIMED_AT, ControllerFixture, HOST, INSTANCE, LEASE_EXPIRES, NOW, claim_request, offer_request,
 };
+use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
+use crate::daemon::db::task_board::remote_assignment_authority_queries::RemoteAssignmentAuthorityQueries;
+use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
+use crate::daemon::db::task_board::workflow_execution_queries::WorkflowExecutionQueries;
 use crate::daemon::db::{
     TaskBoardRemoteMutationOutcome, TaskBoardRemoteOfferOutcome, TaskBoardRemoteOfferWindow,
     workflow_owner,
@@ -13,10 +17,6 @@ use crate::task_board::{
     TaskBoardAttemptState, TaskBoardExecutionAttemptCas, TaskBoardExecutionOwnership,
     TaskBoardWorkflowExecutionCas,
 };
-use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
-use crate::daemon::db::task_board::remote_assignment_authority_queries::RemoteAssignmentAuthorityQueries;
-use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
-use crate::daemon::db::task_board::workflow_execution_queries::WorkflowExecutionQueries;
 
 pub(crate) async fn seed_cancelable_controller_targets(fixture: &ControllerFixture, count: u32) {
     assert!(count > 0, "cancelable target fixture needs one target");
