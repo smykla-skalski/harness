@@ -65,6 +65,8 @@ mod async_runtime;
 pub(crate) use async_runtime::AsyncRuntimeSnapshotQueries;
 mod async_session_state;
 pub(crate) use async_session_state::AsyncSessionStateQueries;
+mod async_session_summaries;
+pub(crate) use async_session_summaries::AsyncSessionSummaryQueries;
 mod async_signal_writes;
 pub(crate) use async_signal_writes::AsyncSignalIndexQueries;
 mod async_writes;

@@ -3,6 +3,7 @@ use super::{
     RemoteWorkerIdentity, TaskBoardRemoteAssignmentRecord, TaskBoardRemoteExecutorStartIoPermit,
     concurrent, executor_start_authority, reconcile_persisted_start_without_run, utc_now,
 };
+use crate::daemon::db::AsyncSessionSummaryQueries;
 use crate::daemon::db::task_board::prelude::*;
 
 pub(super) async fn abandon_predecessor_claim(

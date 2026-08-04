@@ -25,6 +25,7 @@ use crate::task_board::{
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::source_bundle::apply_prior_phase_bundle;
+use crate::daemon::db::AsyncSessionSummaryQueries;
 
 pub(super) async fn prepare_remote_workspace(
     db: &AsyncDaemonDb,

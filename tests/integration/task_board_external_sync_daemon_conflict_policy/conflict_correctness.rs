@@ -5,7 +5,7 @@ use tempfile::tempdir;
 
 use harness_kernel::errors::{CliError, CliErrorKind};
 
-use harness::daemon::db::AsyncDaemonDb;
+use harness::daemon::db::{AsyncDaemonDb, AsyncDaemonDbConnect};
 use harness::task_board::external::{
     ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision, ExternalProviderScopeState,
     ExternalSyncClient, ExternalSyncOptions, TaskBoardExternalCreateStore,

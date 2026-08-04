@@ -7,7 +7,7 @@ use tempfile::tempdir;
 
 use std::collections::BTreeSet;
 
-use harness::daemon::db::AsyncDaemonDb;
+use harness::daemon::db::{AsyncDaemonDb, AsyncDaemonDbConnect};
 use harness::task_board::external::{ExternalSyncClient, ExternalSyncOptions, sync_external_tasks};
 use harness::task_board::{
     ExternalProvider, ExternalRefProvider, ExternalSyncAction, ExternalSyncConflictPolicy,

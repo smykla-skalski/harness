@@ -1,6 +1,6 @@
 use tempfile::tempdir;
 
-use harness::daemon::db::AsyncDaemonDb;
+use harness::daemon::db::{AsyncDaemonDb, AsyncDaemonDbConnect};
 use harness::task_board::external::{ExternalSyncClient, ExternalSyncOptions, sync_external_tasks};
 use harness::task_board::store::TaskBoardItemPatch;
 use harness::task_board::{
