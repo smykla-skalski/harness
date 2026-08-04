@@ -3,7 +3,7 @@ use tempfile::tempdir;
 
 use super::tests::{legacy_v40_fixture, legacy_v40_fixture_at};
 use super::*;
-use harness_daemon::daemon::db::AsyncDaemonDb;
+use harness_daemon::daemon::db::{AsyncDaemonDb, AsyncDaemonDbConnect};
 
 #[test]
 fn sync_upgrade_repairs_partial_v40_admission_before_rebuild() {

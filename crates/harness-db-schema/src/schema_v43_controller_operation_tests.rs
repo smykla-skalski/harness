@@ -7,7 +7,7 @@ use super::tests::{
 };
 use super::*;
 use harness_daemon::daemon::db::{
-    AsyncDaemonDb, DaemonDb, DaemonDbOpen, TaskBoardRemoteHostTrustFence,
+    AsyncDaemonDb, AsyncDaemonDbConnect, DaemonDb, DaemonDbOpen, TaskBoardRemoteHostTrustFence,
     TaskBoardRemoteLifecycleTrustSnapshot, schema_query_test_support,
 };
 use harness_task_board::TaskBoardExecutionHostConfig;

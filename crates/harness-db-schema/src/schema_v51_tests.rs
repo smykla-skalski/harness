@@ -1,7 +1,7 @@
 use rusqlite::Connection;
 use tempfile::tempdir;
 
-use harness_daemon::daemon::db::{AsyncDaemonDb, DaemonDb, DaemonDbOpen};
+use harness_daemon::daemon::db::{AsyncDaemonDb, AsyncDaemonDbConnect, DaemonDb, DaemonDbOpen};
 use harness_task_board::project::is_project_id;
 
 const DROP_V51_SQL: &str = "

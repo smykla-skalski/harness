@@ -3,7 +3,7 @@ use tempfile::tempdir;
 
 use super::tests::{legacy_v40_fixture, legacy_v40_fixture_at};
 use super::*;
-use harness_daemon::daemon::db::AsyncDaemonDb;
+use harness_daemon::daemon::db::{AsyncDaemonDb, AsyncDaemonDbConnect};
 
 const DISPATCH_ADMISSION_INDEXES: &[&str] = &[
     "task_board_dispatch_intents_admission_identity",
