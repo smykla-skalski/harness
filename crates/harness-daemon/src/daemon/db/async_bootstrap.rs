@@ -435,9 +435,19 @@ async fn restore_migration_pragmas(conn: &mut sqlx::SqliteConnection) -> Result<
 
 #[cfg(test)]
 mod pragma_tests {
-    use super::{query, restore_migration_pragmas};
+    use super::{SchemaRepairHooks, query, restore_migration_pragmas};
     use crate::daemon::db::AsyncDaemonDb;
-    use crate::daemon::db_open::AsyncDaemonDbConnect;
+
+    /// The hooks are unreachable here: `connect_with_hooks` only threads them
+    /// through `prepare_legacy_schema`, which is a no-op for a path that does
+    /// not exist yet (see its own early return), and this test always opens a
+    /// fresh `tempdir` path.
+    fn unreachable_repair_hooks() -> SchemaRepairHooks {
+        SchemaRepairHooks {
+            sync_session: |_, _, _| unreachable!("fresh db never re-runs legacy repairs"),
+            backfill_legacy_timelines: |_| unreachable!("fresh db never re-runs legacy repairs"),
+        }
+    }
 
     /// Reading the pragma back through the pool proves nothing: the pool opens
     /// connections with `foreign_keys(true)`, so it can answer from a connection
@@ -446,9 +456,12 @@ mod pragma_tests {
     #[tokio::test]
     async fn restoring_pragmas_applies_every_statement_on_that_connection() {
         let dir = tempfile::tempdir().expect("tempdir");
-        let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
-            .await
-            .expect("open async db");
+        let db = AsyncDaemonDb::connect_with_hooks(
+            &dir.path().join("harness.db"),
+            &unreachable_repair_hooks(),
+        )
+        .await
+        .expect("open async db");
         let mut conn = db.pool().acquire().await.expect("acquire connection");
         for pragma in [
             "PRAGMA foreign_keys = OFF",
