@@ -132,7 +132,7 @@ struct DashboardDebuggingOCRPolicyBatchTests {
       return .success("Discarded recognized text")
     }
 
-    #expect(try recentStore.load().isEmpty)
+    #expect(recentStore.load().isEmpty)
     #expect(center.recentAutomationEvents.isEmpty)
     #expect(center.clipboardRuntimeState == .paused("Automation kill switch is engaged"))
   }
