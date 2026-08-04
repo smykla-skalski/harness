@@ -207,7 +207,7 @@ if (( rendered_count == 0 )); then
   exit 1
 fi
 
-gallery_path="$output_directory/index.html"
+gallery_path="$output_directory/$suite.html"
 {
   printf '%s\n' \
     '<!doctype html>' \
@@ -284,4 +284,5 @@ gallery_path="$output_directory/index.html"
     '</body>' \
     '</html>'
 } > "$gallery_path"
+cp -f -- "$gallery_path" "$output_directory/index.html"
 printf '%s\n' "$gallery_path"

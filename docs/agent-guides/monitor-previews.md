@@ -18,13 +18,13 @@ List the registered snapshot suites with:
 mise run monitor:preview -- --list
 ```
 
-`monitor:preview` builds the `HarnessMonitorUIPreviews` scheme in the active build lane, runs `HarnessMonitorPreviewHost` with no window or Dock presence, verifies that the renderer produced fresh non-empty PNGs, copies them to the requested directory, and generates an `index.html` gallery. The gallery shows each image at its exact point dimensions and render scale and links to the original PNG. Keep generated snapshots and galleries under the worktree's ignored `tmp/preview-snapshots/` tree and do not commit them.
+`monitor:preview` builds the `HarnessMonitorUIPreviews` scheme in the active build lane, runs `HarnessMonitorPreviewHost` with no window or Dock presence, verifies that the renderer produced fresh non-empty PNGs, copies them to the requested directory, and generates a suite-named HTML gallery plus an `index.html` copy for directory browsing. The suite-named file keeps multiple gallery links distinct in artifact viewers that identify local documents by basename. The gallery shows each image at its exact point dimensions and render scale and links to the original PNG. Keep generated snapshots and galleries under the worktree's ignored `tmp/preview-snapshots/` tree and do not commit them.
 
 After every visual task, render the affected suite and inspect every emitted image with the environment's native image inspection tool.
 
 ## The approval gate
 
-A change to what the app renders needs the user's approval of the generated gallery before its first commit, per the root `AGENTS.md`. Hand over the clickable `index.html` path so the user reviews every exact-size snapshot without launching the app, then wait. Re-render after every requested change, because approval covers the images the user saw.
+A change to what the app renders needs the user's approval of the generated gallery before its first commit, per the root `AGENTS.md`. Hand over the clickable suite-named HTML path printed by `monitor:preview` so the user reviews every exact-size snapshot without launching the app, then wait. Re-render after every requested change, because approval covers the images the user saw.
 
 The gate covers layout, typography, spacing, color, iconography, state presentation, animation endpoints, and any new or restyled view, on macOS, iOS, and watchOS alike. A change that leaves rendering identical, such as a refactor or a behavior fix with no visual surface, skips it. Say that rendering is unchanged rather than skipping silently.
 
