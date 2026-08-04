@@ -161,6 +161,7 @@ mod tests {
     use sqlx::query_scalar;
 
     use super::*;
+    use crate::daemon::db_open::AsyncDaemonDbConnect;
     use crate::task_board::TaskBoardAutomationDesiredMode;
 
     #[test]

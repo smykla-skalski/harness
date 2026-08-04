@@ -10,6 +10,7 @@ use crate::daemon::db::task_board::orchestrator_settings_queries::OrchestratorSe
 use crate::daemon::db::task_board::remote_assignment_authority_queries::RemoteAssignmentAuthorityQueries;
 use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::db::task_board::remote_source_bundle_queries::RemoteSourceBundleQueries;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::task_board::remote_wire::wire::{
     RemoteArtifactEntry, RemoteArtifactManifest, RemoteSourceBundleAbandonRequest,
     RemoteSourceBundleUploadRequest, RemoteSourceMaterial, test_codex_launch,

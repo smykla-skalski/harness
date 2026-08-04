@@ -30,3 +30,6 @@ pub(crate) use super::{
 // through a direct `crate::daemon::db::ChangeTrackingQueries` import (see
 // `watch/storage.rs`), so including it here would be an unused glob member.
 // Add it back the moment a glob-only caller needs it.
+//
+// `AsyncDaemonDbConnect` is excluded for the same reason: every current
+// `AsyncDaemonDb::connect` caller already imports it directly.

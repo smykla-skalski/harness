@@ -18,6 +18,7 @@ use super::reviews_policy_fixtures::{
     review_target_fixture, reviews_policy_run_request, test_runtime_root,
     write_active_policy_graph,
 };
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 #[tokio::test]
 async fn reviews_policy_preview_and_start_runs() {

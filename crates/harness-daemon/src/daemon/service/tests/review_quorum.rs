@@ -8,6 +8,7 @@ use crate::daemon::protocol::{
 use crate::session::types::{ReviewVerdict, SessionRole, TaskStatus};
 
 use super::*;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 #[test]
 fn submit_review_async_concurrent_reviewers_close_quorum_without_lost_state() {

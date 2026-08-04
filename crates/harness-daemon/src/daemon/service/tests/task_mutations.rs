@@ -1,4 +1,5 @@
 use super::*;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 #[test]
 fn create_task_uses_suggested_fix_from_request() {

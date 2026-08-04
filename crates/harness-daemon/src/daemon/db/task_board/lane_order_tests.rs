@@ -6,6 +6,7 @@ use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::task_board::dispatch_admission_queries::DispatchAdmissionQueries;
 use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
 use crate::daemon::db::task_board::lane_placement_queries::LanePlacementQueries;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::task_board::store::TaskBoardItemPatch;
 use crate::task_board::{
     TaskBoardItem, TaskBoardLaneOrigin, TaskBoardPriority, TaskBoardStatus, TaskBoardSyncStore,

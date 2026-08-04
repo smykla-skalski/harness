@@ -7,6 +7,7 @@ use crate::daemon::db::task_board::triage_queries::TriageQueries;
 use crate::daemon::db::{
     AsyncDaemonDb, TaskBoardLanePositionInput, TaskBoardTriageOverrideSetInput,
 };
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::task_board::{TaskBoardItem, TaskBoardStatus, TriageVerdict};
 
 async fn connect() -> (tempfile::TempDir, AsyncDaemonDb) {

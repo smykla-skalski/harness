@@ -21,6 +21,7 @@ use super::{
     liveness_reconcile_due, poll_change_tracking, poll_change_tracking_async,
 };
 use crate::daemon::db::prelude::*;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 /// Mirrors `service::SESSION_LIVENESS_REFRESH_TTL` for tests that exercise the
 /// loop's own due-or-not arithmetic; `watch` takes the real value as a

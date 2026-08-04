@@ -4,6 +4,7 @@ use tempfile::tempdir;
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
 use crate::daemon::db::task_board::triage_queries::TriageQueries;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::task_board::{
     OVERRIDE_PLACEMENT_PRODUCER, TaskBoardItem, TaskBoardPriority, TaskBoardStatus,
     TriagePriorityAction, TriageRule, TriageRuleCondition, TriageRuleOutcome, TriageRuleSetV1,

@@ -5,6 +5,7 @@ use crate::daemon::protocol::PolicyPipelinePromoteRequest;
 use crate::task_board::policy_graph::{PolicyCanvasWorkspace, apply_set_global_enforcement};
 
 use super::promote_policy_pipeline;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::daemon::reviews_store::PolicyGraphQueries;
 
 async fn connect() -> (TempDir, AsyncDaemonDb) {

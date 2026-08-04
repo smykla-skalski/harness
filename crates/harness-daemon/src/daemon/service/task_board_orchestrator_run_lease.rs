@@ -217,6 +217,7 @@ mod tests {
 
     use super::*;
     use crate::daemon::db::{TaskBoardAutomationRunAdmission, TaskBoardRunAcquireRequest};
+    use crate::daemon::db_open::AsyncDaemonDbConnect;
     use crate::daemon::test_liveness::LIVENESS;
     use crate::task_board::{
         TaskBoardAutomationDesiredMode, TaskBoardAutomationRunTrigger, TaskBoardAutomationScope,

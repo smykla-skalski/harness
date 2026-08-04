@@ -16,6 +16,7 @@ use crate::daemon::db::task_board::workflow_execution_queries::WorkflowExecution
 use crate::daemon::db::tests::task_board::{
     PreparedRemoteOffer, prepare_remote_implementation_offer,
 };
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::task_board::remote_wire::wire::{
     RemoteOfferDisposition, RemoteOfferRequest, RemoteOfferResponse,
     TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION, test_codex_launch,

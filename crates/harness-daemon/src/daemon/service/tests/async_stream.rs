@@ -1,5 +1,6 @@
 use super::*;
 use crate::daemon::db::prelude::*;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::daemon::test_liveness::LIVENESS;
 
 #[test]

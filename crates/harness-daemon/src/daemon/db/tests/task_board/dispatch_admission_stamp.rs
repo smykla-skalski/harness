@@ -7,6 +7,7 @@ use crate::daemon::db::task_board::write_workflow_fixture::{
     approved_write_item, complete_write_preparation,
 };
 use crate::daemon::db::{AsyncDaemonDb, ReservedTaskBoardDispatch};
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::task_board::{
     TaskBoardItem, TaskBoardStatus, TaskBoardWorkflowStatus, build_dispatch_plans_with_policy,
 };

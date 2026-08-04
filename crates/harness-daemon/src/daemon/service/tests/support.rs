@@ -1,5 +1,6 @@
 use super::*;
 use crate::daemon::db::prelude::*;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 pub(super) fn install_test_observe_runtime(poll_interval: Duration) {
     let (sender, _) = broadcast::channel(8);

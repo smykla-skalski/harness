@@ -251,6 +251,7 @@ mod tests {
     use super::*;
     use crate::daemon::db::AsyncAuditQueries;
     use crate::daemon::db::task_board::prelude::*;
+    use crate::daemon::db_open::AsyncDaemonDbConnect;
     use crate::daemon::protocol::HarnessMonitorAuditEventsRequest;
     use crate::task_board::{
         ExternalCreateOutcome, ExternalProvider, ExternalRefSyncState, ExternalSyncConfig,

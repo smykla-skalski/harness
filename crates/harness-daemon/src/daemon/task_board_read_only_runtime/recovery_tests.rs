@@ -11,6 +11,7 @@ use crate::daemon::agent_tui::AgentTuiManagerHandle;
 use crate::daemon::codex_controller::CodexControllerHandle;
 use crate::daemon::db::prelude::*;
 use crate::daemon::db::{AgentTurnRunSnapshot, AgentTurnRunStatus, AsyncDaemonDb, DaemonDb};
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::daemon::http::{
     AsyncDaemonDbSlot, DaemonHttpAuthMode, DaemonHttpState, ManagedAgentMutationLocks,
     default_remote_pairing_limiter, default_remote_pairing_status_limiter,

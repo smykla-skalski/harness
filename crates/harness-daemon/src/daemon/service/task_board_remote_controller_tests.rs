@@ -7,6 +7,7 @@ use crate::daemon::db::{
     AsyncDaemonDb, TaskBoardRemoteControllerScanStep, TaskBoardRemoteOfferOutcome,
     remote_controller_fixture,
 };
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::task_board::{
     TASK_BOARD_EXECUTION_TARGET_RESOURCE, TASK_BOARD_REMOTE_PROTOCOL_VERSION,
     TaskBoardAttemptState, TaskBoardExecutionAttemptCas, TaskBoardExecutionHostAdvertisement,

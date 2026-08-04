@@ -346,6 +346,7 @@ mod tests {
 
     use super::*;
     use crate::daemon::db::AsyncDaemonDb;
+    use crate::daemon::db_open::AsyncDaemonDbConnect;
     use crate::reviews::{
         ReviewCheckStatus, ReviewMergeableState, ReviewPullRequestState, ReviewReviewStatus,
         ReviewTargetFlags,

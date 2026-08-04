@@ -8,6 +8,7 @@ use crate::daemon::db::{
     AsyncDaemonDb, REMOTE_EXECUTOR_PRINCIPAL, RemoteExecutorFixture, accept_remote_executor,
     remote_executor_claim_request, remote_executor_fixture, remote_executor_identity,
 };
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::git::source_bundle_export::GitSourceBundleExportPlan;
 use crate::task_board::remote_wire::wire::{
     RemoteArtifactEntry, RemoteArtifactManifest, RemoteOfferRequest,

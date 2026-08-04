@@ -1,8 +1,7 @@
 use sqlx::migrate::{Migration, Migrator};
 use sqlx::{SqlitePool, query, query_as, query_scalar};
 
-use super::{CliError, Connection, DaemonDb, Path, db_error};
-use crate::daemon::db_open::DaemonDbOpen;
+use super::{CliError, Connection, DaemonDb, Path, SchemaRepairHooks, db_error};
 
 const TABLE_EXISTS_SQL: &str =
     "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name = ?1";
@@ -276,7 +275,10 @@ pub(super) async fn read_async_schema_version(pool: &SqlitePool) -> Result<Strin
         .map_err(|error| db_error(format!("read async schema version: {error}")))
 }
 
-pub(super) fn prepare_legacy_schema(path: &Path) -> Result<(), CliError> {
+pub(super) fn prepare_legacy_schema(
+    path: &Path,
+    hooks: &SchemaRepairHooks,
+) -> Result<(), CliError> {
     if !path.exists() {
         return Ok(());
     }
@@ -295,7 +297,7 @@ pub(super) fn prepare_legacy_schema(path: &Path) -> Result<(), CliError> {
     drop(conn);
 
     if version != super::SCHEMA_VERSION || needs_shape_repair {
-        let _ = DaemonDb::open(path)?;
+        let _ = DaemonDb::open_with_hooks(path, hooks)?;
     }
     Ok(())
 }
@@ -435,6 +437,7 @@ async fn restore_migration_pragmas(conn: &mut sqlx::SqliteConnection) -> Result<
 mod pragma_tests {
     use super::{query, restore_migration_pragmas};
     use crate::daemon::db::AsyncDaemonDb;
+    use crate::daemon::db_open::AsyncDaemonDbConnect;
 
     /// Reading the pragma back through the pool proves nothing: the pool opens
     /// connections with `foreign_keys(true)`, so it can answer from a connection

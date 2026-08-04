@@ -21,6 +21,8 @@ use tracing::Instrument as _;
 use tracing::field::{Empty, display};
 
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb, canonical_db_unavailable};
+#[cfg(test)]
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::daemon::remote_pairing::{RemotePairingRateLimiter, RemotePairingStatusRateLimiter};
 use crate::daemon::server_state;
 use crate::daemon::service::{

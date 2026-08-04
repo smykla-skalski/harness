@@ -4,6 +4,7 @@ use tempfile::tempdir;
 
 use super::*;
 use crate::daemon::db::prelude::*;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::daemon::protocol::{
     SessionJoinRequest, SessionStartRequest, TaskBoardUpdateItemRequest, TaskCreateRequest,
 };

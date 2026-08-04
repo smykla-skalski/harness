@@ -3,6 +3,7 @@ use crate::task_board::{ExternalRef, ExternalRefProvider};
 use super::*;
 use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
 use crate::daemon::db::task_board::lane_placement_queries::LanePlacementQueries;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 #[tokio::test]
 async fn same_lane_default_anchor_compacts_before_inserting_the_requested_slot() {

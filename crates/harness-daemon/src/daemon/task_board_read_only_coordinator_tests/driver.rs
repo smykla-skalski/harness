@@ -5,6 +5,7 @@ use super::super::task_board_read_only_coordinator::reconcile_task_board_read_on
 use super::super::task_board_read_only_runtime::TaskBoardReadOnlyRuntime;
 use super::fixture::Fixture;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 pub(super) struct HeadlessWorkflowDriver<'a, R> {
     fixture: &'a Fixture,

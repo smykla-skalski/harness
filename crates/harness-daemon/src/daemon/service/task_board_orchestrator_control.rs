@@ -226,6 +226,7 @@ mod tests {
 
     use super::*;
     use crate::daemon::db::{TaskBoardAutomationRunAdmission, TaskBoardRunAcquireRequest};
+    use crate::daemon::db_open::AsyncDaemonDbConnect;
     use crate::task_board::{
         TaskBoardAutomationEffectiveState, TaskBoardAutomationRunTrigger, TaskBoardAutomationScope,
     };

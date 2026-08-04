@@ -80,6 +80,7 @@ mod tests {
     use tokio::time::{Duration, sleep, timeout};
 
     use super::*;
+    use crate::daemon::db_open::AsyncDaemonDbConnect;
     use crate::task_board::Machine;
 
     #[tokio::test]

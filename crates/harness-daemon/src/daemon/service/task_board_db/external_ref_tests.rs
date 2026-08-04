@@ -1,4 +1,5 @@
 use super::*;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::task_board::{
     ExternalRef, ExternalRefProvider, ExternalRefSyncState, PlanningState, TaskBoardItem,
     TaskBoardStatus,

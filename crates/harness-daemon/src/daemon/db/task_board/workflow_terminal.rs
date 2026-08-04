@@ -113,6 +113,7 @@ mod tests {
     use super::super::workflow_dispatch::workflow_owner;
     use super::projection::terminal_target;
     use super::*;
+    use crate::daemon::db_open::AsyncDaemonDbConnect;
     use crate::task_board::{
         TaskBoardExecutionOwnership, TaskBoardExecutionPhase, TaskBoardExecutionState,
         TaskBoardTerminalOutcome, TaskBoardTerminalOutcomeKind,

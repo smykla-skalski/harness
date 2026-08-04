@@ -257,6 +257,7 @@ mod tests {
     use tempfile::tempdir;
 
     use super::*;
+    use crate::daemon::db_open::AsyncDaemonDbConnect;
     use crate::task_board::{TaskBoardReviewFindingLocation, TaskBoardReviewFindingSeverity};
 
     #[tokio::test]

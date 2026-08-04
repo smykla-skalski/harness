@@ -3,6 +3,7 @@ use sqlx::{query, query_scalar};
 
 use super::TaskBoardRunAcquireRequest;
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::task_board::{TaskBoardAutomationRunTrigger, TaskBoardAutomationScope};
 
 pub(super) fn instant(value: &str) -> DateTime<Utc> {

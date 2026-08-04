@@ -9,6 +9,7 @@ use tokio::sync::broadcast;
 use crate::daemon::codex_controller::CodexControllerHandle;
 use crate::daemon::db::prelude::*;
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::daemon::index::DiscoveredProject;
 use crate::daemon::protocol::{
     CodexApprovalRequest, CodexRunMode, CodexRunSnapshot, CodexRunStatus, StreamEvent,

@@ -19,6 +19,7 @@ use super::super::task_board_support::{
 };
 use crate::daemon::db::prelude::*;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 pub(super) const DEEPSEEK_MODEL: &str = "deepseek/deepseek-v4-flash";
 pub(super) const ADVANCED_HEAD: &str = "89abcdef0123456789abcdef0123456789abcdef";

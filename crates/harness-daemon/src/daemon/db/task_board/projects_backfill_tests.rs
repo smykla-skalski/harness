@@ -4,6 +4,7 @@ use tempfile::{TempDir, tempdir};
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
 use crate::daemon::db::task_board::project_registry_queries::ProjectRegistryQueries;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::task_board::project::is_project_id;
 use crate::task_board::{ExternalRef, ExternalRefProvider, TaskBoardItem};
 

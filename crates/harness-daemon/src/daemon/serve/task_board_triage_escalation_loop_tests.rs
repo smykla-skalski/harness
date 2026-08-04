@@ -9,6 +9,7 @@ use crate::daemon::agent_tui::AgentTuiManagerHandle;
 use crate::daemon::codex_controller::CodexControllerHandle;
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::daemon::http::{AsyncDaemonDbSlot, DaemonHttpState, ManagedAgentMutationLocks};
 use crate::daemon::state::{DaemonManifest, HostBridgeManifest};
 use crate::daemon::websocket::ReplayBuffer;

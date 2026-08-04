@@ -3,6 +3,7 @@ use sqlx::{query, query_as};
 
 use super::*;
 use crate::daemon::db::{TaskBoardAutomationRunAdmission, TaskBoardRunAcquireRequest};
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::task_board::{
     TaskBoardAutomationScope, TaskBoardAutomationWakeEvent, TaskBoardAutomationWakePayload,
 };

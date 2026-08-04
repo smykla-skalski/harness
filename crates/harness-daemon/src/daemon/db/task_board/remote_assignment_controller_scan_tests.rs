@@ -17,6 +17,7 @@ use crate::daemon::db::task_board::remote_assignment_authority_queries::RemoteAs
 use crate::daemon::db::task_board::remote_assignment_controller_scan::RemoteAssignmentControllerScanQueries;
 use crate::daemon::db::task_board::remote_assignment_executor_lifecycle_queries::RemoteAssignmentExecutorLifecycleQueries;
 use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::task_board::remote_wire::wire::{
     RemoteAssignmentWireState, RemoteCancelRequest, RemoteCancelResponse, RemoteLease,
     RemoteOfferDisposition, RemoteOfferResponse, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,

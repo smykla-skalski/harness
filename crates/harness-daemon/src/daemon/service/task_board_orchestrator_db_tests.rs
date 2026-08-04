@@ -4,6 +4,7 @@ use super::{
 };
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::daemon::protocol::TaskBoardOrchestratorRunOnceRequest;
 use crate::task_board::github::GitHubAutomation;
 use crate::task_board::{

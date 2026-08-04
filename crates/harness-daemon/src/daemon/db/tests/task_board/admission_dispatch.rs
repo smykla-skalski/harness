@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::ops::Deref;
 
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 use tempfile::{TempDir, tempdir};
 
 #[path = "admission_dispatch_completion_evidence.rs"]

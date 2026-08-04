@@ -4,6 +4,7 @@ use super::{RepositoryCase, RepositorySource, seed_repository_case};
 use crate::daemon::db::prelude::*;
 use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{AgentTurnRunStatus, AsyncDaemonDb};
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::daemon::http::tests::support::remote_execution_acceptance::fixture::{
     AcceptanceFixture, HOST_INSTANCE, TlsRouterServer, assignment,
 };

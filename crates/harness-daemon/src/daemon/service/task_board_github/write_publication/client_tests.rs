@@ -2,6 +2,7 @@ use harness_testkit::with_isolated_harness_env;
 use tempfile::tempdir;
 
 use super::*;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::daemon::service::sync_task_board_github_tokens;
 use crate::task_board::TaskBoardGitHubTokensSyncRequest;
 use crate::task_board::github::GitHubAutomation;

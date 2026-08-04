@@ -10,6 +10,7 @@ use crate::daemon::db::{
     accept_remote_executor, remote_controller_fixture, remote_executor_claim_request,
     remote_executor_fixture,
 };
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::task_board::remote_wire::wire::{
     RemoteAssignmentWireState, RemoteCancelRequest, RemoteCancelResponse, RemoteClaimRequest,
     RemoteClaimResponse, RemoteLease, RemoteLeaseRenewRequest, RemoteLeaseRenewResponse,

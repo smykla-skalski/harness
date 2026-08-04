@@ -197,6 +197,7 @@ fn validate_record_advance(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::daemon::db_open::AsyncDaemonDbConnect;
     use harness_task_board::TaskBoardItem;
     use harness_task_board::github::GitHubMergeMethod;
 

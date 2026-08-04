@@ -26,6 +26,7 @@ use crate::session::types::{
 
 use super::ReplayBuffer;
 use crate::daemon::db::prelude::*;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 pub(super) fn test_ws_state() -> DaemonHttpState {
     build_test_http_state("20.6.0", "2026-04-13T00:00:00Z", false)

@@ -4,6 +4,7 @@ use tempfile::{TempDir, tempdir};
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::task_board::TaskBoardItem;
 use crate::task_board::types::TaskBoardItemKind;
 

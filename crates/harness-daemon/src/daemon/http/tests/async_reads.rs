@@ -11,6 +11,7 @@ use crate::daemon::agent_tui::AgentTuiManagerHandle;
 use crate::daemon::codex_controller::CodexControllerHandle;
 use crate::daemon::db::prelude::*;
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::daemon::state::DaemonManifest;
 
 mod managed_agents;

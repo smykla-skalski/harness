@@ -14,6 +14,7 @@ use crate::session::{storage as session_storage, types::SessionState};
 
 use super::*;
 use crate::daemon::db::AsyncTaskReviewWrites;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::daemon::db_open::DaemonDbOpen;
 
 struct ReviewPersistenceFixture {

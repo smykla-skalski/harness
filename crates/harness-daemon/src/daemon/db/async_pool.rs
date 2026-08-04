@@ -13,7 +13,7 @@ use super::task_board_sync_coordinator::{
 };
 use super::{
     BTreeMap, CliError, DiscoveredProject, LIVENESS_CANDIDATE_IDS_SQL, Path, PathBuf,
-    SCHEMA_VERSION, async_bootstrap, daemon_index, daemon_protocol, db_error,
+    SCHEMA_VERSION, SchemaRepairHooks, async_bootstrap, daemon_index, daemon_protocol, db_error,
     trace_async_db_operation, usize_from_i64,
 };
 use crate::session::storage;
@@ -129,9 +129,12 @@ impl AsyncDaemonDb {
     ///
     /// # Errors
     /// Returns [`CliError`] when the pool or schema probe cannot be initialized.
-    pub async fn connect(path: &Path) -> Result<Self, CliError> {
+    pub(crate) async fn connect_with_hooks(
+        path: &Path,
+        hooks: &SchemaRepairHooks,
+    ) -> Result<Self, CliError> {
         trace_async_db_operation("connect", "maintenance", Some(path), || async move {
-            async_bootstrap::prepare_legacy_schema(path)?;
+            async_bootstrap::prepare_legacy_schema(path, hooks)?;
             let options = SqliteConnectOptions::new()
                 .filename(path)
                 .create_if_missing(true)

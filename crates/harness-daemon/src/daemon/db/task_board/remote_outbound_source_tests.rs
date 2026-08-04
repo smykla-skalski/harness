@@ -14,6 +14,7 @@ use crate::daemon::db::task_board::orchestrator_settings_queries::OrchestratorSe
 use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::db::task_board::remote_outbound_sources::RemoteOutboundSourceQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError};
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::task_board::remote_wire::wire::{
     RemoteArtifactEntry, RemoteArtifactManifest, RemoteOfferRequest, RemoteSourceMaterial,
     test_codex_launch,

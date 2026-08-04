@@ -8,6 +8,7 @@ use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::prelude::*;
 use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::db::task_board::remote_source_bundle_queries::RemoteSourceBundleQueries;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::task_board::remote_wire::wire::{
     RemoteArtifactEntry, RemoteArtifactManifest, RemoteOfferRequest,
     RemoteSourceBundleAbandonRequest, RemoteSourceBundleUploadRequest, RemoteSourceMaterial,

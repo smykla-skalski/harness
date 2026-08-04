@@ -17,6 +17,7 @@ use crate::session::types::{
 };
 
 use super::*;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 #[test]
 fn v10_task_columns_track_every_review_mutation_on_async_path() {

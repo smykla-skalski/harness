@@ -1,4 +1,5 @@
 use super::super::*;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 #[test]
 fn remove_agent_async_direct_sends_abort_signal() {
