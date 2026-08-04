@@ -3,7 +3,7 @@ use tempfile::tempdir;
 
 use harness_kernel::errors::CliError;
 
-use harness::daemon::db::AsyncDaemonDb;
+use harness::daemon::db::{AsyncDaemonDb, AsyncDaemonDbConnect};
 use harness::task_board::external::{
     ExternalCreateLease, ExternalCreateProbe, ExternalCreateRecoveryClient, ExternalCreateRequest,
     ExternalSyncClient, ExternalSyncOptions, sync_external_tasks,
