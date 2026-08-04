@@ -9,6 +9,7 @@ use crate::daemon::protocol::{
 use crate::session::types::{SessionRole, TaskStatus};
 
 use super::*;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 #[test]
 fn submit_for_review_async_emits_spawn_reviewer_when_no_reviewer_present() {

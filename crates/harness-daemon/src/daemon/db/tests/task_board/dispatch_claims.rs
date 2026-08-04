@@ -14,6 +14,7 @@ use super::admission_dispatch::{
     admission_policy, configure_policy, ledger_kind_state, preparing_intent, test_db,
 };
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 #[tokio::test]
 async fn worker_claim_renewal_prevents_reclaim() {

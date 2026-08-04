@@ -10,6 +10,7 @@ use crate::daemon::db::task_board::remote_assignment_authority_queries::RemoteAs
 use crate::daemon::db::task_board::remote_assignment_terminal::RemoteAssignmentTerminalQueries;
 use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::db::task_board::remote_source_bundle_queries::RemoteSourceBundleQueries;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::task_board::TaskBoardRemoteAssignmentState;
 use crate::task_board::remote_wire::wire::{
     RemoteAssignmentWireState, RemoteCancelRequest, RemoteSettledRequest,

@@ -1,6 +1,7 @@
 use tempfile::tempdir;
 
 use super::*;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::task_board::store::OptionalFieldPatch;
 
 #[tokio::test]

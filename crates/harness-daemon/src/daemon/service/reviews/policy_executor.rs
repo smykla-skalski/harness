@@ -167,6 +167,7 @@ async fn record_reviews_policy_action_audit_result<T>(
 mod tests {
     use super::*;
     use crate::daemon::db::AsyncAuditQueries;
+    use crate::daemon::db_open::AsyncDaemonDbConnect;
     use crate::daemon::reviews_store::PolicyGraphQueries;
     use crate::task_board::policy_graph::PolicyCanvasWorkspace;
     use crate::task_board::policy_runtime::handoff::{HANDOFF_ACTION_KEY, HANDOFF_PROVIDER};

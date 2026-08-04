@@ -15,6 +15,7 @@ use super::{
     update_task_board_project_db,
 };
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 async fn connect(directory: &tempfile::TempDir) -> AsyncDaemonDb {
     AsyncDaemonDb::connect(&directory.path().join("harness.db"))

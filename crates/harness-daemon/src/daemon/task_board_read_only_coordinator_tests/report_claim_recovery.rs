@@ -9,6 +9,7 @@ use super::load_execution;
 use super::prepared_report_fixture::seed_dispatched_initial_report;
 use super::runtime::{FakeReadOnlyRuntime, PlannedReport};
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 #[tokio::test]
 async fn second_reconciler_waits_for_claimed_report_without_orphaning_run() {

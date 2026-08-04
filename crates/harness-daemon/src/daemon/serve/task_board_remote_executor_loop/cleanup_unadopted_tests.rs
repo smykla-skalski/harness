@@ -20,6 +20,7 @@ use super::super::source::ensure_remote_session;
 use super::tests::{CLAIMED_AT, SETTLED_AT, STARTED_AT, UNKNOWN_AT, active_count, git_repository};
 use crate::daemon::db::prelude::*;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 const EXPIRED_AT: &str = "2026-07-19T10:11:00Z";
 

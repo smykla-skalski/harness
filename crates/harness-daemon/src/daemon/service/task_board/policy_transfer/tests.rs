@@ -11,6 +11,7 @@ use crate::task_board::policy_graph::{
 
 use super::{dump_policies, import_policies};
 use crate::daemon::db::prelude::*;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::daemon::reviews_store::PolicyGraphQueries;
 
 async fn connect() -> (TempDir, AsyncDaemonDb) {

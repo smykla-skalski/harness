@@ -29,6 +29,7 @@ mod tests {
     use tempfile::{TempDir, tempdir};
 
     use crate::daemon::db::AsyncDaemonDb;
+    use crate::daemon::db_open::AsyncDaemonDbConnect;
 
     // The caller keeps the returned TempDir alive; dropping it removes the
     // database files out from under the open pool.

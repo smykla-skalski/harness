@@ -2,6 +2,7 @@ use tempfile::tempdir;
 
 use super::*;
 use crate::daemon::db::AsyncAuditQueries;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::daemon::protocol::{
     HarnessMonitorAuditEvent, HarnessMonitorAuditEventsRequest, TaskBoardSyncRequest,
 };

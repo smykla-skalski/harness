@@ -8,6 +8,7 @@ use crate::daemon::db::{
     AsyncDaemonDb, ReservedTaskBoardDispatch, TASK_BOARD_PREPARATION_MAX_ATTEMPTS,
     TaskBoardPreparationClaim, TaskBoardPreparationUnavailable,
 };
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::task_board::{SpawnGateSwitches, TaskBoardItem, build_dispatch_plans_with_policy};
 
 async fn test_db() -> (AsyncDaemonDb, tempfile::TempDir) {

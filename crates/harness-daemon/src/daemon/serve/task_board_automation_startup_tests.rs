@@ -3,6 +3,7 @@ use std::sync::{Arc, OnceLock};
 
 use super::*;
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::daemon::service::task_board_orchestrator_status_db;
 use crate::feature_flags::TASK_BOARD_AUTOMATION_V2_ENV;
 use crate::task_board::{

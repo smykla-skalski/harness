@@ -3,6 +3,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use super::*;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 const ACTIVE_DELIVERY_SESSION_ID: &str = "4f2f2a50-142c-583c-a0b5-e0d671b61e40";
 

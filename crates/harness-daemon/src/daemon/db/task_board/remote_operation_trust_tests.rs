@@ -16,6 +16,7 @@ use crate::daemon::db::task_board::remote_assignment_authority_queries::RemoteAs
 use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
 use crate::daemon::db::task_board::remote_hosts::RemoteHostQueries;
 use crate::daemon::db::{AsyncDaemonDb, CliError};
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::task_board::{
     TASK_BOARD_REMOTE_PROTOCOL_VERSION, TaskBoardExecutionHostAdvertisement,
     TaskBoardPhaseCapabilityProfile,

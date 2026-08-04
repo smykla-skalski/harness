@@ -18,6 +18,7 @@ use crate::session::types::SessionRole;
 use harness_testkit::with_isolated_harness_env;
 
 use super::*;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 pub(super) async fn test_http_state_with_empty_async_db(
     db_path: &std::path::Path,

@@ -8,6 +8,7 @@ use crate::daemon::db::{
     AsyncDaemonDb, ClaimedTaskBoardDispatchPreparation, ReservedTaskBoardDispatch,
     TASK_BOARD_PREPARATION_MAX_ATTEMPTS,
 };
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::task_board::{
     SpawnGateSwitches, TaskBoardItem, TaskBoardStatus, TaskBoardWorkflowStatus,
     build_dispatch_plans_with_policy,

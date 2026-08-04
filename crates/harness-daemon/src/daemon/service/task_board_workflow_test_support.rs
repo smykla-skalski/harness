@@ -12,6 +12,7 @@ use super::task_board_workflow_execution::{
     TaskBoardWorkflowExecutionCreateRequest, create_or_load_workflow_execution,
 };
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 pub(super) const CREATED_AT: &str = "2026-07-15T10:00:00Z";
 

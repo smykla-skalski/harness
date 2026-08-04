@@ -7,6 +7,7 @@ use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::task_board::orchestrator_settings_queries::OrchestratorSettingsQueries;
 use crate::daemon::db::task_board::remote_assignment_authority_queries::RemoteAssignmentAuthorityQueries;
 use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 const SETTLED_AT: &str = "2026-07-19T10:00:40Z";
 const CLEANED_AT: &str = "2026-07-19T10:00:50Z";

@@ -9,6 +9,7 @@ use crate::daemon::codex_controller::CodexControllerHandle;
 use crate::daemon::db::prelude::*;
 use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{AsyncDaemonDb, complete_write_preparation};
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::daemon::protocol::{CodexRunStatus, StreamEvent};
 use crate::task_board::AgentMode;
 

@@ -6,6 +6,7 @@ use tokio::sync::Barrier;
 use super::test_support::{database, instant};
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::task_board::scheduler::queries::TaskBoardAutomationSchedulerQueries;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::task_board::{
     TaskBoardAutomationWakeEntityKind, TaskBoardAutomationWakePayload,
     TaskBoardAutomationWakeRecoveryReason, TaskBoardAutomationWakeRequest,

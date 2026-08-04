@@ -8,6 +8,7 @@ use crate::daemon::db::db_error;
 use crate::daemon::db::task_board::remote_assignment_executor_lifecycle_queries::RemoteAssignmentExecutorLifecycleQueries;
 use crate::daemon::db::task_board::remote_assignment_recovery::RemoteAssignmentRecoveryQueries;
 use crate::daemon::db::task_board::remote_execution_queries::RemoteExecutionQueries;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 const REPLACED_AT: &str = "2026-07-19T10:00:01Z";
 

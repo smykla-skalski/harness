@@ -8,6 +8,7 @@ use tempfile::tempdir;
 use tokio::runtime::Builder as RuntimeBuilder;
 
 use super::*;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::daemon::service::sync_task_board_github_tokens;
 use crate::task_board::{
     TaskBoardGitHubTokensSyncRequest, TaskBoardOrchestratorSettings,

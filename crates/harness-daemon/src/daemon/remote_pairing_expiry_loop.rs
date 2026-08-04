@@ -64,6 +64,7 @@ mod tests {
 
     use super::*;
     use crate::daemon::db::DaemonDb;
+    use crate::daemon::db_open::AsyncDaemonDbConnect;
     use crate::daemon::db_open::DaemonDbOpen;
     use crate::daemon::remote::{RemoteAccessScope, RemoteRole};
     use crate::daemon::remote_identity_queries::RemoteIdentitySyncQueries;

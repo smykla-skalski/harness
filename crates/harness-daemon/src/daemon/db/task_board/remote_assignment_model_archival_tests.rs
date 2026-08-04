@@ -3,6 +3,7 @@ use tempfile::tempdir;
 
 use super::RemoteAssignmentRow;
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 // The column order mirrors RemoteAssignmentRow::SELECT_COLLISION exactly so the
 // derived FromRow decode lines up; unlike the production queries it omits the

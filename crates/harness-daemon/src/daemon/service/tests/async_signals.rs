@@ -4,6 +4,7 @@ use crate::session::types::{SessionRole, SessionSignalStatus};
 
 use super::*;
 use crate::daemon::db::prelude::*;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 async fn seed_pending_signal(
     async_db: &crate::daemon::db::AsyncDaemonDb,

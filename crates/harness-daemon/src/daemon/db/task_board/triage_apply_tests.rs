@@ -6,6 +6,7 @@ use super::{apply_builtin_v1_triage_in_tx, triage_cause};
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::prelude::*;
 use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::task_board::{
     BUILTIN_V1_EVALUATOR_IDENTITY, BUILTIN_V1_EVALUATOR_VERSION, TaskBoardItem,
     TaskBoardLaneOrigin, TaskBoardPriority, TaskBoardStatus, TaskBoardTriageDecision, TriageCause,

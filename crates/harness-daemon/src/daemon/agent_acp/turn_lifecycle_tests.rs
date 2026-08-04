@@ -16,6 +16,7 @@ use crate::session::types::AgentStatus;
 use harness_kernel::errors::CliError;
 
 use super::{OpenRouterAgentTurnRuntime, OpenRouterTurnManager};
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 pub(super) const HEAD: &str = "0123456789abcdef0123456789abcdef01234567";
 pub(super) const MODEL: &str = "deepseek/deepseek-v4-flash";

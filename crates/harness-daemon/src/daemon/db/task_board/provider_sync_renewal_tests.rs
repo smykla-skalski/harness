@@ -2,6 +2,7 @@ use tempfile::tempdir;
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::task_board::provider_queries::ProviderQueries;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::task_board::ExternalProvider;
 use crate::task_board::external::{
     ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision,

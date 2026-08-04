@@ -1,5 +1,6 @@
 use super::*;
 use crate::daemon::db::prelude::*;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 fn set_adoption_metadata(project: &Path, session_id: &str) {
     let layout =

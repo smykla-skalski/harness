@@ -10,6 +10,7 @@ use crate::daemon::db::task_board::write_workflow_fixture::{
     approved_write_item, complete_write_preparation,
 };
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb, ReservedTaskBoardDispatch};
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::task_board::{
     DispatchPlan, SpawnGateSwitches, TaskBoardAdmissionRequirement, TaskBoardAutomationPolicy,
     TaskBoardItem, TaskBoardLaunchCapability, TaskBoardOutsideWindowAction, TaskBoardPolicyLimit,

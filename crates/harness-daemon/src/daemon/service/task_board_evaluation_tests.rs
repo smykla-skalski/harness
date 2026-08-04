@@ -6,6 +6,7 @@ use crate::task_board::{TaskBoardEvaluationOutcome, TaskBoardWorkflowStatus};
 use harness_kernel::errors::CliErrorKind;
 
 use super::*;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 const NOW: &str = "2026-05-14T00:00:00Z";
 

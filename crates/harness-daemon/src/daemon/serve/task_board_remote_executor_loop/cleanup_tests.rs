@@ -9,6 +9,7 @@ use crate::daemon::db::{
     TaskBoardRemoteExecutorIdentity, TaskBoardRemoteMutationOutcome, accept_remote_executor,
     remote_executor_claim_request, remote_executor_fixture, remote_executor_identity,
 };
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::daemon::protocol::{CodexRunSnapshot, CodexRunStatus};
 use crate::task_board::remote_wire::wire::{
     RemoteAssignmentWireState, RemoteSettledRequest, RemoteSourceMaterial,

@@ -21,6 +21,7 @@ use super::task_board_workflow_test_support::{
 };
 use crate::daemon::db::prelude::*;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 #[tokio::test]
 async fn write_workflow_is_rejected_without_a_durable_execution() {

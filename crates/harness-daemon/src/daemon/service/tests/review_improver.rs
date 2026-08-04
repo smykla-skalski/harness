@@ -5,6 +5,7 @@ use crate::daemon::protocol::{
 use crate::session::types::{SessionRole, TaskStatus};
 
 use super::*;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 #[test]
 fn improver_apply_async_resolves_session_via_async_db_for_dry_run() {

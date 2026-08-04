@@ -25,6 +25,7 @@ use super::{
     shared_review_request_clients_from_settings,
 };
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 const REVIEW_STACK_CHILD_ENV: &str = "HARNESS_TEST_SHARED_REVIEW_STACK_CHILD";
 const REVIEW_STACK_TEST: &str = "daemon::service::task_board_db::reviews_sync::tests::shared_review_query_validation_runs_on_fresh_task_stack";

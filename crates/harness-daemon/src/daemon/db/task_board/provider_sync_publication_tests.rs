@@ -11,6 +11,7 @@ use super::ORCHESTRATOR_CHANGE_SCOPE;
 use crate::daemon::db::prelude::*;
 use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
 use crate::daemon::db::task_board::provider_queries::ProviderQueries;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 #[tokio::test]
 async fn backoff_only_changes_publish_without_identical_recovery_churn() {

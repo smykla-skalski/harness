@@ -10,6 +10,7 @@ use crate::daemon::db::{
     TaskBoardRemoteMutationOutcome, accept_remote_executor, authorize_and_start_remote_executor,
     remote_executor_claim_request, remote_executor_fixture,
 };
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::daemon::protocol::CodexRunStatus;
 use crate::task_board::remote_wire::wire::{
     MAX_REMOTE_TYPED_RESULT_BYTES, RemoteAssignmentWireState,

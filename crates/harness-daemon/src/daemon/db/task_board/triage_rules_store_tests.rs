@@ -2,6 +2,7 @@ use tempfile::tempdir;
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::task_board::triage_queries::TriageQueries;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::task_board::{TriageRuleSetV1, TriageVerdict};
 
 async fn connect() -> (tempfile::TempDir, AsyncDaemonDb) {

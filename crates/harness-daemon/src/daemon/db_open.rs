@@ -11,12 +11,13 @@
 //! call syntax every caller already uses, the same shape
 //! `daemon::remote_identity_queries` uses for its own area.
 
+use std::future::Future;
 use std::path::Path;
 
 use harness_kernel::errors::CliError;
 
 use crate::daemon::db::timeline::DaemonDbTimeline;
-use crate::daemon::db::{DaemonDb, SchemaRepairHooks, SessionWriteQueries};
+use crate::daemon::db::{AsyncDaemonDb, DaemonDb, SchemaRepairHooks, SessionWriteQueries};
 
 /// Opens a [`DaemonDb`] with its session-write/timeline repair hooks
 /// supplied, preserving the `DaemonDb::open(path)` call syntax callers
@@ -40,6 +41,23 @@ impl DaemonDbOpen for DaemonDb {
     #[cfg(any(test, feature = "test-support"))]
     fn open_in_memory() -> Result<Self, CliError> {
         Self::open_in_memory_with_hooks(&repair_hooks())
+    }
+}
+
+/// Connects an [`AsyncDaemonDb`], supplying the same repair hooks [`DaemonDbOpen`]
+/// does: `connect` primes a legacy on-disk database through a synchronous
+/// [`DaemonDb::open_with_hooks`] before the async pool attaches, so it needs
+/// the real hooks too, not just the outer async caller.
+pub trait AsyncDaemonDbConnect: Sized {
+    /// # Errors
+    /// Returns [`CliError`] when the pool or schema probe cannot be initialized.
+    fn connect(path: &Path) -> impl Future<Output = Result<Self, CliError>> + Send;
+}
+
+impl AsyncDaemonDbConnect for AsyncDaemonDb {
+    fn connect(path: &Path) -> impl Future<Output = Result<Self, CliError>> + Send {
+        let hooks = repair_hooks();
+        async move { Self::connect_with_hooks(path, &hooks).await }
     }
 }
 

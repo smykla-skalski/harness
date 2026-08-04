@@ -1,6 +1,7 @@
 use super::*;
 use crate::agents::kind::DisconnectReason;
 use crate::daemon::db::prelude::*;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 #[test]
 fn leave_session_db_direct_marks_leaderless_degraded_without_successor() {
