@@ -171,9 +171,11 @@ private enum TaskBoardRepositoryScopePreviewFixtures {
     """
   )
 
+  private static let decoder = JSONDecoder()
+
   private static func decode<T: Decodable>(_ json: String) -> T {
     do {
-      return try JSONDecoder().decode(T.self, from: Data(json.utf8))
+      return try decoder.decode(T.self, from: Data(json.utf8))
     } catch {
       preconditionFailure("Invalid repository-scope preview fixture: \(error)")
     }

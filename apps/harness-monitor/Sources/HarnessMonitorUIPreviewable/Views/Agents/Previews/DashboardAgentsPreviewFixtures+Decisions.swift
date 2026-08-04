@@ -98,6 +98,8 @@ extension DashboardAgentsPreviewFixtures {
 }
 
 private struct PreviewDecisionFixture {
+  private static let encoder = JSONEncoder()
+
   let id: String
   let severity: DecisionSeverity
   let ruleID: String
@@ -122,7 +124,7 @@ private struct PreviewDecisionFixture {
   }
 
   private var encodedActions: String {
-    guard let data = try? JSONEncoder().encode(actions),
+    guard let data = try? Self.encoder.encode(actions),
       let json = String(data: data, encoding: .utf8)
     else {
       return "[]"
