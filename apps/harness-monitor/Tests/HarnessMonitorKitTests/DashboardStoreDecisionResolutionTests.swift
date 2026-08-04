@@ -139,6 +139,41 @@ struct DashboardStoreDecisionResolutionTests {
     #expect(actions?.map(\.kind) == [.dismiss])
   }
 
+  @Test("Suggested action cache invalidates when the persisted payload changes")
+  func suggestedActionCacheInvalidates() async throws {
+    let store = await makeBootstrappedStore()
+    let session = PreviewFixtures.summary
+    _ = store.sessionIndex.applySessionSummary(session)
+    let decision = Decision(
+      id: "stuck-agent:cached-actions",
+      severity: .warn,
+      ruleID: "stuck-agent",
+      sessionID: session.sessionId,
+      agentID: nil,
+      taskID: nil,
+      summary: "Agent has stalled",
+      contextJSON: "{}",
+      suggestedActionsJSON: "[]"
+    )
+    store.supervisorOpenDecisions = [decision]
+
+    let first = store.dashboardDecisionResolution(agents: [])
+    #expect(first.workspaceBuckets.first?.items.first?.suggestedActions.map(\.kind) == [.dismiss])
+
+    let encodedActions = try JSONEncoder().encode([
+      SuggestedAction(id: "nudge", title: "Nudge", kind: .nudge, payloadJSON: "{}")
+    ])
+    decision.suggestedActionsJSON = try #require(
+      String(bytes: encodedActions, encoding: .utf8)
+    )
+
+    let second = store.dashboardDecisionResolution(agents: [])
+    #expect(
+      second.workspaceBuckets.first?.items.first?.suggestedActions.map(\.kind)
+        == [.nudge, .dismiss]
+    )
+  }
+
   private func makeBatch(sessionID: String) -> AcpPermissionBatch {
     AcpPermissionBatch(
       batchId: "batch-1",

@@ -24,16 +24,14 @@ public struct DashboardAgentWorkspaceIdentity: Codable, Hashable, Sendable {
   }
 
   public var selectionRawValue: String {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys]
-    guard let data = try? encoder.encode(self) else { return "" }
+    guard let data = try? DashboardAgentIdentityCoding.encoder.encode(self) else { return "" }
     return data.base64EncodedString()
   }
 
   public init?(selectionRawValue: String) {
     guard
       let data = Data(base64Encoded: selectionRawValue),
-      let decoded = try? JSONDecoder().decode(Self.self, from: data)
+      let decoded = try? DashboardAgentIdentityCoding.decoder.decode(Self.self, from: data)
     else { return nil }
     self = decoded
   }
@@ -57,19 +55,27 @@ public struct DashboardAgentIdentity: Codable, Hashable, Identifiable, Sendable 
   public var id: String { selectionRawValue }
 
   public var selectionRawValue: String {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys]
-    guard let data = try? encoder.encode(self) else { return "" }
+    guard let data = try? DashboardAgentIdentityCoding.encoder.encode(self) else { return "" }
     return data.base64EncodedString()
   }
 
   public init?(selectionRawValue: String) {
     guard
       let data = Data(base64Encoded: selectionRawValue),
-      let decoded = try? JSONDecoder().decode(Self.self, from: data)
+      let decoded = try? DashboardAgentIdentityCoding.decoder.decode(Self.self, from: data)
     else { return nil }
     self = decoded
   }
+}
+
+private enum DashboardAgentIdentityCoding {
+  static let encoder: JSONEncoder = {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys]
+    return encoder
+  }()
+
+  static let decoder = JSONDecoder()
 }
 
 public struct DashboardAgentWorkspace: Codable, Equatable, Hashable, Identifiable, Sendable {

@@ -29,6 +29,7 @@ struct DashboardWorkspaceDecisionsDetail: View {
       HStack(alignment: .firstTextBaseline, spacing: 10) {
         Text("Workspace decisions")
           .scaledFont(.title2.weight(.semibold))
+          .accessibilityAddTraits(.isHeader)
         Spacer()
       }
       HStack(spacing: 8) {

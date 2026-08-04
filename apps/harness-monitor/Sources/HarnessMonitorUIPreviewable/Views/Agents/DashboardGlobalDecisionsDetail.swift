@@ -11,6 +11,7 @@ struct DashboardGlobalDecisionsDetail: View {
         VStack(alignment: .leading, spacing: 10) {
           Text("Global decisions")
             .scaledFont(.title2.weight(.semibold))
+            .accessibilityAddTraits(.isHeader)
           Text("These decisions need attention but are not tied to a loaded workspace")
             .scaledFont(.callout)
             .foregroundStyle(.secondary)

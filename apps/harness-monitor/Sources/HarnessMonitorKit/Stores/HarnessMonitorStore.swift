@@ -55,6 +55,8 @@ public final class HarnessMonitorStore {
   public var lastExternalSessionAttachOutcome: ExternalSessionAttachOutcome?
   public var supervisorSelectedDecisionID: String?
   public var supervisorOpenDecisions: [Decision] = []
+  @ObservationIgnored var dashboardDecisionActionsCache:
+    [String: DashboardDecisionActionsCacheEntry] = [:]
   public var supervisorOpenDecisionsByID: [String: Decision] = [:]
   public var supervisorOpenDecisionsBySession: [String: [Decision]] = [:]
   public var supervisorOpenDecisionPresentationItems: [DecisionPresentationSnapshot] = []

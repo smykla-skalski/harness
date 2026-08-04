@@ -9,6 +9,10 @@ extension HarnessMonitorStore {
   public func dashboardDecisionResolution(
     agents: [DashboardAgentSummary]
   ) -> DashboardDecisionResolution {
+    let openDecisionIDs = Set(supervisorOpenDecisions.map(\.id))
+    dashboardDecisionActionsCache = dashboardDecisionActionsCache.filter {
+      openDecisionIDs.contains($0.key)
+    }
     let inputs = supervisorOpenDecisions.map(dashboardDecisionAttributionInput(for:))
     return DashboardDecisionAttributor.resolve(inputs: inputs, agents: agents)
   }
@@ -53,10 +57,26 @@ extension HarnessMonitorStore {
       managedAgentID: managedAgent?.id,
       managedAgentKind: managedAgent?.kind,
       workspace: workspace,
-      suggestedActions: DecisionDetailViewModel.prepareContent(
-        input: .init(decision: decision)
-      ).suggestedActions
+      suggestedActions: dashboardDecisionSuggestedActions(for: decision)
     )
+  }
+
+  private func dashboardDecisionSuggestedActions(for decision: Decision) -> [SuggestedAction] {
+    if let cached = dashboardDecisionActionsCache[decision.id],
+      cached.ruleID == decision.ruleID,
+      cached.suggestedActionsJSON == decision.suggestedActionsJSON
+    {
+      return cached.actions
+    }
+    let actions = DecisionDetailViewModel.prepareContent(
+      input: .init(decision: decision)
+    ).suggestedActions
+    dashboardDecisionActionsCache[decision.id] = DashboardDecisionActionsCacheEntry(
+      ruleID: decision.ruleID,
+      suggestedActionsJSON: decision.suggestedActionsJSON,
+      actions: actions
+    )
+    return actions
   }
 
   /// The daemon-managed agent handle for an ACP permission decision. Prefers the live sync cache and
@@ -87,4 +107,10 @@ extension HarnessMonitorStore {
 private struct DashboardDecisionManagedAgent {
   let id: String
   let kind: DashboardAgentRuntimeKind
+}
+
+struct DashboardDecisionActionsCacheEntry {
+  let ruleID: String
+  let suggestedActionsJSON: String
+  let actions: [SuggestedAction]
 }
