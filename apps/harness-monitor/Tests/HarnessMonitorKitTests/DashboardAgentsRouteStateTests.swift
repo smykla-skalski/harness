@@ -41,6 +41,14 @@ struct DashboardAgentsRouteStateTests {
     #expect(state.viewState.presentsAsFullWidthState)
   }
 
+  @Test("Decision destinations remain content when no agents are loaded")
+  func decisionOnlyContent() {
+    let state = DashboardAgentBrowserViewState(hasAttemptedLoad: true)
+
+    #expect(state.contentState(hasDecisionDestinations: true) == .content)
+    #expect(!state.presentsAsFullWidthState(hasDecisionDestinations: true))
+  }
+
   @Test("Offline and request failure remain different issues")
   func offlineAndRequestFailureRemainDifferent() throws {
     let state = DashboardAgentsRouteState()

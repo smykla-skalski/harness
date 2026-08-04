@@ -5,6 +5,7 @@ struct DashboardTerminalAgentDetailView: View {
   let store: HarnessMonitorStore
   let agent: DashboardAgentSummary
   @Bindable var state: DashboardTerminalAgentDetailState
+  var teamDecisions: [DashboardDecisionItem] = []
   let loadsAutomatically: Bool
   let onMembershipRemoved: () -> Void
   @State private var isConfirmingRemoval = false
@@ -62,6 +63,7 @@ struct DashboardTerminalAgentDetailView: View {
     ScrollView {
       VStack(alignment: .leading, spacing: 20) {
         DashboardAgentDetailHeader(agent: agent)
+        DashboardAgentDecisionsSection(store: store, items: teamDecisions)
         DashboardTerminalStatusCard(detail: detail)
         DashboardAcpIssues(issues: detail.issues)
         if let snapshot = detail.snapshot {

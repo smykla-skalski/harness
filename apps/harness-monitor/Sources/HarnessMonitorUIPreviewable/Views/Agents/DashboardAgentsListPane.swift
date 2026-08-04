@@ -3,11 +3,14 @@ import SwiftUI
 
 struct DashboardAgentsListPane: View {
   let state: DashboardAgentBrowserViewState
-  @Binding var selection: DashboardAgentIdentity?
+  @Binding var selection: DashboardAgentsSelection?
+  let decisionSummaries: [DashboardAgentIdentity: DashboardAgentDecisionSummary]
+  let workspaceBuckets: [DashboardDecisionWorkspaceBucket]
+  let unattributedItems: [DashboardDecisionItem]
 
   var body: some View {
     Group {
-      switch state.contentState {
+      switch state.contentState(hasDecisionDestinations: hasDecisionDestinations) {
       case .firstRun:
         DashboardAgentsEmptyState(
           title: "Agents are ready to browse",
@@ -34,16 +37,36 @@ struct DashboardAgentsListPane: View {
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardAgentsList)
   }
 
+  private var sections: [DashboardAgentsListSection] {
+    DashboardAgentsListSection.make(groups: state.groups, buckets: workspaceBuckets)
+  }
+
+  private var hasDecisionDestinations: Bool {
+    !workspaceBuckets.isEmpty || !unattributedItems.isEmpty
+  }
+
   private var agentList: some View {
     List(selection: $selection) {
-      ForEach(state.groups) { group in
+      if !unattributedItems.isEmpty {
         Section {
-          ForEach(group.agents) { agent in
-            DashboardAgentListRow(agent: agent)
-              .tag(agent.identity)
+          DashboardGlobalDecisionsRow(items: unattributedItems)
+            .tag(DashboardAgentsSelection.globalDecisions)
+        } header: {
+          Text("All workspaces")
+        }
+      }
+      ForEach(sections) { section in
+        Section {
+          ForEach(section.agents) { agent in
+            DashboardAgentListRow(agent: agent, summary: decisionSummaries[agent.identity])
+              .tag(DashboardAgentsSelection.agent(agent.identity))
+          }
+          if let bucket = section.bucket {
+            DashboardWorkspaceDecisionsRow(bucket: bucket)
+              .tag(DashboardAgentsSelection.workspaceDecisions(bucket.workspace.identity))
           }
         } header: {
-          DashboardAgentWorkspaceHeader(workspace: group.workspace)
+          DashboardAgentWorkspaceHeader(workspace: section.workspace)
         }
       }
     }
@@ -74,6 +97,77 @@ struct DashboardAgentsListPane: View {
   }
 }
 
+private struct DashboardGlobalDecisionsRow: View {
+  let items: [DashboardDecisionItem]
+
+  var body: some View {
+    HStack(spacing: 10) {
+      Image(systemName: "globe")
+        .foregroundStyle(worstSeverity.chipColor)
+        .frame(width: 16)
+
+      Text("Global decisions")
+        .lineLimit(1)
+
+      Spacer(minLength: 4)
+
+      DashboardAgentDecisionBadge(
+        summary: DashboardAgentDecisionSummary(
+          count: items.count,
+          worstSeverity: worstSeverity
+        )
+      )
+    }
+    .accessibilityElement(children: .combine)
+    .accessibilityLabel("Global decisions, \(items.count) pending")
+  }
+
+  private var worstSeverity: DecisionSeverity {
+    items.map(\.severity).max(by: { $0.sortKey < $1.sortKey }) ?? .info
+  }
+}
+
+/// One workspace's list section: its agents plus an optional agent-less decisions bucket. A bucket
+/// can exist without agents, so bucket-only workspaces still get a section.
+private struct DashboardAgentsListSection: Identifiable {
+  let workspace: DashboardAgentWorkspace
+  let agents: [DashboardAgentSummary]
+  let bucket: DashboardDecisionWorkspaceBucket?
+
+  var id: DashboardAgentWorkspaceIdentity { workspace.identity }
+
+  static func make(
+    groups: [DashboardAgentWorkspaceGroup],
+    buckets: [DashboardDecisionWorkspaceBucket]
+  ) -> [Self] {
+    var bucketsByWorkspace = Dictionary(
+      buckets.map { ($0.workspace.identity, $0) },
+      uniquingKeysWith: { first, _ in first }
+    )
+    var sections = groups.map { group in
+      Self(
+        workspace: group.workspace,
+        agents: group.agents,
+        bucket: bucketsByWorkspace.removeValue(forKey: group.workspace.identity)
+      )
+    }
+    let bucketOnly = bucketsByWorkspace.values
+      .map { Self(workspace: $0.workspace, agents: [], bucket: $0) }
+      .sorted { workspaceOrdering($0.workspace, $1.workspace) }
+    sections.append(contentsOf: bucketOnly)
+    return sections
+  }
+
+  private static func workspaceOrdering(
+    _ lhs: DashboardAgentWorkspace,
+    _ rhs: DashboardAgentWorkspace
+  ) -> Bool {
+    let left = "\(lhs.title)\u{0}\(lhs.subtitle)"
+    let right = "\(rhs.title)\u{0}\(rhs.subtitle)"
+    return left.localizedStandardCompare(right) == .orderedAscending
+  }
+}
+
 private struct DashboardAgentWorkspaceHeader: View {
   let workspace: DashboardAgentWorkspace
 
@@ -92,6 +186,7 @@ private struct DashboardAgentWorkspaceHeader: View {
 
 private struct DashboardAgentListRow: View {
   let agent: DashboardAgentSummary
+  let summary: DashboardAgentDecisionSummary?
 
   var body: some View {
     HStack(spacing: 10) {
@@ -110,6 +205,10 @@ private struct DashboardAgentListRow: View {
 
       Spacer(minLength: 4)
 
+      if let summary {
+        DashboardAgentDecisionBadge(summary: summary)
+      }
+
       Circle()
         .fill(agent.lifecycle.tint)
         .frame(width: 7, height: 7)
@@ -119,10 +218,56 @@ private struct DashboardAgentListRow: View {
     .accessibilityIdentifier(
       HarnessMonitorAccessibility.dashboardAgentRow(agent.identity.selectionRawValue)
     )
-    .accessibilityLabel(
-      "\(agent.displayName), \(agent.runtimeKind.title), managed agent \(agent.managedAgentID)"
-    )
+    .accessibilityLabel(rowAccessibilityLabel)
     .accessibilityValue(agent.lifecycle.title)
+  }
+
+  private var rowAccessibilityLabel: String {
+    let base =
+      "\(agent.displayName), \(agent.runtimeKind.title), managed agent \(agent.managedAgentID)"
+    guard let summary else { return base }
+    return "\(base), \(summary.count) pending decisions"
+  }
+}
+
+private struct DashboardWorkspaceDecisionsRow: View {
+  let bucket: DashboardDecisionWorkspaceBucket
+
+  var body: some View {
+    HStack(spacing: 10) {
+      Image(systemName: "tray.full")
+        .foregroundStyle(bucket.worstSeverity.chipColor)
+        .frame(width: 16)
+
+      Text("Workspace decisions")
+        .lineLimit(1)
+
+      Spacer(minLength: 4)
+
+      DashboardAgentDecisionBadge(
+        summary: DashboardAgentDecisionSummary(
+          count: bucket.items.count,
+          worstSeverity: bucket.worstSeverity
+        )
+      )
+    }
+    .accessibilityElement(children: .combine)
+    .accessibilityLabel("Workspace decisions, \(bucket.items.count) pending")
+  }
+}
+
+private struct DashboardAgentDecisionBadge: View {
+  let summary: DashboardAgentDecisionSummary
+
+  var body: some View {
+    Text("\(summary.count)")
+      .scaledFont(.caption2.weight(.bold))
+      .monospacedDigit()
+      .foregroundStyle(summary.worstSeverity.chipColor)
+      .padding(.horizontal, 6)
+      .padding(.vertical, 2)
+      .background(summary.worstSeverity.chipColor.opacity(0.18), in: Capsule())
+      .accessibilityHidden(true)
   }
 }
 

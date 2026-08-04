@@ -45,23 +45,63 @@ struct DashboardAgentsRouteView: View {
     _state = State(initialValue: DashboardAgentsRouteState(viewState: initialState))
   }
 
-  private var selectedIdentity: DashboardAgentIdentity? {
-    DashboardAgentIdentity(selectionRawValue: persistedSelectionRaw)
+  private var currentSelection: DashboardAgentsSelection? {
+    DashboardAgentsSelection(rawValue: persistedSelectionRaw)
   }
 
-  private var selectedAgent: DashboardAgentSummary? {
-    guard let selectedIdentity else { return nil }
-    return state.viewState.agents.first { $0.identity == selectedIdentity }
+  @ViewBuilder
+  private func detailPane(_ resolution: DashboardDecisionResolution) -> some View {
+    switch currentSelection {
+    case .globalDecisions:
+      if resolution.unattributedItems.isEmpty {
+        agentDetail(nil, decisions: [])
+      } else {
+        DashboardGlobalDecisionsDetail(store: store, items: resolution.unattributedItems)
+      }
+    case .workspaceDecisions(let workspaceID):
+      if let bucket = resolution.workspaceBuckets.first(where: {
+        $0.workspace.identity == workspaceID
+      }) {
+        DashboardWorkspaceDecisionsDetail(store: store, bucket: bucket)
+      } else {
+        agentDetail(nil, decisions: [])
+      }
+    case .agent(let identity):
+      agentDetail(
+        state.viewState.agents.first { $0.identity == identity },
+        decisions: resolution.itemsByAgent[identity] ?? []
+      )
+    case nil:
+      agentDetail(nil, decisions: [])
+    }
   }
 
-  private var selectionBinding: Binding<DashboardAgentIdentity?> {
+  private func agentDetail(
+    _ agent: DashboardAgentSummary?,
+    decisions: [DashboardDecisionItem]
+  ) -> some View {
+    DashboardAgentDetailPane(
+      store: store,
+      agent: agent,
+      decisions: decisions,
+      loadsTerminalDetailAutomatically: refreshesAutomatically,
+      loadsAcpDetailAutomatically: refreshesAutomatically,
+      loadsCodexDetailAutomatically: refreshesAutomatically,
+      initialTerminalDetail: initialTerminalDetail,
+      initialAcpDetail: initialAcpDetail,
+      initialCodexDetail: initialCodexDetail,
+      onTerminalMembershipRemoved: { requestRefresh(force: true) }
+    )
+  }
+
+  private var selectionBinding: Binding<DashboardAgentsSelection?> {
     Binding(
-      get: { selectedIdentity },
-      set: { identity in
-        let rawValue = identity?.selectionRawValue ?? ""
+      get: { currentSelection },
+      set: { selection in
+        let rawValue = selection?.rawValue ?? ""
         guard persistedSelectionRaw != rawValue else { return }
         persistedSelectionRaw = rawValue
-        if let identity {
+        if let identity = selection?.agentIdentity {
           history.recordDashboardAgentSelection(identity)
         }
       }
@@ -77,13 +117,19 @@ struct DashboardAgentsRouteView: View {
   }
 
   var body: some View {
+    let resolution = store.dashboardDecisionResolution(agents: state.viewState.agents)
     VStack(spacing: 0) {
-      header
+      header(resolution)
       Divider()
-      if state.viewState.presentsAsFullWidthState {
+      if state.viewState.presentsAsFullWidthState(
+        hasDecisionDestinations: resolution.hasDecisionDestinations
+      ) {
         DashboardAgentsListPane(
           state: state.viewState,
-          selection: selectionBinding
+          selection: selectionBinding,
+          decisionSummaries: resolution.summaryByAgent,
+          workspaceBuckets: resolution.workspaceBuckets,
+          unattributedItems: resolution.unattributedItems
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
       } else {
@@ -91,22 +137,15 @@ struct DashboardAgentsRouteView: View {
         HSplitView {
           DashboardAgentsListPane(
             state: state.viewState,
-            selection: selectionBinding
+            selection: selectionBinding,
+            decisionSummaries: resolution.summaryByAgent,
+            workspaceBuckets: resolution.workspaceBuckets,
+            unattributedItems: resolution.unattributedItems
           )
           .frame(minWidth: 250, idealWidth: 310, maxWidth: 390)
 
-          DashboardAgentDetailPane(
-            store: store,
-            agent: selectedAgent,
-            loadsTerminalDetailAutomatically: refreshesAutomatically,
-            loadsAcpDetailAutomatically: refreshesAutomatically,
-            loadsCodexDetailAutomatically: refreshesAutomatically,
-            initialTerminalDetail: initialTerminalDetail,
-            initialAcpDetail: initialAcpDetail,
-            initialCodexDetail: initialCodexDetail,
-            onTerminalMembershipRemoved: { requestRefresh(force: true) }
-          )
-          .frame(minWidth: 380, maxWidth: .infinity, maxHeight: .infinity)
+          detailPane(resolution)
+            .frame(minWidth: 380, maxWidth: .infinity, maxHeight: .infinity)
         }
       }
     }
@@ -158,12 +197,12 @@ struct DashboardAgentsRouteView: View {
     }
   }
 
-  private var header: some View {
+  private func header(_ resolution: DashboardDecisionResolution) -> some View {
     HStack(spacing: 12) {
       VStack(alignment: .leading, spacing: 2) {
         Text("Agents")
           .scaledFont(.title3.weight(.semibold))
-        Text(agentCountText)
+        Text(agentCountText(resolution))
           .scaledFont(.caption)
           .foregroundStyle(.secondary)
       }
@@ -216,10 +255,12 @@ struct DashboardAgentsRouteView: View {
     .frame(minHeight: 54)
   }
 
-  private var agentCountText: String {
+  private func agentCountText(_ resolution: DashboardDecisionResolution) -> String {
     let count = state.viewState.agents.count
     let agentText = count == 1 ? "1 agent" : "\(count) agents"
-    let workspaceCount = state.viewState.groups.count
+    let agentWorkspaceIDs = state.viewState.groups.map(\.id)
+    let decisionWorkspaceIDs = resolution.workspaceBuckets.map(\.id)
+    let workspaceCount = Set(agentWorkspaceIDs + decisionWorkspaceIDs).count
     let workspaceText = workspaceCount == 1 ? "1 workspace" : "\(workspaceCount) workspaces"
     return "\(agentText) across \(workspaceText)"
   }
@@ -307,85 +348,26 @@ struct DashboardAgentsRouteView: View {
 
   private func reconcileSelection() {
     let agents = state.viewState.agents
-    guard !agents.isEmpty else { return }
-    if let selectedIdentity, agents.contains(where: { $0.identity == selectedIdentity }) {
+    switch currentSelection {
+    case .agent(let identity):
+      if agents.contains(where: { $0.identity == identity }) { return }
+    case .workspaceDecisions:
+      // A bucket selection stays put across agent updates; the detail pane falls back on its own
+      // if the bucket clears, without stealing focus back to an agent.
       return
+    case .globalDecisions:
+      return
+    case nil:
+      break
     }
-    persistedSelectionRaw = agents[0].identity.selectionRawValue
-    history.recordDashboardAgentSelection(agents[0].identity)
+    guard let first = agents.first else { return }
+    persistedSelectionRaw = first.identity.selectionRawValue
+    history.recordDashboardAgentSelection(first.identity)
   }
 
   private func applyPendingHistoryRestoreIfNeeded() {
     guard let request = history.pendingDashboardAgentsRestoreRequest else { return }
     persistedSelectionRaw = request.identity.selectionRawValue
     history.finishDashboardAgentsRestoreRequest(request.requestID)
-  }
-}
-
-private struct DashboardAgentsIssueBanner: View {
-  let state: DashboardAgentBrowserViewState
-
-  var body: some View {
-    if let issue = state.issue {
-      HStack(spacing: 8) {
-        Image(systemName: issue.systemImage)
-        Text(issue.message(hasCachedAgents: !state.agents.isEmpty))
-          .lineLimit(2)
-        Spacer()
-      }
-      .scaledFont(.callout)
-      .foregroundStyle(issue.tint)
-      .padding(.horizontal, 16)
-      .padding(.vertical, 9)
-      .background(issue.tint.opacity(0.08))
-      .accessibilityElement(children: .combine)
-      .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardAgentsLoadState)
-    }
-  }
-}
-
-extension DashboardAgentLoadIssue {
-  fileprivate var systemImage: String {
-    switch self {
-    case .offline: "wifi.slash"
-    case .requestFailure: "exclamationmark.triangle"
-    }
-  }
-
-  fileprivate var tint: Color {
-    switch self {
-    case .offline: HarnessMonitorTheme.caution
-    case .requestFailure: HarnessMonitorTheme.danger
-    }
-  }
-
-  fileprivate func message(hasCachedAgents: Bool) -> String {
-    switch self {
-    case .offline(let reason):
-      hasCachedAgents
-        ? "Offline — showing cached agents — \(reason.withoutTrailingPeriod)"
-        : "Offline — no cached agents available — \(reason.withoutTrailingPeriod)"
-    case .requestFailure(let message):
-      hasCachedAgents
-        ? "Refresh failed — unaffected workspaces remain visible — \(message.withoutTrailingPeriod)"
-        : "Agent request failed — \(message.withoutTrailingPeriod)"
-    }
-  }
-}
-
-private struct DashboardAgentsRefreshContext: Hashable {
-  let isVisible: Bool
-  let connection: String
-  let sessionIDs: [String]
-}
-
-extension HarnessMonitorStore.ConnectionState {
-  var refreshIdentity: String {
-    switch self {
-    case .idle: "idle"
-    case .connecting: "connecting"
-    case .online: "online"
-    case .offline(let message): "offline:\(message)"
-    }
   }
 }

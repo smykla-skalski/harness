@@ -79,8 +79,89 @@ public enum DashboardAgentsPreviewRenderer {
         largestIndex: largestIndex,
         directory: directory
       )
+      && renderDecisionStates(
+        defaultIndex: defaultIndex,
+        largestIndex: largestIndex,
+        directory: directory
+      )
   }
 
+  @MainActor
+  private static func renderDecisionStates(
+    defaultIndex: Int,
+    largestIndex: Int,
+    directory: String
+  ) -> Bool {
+    let bucketSession = DashboardAgentsPreviewFixtures.decisionBucketSession
+    let bucketWorkspaceID = DashboardAgentWorkspaceIdentity(
+      projectID: bucketSession.projectId,
+      checkoutID: bucketSession.checkoutId
+    )
+    let bucketSelection = DashboardAgentsSelection.workspaceDecisions(bucketWorkspaceID)
+    return render(
+      name: "agents-decisions-list",
+      state: DashboardAgentsPreviewFixtures.liveState,
+      textSizeIndex: defaultIndex,
+      directory: directory,
+      selectedIdentity: DashboardAgentsPreviewFixtures.acpAgent.identity,
+      decisions: DashboardAgentsPreviewFixtures.previewDecisions,
+      bucketSession: DashboardAgentsPreviewFixtures.decisionBucketSession,
+      initialAcpDetail: DashboardAgentsPreviewFixtures.managedAcpDetail
+    )
+      && render(
+        name: "agents-decisions-terminal",
+        state: DashboardAgentsPreviewFixtures.liveState,
+        textSizeIndex: defaultIndex,
+        directory: directory,
+        selectedIdentity: DashboardAgentsPreviewFixtures.liveAgents[0].identity,
+        decisions: DashboardAgentsPreviewFixtures.previewDecisions,
+        bucketSession: DashboardAgentsPreviewFixtures.decisionBucketSession,
+        initialTerminalDetail: DashboardAgentsPreviewFixtures.managedTerminalDetail
+      )
+      && render(
+        name: "agents-decisions-workspace-bucket",
+        state: DashboardAgentsPreviewFixtures.liveState,
+        textSizeIndex: defaultIndex,
+        directory: directory,
+        selectionRawValue: bucketSelection.rawValue,
+        decisions: DashboardAgentsPreviewFixtures.previewDecisions,
+        bucketSession: DashboardAgentsPreviewFixtures.decisionBucketSession
+      )
+      && render(
+        name: "agents-decisions-bucket-only",
+        state: DashboardAgentsPreviewFixtures.emptyState,
+        textSizeIndex: defaultIndex,
+        directory: directory,
+        selectionRawValue: bucketSelection.rawValue,
+        decisions: DashboardAgentsPreviewFixtures.previewDecisions.filter {
+          $0.id == "unassigned-task:mesh-4821"
+        },
+        bucketSession: DashboardAgentsPreviewFixtures.decisionBucketSession
+      )
+      && render(
+        name: "agents-decisions-global",
+        state: DashboardAgentsPreviewFixtures.emptyState,
+        textSizeIndex: defaultIndex,
+        directory: directory,
+        selectionRawValue: DashboardAgentsSelection.globalDecisions.rawValue,
+        decisions: DashboardAgentsPreviewFixtures.previewDecisions.filter {
+          $0.id == "quarantine:observer-issue-escalation"
+        }
+      )
+      && render(
+        name: "agents-decisions-largest-text",
+        state: DashboardAgentsPreviewFixtures.liveState,
+        textSizeIndex: largestIndex,
+        directory: directory,
+        selectedIdentity: DashboardAgentsPreviewFixtures.liveAgents[1].identity,
+        decisions: DashboardAgentsPreviewFixtures.previewDecisions,
+        bucketSession: DashboardAgentsPreviewFixtures.decisionBucketSession,
+        initialCodexDetail: DashboardAgentsPreviewFixtures.managedCodexDetail
+      )
+  }
+}
+
+extension DashboardAgentsPreviewRenderer {
   @MainActor
   private static func renderAcpStates(
     defaultIndex: Int,
@@ -178,6 +259,9 @@ public enum DashboardAgentsPreviewRenderer {
     textSizeIndex: Int,
     directory: String,
     selectedIdentity: DashboardAgentIdentity? = nil,
+    selectionRawValue: String? = nil,
+    decisions: [Decision] = [],
+    bucketSession: SessionSummary? = nil,
     initialTerminalDetail: DashboardTerminalAgentDetail? = nil,
     initialAcpDetail: DashboardAcpAgentDetail? = nil,
     initialCodexDetail: DashboardCodexAgentDetail? = nil
@@ -186,6 +270,9 @@ public enum DashboardAgentsPreviewRenderer {
     let hosted = DashboardAgentsPreviewSurface(
       state: state,
       selectedIdentity: selectedIdentity,
+      selectionRawValue: selectionRawValue,
+      decisions: decisions,
+      bucketSession: bucketSession,
       initialTerminalDetail: initialTerminalDetail,
       initialAcpDetail: initialAcpDetail,
       initialCodexDetail: initialCodexDetail
@@ -322,54 +409,5 @@ public enum DashboardAgentsPreviewRenderer {
     } catch {
       return false
     }
-  }
-}
-
-struct DashboardAgentsPreviewSurface: View {
-  let state: DashboardAgentBrowserViewState
-  let initialTerminalDetail: DashboardTerminalAgentDetail?
-  let initialAcpDetail: DashboardAcpAgentDetail?
-  let initialCodexDetail: DashboardCodexAgentDetail?
-  private let store: HarnessMonitorStore
-  private let history: GlobalWindowNavigationHistory
-  private let selectionDefaults: UserDefaults
-
-  @MainActor
-  init(
-    state: DashboardAgentBrowserViewState,
-    selectedIdentity: DashboardAgentIdentity? = nil,
-    initialTerminalDetail: DashboardTerminalAgentDetail? = nil,
-    initialAcpDetail: DashboardAcpAgentDetail? = nil,
-    initialCodexDetail: DashboardCodexAgentDetail? = nil
-  ) {
-    self.state = state
-    self.initialTerminalDetail = initialTerminalDetail
-    self.initialAcpDetail = initialAcpDetail
-    self.initialCodexDetail = initialCodexDetail
-    let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .dashboardLoaded)
-    self.store = store
-    history = GlobalWindowNavigationHistory(store: store, initialDashboardRoute: .agents)
-    let suiteName = "HarnessMonitorPreview.DashboardAgents.\(UUID().uuidString)"
-    let defaults = UserDefaults(suiteName: suiteName) ?? .standard
-    defaults.set(
-      selectedIdentity?.selectionRawValue ?? state.agents.first?.identity.selectionRawValue ?? "",
-      forKey: DashboardAgentSelectionDefaults.storageKey
-    )
-    selectionDefaults = defaults
-  }
-
-  var body: some View {
-    DashboardAgentsRouteView(
-      store: store,
-      sessions: [PreviewFixtures.summary],
-      history: history,
-      isRouteVisible: true,
-      refreshesAutomatically: false,
-      initialState: state,
-      initialTerminalDetail: initialTerminalDetail,
-      initialAcpDetail: initialAcpDetail,
-      initialCodexDetail: initialCodexDetail,
-      selectionDefaults: selectionDefaults
-    )
   }
 }

@@ -219,7 +219,7 @@ extension HarnessMonitorStore {
     )
   }
 
-  nonisolated private static func dashboardAgentWorkspace(
+  nonisolated static func dashboardAgentWorkspace(
     _ session: SessionSummary
   ) -> DashboardAgentWorkspace {
     DashboardAgentWorkspace(
