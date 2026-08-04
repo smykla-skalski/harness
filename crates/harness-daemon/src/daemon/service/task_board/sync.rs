@@ -61,7 +61,7 @@ pub(crate) fn log_sync_request(
     config: &ExternalSyncConfig,
     client_count: usize,
 ) {
-    tracing::info!(
+    tracing::debug!(
         "{}",
         format_sync_request_message(request, config, client_count)
     );
@@ -72,7 +72,7 @@ pub(crate) fn log_sync_request(
     reason = "tracing macro expansion; tokio-rs/tracing#553"
 )]
 pub(crate) fn log_sync_completion(summary: &TaskBoardSyncResponse) {
-    tracing::info!("{}", format_sync_completion_message(summary));
+    tracing::debug!("{}", format_sync_completion_message(summary));
 }
 
 fn has_available_sync_client(

@@ -13,6 +13,7 @@ use crate::daemon::sandboxed_from_env;
 use crate::daemon::state::task_board_openrouter_token;
 use crate::workspace::utc_now;
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_telemetry::{RepeatedLogGate, log_identity};
 
 use super::manager::{
     AcpAgentInspectResponse, AcpAgentManagerHandle, AcpAgentReconcileResponse,
@@ -210,11 +211,12 @@ impl AcpAgentManagerHandle {
         let mut idle_polls = 0usize;
         let mut last_protocol_desync: Option<(String, u64, u64, bool, Vec<String>)> = None;
         let mut last_pool_key_mismatch = BTreeMap::<String, Vec<String>>::new();
+        let mut failure_log_gate = RepeatedLogGate::default();
         loop {
             let bridge = match BridgeClient::for_capability(BridgeCapability::Acp) {
                 Ok(bridge) => bridge,
                 Err(error) => {
-                    tracing::warn!(%error, "ACP sandbox event poller failed to connect; retrying");
+                    log_poller_failure(&mut failure_log_gate, "connect", &error);
                     thread::sleep(SANDBOX_ACP_EVENT_ERROR_BACKOFF);
                     continue;
                 }
@@ -239,10 +241,7 @@ impl AcpAgentManagerHandle {
                         let reconcile = match bridge.acp_reconcile() {
                             Ok(reconcile) => reconcile,
                             Err(error) => {
-                                tracing::warn!(
-                                    %error,
-                                    "ACP sandbox reconcile batch fetch failed; retrying"
-                                );
+                                log_poller_failure(&mut failure_log_gate, "reconcile", &error);
                                 thread::sleep(SANDBOX_ACP_EVENT_ERROR_BACKOFF);
                                 continue;
                             }
@@ -278,7 +277,7 @@ impl AcpAgentManagerHandle {
                     }
                 }
                 Err(error) => {
-                    tracing::warn!(%error, "ACP sandbox event poller hit bridge error; retrying");
+                    log_poller_failure(&mut failure_log_gate, "poll", &error);
                     thread::sleep(SANDBOX_ACP_EVENT_ERROR_BACKOFF);
                     continue;
                 }
@@ -391,6 +390,27 @@ fn inspect_for_session(
         daemon_perceived_now: inspect.daemon_perceived_now.clone(),
         available: inspect.available,
         issue_message: inspect.issue_message.clone(),
+    }
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion in a leaf logging helper"
+)]
+fn log_poller_failure(gate: &mut RepeatedLogGate, operation: &str, error: &CliError) {
+    let identity = log_identity(&(operation, error.code(), error.to_string()));
+    if gate.should_warn(identity) {
+        tracing::warn!(
+            %error,
+            operation,
+            "ACP sandbox event poller failed; retrying"
+        );
+    } else {
+        tracing::debug!(
+            %error,
+            operation,
+            "ACP sandbox event poller failed; retrying"
+        );
     }
 }
 

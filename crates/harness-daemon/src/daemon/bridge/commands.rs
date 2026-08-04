@@ -76,6 +76,20 @@ impl Execute for BridgeCommand {
     }
 }
 
+impl BridgeCommand {
+    pub fn prepare_runtime_context(&self) {
+        let command = match self {
+            Self::Start(_) => "bridge-start",
+            Self::Stop(_) => "bridge-stop",
+            Self::Status(_) => "bridge-status",
+            Self::Reconfigure(_) => "bridge-reconfigure",
+            Self::InstallLaunchAgent(_) => "bridge-install-launch-agent",
+            Self::RemoveLaunchAgent(_) => "bridge-remove-launch-agent",
+        };
+        adopt_daemon_root_before_telemetry(command);
+    }
+}
+
 /// Return the active runtime profile when the env var is set to a
 /// non-empty value. Extracted as its own function so adoption-skip
 /// behavior is unit-testable without invoking the discovery scan.
@@ -112,11 +126,19 @@ fn should_skip_daemon_root_adoption(profile: &OsStr) -> bool {
 /// orderings forgiving - the user can run `monitor:user:bridge:start`
 /// then click Run in Xcode, and the bridge still lands on the right
 /// daemon root once the app comes up.
+fn adopt_daemon_root_for_bridge_command(command: &'static str) {
+    adopt_daemon_root(command, command == "bridge-start");
+}
+
+fn adopt_daemon_root_before_telemetry(command: &'static str) {
+    adopt_daemon_root(command, false);
+}
+
 #[expect(
     clippy::cognitive_complexity,
     reason = "tracing macro expansion; tokio-rs/tracing#553"
 )]
-fn adopt_daemon_root_for_bridge_command(command: &'static str) {
+fn adopt_daemon_root(command: &'static str, wait_for_start: bool) {
     if let Some(profile) = pinned_runtime_profile()
         && should_skip_daemon_root_adoption(profile.as_os_str())
     {
@@ -127,7 +149,7 @@ fn adopt_daemon_root_for_bridge_command(command: &'static str) {
         );
         return;
     }
-    let outcome = if command == "bridge-start" {
+    let outcome = if wait_for_start {
         adopt_with_daemon_wait(bridge_start_daemon_wait_timeout())
     } else {
         discovery::adopt_running_daemon_root()

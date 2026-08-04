@@ -258,17 +258,11 @@ pub(super) fn render_launch_agent_plist(bridge_binary: &Path) -> String {
   <string>Aqua</string>
   <key>ProcessType</key>
   <string>Interactive</string>
-  <key>StandardOutPath</key>
-  <string>{stdout}</string>
-  <key>StandardErrorPath</key>
-  <string>{stderr}</string>
 </dict>
 </plist>
 "#,
         label = BRIDGE_LAUNCH_AGENT_LABEL,
         arguments = args.join("\n    "),
-        stdout = state::daemon_root().join("bridge.stdout.log").display(),
-        stderr = state::daemon_root().join("bridge.stderr.log").display(),
     )
 }
 

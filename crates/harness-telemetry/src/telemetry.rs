@@ -1,11 +1,14 @@
 mod config;
 mod console_fields;
 mod daemon_file;
+mod daemon_log_rotation;
 mod guard;
 mod metrics;
 mod profiler;
 mod providers;
 mod reachability;
+mod repeat_log;
+mod stderr_output;
 mod subscriber;
 
 use std::sync::{Mutex, MutexGuard, OnceLock};
@@ -16,7 +19,9 @@ pub use config::{
     resolve_telemetry_config, runtime_service_from_args, runtime_service_from_current_process,
     shared_config_path,
 };
-pub use daemon_file::{observe_daemon_ownership_override, observe_daemon_root_override};
+pub use daemon_file::{
+    observe_daemon_ownership_override, observe_daemon_root_override, write_runtime_fallback_error,
+};
 pub use guard::TelemetryGuard;
 pub use metrics::{
     TelemetryBaggage, apply_current_baggage_to_span, apply_parent_context_from_headers,
@@ -26,6 +31,7 @@ pub use metrics::{
     record_hook_metrics, with_active_baggage,
 };
 pub use profiler::DaemonProfiler;
+pub use repeat_log::{RepeatedLogGate, log_identity};
 pub use subscriber::{init_tracing_subscriber, init_tracing_subscriber_for};
 
 #[doc(hidden)]

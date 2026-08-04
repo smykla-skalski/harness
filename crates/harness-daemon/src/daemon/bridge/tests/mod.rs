@@ -20,7 +20,10 @@ use super::bridge_state::{
 use super::control::compute_bridge_manifest_update;
 use super::core::{BridgeEnvelope, BridgeReconfigureSpec, BridgeRequest, BridgeResponse};
 use super::detached::{bridge_response_error, wait_until_bridge_dead};
-use super::helpers::{cleanup_legacy_bridge_artifacts, merged_persisted_config, remove_if_exists};
+use super::helpers::{
+    cleanup_legacy_bridge_artifacts, merged_persisted_config, remove_if_exists,
+    render_launch_agent_plist,
+};
 use super::runtime::BridgeSocketGuard;
 use super::types::{
     DEFAULT_BRIDGE_SOCKET_NAME, FALLBACK_BRIDGE_SOCKET_SUFFIX, PersistedBridgeConfig,

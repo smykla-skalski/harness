@@ -8,6 +8,8 @@ use clap::Parser;
 use crate::control::{restart_daemon_with, stop_daemon_with};
 use crate::{DaemonCommand, HARNESS_MONITOR_APP_GROUP_ID};
 
+static RUNTIME_CONTEXT_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 #[derive(Debug, Parser)]
 struct DaemonCommandTestHarness {
     #[command(subcommand)]
@@ -40,6 +42,32 @@ fn daemon_cli_round_trip_smoke_covers_public_surface() {
         parsed.snapshot,
     );
     assert_manual_stop_and_restart_smoke();
+}
+
+#[test]
+fn dev_runtime_context_selects_external_root_before_execution() {
+    let _lock = RUNTIME_CONTEXT_TEST_LOCK.lock().expect("test lock");
+    let base = format!("/tmp/harness-daemon-context-{}", std::process::id());
+    temp_env::with_var("HARNESS_DAEMON_DATA_HOME", Some(&base), || {
+        let command = DaemonCommandTestHarness::try_parse_from([
+            "test",
+            "dev",
+            "--app-group-id",
+            "io.harnessmonitor.context-test",
+        ])
+        .expect("parse dev command")
+        .command;
+        let context = command.prepare_runtime_context();
+
+        assert_eq!(
+            harness_daemon::daemon::state::daemon_root(),
+            PathBuf::from(&base)
+                .join("harness")
+                .join("daemon")
+                .join("external")
+        );
+        drop(context);
+    });
 }
 
 fn parse_daemon_test_commands() -> ParsedDaemonCommands {

@@ -1,6 +1,5 @@
 use std::env;
 use std::fmt::Display;
-use std::io;
 #[cfg(feature = "tokio-console")]
 use std::net::SocketAddr;
 use std::time::Duration;
@@ -11,8 +10,6 @@ use opentelemetry_appender_tracing::layer::OpenTelemetryTracingBridge;
 use opentelemetry_sdk::logs::SdkLoggerProvider;
 use opentelemetry_sdk::trace::SdkTracerProvider;
 use tracing_subscriber::filter::filter_fn;
-use tracing_subscriber::fmt;
-use tracing_subscriber::fmt::time::ChronoUtc;
 use tracing_subscriber::prelude::*;
 #[cfg(feature = "tokio-console")]
 use tracing_subscriber::registry::LookupSpan;
@@ -24,7 +21,6 @@ use super::config::{
     ResolvedTelemetryConfig, RuntimeService, resolve_telemetry_config,
     runtime_service_from_current_process,
 };
-use super::console_fields::{FilteredDefaultFields, FilteredJsonFields};
 use super::guard::TelemetryGuard;
 use super::metrics::install_text_map_propagator;
 use super::profiler::DaemonProfiler;
@@ -141,35 +137,19 @@ fn init_subscriber_without_telemetry(
         use_json_format,
         show_console_observability_fields(service),
     );
+    let stderr_layer = super::stderr_output::layer(
+        service,
+        use_json_format,
+        show_console_observability_fields(service),
+    );
 
-    if use_json_format {
-        tracing_subscriber::registry()
-            .with(filter_layer)
-            .with(console_layer)
-            .with(daemon_file_layer)
-            .with(
-                fmt::layer()
-                    .json()
-                    .fmt_fields(FilteredJsonFields::new())
-                    .with_writer(io::stderr),
-            )
-            .try_init()
-            .map_err(tracing_init_error)
-    } else {
-        tracing_subscriber::registry()
-            .with(filter_layer)
-            .with(console_layer)
-            .with(daemon_file_layer)
-            .with(
-                fmt::layer()
-                    .fmt_fields(FilteredDefaultFields::new())
-                    .with_writer(io::stderr)
-                    .with_target(false)
-                    .with_timer(ChronoUtc::rfc_3339()),
-            )
-            .try_init()
-            .map_err(tracing_init_error)
-    }
+    tracing_subscriber::registry()
+        .with(filter_layer)
+        .with(console_layer)
+        .with(daemon_file_layer)
+        .with(stderr_layer)
+        .try_init()
+        .map_err(tracing_init_error)
 }
 
 fn tracing_init_error(error: impl Display) -> CliError {
@@ -189,6 +169,7 @@ fn init_json_telemetry_subscriber(
     let console_layer: Option<Box<dyn tracing_subscriber::Layer<_> + Send + Sync>> = None;
     let daemon_file_layer =
         super::daemon_file::layer(service, true, show_console_observability_fields(service));
+    let stderr_layer = super::stderr_output::layer(service, true, true);
 
     let otel_trace_layer =
         tracing_opentelemetry::layer().with_tracer(tracer_provider.tracer(service.service_name()));
@@ -201,7 +182,7 @@ fn init_json_telemetry_subscriber(
         .with(filter_layer)
         .with(console_layer)
         .with(daemon_file_layer)
-        .with(fmt::layer().json().with_writer(io::stderr))
+        .with(stderr_layer)
         .with(otel_trace_layer)
         .with(otel_log_layer)
         .try_init()
@@ -221,6 +202,7 @@ fn init_filtered_json_telemetry_subscriber(
     let console_layer: Option<Box<dyn tracing_subscriber::Layer<_> + Send + Sync>> = None;
     let daemon_file_layer =
         super::daemon_file::layer(service, true, show_console_observability_fields(service));
+    let stderr_layer = super::stderr_output::layer(service, true, false);
 
     let otel_trace_layer =
         tracing_opentelemetry::layer().with_tracer(tracer_provider.tracer(service.service_name()));
@@ -233,12 +215,7 @@ fn init_filtered_json_telemetry_subscriber(
         .with(filter_layer)
         .with(console_layer)
         .with(daemon_file_layer)
-        .with(
-            fmt::layer()
-                .json()
-                .fmt_fields(FilteredJsonFields::new())
-                .with_writer(io::stderr),
-        )
+        .with(stderr_layer)
         .with(otel_trace_layer)
         .with(otel_log_layer)
         .try_init()
@@ -258,6 +235,7 @@ fn init_text_telemetry_subscriber(
     let console_layer: Option<Box<dyn tracing_subscriber::Layer<_> + Send + Sync>> = None;
     let daemon_file_layer =
         super::daemon_file::layer(service, false, show_console_observability_fields(service));
+    let stderr_layer = super::stderr_output::layer(service, false, true);
 
     let otel_trace_layer =
         tracing_opentelemetry::layer().with_tracer(tracer_provider.tracer(service.service_name()));
@@ -270,12 +248,7 @@ fn init_text_telemetry_subscriber(
         .with(filter_layer)
         .with(console_layer)
         .with(daemon_file_layer)
-        .with(
-            fmt::layer()
-                .with_writer(io::stderr)
-                .with_target(false)
-                .with_timer(ChronoUtc::rfc_3339()),
-        )
+        .with(stderr_layer)
         .with(otel_trace_layer)
         .with(otel_log_layer)
         .try_init()
@@ -295,6 +268,7 @@ fn init_filtered_text_telemetry_subscriber(
     let console_layer: Option<Box<dyn tracing_subscriber::Layer<_> + Send + Sync>> = None;
     let daemon_file_layer =
         super::daemon_file::layer(service, false, show_console_observability_fields(service));
+    let stderr_layer = super::stderr_output::layer(service, false, false);
 
     let otel_trace_layer =
         tracing_opentelemetry::layer().with_tracer(tracer_provider.tracer(service.service_name()));
@@ -307,13 +281,7 @@ fn init_filtered_text_telemetry_subscriber(
         .with(filter_layer)
         .with(console_layer)
         .with(daemon_file_layer)
-        .with(
-            fmt::layer()
-                .fmt_fields(FilteredDefaultFields::new())
-                .with_writer(io::stderr)
-                .with_target(false)
-                .with_timer(ChronoUtc::rfc_3339()),
-        )
+        .with(stderr_layer)
         .with(otel_trace_layer)
         .with(otel_log_layer)
         .try_init()

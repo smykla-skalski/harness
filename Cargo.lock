@@ -4588,6 +4588,8 @@ dependencies = [
  "axum",
  "chrono",
  "console-subscriber",
+ "fs2",
+ "libc",
  "opentelemetry",
  "opentelemetry-appender-tracing",
  "opentelemetry-otlp",

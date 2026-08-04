@@ -7,7 +7,9 @@ use harness_daemon::app::{AppContext, Execute};
 use harness_daemon::daemon::state;
 use harness_daemon_bin::cli::Cli;
 use harness_kernel::errors;
-use harness_telemetry::init_daemon_tracing_subscriber;
+use harness_telemetry::{
+    RuntimeService, init_daemon_tracing_subscriber, write_runtime_fallback_error,
+};
 use tracing_subscriber::EnvFilter;
 
 fn main() -> ExitCode {
@@ -17,18 +19,21 @@ fn main() -> ExitCode {
             Err(error) => render_error(&error),
         };
     }
+    let cli = Cli::parse();
+    let _runtime_context = cli.command.prepare_runtime_context();
     let (persisted_log_level, persisted_log_error) = startup_persisted_log_level();
     let telemetry_guard = match init_daemon_tracing_subscriber(persisted_log_level.as_deref()) {
         Ok(guard) => guard,
         Err(error) => {
-            eprintln!("{error}");
+            let rendered = error.to_string();
+            let _ = write_runtime_fallback_error(RuntimeService::Daemon, &rendered);
+            eprintln!("{rendered}");
             return ExitCode::FAILURE;
         }
     };
     if let Some(error) = persisted_log_error {
         state::append_event_best_effort("warn", &persisted_log_warning(&error));
     }
-    let cli = Cli::parse();
     if cli.delay > 0.0 {
         thread::sleep(Duration::from_secs_f64(cli.delay));
     }

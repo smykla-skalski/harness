@@ -3,9 +3,18 @@ use super::{
     BridgeReconfigureSpec, BridgeResponse, BridgeState, HostBridgeCapabilityManifest, PathBuf,
     PersistedBridgeConfig, StdUnixListener, bridge_response_error, cleanup_legacy_bridge_artifacts,
     compiled_capabilities, fs, merged_persisted_config, process_id, read_bridge_config,
-    read_bridge_state, state, tempdir, with_temp_daemon_root, write_bridge_config,
-    write_bridge_state,
+    read_bridge_state, render_launch_agent_plist, state, tempdir, with_temp_daemon_root,
+    write_bridge_config, write_bridge_state,
 };
+
+#[test]
+fn launch_agent_uses_the_bounded_bridge_log() {
+    let plist = render_launch_agent_plist(std::path::Path::new("/tmp/harness-bridge"));
+    assert!(!plist.contains("StandardOutPath"));
+    assert!(!plist.contains("StandardErrorPath"));
+    assert!(!plist.contains("bridge.stdout.log"));
+    assert!(!plist.contains("bridge.stderr.log"));
+}
 
 #[test]
 fn cleanup_legacy_bridge_artifacts_keeps_external_socket_path() {

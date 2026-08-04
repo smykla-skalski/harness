@@ -1,5 +1,4 @@
-use std::fs::{File, OpenOptions};
-use std::io;
+use std::io::{self, Write as _};
 use std::path::PathBuf;
 use std::sync::Mutex;
 
@@ -14,6 +13,7 @@ use crate::workspace::{harness_data_root, normalized_env_value};
 
 use super::config::RuntimeService;
 use super::console_fields::{FilteredDefaultFields, FilteredJsonFields};
+use super::daemon_log_rotation::{BoundedLogFile, LogFormat, diagnostic_event};
 
 pub(super) fn layer<S>(
     service: RuntimeService,
@@ -23,77 +23,76 @@ pub(super) fn layer<S>(
 where
     S: Subscriber + for<'span> LookupSpan<'span>,
 {
-    if service != RuntimeService::Daemon {
+    if !matches!(service, RuntimeService::Daemon | RuntimeService::Bridge) {
         return None;
     }
 
+    let writer = RuntimeLogWriter {
+        service,
+        format: if use_json_format {
+            LogFormat::Json
+        } else {
+            LogFormat::Text
+        },
+    };
+
     match (use_json_format, show_observability_fields) {
-        (true, true) => Some(Box::new(fmt::layer().json().with_writer(DaemonLogWriter))),
+        (true, true) => Some(Box::new(fmt::layer().json().with_writer(writer))),
         (true, false) => Some(Box::new(
             fmt::layer()
                 .json()
                 .fmt_fields(FilteredJsonFields::new())
-                .with_writer(DaemonLogWriter),
+                .with_writer(writer),
         )),
         (false, true) => Some(Box::new(
             fmt::layer()
-                .with_writer(DaemonLogWriter)
+                .with_writer(writer)
                 .with_target(false)
                 .with_timer(ChronoUtc::rfc_3339()),
         )),
         (false, false) => Some(Box::new(
             fmt::layer()
                 .fmt_fields(FilteredDefaultFields::new())
-                .with_writer(DaemonLogWriter)
+                .with_writer(writer)
                 .with_target(false)
                 .with_timer(ChronoUtc::rfc_3339()),
         )),
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-struct DaemonLogWriter;
+#[derive(Debug, Clone)]
+struct RuntimeLogWriter {
+    service: RuntimeService,
+    format: LogFormat,
+}
 
-impl<'writer> MakeWriter<'writer> for DaemonLogWriter {
-    type Writer = DaemonLogFile;
+impl<'writer> MakeWriter<'writer> for RuntimeLogWriter {
+    type Writer = BoundedLogFile;
 
     fn make_writer(&'writer self) -> Self::Writer {
-        DaemonLogFile::open()
+        BoundedLogFile::open(runtime_log_path(self.service), self.format)
     }
 }
 
-enum DaemonLogFile {
-    File(File),
-    Sink(io::Sink),
-}
-
-impl DaemonLogFile {
-    fn open() -> Self {
-        let path = daemon_log_path();
-        if let Some(parent) = path.parent()
-            && std::fs::create_dir_all(parent).is_ok()
-            && let Ok(file) = OpenOptions::new().create(true).append(true).open(path)
-        {
-            return Self::File(file);
-        }
-        Self::Sink(io::sink())
+/// Persist an initialization failure before the tracing subscriber exists.
+///
+/// # Errors
+/// Returns an error when the bounded daemon log cannot be written.
+pub fn write_runtime_fallback_error(service: RuntimeService, message: &str) -> io::Result<()> {
+    if !matches!(service, RuntimeService::Daemon | RuntimeService::Bridge) {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "bounded fallback logging is only available to long-lived services",
+        ));
     }
-}
-
-impl io::Write for DaemonLogFile {
-    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-        match self {
-            Self::File(file) => file.write(bytes),
-            Self::Sink(sink) => sink.write(bytes),
-        }
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        match self {
-            Self::File(file) => file.flush(),
-            Self::Sink(sink) => sink.flush(),
-        }
-    }
+    let format = if normalized_env_value("HARNESS_LOG_FORMAT").as_deref() == Some("json") {
+        LogFormat::Json
+    } else {
+        LogFormat::Text
+    };
+    let mut writer = BoundedLogFile::open(runtime_log_path(service), format);
+    writer.write_all(&diagnostic_event(format, "ERROR", message))?;
+    writer.flush()
 }
 
 // `src/daemon/state` (`ScopedDaemonRootOverride`/`ScopedOwnershipOverride`) is
@@ -164,6 +163,14 @@ fn daemon_log_path() -> PathBuf {
         .join("daemon.log")
 }
 
+fn runtime_log_path(service: RuntimeService) -> PathBuf {
+    let file_name = match service {
+        RuntimeService::Bridge => "bridge.log",
+        _ => "daemon.log",
+    };
+    daemon_log_path().with_file_name(file_name)
+}
+
 fn daemon_base_dir() -> PathBuf {
     if let Some(root) = normalized_env_value("HARNESS_DAEMON_DATA_HOME") {
         return PathBuf::from(root).join("harness").join("daemon");
@@ -197,9 +204,16 @@ fn home_dir() -> PathBuf {
 
 #[cfg(test)]
 mod tests {
-    use tempfile::tempdir;
+    use std::io::Write as _;
 
-    use super::{daemon_log_path, observe_daemon_ownership_override, observe_daemon_root_override};
+    use tempfile::tempdir;
+    use tracing_subscriber::fmt::writer::MakeWriter as _;
+
+    use super::{
+        LogFormat, RuntimeLogWriter, RuntimeService, daemon_log_path,
+        observe_daemon_ownership_override, observe_daemon_root_override,
+        write_runtime_fallback_error,
+    };
     use crate::telemetry::telemetry_test_guard;
 
     /// Serializes access to the module-level override mirrors and always
@@ -299,6 +313,66 @@ mod tests {
                     .join("daemon.log");
                 assert_eq!(daemon_log_path(), expected);
             },
+        );
+    }
+
+    #[test]
+    fn startup_fallback_is_a_bounded_valid_json_event() {
+        let _scope = OverrideScope::new();
+        let root = tempdir().expect("tempdir");
+        observe_daemon_root_override(Some(root.path().to_path_buf()));
+
+        temp_env::with_var("HARNESS_LOG_FORMAT", Some("json"), || {
+            write_runtime_fallback_error(
+                RuntimeService::Daemon,
+                "subscriber initialization failed",
+            )
+            .expect("fallback event");
+        });
+
+        let event =
+            std::fs::read_to_string(root.path().join("daemon.log")).expect("fallback daemon log");
+        let event: serde_json::Value = serde_json::from_str(event.trim()).expect("valid JSON");
+        assert_eq!(event["level"], "ERROR");
+        assert_eq!(
+            event["fields"]["message"],
+            "subscriber initialization failed"
+        );
+    }
+
+    #[test]
+    fn bridge_fallback_uses_its_own_bounded_log() {
+        let _scope = OverrideScope::new();
+        let root = tempdir().expect("tempdir");
+        observe_daemon_root_override(Some(root.path().to_path_buf()));
+
+        write_runtime_fallback_error(RuntimeService::Bridge, "bridge startup failed")
+            .expect("bridge fallback");
+
+        let event =
+            std::fs::read_to_string(root.path().join("bridge.log")).expect("bridge fallback log");
+        assert!(event.contains("bridge startup failed"));
+        assert!(!root.path().join("daemon.log").exists());
+    }
+
+    #[test]
+    fn writer_resolves_daemon_root_after_layer_construction() {
+        let _scope = OverrideScope::new();
+        let root = tempdir().expect("tempdir");
+        let writer = RuntimeLogWriter {
+            service: RuntimeService::Bridge,
+            format: LogFormat::Text,
+        };
+        observe_daemon_root_override(Some(root.path().to_path_buf()));
+
+        writer
+            .make_writer()
+            .write_all(b"adopted root event")
+            .expect("bounded bridge log");
+
+        assert_eq!(
+            std::fs::read(root.path().join("bridge.log")).expect("adopted bridge log"),
+            b"adopted root event"
         );
     }
 }

@@ -56,10 +56,6 @@ pub fn render_launch_agent_plist(binary_path: &Path) -> String {
   <true/>
   <key>WorkingDirectory</key>
   <string>{cwd}</string>
-  <key>StandardOutPath</key>
-  <string>{stdout}</string>
-  <key>StandardErrorPath</key>
-  <string>{stderr}</string>
 </dict>
 </plist>
 "#,
@@ -68,8 +64,6 @@ pub fn render_launch_agent_plist(binary_path: &Path) -> String {
         cwd = current_dir()
             .unwrap_or_else(|_| PathBuf::from("."))
             .display(),
-        stdout = state::daemon_root().join("launchd.stdout.log").display(),
-        stderr = state::daemon_root().join("launchd.stderr.log").display(),
     )
 }
 

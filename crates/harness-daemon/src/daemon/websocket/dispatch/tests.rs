@@ -20,6 +20,29 @@ fn websocket_activity_logging_uses_debug_level() {
 }
 
 #[test]
+fn repeated_websocket_dispatch_failures_drop_to_debug() {
+    let mut gate = RepeatedLogGate::default();
+    let error = WsErrorPayload {
+        code: "FAILED".into(),
+        message: "same failure".into(),
+        details: Vec::new(),
+        status_code: Some(500),
+        data: None,
+    };
+
+    let identity = dispatch_failure_identity("sessions.list", &error);
+    assert!(gate.should_warn(identity));
+    assert!(!gate.should_warn(identity));
+    assert!(gate.should_warn(dispatch_failure_identity("tasks.list", &error)));
+
+    let changed = WsErrorPayload {
+        message: "materially different failure".into(),
+        ..error
+    };
+    assert!(gate.should_warn(dispatch_failure_identity("sessions.list", &changed)));
+}
+
+#[test]
 fn ws_request_deserialization() {
     let json = r#"{"id":"abc-123","method":"health","params":{}}"#;
     let request: WsRequest = serde_json::from_str(json).expect("deserialize");

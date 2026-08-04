@@ -349,21 +349,13 @@ pub(super) fn spawn_daemon(sandboxed: bool, binary: &Path) -> Result<Child, CliE
             "daemon-spawn",
         )));
     }
-    let log_path = state::daemon_root().join("daemon.stderr.log");
     let _ = fs::create_dir_all(state::daemon_root());
-    let stderr_file = fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&log_path)
-        .map_err(|error| {
-            CliErrorKind::workflow_io(format!("open daemon log {}: {error}", log_path.display()))
-        })?;
 
     Command::new(binary)
         .args(["serve", "--host", "127.0.0.1", "--port", "0"])
         .stdin(Stdio::null())
         .stdout(Stdio::null())
-        .stderr(Stdio::from(stderr_file))
+        .stderr(Stdio::null())
         .spawn()
         .map_err(|error| {
             CliError::from(CliErrorKind::workflow_io(format!(

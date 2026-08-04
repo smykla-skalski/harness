@@ -9,6 +9,8 @@ publish = false
 axum = { version = "0.8.7", features = ["json"] }
 chrono = { version = "0.4.44", features = ["serde"] }
 console-subscriber = { version = "0.5", optional = true }
+fs2 = "0.4.3"
+libc = "0.2"
 opentelemetry = { version = "0.32.0", default-features = false, features = ["trace", "metrics", "logs"] }
 opentelemetry-appender-tracing = "0.32.0"
 opentelemetry-otlp = { version = "0.32.0", default-features = false, features = ["trace", "metrics", "logs", "grpc-tonic", "http-proto", "reqwest-client"] }

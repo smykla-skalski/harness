@@ -23,6 +23,8 @@ fn render_launch_agent_plist_contains_expected_fields() {
     assert!(plist.contains("<string>/usr/local/bin/harness-daemon</string>"));
     assert!(!plist.contains("<string>daemon</string>"));
     assert!(plist.contains("<string>serve</string>"));
+    assert!(!plist.contains("StandardOutPath"));
+    assert!(!plist.contains("StandardErrorPath"));
 }
 
 #[test]

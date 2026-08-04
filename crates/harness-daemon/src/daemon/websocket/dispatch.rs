@@ -21,14 +21,18 @@ use crate::telemetry::{
 };
 use axum::extract::ws::Message;
 use harness_kernel::errors::CliError;
+use harness_telemetry::{RepeatedLogGate, log_identity};
 use std::future::Future;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, LazyLock, Mutex};
 use tokio::time::Instant;
 use tracing::Instrument as _;
 use tracing::field::{Empty, display};
 
 mod mutation_handlers;
 mod routing;
+
+static WS_DISPATCH_FAILURE_LOG_GATE: LazyLock<Mutex<RepeatedLogGate>> =
+    LazyLock::new(|| Mutex::new(RepeatedLogGate::default()));
 
 pub(crate) async fn handle_message(
     text: &str,
@@ -152,14 +156,7 @@ pub(crate) async fn dispatch(
     span.record("is_error", display(is_error));
     span.record("request.failed", display(is_error));
     if let Some(error) = response.error.as_ref() {
-        tracing::warn!(
-            method = %request.method,
-            request_id = %request.id,
-            duration_ms,
-            error.code = %error.code,
-            error.message = %error.message,
-            "ws dispatch failed"
-        );
+        log_dispatch_failure(request, error, duration_ms);
     } else {
         tracing::event!(
             ws_activity_log_level(),
@@ -175,6 +172,51 @@ pub(crate) async fn dispatch(
 
 pub(crate) const fn ws_activity_log_level() -> tracing::Level {
     crate::DAEMON_ACTIVITY_LOG_LEVEL
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion in a leaf logging helper"
+)]
+fn log_dispatch_failure(request: &WsRequest, error: &WsErrorPayload, duration_ms: u64) {
+    let should_warn = should_warn_dispatch_failure(&request.method, error);
+    if should_warn {
+        tracing::warn!(
+            method = %request.method,
+            request_id = %request.id,
+            duration_ms,
+            error.code = %error.code,
+            error.message = %error.message,
+            "ws dispatch failed"
+        );
+    } else {
+        tracing::debug!(
+            method = %request.method,
+            request_id = %request.id,
+            duration_ms,
+            error.code = %error.code,
+            error.message = %error.message,
+            "ws dispatch failed"
+        );
+    }
+}
+
+fn should_warn_dispatch_failure(method: &str, error: &WsErrorPayload) -> bool {
+    let key = dispatch_failure_identity(method, error);
+    WS_DISPATCH_FAILURE_LOG_GATE
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .should_warn(key)
+}
+
+fn dispatch_failure_identity(method: &str, error: &WsErrorPayload) -> u64 {
+    log_identity(&(
+        method,
+        error.code.as_str(),
+        error.message.as_str(),
+        error.details.as_slice(),
+        error.status_code,
+    ))
 }
 
 #[expect(

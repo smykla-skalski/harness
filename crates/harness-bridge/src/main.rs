@@ -14,22 +14,30 @@ use harness_bridge::cli::Cli;
 #[cfg(feature = "daemon-runtime")]
 use harness_daemon::app::{AppContext, Execute};
 use harness_kernel::errors;
-use harness_telemetry::{RuntimeService, init_tracing_subscriber_for};
+use harness_telemetry::{
+    RuntimeService, init_tracing_subscriber_for, write_runtime_fallback_error,
+};
 
 fn main() -> ExitCode {
+    let cli = Cli::parse();
+    cli.command.prepare_runtime_context();
     let telemetry_guard = match init_tracing_subscriber_for(RuntimeService::Bridge) {
         Ok(guard) => guard,
         Err(error) => {
-            eprintln!("{error}");
+            let rendered = error.to_string();
+            let _ = write_runtime_fallback_error(RuntimeService::Bridge, &rendered);
+            eprintln!("{rendered}");
             return ExitCode::FAILURE;
         }
     };
-    let cli = Cli::parse();
     if cli.delay > 0.0 {
         thread::sleep(Duration::from_secs_f64(cli.delay));
     }
     harness_bridge::app::run_startup_migrations();
     let result = cli.command.execute(&AppContext::production());
+    if let Err(error) = &result {
+        tracing::error!(code = error.code(), "{}", errors::render_error(error));
+    }
     drop(telemetry_guard);
     match result {
         Ok(code) => exit_code(code),

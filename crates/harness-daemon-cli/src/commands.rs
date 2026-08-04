@@ -21,6 +21,9 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 
 use crate::control::{restart_daemon, stop_daemon};
 
+mod runtime_context;
+pub use runtime_context::DaemonRuntimeContext;
+
 /// Local daemon operations and remote-daemon scaffolding.
 #[derive(Debug, Clone, Subcommand)]
 #[non_exhaustive]

@@ -398,7 +398,7 @@ fn read_bridge_state_at(root: &Path) -> Result<Option<BridgeState>, CliError> {
     reason = "tracing macro expansion in a leaf logging helper"
 )]
 fn log_sibling_bridge_adoption(own_root: &Path, sibling_root: &Path) {
-    tracing::info!(
+    tracing::debug!(
         own_root = %own_root.display(),
         sibling_root = %sibling_root.display(),
         "host bridge: adopted sibling-root bridge state (cross-profile discovery)"
