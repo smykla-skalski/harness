@@ -1,4 +1,5 @@
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::AsyncSessionSummaryQueries;
 use crate::daemon::db::task_board::prelude::*;
 use crate::session::types::TaskStatus;
 use crate::task_board::TaskBoardStatus;

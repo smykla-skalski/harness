@@ -14,7 +14,7 @@ impl AsyncSignalStorage for AsyncDaemonDb {
     }
 
     async fn resolve_session(&self, session_id: &str) -> Result<Option<ResolvedSession>, CliError> {
-        AsyncDaemonDb::resolve_session(self, session_id).await
+        <Self as AsyncSessionSummaryQueries>::resolve_session(self, session_id).await
     }
 
     async fn bump_change(&self, scope: &str) -> Result<(), CliError> {
@@ -91,7 +91,7 @@ impl AsyncSignalStorage for AsyncDaemonDb {
     async fn list_session_summaries(
         &self,
     ) -> Result<Vec<harness_session::wire::SessionSummary>, CliError> {
-        AsyncDaemonDb::list_session_summaries(self).await
+        <Self as AsyncSessionSummaryQueries>::list_session_summaries(self).await
     }
 
     async fn resolve_runtime_session_agents(

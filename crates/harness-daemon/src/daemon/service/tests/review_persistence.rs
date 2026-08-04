@@ -13,6 +13,7 @@ use crate::session::types::{ReviewVerdict, SessionRole, TaskStatus};
 use crate::session::{storage as session_storage, types::SessionState};
 
 use super::*;
+use crate::daemon::db::AsyncSessionSummaryQueries;
 use crate::daemon::db::AsyncTaskReviewWrites;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::daemon::db_open::DaemonDbOpen;

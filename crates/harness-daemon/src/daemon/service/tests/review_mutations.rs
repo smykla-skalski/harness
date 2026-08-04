@@ -9,6 +9,7 @@ use crate::daemon::protocol::{
 use crate::session::types::{SessionRole, TaskStatus};
 
 use super::*;
+use crate::daemon::db::AsyncSessionSummaryQueries;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 #[test]

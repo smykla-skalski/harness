@@ -7,6 +7,7 @@ use super::lifecycle::{
     assert_executor_runtime_presence, drive, executor_assignment, offer_and_claim,
     reconcile_executor_tick, run_deep_acceptance_async, with_acceptance_environment,
 };
+use crate::daemon::db::AsyncSessionSummaryQueries;
 use crate::daemon::db::remote_executor_identity;
 use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::task_board_remote_transport::controller_authority_test_support::{

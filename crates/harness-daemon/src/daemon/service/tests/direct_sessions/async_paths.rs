@@ -1,4 +1,5 @@
 use super::super::*;
+use crate::daemon::db::AsyncSessionSummaryQueries;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 #[test]
