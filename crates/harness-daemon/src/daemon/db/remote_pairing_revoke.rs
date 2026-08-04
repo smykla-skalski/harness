@@ -6,8 +6,8 @@
 
 use sqlx::{Row, Sqlite, Transaction, query};
 
+use super::audit_event_retention_async::prune_remote_audit_events_in_transaction;
 use super::remote_identity::INSERT_REMOTE_AUDIT_EVENT_SQL;
-use super::remote_identity_async::prune_remote_audit_events_in_transaction;
 use super::{CliError, db_error};
 use crate::daemon::remote_identity::{RemoteAuditEvent, RemoteAuditOutcome};
 use crate::daemon::remote_pairing_queries::{RemotePairingRevokeOutcome, RemotePairingRevoked};

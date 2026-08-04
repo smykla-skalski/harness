@@ -3,10 +3,10 @@ use rusqlite::{OptionalExtension, params};
 use harness_kernel::errors::CliError;
 
 use crate::daemon::db::DaemonDb;
+use crate::daemon::db::audit_event_retention::prune_remote_audit_events_in_transaction;
 use crate::daemon::db::db_error;
 use crate::daemon::db::remote_identity::{
-    prune_remote_audit_events_in_transaction, record_remote_audit_event_in_transaction,
-    upsert_remote_client_for_pairing,
+    record_remote_audit_event_in_transaction, upsert_remote_client_for_pairing,
 };
 use crate::daemon::db::remote_pairing::inventory::{
     SELECT_REMOTE_PAIRING_ENTRY_SQL, SELECT_REMOTE_PAIRING_INVENTORY_SQL, entry_from_columns,

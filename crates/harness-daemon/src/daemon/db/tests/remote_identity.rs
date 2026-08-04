@@ -1,4 +1,4 @@
-use super::super::remote_identity::REMOTE_AUDIT_EVENT_RETENTION_LIMIT;
+use super::super::audit_event_retention::REMOTE_AUDIT_EVENT_RETENTION_LIMIT;
 use super::*;
 use crate::daemon::remote::{RemoteAccessScope, RemoteRole};
 use crate::daemon::remote_identity::{

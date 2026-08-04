@@ -1,6 +1,8 @@
 use sqlx::{Sqlite, Transaction, query};
 
-use super::remote_identity::{PRUNE_REMOTE_AUDIT_EVENTS_SQL, REMOTE_AUDIT_EVENT_RETENTION_LIMIT};
+use super::audit_event_retention::{
+    PRUNE_REMOTE_AUDIT_EVENTS_SQL, REMOTE_AUDIT_EVENT_RETENTION_LIMIT,
+};
 use super::{AsyncDaemonDb, CliError, db_error};
 
 /// # Errors

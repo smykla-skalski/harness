@@ -5,7 +5,7 @@ use sqlx::pool::PoolOptions;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous};
 use sqlx::{Sqlite, SqlitePool, query_as, query_scalar};
 
-use super::remote_identity_async::prune_remote_audit_events;
+use super::audit_event_retention_async::prune_remote_audit_events;
 use super::task_board_sync_coordinator::{
     TaskBoardSyncCoordinator, TaskBoardSyncPermit, TaskBoardSyncStatus,
 };
