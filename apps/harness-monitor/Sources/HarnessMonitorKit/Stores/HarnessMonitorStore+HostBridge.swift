@@ -129,7 +129,63 @@ extension HarnessMonitorStore {
     } else {
       baseCommand = "harness-bridge start"
     }
-    return HarnessMonitorPaths.shellCommand(baseCommand, using: environment)
+    return HarnessMonitorPaths.multilineShellCommand(
+      baseCommand,
+      using: hostBridgeCommandEnvironment(using: environment)
+    )
+  }
+
+  private func hostBridgeCommandEnvironment(
+    using environment: HarnessMonitorEnvironment
+  ) -> HarnessMonitorEnvironment {
+    guard !usesRemoteDaemon else {
+      return environment
+    }
+
+    var values = environment.values
+    let connectedContext = manifestURL.flatMap(Self.connectedDaemonContext(for:))
+    let ownership = connectedContext?.ownership ?? daemonOwnership
+    values[DaemonOwnership.daemonProcessEnvironmentKey] = ownership.rawValue
+
+    if HarnessMonitorPaths.configuredDataHomeRoot(using: environment) == nil,
+      HarnessMonitorPaths.resolvedRuntimeLane(using: environment) == nil,
+      let connectedContext
+    {
+      values[HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey] =
+        connectedContext.dataHomeRoot.path
+      if let lane = HarnessMonitorPaths.inferRuntimeLane(
+        fromPath: connectedContext.dataHomeRoot.path
+      ) {
+        values[HarnessMonitorRuntimeLane.environmentKey] = lane
+      }
+    }
+
+    return HarnessMonitorEnvironment(
+      values: values,
+      homeDirectory: environment.homeDirectory,
+      bundleURL: environment.bundleURL
+    )
+  }
+
+  private static func connectedDaemonContext(
+    for manifestURL: URL
+  ) -> ConnectedDaemonContext? {
+    let manifestURL = manifestURL.standardizedFileURL
+    guard manifestURL.lastPathComponent == "manifest.json" else { return nil }
+
+    var daemonRoot = manifestURL.deletingLastPathComponent()
+    let ownership = DaemonOwnership(rawValue: daemonRoot.lastPathComponent)
+    if ownership != nil {
+      daemonRoot.deleteLastPathComponent()
+    }
+    guard daemonRoot.lastPathComponent == "daemon" else { return nil }
+
+    let harnessRoot = daemonRoot.deletingLastPathComponent()
+    guard harnessRoot.lastPathComponent == "harness" else { return nil }
+    return ConnectedDaemonContext(
+      dataHomeRoot: harnessRoot.deletingLastPathComponent(),
+      ownership: ownership
+    )
   }
 
   public func clearHostBridgeIssue(for capability: String) {
@@ -256,4 +312,9 @@ extension HarnessMonitorStore {
       retryCount: 0
     )
   }
+}
+
+private struct ConnectedDaemonContext {
+  let dataHomeRoot: URL
+  let ownership: DaemonOwnership?
 }

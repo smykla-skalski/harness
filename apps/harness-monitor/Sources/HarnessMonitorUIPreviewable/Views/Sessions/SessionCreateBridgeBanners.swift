@@ -32,15 +32,10 @@ struct SessionCreateBridgeBanner: View {
         .disabled(store.isDaemonActionInFlight || store.isSessionActionInFlight)
       }
       if !copy.command.isEmpty {
-        Text(copy.command)
-          .scaledFont(.body.monospaced())
-          .textSelection(.enabled)
-          .padding(HarnessMonitorTheme.spacingSM)
-          .frame(maxWidth: .infinity, alignment: .leading)
-          .background(
-            .quaternary.opacity(0.3),
-            in: RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM)
-          )
+        CopyableCommandBox(
+          command: copy.command,
+          accessibilityIdentifier: "session-create-bridge-command-copy-button"
+        )
       }
     }
     .padding(.horizontal, HarnessMonitorTheme.spacingMD)
@@ -68,12 +63,15 @@ extension SessionCreateBridgeBannerKind {
   }
 
   @MainActor
-  func copy(store: HarnessMonitorStore) -> SessionCreateBridgeBannerCopy {
+  func copy(
+    store: HarnessMonitorStore,
+    environment: HarnessMonitorEnvironment = .current
+  ) -> SessionCreateBridgeBannerCopy {
     let state = store.hostBridgeCapabilityState(for: capability)
     let hostBridgeRunning = store.daemonStatus?.manifest?.hostBridge.running ?? false
     let title = bannerTitle(state: state)
     let message = bannerMessage(state: state, hostBridgeRunning: hostBridgeRunning)
-    let command = store.hostBridgeStartCommand(for: capability)
+    let command = store.hostBridgeStartCommand(for: capability, environment: environment)
     let enableLabel: String? = state == .excluded && hostBridgeRunning ? "Enable now" : nil
     return SessionCreateBridgeBannerCopy(
       title: title,

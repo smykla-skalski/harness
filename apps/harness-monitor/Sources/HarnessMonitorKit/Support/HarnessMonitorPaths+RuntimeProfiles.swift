@@ -120,6 +120,14 @@ extension HarnessMonitorPaths {
         (HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey, commandDataHomeRoot.path))
     }
 
+    if let rawOwnership = normalizedNonEmpty(
+      environment.values[DaemonOwnership.daemonProcessEnvironmentKey]
+    )?.lowercased(),
+      let ownership = DaemonOwnership(rawValue: rawOwnership)
+    {
+      entries.append((DaemonOwnership.daemonProcessEnvironmentKey, ownership.rawValue))
+    }
+
     if let codexBridgePort = resolvedCodexBridgePortString(using: environment) {
       entries.append((HarnessMonitorRuntimeLane.codexWSPortEnvironmentKey, codexBridgePort))
     }
@@ -223,6 +231,18 @@ extension HarnessMonitorPaths {
 
   static func shellEscape(_ rawValue: String) -> String {
     "'\(rawValue.replacingOccurrences(of: "'", with: "'\\''"))'"
+  }
+
+  public static func multilineShellCommand(
+    _ command: String,
+    using environment: HarnessMonitorEnvironment = .current
+  ) -> String {
+    let environmentLines = commandEnvironmentEntries(using: environment)
+      .map { "\($0.0)=\(shellEscape($0.1)) \\" }
+    guard !environmentLines.isEmpty else {
+      return command
+    }
+    return (environmentLines + [command]).joined(separator: "\n")
   }
 }
 

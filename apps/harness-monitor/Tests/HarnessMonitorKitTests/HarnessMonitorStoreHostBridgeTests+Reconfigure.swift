@@ -29,7 +29,7 @@ extension HarnessMonitorStoreHostBridgeTests {
         ]
       )
     )
-    let store = await makeBootstrappedStore(client: client)
+    let store = await makeIsolatedHostBridgeStore(client: client)
     client.clearRecordedCalls()
     store.daemonStatus = sandboxedStatus(
       hostBridge: HostBridgeManifest(
@@ -85,7 +85,7 @@ extension HarnessMonitorStoreHostBridgeTests {
         ]
       )
     )
-    let store = await makeBootstrappedStore(client: client)
+    let store = await makeIsolatedHostBridgeStore(client: client)
     client.clearRecordedCalls()
     store.daemonStatus = sandboxedStatus(
       hostBridge: HostBridgeManifest(
@@ -188,7 +188,7 @@ extension HarnessMonitorStoreHostBridgeTests {
           "agent-tui capability has 1 active session(s); rerun with --force to stop them first"
       )
     )
-    let store = await makeBootstrappedStore(client: client)
+    let store = await makeIsolatedHostBridgeStore(client: client)
     client.clearRecordedCalls()
     store.daemonStatus = sandboxedStatus(
       hostBridge: HostBridgeManifest(
@@ -254,7 +254,7 @@ extension HarnessMonitorStoreHostBridgeTests {
     client.configureHostBridgeReconfigureError(
       HarnessMonitorAPIError.server(code: 400, message: "bridge is not running")
     )
-    let store = await makeBootstrappedStore(client: client)
+    let store = await makeIsolatedHostBridgeStore(client: client)
     store.daemonStatus = sandboxedStatus(
       hostBridge: HostBridgeManifest(
         running: true,
@@ -275,7 +275,7 @@ extension HarnessMonitorStoreHostBridgeTests {
       store.hostBridgeStartCommand(
         for: "agent-tui",
         environment: hostBridgeCommandTestEnvironment
-      ) == "harness-bridge start"
+      ) == expectedHostBridgeCommand("harness-bridge start")
     )
     #expect(store.daemonStatus?.manifest?.hostBridge.running == false)
   }
@@ -301,7 +301,7 @@ extension HarnessMonitorStoreHostBridgeTests {
         ]
       )
     )
-    let store = await makeBootstrappedStore(client: client)
+    let store = await makeIsolatedHostBridgeStore(client: client)
     client.clearRecordedCalls()
     await store.selectSession(PreviewFixtures.summary.sessionId)
     store.daemonStatus = sandboxedStatus(

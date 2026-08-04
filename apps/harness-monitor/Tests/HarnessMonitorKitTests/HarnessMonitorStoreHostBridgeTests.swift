@@ -10,11 +10,30 @@ let hostBridgeCommandTestEnvironment = HarnessMonitorEnvironment(
 )
 
 @MainActor
+func makeIsolatedHostBridgeStore(
+  client: any HarnessMonitorClientProtocol = RecordingHarnessClient()
+) async -> HarnessMonitorStore {
+  let store = await makeBootstrappedStore(client: client)
+  store.manifestURL = nil
+  return store
+}
+
+func expectedHostBridgeCommand(
+  _ command: String,
+  ownership: DaemonOwnership = .managed
+) -> String {
+  [
+    "\(DaemonOwnership.daemonProcessEnvironmentKey)='\(ownership.rawValue)' \\",
+    command,
+  ].joined(separator: "\n")
+}
+
+@MainActor
 @Suite("Harness Monitor host bridge state")
 struct HarnessMonitorStoreHostBridgeTests {
   @Test("Host bridge capability state reports excluded when running bridge omits capability")
   func hostBridgeCapabilityStateReportsExcludedCapability() async {
-    let store = await makeBootstrappedStore()
+    let store = await makeIsolatedHostBridgeStore()
     store.daemonStatus = sandboxedStatus(
       hostBridge: HostBridgeManifest(
         running: true,
@@ -35,7 +54,7 @@ struct HarnessMonitorStoreHostBridgeTests {
 
   @Test("Host bridge capability state ignores stale excluded issue when the bridge stops")
   func hostBridgeCapabilityStateIgnoresStaleExcludedIssueWhenBridgeStops() async {
-    let store = await makeBootstrappedStore()
+    let store = await makeIsolatedHostBridgeStore()
     store.daemonStatus = sandboxedStatus(hostBridge: HostBridgeManifest())
     store.hostBridgeCapabilityIssues["agent-tui"] = .excluded
 
@@ -44,13 +63,13 @@ struct HarnessMonitorStoreHostBridgeTests {
       store.hostBridgeStartCommand(
         for: "agent-tui",
         environment: hostBridgeCommandTestEnvironment
-      ) == "harness-bridge start"
+      ) == expectedHostBridgeCommand("harness-bridge start")
     )
   }
 
   @Test("Host bridge start command narrows to missing capability when running bridge excludes it")
   func hostBridgeStartCommandNarrowsToMissingCapability() async {
-    let store = await makeBootstrappedStore()
+    let store = await makeIsolatedHostBridgeStore()
     store.daemonStatus = sandboxedStatus(
       hostBridge: HostBridgeManifest(
         running: true,
@@ -69,25 +88,25 @@ struct HarnessMonitorStoreHostBridgeTests {
       store.hostBridgeStartCommand(
         for: "codex",
         environment: hostBridgeCommandTestEnvironment
-      ) == "harness bridge reconfigure --enable codex"
+      ) == expectedHostBridgeCommand("harness bridge reconfigure --enable codex")
     )
   }
 
   @Test("Host bridge start command falls back to bridge start when the bridge is absent")
   func hostBridgeStartCommandFallsBackToStartWhenBridgeIsAbsent() async {
-    let store = await makeBootstrappedStore()
+    let store = await makeIsolatedHostBridgeStore()
 
     #expect(
       store.hostBridgeStartCommand(
         for: "codex",
         environment: hostBridgeCommandTestEnvironment
-      ) == "harness-bridge start"
+      ) == expectedHostBridgeCommand("harness-bridge start")
     )
     #expect(
       store.hostBridgeStartCommand(
         for: "agent-tui",
         environment: hostBridgeCommandTestEnvironment
-      ) == "harness-bridge start"
+      ) == expectedHostBridgeCommand("harness-bridge start")
     )
   }
 
@@ -102,16 +121,72 @@ struct HarnessMonitorStoreHostBridgeTests {
       homeDirectory: URL(fileURLWithPath: "/tmp/harness-monitor-host-bridge-tests"),
       bundleURL: nil
     )
-    let store = await makeBootstrappedStore()
-    let expectedCommand = """
-      HARNESS_MONITOR_RUNTIME_LANE='dev-profile' \
-      HARNESS_DAEMON_DATA_HOME='/tmp/harness-profile-home' \
-      HARNESS_CODEX_WS_PORT='31337' harness-bridge start
-      """
+    let store = await makeIsolatedHostBridgeStore()
+    let expectedCommand = [
+      "HARNESS_MONITOR_RUNTIME_LANE='dev-profile' \\",
+      "HARNESS_DAEMON_DATA_HOME='/tmp/harness-profile-home' \\",
+      "HARNESS_DAEMON_OWNERSHIP='managed' \\",
+      "HARNESS_CODEX_WS_PORT='31337' \\",
+      "harness-bridge start",
+    ].joined(separator: "\n")
 
     #expect(
       store.hostBridgeStartCommand(for: "codex", environment: environment)
         == expectedCommand
+    )
+  }
+
+  @Test("Host bridge command pins the connected discovered daemon root")
+  func hostBridgeCommandPinsConnectedDiscoveredDaemonRoot() async {
+    let lane = "discovered-lane"
+    let dataHomeRoot = hostBridgeCommandTestEnvironment.homeDirectory
+      .appendingPathComponent("runtime-lanes", isDirectory: true)
+      .appendingPathComponent(lane, isDirectory: true)
+    let store = await makeIsolatedHostBridgeStore()
+    store.manifestURL =
+      dataHomeRoot
+      .appendingPathComponent("harness/daemon/managed", isDirectory: true)
+      .appendingPathComponent("manifest.json")
+    let expectedPort = HarnessMonitorPaths.derivedCodexBridgePort(for: lane)
+    let expectedCommand = [
+      "HARNESS_MONITOR_RUNTIME_LANE='\(lane)' \\",
+      "HARNESS_DAEMON_DATA_HOME='\(dataHomeRoot.path)' \\",
+      "HARNESS_DAEMON_OWNERSHIP='managed' \\",
+      "HARNESS_CODEX_WS_PORT='\(expectedPort)' \\",
+      "harness-bridge start",
+    ].joined(separator: "\n")
+
+    #expect(
+      store.hostBridgeStartCommand(
+        for: "agent-tui",
+        environment: hostBridgeCommandTestEnvironment
+      ) == expectedCommand
+    )
+  }
+
+  @Test("Host bridge command pins external ownership from the connected daemon")
+  func hostBridgeCommandPinsConnectedExternalOwnership() async {
+    let dataHomeRoot = hostBridgeCommandTestEnvironment.homeDirectory
+      .appendingPathComponent("external-daemon", isDirectory: true)
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(),
+      daemonOwnership: .external
+    )
+    store.manifestURL =
+      dataHomeRoot
+      .appendingPathComponent("harness/daemon/external", isDirectory: true)
+      .appendingPathComponent("manifest.json")
+    let expectedCommand = [
+      "HARNESS_DAEMON_DATA_HOME='\(dataHomeRoot.path)' \\",
+      "HARNESS_DAEMON_OWNERSHIP='external' \\",
+      "harness-bridge start",
+    ].joined(separator: "\n")
+
+    #expect(
+      store.hostBridgeStartCommand(
+        for: "agent-tui",
+        environment: hostBridgeCommandTestEnvironment
+      ) == expectedCommand
     )
   }
 
@@ -158,7 +233,7 @@ struct HarnessMonitorStoreHostBridgeTests {
 
   @Test("501 bridge issue marks excluded only when running bridge omits capability")
   func markHostBridgeIssueUsesExcludedForMissingCapability() async {
-    let store = await makeBootstrappedStore()
+    let store = await makeIsolatedHostBridgeStore()
     store.daemonStatus = sandboxedStatus(
       hostBridge: HostBridgeManifest(
         running: true,
@@ -180,7 +255,7 @@ struct HarnessMonitorStoreHostBridgeTests {
       store.hostBridgeStartCommand(
         for: "agent-tui",
         environment: hostBridgeCommandTestEnvironment
-      ) == "harness bridge reconfigure --enable agent-tui"
+      ) == expectedHostBridgeCommand("harness bridge reconfigure --enable agent-tui")
     )
   }
 

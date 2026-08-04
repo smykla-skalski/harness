@@ -22,6 +22,10 @@ struct PreviewHostApp: App {
         "HARNESS_TASK_BOARD_LANE_ALIGNMENT_PREVIEW_DUMP",
         TaskBoardLaneAlignmentPreviewRenderer.dump
       ),
+      (
+        "HARNESS_SESSION_CREATE_BRIDGE_BANNER_PREVIEW_DUMP",
+        SessionCreateBridgeBannerPreviewRenderer.dump
+      ),
       ("HARNESS_TASK_BOARD_INSPECTOR_PREVIEW_DUMP", TaskBoardInspectorPreviewRenderer.dump),
       ("HARNESS_TASK_BOARD_REVIEW_REPORT_PREVIEW_DUMP", TaskBoardReviewReportPreviewRenderer.dump),
       (
