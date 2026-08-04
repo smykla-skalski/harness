@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use tempfile::tempdir;
 
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_task_board_provider_sync::open_task_board_sync_conflicts;
 
 use harness::daemon::db::{AsyncDaemonDb, AsyncDaemonDbConnect};
 use harness::task_board::external::{
@@ -32,7 +33,7 @@ async fn push_precondition_failure_persists_three_way_conflict() {
         "Old body",
         TaskBoardStatus::Todo,
     );
-    db.create_task_board_item(item).await.expect("create item");
+    db.create_item(item).await.expect("create item");
     let client = UpdateFakeSyncClient::new(
         ExternalProvider::GitHub,
         vec![ExternalSyncField::Title],
@@ -52,8 +53,7 @@ async fn push_precondition_failure_persists_three_way_conflict() {
 
     assert_eq!(operations.len(), 1);
     assert_eq!(operations[0].action, ExternalSyncAction::Conflict);
-    let conflicts = db
-        .open_task_board_sync_conflicts()
+    let conflicts = open_task_board_sync_conflicts(&db)
         .await
         .expect("open conflicts");
     assert_eq!(conflicts.len(), 1);
@@ -82,7 +82,7 @@ async fn prefer_remote_supersedes_existing_open_conflict() {
         "Old body",
         TaskBoardStatus::Todo,
     );
-    db.create_task_board_item(item).await.expect("create item");
+    db.create_item(item).await.expect("create item");
     record_open_title_conflict(&db, "task-prefer-remote").await;
     let client = UpdateFakeSyncClient::new(
         ExternalProvider::GitHub,
@@ -105,14 +105,15 @@ async fn prefer_remote_supersedes_existing_open_conflict() {
     .expect("sync external tasks");
 
     assert_eq!(
-        db.task_board_item("task-prefer-remote")
+        db.item_snapshot("task-prefer-remote")
             .await
             .expect("item")
+            .item
             .title,
         "Remote edit"
     );
     assert!(
-        db.open_task_board_sync_conflicts()
+        open_task_board_sync_conflicts(&db)
             .await
             .expect("open conflicts")
             .is_empty()
@@ -131,7 +132,7 @@ async fn pull_report_supersedes_only_converged_known_conflict_fields() {
         "Old body",
         TaskBoardStatus::Todo,
     );
-    db.create_task_board_item(item).await.expect("create item");
+    db.create_item(item).await.expect("create item");
     record_open_title_and_future_conflicts(&db, "task-pull-report").await;
     let client = UpdateFakeSyncClient::new(
         ExternalProvider::GitHub,
@@ -150,14 +151,14 @@ async fn pull_report_supersedes_only_converged_known_conflict_fields() {
         .expect("pull report sync");
 
     assert_eq!(
-        db.task_board_item("task-pull-report")
+        db.item_snapshot("task-pull-report")
             .await
             .expect("item")
+            .item
             .title,
         "Remote edit"
     );
-    let open = db
-        .open_task_board_sync_conflicts()
+    let open = open_task_board_sync_conflicts(&db)
         .await
         .expect("open conflicts");
     assert_eq!(open.len(), 1);
@@ -176,7 +177,7 @@ async fn prefer_local_supersedes_conflict_after_remote_and_local_state_converge(
         "Old body",
         TaskBoardStatus::Todo,
     );
-    db.create_task_board_item(item).await.expect("create item");
+    db.create_item(item).await.expect("create item");
     record_open_title_conflict(&db, "task-prefer-local").await;
     let client = UpdateFakeSyncClient::new(
         ExternalProvider::GitHub,
@@ -199,7 +200,11 @@ async fn prefer_local_supersedes_conflict_after_remote_and_local_state_converge(
     .await
     .expect("sync external tasks");
 
-    let item = db.task_board_item("task-prefer-local").await.expect("item");
+    let item = db
+        .item_snapshot("task-prefer-local")
+        .await
+        .expect("item")
+        .item;
     assert_eq!(item.title, "Local edit");
     assert_eq!(item.body, "Remote body");
     let pull = operations
@@ -213,7 +218,7 @@ async fn prefer_local_supersedes_conflict_after_remote_and_local_state_converge(
         vec![("remote-1".to_string(), vec![ExternalSyncField::Title])]
     );
     assert!(
-        db.open_task_board_sync_conflicts()
+        open_task_board_sync_conflicts(&db)
             .await
             .expect("open conflicts")
             .is_empty()
@@ -270,7 +275,7 @@ async fn prefer_local_still_records_a_hierarchy_only_applied_change_despite_a_co
         "Old body",
         TaskBoardStatus::Todo,
     );
-    db.create_task_board_item(item).await.expect("create item");
+    db.create_item(item).await.expect("create item");
     let client = UpdateFakeSyncClient::new(
         ExternalProvider::GitHub,
         vec![ExternalSyncField::Title],
@@ -301,9 +306,10 @@ async fn prefer_local_still_records_a_hierarchy_only_applied_change_despite_a_co
     .expect("sync external tasks");
 
     let item = db
-        .task_board_item("task-hierarchy-only")
+        .item_snapshot("task-hierarchy-only")
         .await
-        .expect("item");
+        .expect("item")
+        .item;
     assert_eq!(item.title, "Local edit", "the title conflict keeps local");
     assert_eq!(
         item.tags,
@@ -358,7 +364,7 @@ async fn record_open_title_and_future_conflicts(db: &AsyncDaemonDb, item_id: &st
 
 async fn record_open_conflicts(db: &AsyncDaemonDb, item_id: &str, fields: &[&str]) {
     let revision = db
-        .task_board_item_snapshot(item_id)
+        .item_snapshot(item_id)
         .await
         .expect("item snapshot")
         .item_revision;
@@ -366,7 +372,7 @@ async fn record_open_conflicts(db: &AsyncDaemonDb, item_id: &str, fields: &[&str
         .iter()
         .map(|field| open_conflict(item_id, field, revision))
         .collect::<Vec<_>>();
-    db.replace_open_task_board_sync_conflicts(
+    db.replace_open_sync_conflicts(
         item_id,
         ExternalProvider::GitHub,
         "remote-1",

@@ -6,7 +6,7 @@ use harness_kernel::errors::CliError;
 use harness::daemon::db::{AsyncDaemonDb, AsyncDaemonDbConnect};
 use harness::task_board::external::{
     ExternalCreateLease, ExternalCreateProbe, ExternalCreateRecoveryClient, ExternalCreateRequest,
-    ExternalSyncClient, ExternalSyncOptions, sync_external_tasks,
+    ExternalSyncClient, ExternalSyncOptions, TaskBoardSyncStore, sync_external_tasks,
 };
 use harness::task_board::{
     ExternalProvider, ExternalSyncAction, ExternalSyncConflictPolicy, ExternalSyncDirection,
@@ -28,10 +28,7 @@ async fn github_create_persists_repository_without_replacing_project_identity() 
         "2026-07-16T00:00:00Z".to_owned(),
     );
     item.project_id = Some("portfolio-primary".to_owned());
-    board
-        .create_task_board_item(item)
-        .await
-        .expect("create local task");
+    board.create_item(item).await.expect("create local task");
     let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(GitHubCreateClient)];
 
     let operations = sync_external_tasks(
@@ -51,9 +48,10 @@ async fn github_create_persists_repository_without_replacing_project_identity() 
     assert_eq!(operations.len(), 1);
     assert!(operations[0].applied);
     let linked = board
-        .task_board_item("local-1")
+        .item_snapshot("local-1")
         .await
-        .expect("load linked task");
+        .expect("load linked task")
+        .item;
     assert_eq!(linked.project_id.as_deref(), Some("portfolio-primary"));
     assert_eq!(linked.execution_repository.as_deref(), Some("owner/repo"));
     let state = linked.external_refs[0]

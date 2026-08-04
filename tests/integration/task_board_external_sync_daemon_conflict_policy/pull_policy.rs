@@ -1,11 +1,14 @@
 use tempfile::tempdir;
 
 use harness::daemon::db::{AsyncDaemonDb, AsyncDaemonDbConnect};
-use harness::task_board::external::{ExternalSyncClient, ExternalSyncOptions, sync_external_tasks};
+use harness::task_board::external::{
+    ExternalSyncClient, ExternalSyncOptions, TaskBoardSyncStore, sync_external_tasks,
+};
 use harness::task_board::{
     ExternalProvider, ExternalSyncAction, ExternalSyncConflictPolicy, ExternalSyncDirection,
     ExternalSyncField, TaskBoardStatus,
 };
+use harness_task_board_provider_sync::open_task_board_sync_conflicts;
 
 use super::support::{UpdateFakeSyncClient, linked_item, remote_task};
 
@@ -29,7 +32,7 @@ async fn pull_report_is_remote_authoritative_but_prefer_local_is_explicit() {
         let db = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
             .await
             .expect("database");
-        db.create_task_board_item(linked_item(
+        db.create_item(linked_item(
             item_id,
             "Local title",
             "Old body",
@@ -63,9 +66,10 @@ async fn pull_report_is_remote_authoritative_but_prefer_local_is_explicit() {
         .expect("pull external task");
 
         assert_eq!(
-            db.task_board_item(item_id)
+            db.item_snapshot(item_id)
                 .await
                 .expect("reconciled item")
+                .item
                 .title,
             expected_title
         );
@@ -79,7 +83,7 @@ async fn pull_report_is_remote_authoritative_but_prefer_local_is_explicit() {
                     .contains(&ExternalSyncField::Title)
             );
             assert!(
-                db.open_task_board_sync_conflicts()
+                open_task_board_sync_conflicts(&db)
                     .await
                     .expect("open conflicts")
                     .is_empty()

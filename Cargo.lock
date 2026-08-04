@@ -3561,6 +3561,7 @@ dependencies = [
  "harness-session",
  "harness-systemd-protocol",
  "harness-task-board",
+ "harness-task-board-provider-sync",
  "harness-telemetry",
  "harness-testkit",
  "harness-workspace",

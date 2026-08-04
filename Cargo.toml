@@ -197,6 +197,7 @@ harness-daemon-client = { path = "crates/harness-daemon-client", version = "57.0
 harness-github-api = { path = "crates/harness-github-api", version = "57.0.0", features = ["test-support"] }
 harness-reviews = { path = "crates/harness-reviews", version = "57.0.0", features = ["test-support"] }
 harness-task-board = { path = "crates/harness-task-board", version = "57.0.0", features = ["test-support"] }
+harness-task-board-provider-sync = { path = "crates/harness-task-board-provider-sync", version = "57.0.0", features = ["daemon-runtime"] }
 harness-testkit = { path = "testkit" }
 temp-env = { version = "=0.3.6", features = ["async_closure"] }
 axum = { version = "=0.8.9", features = ["http2", "json", "ws"] }

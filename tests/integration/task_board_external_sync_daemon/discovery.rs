@@ -8,7 +8,9 @@ use tempfile::tempdir;
 use std::collections::BTreeSet;
 
 use harness::daemon::db::{AsyncDaemonDb, AsyncDaemonDbConnect};
-use harness::task_board::external::{ExternalSyncClient, ExternalSyncOptions, sync_external_tasks};
+use harness::task_board::external::{
+    ExternalSyncClient, ExternalSyncOptions, TaskBoardSyncStore, sync_external_tasks,
+};
 use harness::task_board::{
     ExternalProvider, ExternalRefProvider, ExternalSyncAction, ExternalSyncConflictPolicy,
     ExternalSyncDirection, ExternalSyncOperation, ExternalTask, ExternalTaskRef, TaskBoardItem,
@@ -39,9 +41,10 @@ async fn imported_items(
     for id in imported_item_ids(operations) {
         items.push(
             board
-                .task_board_item(&id)
+                .item_snapshot(&id)
                 .await
-                .expect("load imported item"),
+                .expect("load imported item")
+                .item,
         );
     }
     items
@@ -140,10 +143,10 @@ async fn combined_intent_folds_dependency_and_review_into_one_ticket() {
     let board = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
         .await
         .expect("database");
-    // A ticket already discovered as a dependency update (its head frozen)
-    // becomes a review request too. The pull must reconcile onto the one
-    // ticket, union the intents, and leave the frozen head untouched rather
-    // than replacing an intent or duplicating the ticket.
+    // A ticket already discovered as a dependency update becomes a review
+    // request too. The pull must reconcile onto the one ticket, union the
+    // intents, and refresh its live provider head without replacing the
+    // stable author or duplicating the ticket.
     let mut existing = github_review_request_item(
         "task-combined-7",
         &format!("{REPOSITORY}#7"),
@@ -153,7 +156,7 @@ async fn combined_intent_folds_dependency_and_review_into_one_ticket() {
     existing.workflow.pr_head_revision = Some("frozen-head".to_owned());
     existing.workflow.pr_author = Some("renovate[bot]".to_owned());
     board
-        .create_task_board_item(existing)
+        .create_item(existing)
         .await
         .expect("seed dependency ticket");
 
@@ -174,14 +177,15 @@ async fn combined_intent_folds_dependency_and_review_into_one_ticket() {
         .expect("review discovery pull");
 
     let ticket = board
-        .task_board_item("task-combined-7")
+        .item_snapshot("task-combined-7")
         .await
-        .expect("load combined ticket");
+        .expect("load combined ticket")
+        .item;
     assert_eq!(ticket.workflow_kind, TaskBoardWorkflowKind::PrFixReview);
     assert_eq!(
         ticket.workflow.pr_head_revision.as_deref(),
-        Some("frozen-head"),
-        "reconciliation backfills only a missing head, never overwrites a frozen one"
+        Some("advanced-head"),
+        "reconciliation refreshes the live provider head"
     );
     assert_eq!(ticket.workflow.pr_author.as_deref(), Some("renovate[bot]"));
 }
@@ -193,7 +197,7 @@ async fn authoritative_complete_pull_closes_an_omitted_review_ticket() {
         .await
         .expect("database");
     board
-        .create_task_board_item(github_review_request_item(
+        .create_item(github_review_request_item(
             "task-review-30",
             &format!("{REPOSITORY}#30"),
             TaskBoardStatus::Inbox,
@@ -211,9 +215,10 @@ async fn authoritative_complete_pull_closes_an_omitted_review_ticket() {
         .expect("authoritative pull");
 
     let ticket = board
-        .task_board_item("task-review-30")
+        .item_snapshot("task-review-30")
         .await
-        .expect("load review ticket");
+        .expect("load review ticket")
+        .item;
     assert_eq!(
         ticket.status,
         TaskBoardStatus::Done,
@@ -228,7 +233,7 @@ async fn non_authoritative_pull_preserves_an_omitted_open_review_ticket() {
         .await
         .expect("database");
     board
-        .create_task_board_item(github_review_request_item(
+        .create_item(github_review_request_item(
             "task-review-31",
             &format!("{REPOSITORY}#31"),
             TaskBoardStatus::Inbox,
@@ -247,9 +252,10 @@ async fn non_authoritative_pull_preserves_an_omitted_open_review_ticket() {
         .expect("non-authoritative pull");
 
     let ticket = board
-        .task_board_item("task-review-31")
+        .item_snapshot("task-review-31")
         .await
-        .expect("load review ticket");
+        .expect("load review ticket")
+        .item;
     assert_eq!(
         ticket.status,
         TaskBoardStatus::Inbox,

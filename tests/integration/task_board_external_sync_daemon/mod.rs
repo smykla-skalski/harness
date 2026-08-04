@@ -12,7 +12,9 @@ mod support;
 use tempfile::tempdir;
 
 use harness::daemon::db::{AsyncDaemonDb, AsyncDaemonDbConnect};
-use harness::task_board::external::{ExternalSyncClient, ExternalSyncOptions, sync_external_tasks};
+use harness::task_board::external::{
+    ExternalSyncClient, ExternalSyncOptions, TaskBoardSyncStore, sync_external_tasks,
+};
 use harness::task_board::{
     ExternalProvider, ExternalRefProvider, ExternalSyncAction, ExternalSyncConflictPolicy,
     ExternalSyncDirection, ExternalTask, ExternalTaskRef, TaskBoardItem, TaskBoardStatus,
@@ -70,10 +72,13 @@ async fn sync_external_tasks_uses_injected_clients_without_network() {
         "2026-05-14T00:00:00Z".to_owned(),
     );
     local.status = TaskBoardStatus::Todo;
-    board
-        .create_task_board_item(local)
-        .await
-        .expect("create local task");
+    local.tags = vec!["test/sync".to_owned()];
+    let local = board.create_item(local).await.expect("create local task");
+    assert_eq!(
+        local.status,
+        TaskBoardStatus::Todo,
+        "the fixture must exercise the Todo push path"
+    );
     let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(FakeSyncClient::new(
         ExternalProvider::GitHub,
         vec![external_task("remote-1", "Remote task")],
@@ -111,14 +116,16 @@ async fn sync_external_tasks_uses_injected_clients_without_network() {
             && operation.applied
     }));
     let pulled = board
-        .task_board_item(&pulled_id)
+        .item_snapshot(&pulled_id)
         .await
-        .expect("load pulled task");
+        .expect("load pulled task")
+        .item;
     assert_eq!(pulled.title, "Remote task");
     let pushed = board
-        .task_board_item("local-1")
+        .item_snapshot("local-1")
         .await
-        .expect("load pushed task");
+        .expect("load pushed task")
+        .item;
     assert!(pushed.external_refs.iter().any(|reference| {
         reference.provider == ExternalRefProvider::GitHub
             && reference.external_id == "acme/widgets#local-1"

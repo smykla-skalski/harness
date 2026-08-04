@@ -10,7 +10,7 @@ use harness::daemon::db::{AsyncDaemonDb, AsyncDaemonDbConnect};
 use harness::task_board::external::{
     ExternalCreateLease, ExternalCreateProbe, ExternalCreateRecoveryClient, ExternalCreateRequest,
     ExternalProviderScopeIdentity, ExternalSyncClient, ExternalSyncOptions,
-    TaskBoardExternalCreateIntentState, sync_external_tasks,
+    TaskBoardExternalCreateIntentState, TaskBoardSyncStore, sync_external_tasks,
 };
 use harness::task_board::{
     ExternalProvider, ExternalProviderCapabilities, ExternalRefSyncState, ExternalRevisionUpdate,
@@ -18,6 +18,7 @@ use harness::task_board::{
     ExternalSyncOperation, ExternalTask, ExternalTaskRef, ExternalTaskUpdate,
     ExternalUpdateOutcome, TaskBoardItem, TaskBoardStatus,
 };
+use harness_task_board_provider_sync::task_board_external_create_receipt;
 
 #[tokio::test]
 async fn newly_created_done_item_is_linked_then_closed() {
@@ -69,9 +70,10 @@ async fn failed_close_keeps_link_and_backoff_does_not_create_duplicate() {
     assert_eq!(state.updated_at.as_deref(), Some("provider-revision-1"));
     assert_eq!(
         board
-            .task_board_item("done-1")
+            .item_snapshot("done-1")
             .await
             .expect("linked item after failure")
+            .item
             .external_refs
             .len(),
         1
@@ -145,8 +147,7 @@ async fn done_create_and_close_preserve_exact_unknown_provider_revisions() {
     let state = stored_sync_state(&board).await;
     assert_eq!(state.status, Some(TaskBoardStatus::Done));
     assert_eq!(state.updated_at, None);
-    let receipt = board
-        .task_board_external_create_receipt("done-1", ExternalProvider::GitHub)
+    let receipt = task_board_external_create_receipt(&board, "done-1", ExternalProvider::GitHub)
         .await
         .expect("create receipt")
         .expect("attached create receipt");
@@ -166,7 +167,7 @@ async fn done_create_and_close_preserve_exact_unknown_provider_revisions() {
     );
     assert_eq!(
         board
-            .task_board_provider_scope_state(ExternalProvider::GitHub, &scope_id)
+            .provider_scope_state(ExternalProvider::GitHub, &scope_id)
             .await
             .expect("scope state")
             .base_revision,
@@ -205,18 +206,16 @@ async fn board_with_done_item() -> (tempfile::TempDir, AsyncDaemonDb) {
     );
     item.status = TaskBoardStatus::Done;
     item.project_id = Some("acme/widgets".into());
-    board
-        .create_task_board_item(item)
-        .await
-        .expect("create Done item");
+    board.create_item(item).await.expect("create Done item");
     (temp, board)
 }
 
 async fn stored_sync_state(board: &AsyncDaemonDb) -> ExternalRefSyncState {
     board
-        .task_board_item("done-1")
+        .item_snapshot("done-1")
         .await
         .expect("stored item")
+        .item
         .external_refs
         .first()
         .expect("external reference")

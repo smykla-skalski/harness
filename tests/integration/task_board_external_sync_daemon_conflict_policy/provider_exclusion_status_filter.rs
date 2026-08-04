@@ -1,7 +1,9 @@
 use tempfile::tempdir;
 
 use harness::daemon::db::{AsyncDaemonDb, AsyncDaemonDbConnect};
-use harness::task_board::external::{ExternalSyncClient, ExternalSyncOptions, sync_external_tasks};
+use harness::task_board::external::{
+    ExternalSyncClient, ExternalSyncOptions, TaskBoardSyncStore, sync_external_tasks,
+};
 use harness::task_board::store::TaskBoardItemPatch;
 use harness::task_board::{
     ExternalProvider, ExternalRefProvider, ExternalSyncConflictPolicy, ExternalSyncDirection,
@@ -28,15 +30,16 @@ async fn todo_status_filtered_pull_restores_an_open_provider_exclusion_tombstone
         .as_mut()
         .expect("sync state")
         .labels = vec!["duplicate".into()];
+    db.create_item(item).await.expect("create local task");
     let created = db
-        .create_task_board_item(item)
+        .item_snapshot("hidden-inbox")
         .await
-        .expect("create local task");
-    db.hide_task_board_item_for_provider_exclusion(
+        .expect("load created item");
+    db.hide_for_provider_exclusion(
         "hidden-inbox",
         created.item_revision,
         TaskBoardItemPatch::default(),
-        &ProviderExclusionAuditContext {
+        ProviderExclusionAuditContext {
             provider: ExternalRefProvider::GitHub,
             incoming_external_ref: "remote-1".into(),
             stored_external_ref: "remote-1".into(),
@@ -73,7 +76,7 @@ async fn todo_status_filtered_pull_restores_an_open_provider_exclusion_tombstone
     .expect("sync external tasks");
 
     assert!(
-        !db.task_board_item_snapshot("hidden-inbox")
+        !db.item_snapshot("hidden-inbox")
             .await
             .expect("load restored item")
             .item
