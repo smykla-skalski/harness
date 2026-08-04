@@ -42,6 +42,7 @@ pub(crate) use super::{
 pub(crate) use harness_daemon_snapshot as daemon_snapshot;
 
 pub(crate) mod activity_fold;
+pub(crate) mod activity_fold_cache;
 mod async_agent_turn_runs;
 pub(crate) mod audit_event_retention;
 pub(crate) mod audit_event_retention_async;
@@ -277,7 +278,7 @@ pub struct DaemonDb {
     conn: Connection,
     path: Option<PathBuf>,
     /// Per-agent running activity folds for the live conversation append path.
-    activity_fold: RefCell<activity_fold::ActivityFoldCache>,
+    activity_fold: RefCell<activity_fold_cache::ActivityFoldCache>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

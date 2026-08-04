@@ -58,7 +58,7 @@ impl DaemonDb {
         let db = Self {
             conn,
             path: Some(path.to_path_buf()),
-            activity_fold: RefCell::new(super::activity_fold::ActivityFoldCache::new()),
+            activity_fold: RefCell::new(super::activity_fold_cache::ActivityFoldCache::new()),
         };
         db.ensure_schema(hooks)?;
         prune_remote_audit_events(&db)?;
@@ -82,7 +82,7 @@ impl DaemonDb {
         let db = Self {
             conn,
             path: None,
-            activity_fold: RefCell::new(super::activity_fold::ActivityFoldCache::new()),
+            activity_fold: RefCell::new(super::activity_fold_cache::ActivityFoldCache::new()),
         };
         db.ensure_schema(hooks)?;
         prune_remote_audit_events(&db)?;
