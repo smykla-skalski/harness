@@ -7,6 +7,7 @@ mod admission_reservations;
 pub(super) use admission_lifecycle::release_managed_worker_admission_in_tx;
 mod aggregates;
 mod automation_cancel_targets;
+mod automation_kill_switch;
 mod dispatch_admission_queries;
 mod dispatch_admission_tx_ext;
 mod dispatch_intents;
@@ -45,9 +46,9 @@ mod remote_artifact_fetch_response;
 mod remote_artifacts;
 mod remote_assignment_active_fence;
 mod remote_assignment_archival_fence;
-mod remote_assignment_authority_queries;
 #[cfg(test)]
 mod remote_assignment_archival_fence_tests;
+mod remote_assignment_authority_queries;
 mod remote_assignment_authority_settlement;
 mod remote_assignment_cancel_journal;
 mod remote_assignment_cancel_response;
@@ -266,6 +267,7 @@ pub(crate) mod write_workflow_fixture;
 pub(crate) use admission_recovery::{
     TaskBoardAdmissionMissingRunRecovery, TaskBoardAdmissionWorkerRecovery,
 };
+pub(crate) use automation_kill_switch::AgentTurnStopTarget;
 pub(crate) use dispatch_intents::{ClaimedTaskBoardDispatch, TaskBoardDispatchClaimAction};
 pub(crate) use dispatch_preparation_claim::{
     TaskBoardPreparationClaim, TaskBoardPreparationUnavailable,

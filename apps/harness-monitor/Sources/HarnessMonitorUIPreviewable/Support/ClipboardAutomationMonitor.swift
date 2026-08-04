@@ -135,7 +135,11 @@ final class ClipboardAutomationMonitor {
     onDispatch: @escaping @MainActor (ClipboardAutomationDispatch) -> Void
   ) async {
     guard center.isClipboardMonitorEnabled else {
-      center.updateClipboardRuntimeState(.off)
+      center.updateClipboardRuntimeState(
+        center.isKillSwitchEngaged
+          ? .paused("Automation kill switch is engaged")
+          : .off
+      )
       lastChangeCount = NSPasteboard.general.changeCount
       return
     }

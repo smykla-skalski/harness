@@ -86,7 +86,7 @@ pub(in crate::daemon::db::task_board) async fn validate_worker_start_fence_in_tx
     .map_err(|error| db_error(format!("load final task board start fence: {error}")))?;
     if spawn_kill_switch {
         return Err(CliErrorKind::invalid_transition(
-            "spawn kill switch engaged; worker start refused".to_string(),
+            "automation kill switch engaged; worker start refused".to_string(),
         )
         .into());
     }

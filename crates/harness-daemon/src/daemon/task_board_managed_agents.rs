@@ -4,18 +4,18 @@ use tokio::task::JoinHandle;
 use tokio::time::sleep;
 
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::workflow_owner;
 use crate::daemon::http::{
     DaemonHttpState, require_async_db, run_codex_agent_blocking, run_terminal_agent_blocking,
 };
 use crate::daemon::protocol::ManagedAgentSnapshot;
+use crate::daemon::reviews_store::PolicyGraphQueries;
 use crate::task_board::{
     AgentMode, DispatchAppliedTask, TaskBoardLaunchCapability, codex_worker_id, managed_worker_id,
     terminal_worker_id,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
-use crate::daemon::db::task_board::prelude::*;
-use crate::daemon::reviews_store::PolicyGraphQueries;
 
 const DISPATCH_CLAIM_HEARTBEAT_INTERVAL: Duration = Duration::from_secs(10);
 
@@ -342,17 +342,18 @@ async fn start_worker_by_mode(
     applied: &DispatchAppliedTask,
     dispatch_intent_id: &str,
 ) -> Result<ManagedAgentSnapshot, CliError> {
-    match applied.item.agent_mode {
+    let snapshot = match applied.item.agent_mode {
         AgentMode::Interactive => {
             start_interactive_worker(state, applied, dispatch_intent_id).await
         }
         AgentMode::Headless | AgentMode::Planning | AgentMode::Evaluate => {
             start_codex_worker(state, applied, dispatch_intent_id).await
         }
-    }
+    }?;
+    crate::daemon::automation_kill_switch::fence_started_managed_agent(state, snapshot).await
 }
 
-/// Block the worker start when the persisted spawn kill switch is engaged. The
+/// Block the worker start when the persisted automation kill switch is engaged. The
 /// caller (route executor or recovery loop) surfaces the error so the intent
 /// stays unstarted instead of launching a worker the operator has halted.
 async fn ensure_spawn_kill_switch_clear(
@@ -364,7 +365,7 @@ async fn ensure_spawn_kill_switch_clear(
     if workspace.is_some_and(|workspace| workspace.spawn_kill_switch) {
         warn_kill_switch_at_start(board_item_id);
         return Err(CliErrorKind::invalid_transition(
-            "spawn kill switch engaged; worker start refused".to_string(),
+            "automation kill switch engaged; worker start refused".to_string(),
         )
         .into());
     }
@@ -379,7 +380,7 @@ fn warn_kill_switch_at_start(board_item_id: &str) {
     tracing::warn!(
         target: "harness::task_board",
         board_item_id = %board_item_id,
-        "spawn kill switch engaged at worker start; refusing to launch worker",
+        "automation kill switch engaged at worker start; refusing to launch worker",
     );
 }
 

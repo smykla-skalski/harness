@@ -5,6 +5,7 @@ use uuid::Uuid;
 
 use crate::agents::runtime::{AgentRuntime, InitialPromptDelivery, runtime_for_name};
 use crate::daemon::bridge::{AgentTuiStartSpec, BridgeCapability, BridgeClient};
+use crate::daemon::reviews_store::PolicyGraphSyncQueries;
 use crate::infra::io::validate_safe_segment;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
@@ -46,6 +47,7 @@ impl AgentTuiManagerHandle {
         tui_id: String,
     ) -> Result<AgentTuiSnapshot, CliError> {
         validate_safe_segment(&tui_id)?;
+        self.ensure_automation_kill_switch_clear()?;
         if self.is_tui_active(&tui_id)? {
             return ensure_tui_session(self.load_snapshot(&tui_id)?, session_id);
         }
@@ -98,6 +100,20 @@ impl AgentTuiManagerHandle {
             );
         }
         result
+    }
+
+    fn ensure_automation_kill_switch_clear(&self) -> Result<(), CliError> {
+        let database = self.db()?;
+        let database = lock_db(&database)?;
+        if database
+            .load_policy_workspace()?
+            .is_some_and(|workspace| workspace.spawn_kill_switch)
+        {
+            return Err(
+                CliErrorKind::invalid_transition("automation kill switch is engaged").into(),
+            );
+        }
+        Ok(())
     }
 
     /// Spawn a background thread that waits for the readiness callback (or

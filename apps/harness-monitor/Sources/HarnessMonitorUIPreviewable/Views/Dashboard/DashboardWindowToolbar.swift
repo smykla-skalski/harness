@@ -37,7 +37,7 @@ struct DashboardWindowToolbar: ToolbarContent {
     ToolbarSpacer(.fixed, placement: .primaryAction)
       .sharedBackgroundVisibility(.hidden)
 
-    GlobalPolicyEnforcementToolbarGroup(store: store)
+    AutomationKillSwitchToolbarGroup(store: store)
 
     if let inspector {
       ToolbarSpacer(.fixed, placement: .primaryAction)

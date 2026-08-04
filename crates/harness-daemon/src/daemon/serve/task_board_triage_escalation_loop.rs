@@ -16,13 +16,13 @@ use tokio::task::JoinHandle;
 use tokio::time::{MissedTickBehavior, interval};
 use tracing::warn;
 
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{AsyncDaemonDb, ClaimedTaskBoardTriageEscalation};
 use crate::daemon::http::{DaemonHttpState, run_codex_agent_blocking};
 use crate::daemon::protocol::{CodexRunMode, CodexRunRequest};
 use crate::session::types::{CONTROL_PLANE_ACTOR_ID, SessionRole};
 use crate::task_board::{TaskBoardTriageEscalationConfig, render_triage_escalation_prompt};
 use harness_kernel::errors::{CliError, CliErrorKind};
-use crate::daemon::db::task_board::prelude::*;
 
 const TICK_INTERVAL: Duration = Duration::from_secs(5);
 const SCRATCH_DIR_NAME: &str = "triage-escalation-scratch";
@@ -73,6 +73,15 @@ async fn drain_tick(
     db: &AsyncDaemonDb,
     config: &TaskBoardTriageEscalationConfig,
 ) {
+    match crate::daemon::automation_kill_switch::enforce_triage_automation_control(state, db).await
+    {
+        Ok(true) => return,
+        Ok(false) => {}
+        Err(error) => {
+            warn!(%error, "triage automation control enforcement failed");
+            return;
+        }
+    }
     match db
         .sweep_stale_task_board_triage_escalations(config.timeout_seconds)
         .await
@@ -160,6 +169,7 @@ async fn spawn_escalation_worker(
     db: &AsyncDaemonDb,
     escalation: &ClaimedTaskBoardTriageEscalation,
 ) -> Result<(), CliError> {
+    ensure_triage_automation_enabled(db).await?;
     let item = db.task_board_item(&escalation.item_id).await?;
     let project_dir = ensure_escalation_scratch_dir(db, &escalation.escalation_id)?;
     let prompt = render_triage_escalation_prompt(
@@ -191,7 +201,31 @@ async fn spawn_escalation_worker(
             .start_standalone_run_with_id(&project_dir, &request, run_id)
             .map(|_| ())
     })
-    .await
+    .await?;
+    if !triage_automation_enabled(db).await? {
+        stop_escalation_worker(state, &escalation.managed_run_id).await;
+        return Err(triage_automation_disabled_error());
+    }
+    Ok(())
+}
+
+async fn ensure_triage_automation_enabled(db: &AsyncDaemonDb) -> Result<(), CliError> {
+    if !triage_automation_enabled(db).await? {
+        return Err(triage_automation_disabled_error());
+    }
+    Ok(())
+}
+
+async fn triage_automation_enabled(db: &AsyncDaemonDb) -> Result<bool, CliError> {
+    Ok(!db.automation_kill_switch_engaged().await?
+        && db
+            .task_board_orchestrator_settings()
+            .await?
+            .triage_automation_enabled)
+}
+
+fn triage_automation_disabled_error() -> CliError {
+    CliErrorKind::invalid_transition("triage automation is disabled").into()
 }
 
 /// A dedicated, empty directory per escalation under the daemon's own data

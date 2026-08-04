@@ -13,6 +13,9 @@ pub(super) fn apply_settings_update(
     if let Some(step_mode) = update.step_mode {
         settings.step_mode = step_mode;
     }
+    if let Some(triage_automation_enabled) = update.triage_automation_enabled {
+        settings.triage_automation_enabled = triage_automation_enabled;
+    }
     if let Some(workflows) = &update.enabled_workflows {
         settings.enabled_workflows.clone_from(workflows);
     }

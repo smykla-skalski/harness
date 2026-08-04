@@ -49,11 +49,24 @@ pub(super) async fn post_terminal_agent_start(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let result = run_terminal_agent_blocking(&state, "start", move |manager| {
-        manager.start(&session_id, &request)
-    })
-    .await
-    .map(ManagedAgentSnapshot::Terminal);
+    let result =
+        match crate::daemon::automation_kill_switch::require_automation_kill_switch_clear(&state)
+            .await
+        {
+            Ok(()) => run_terminal_agent_blocking(&state, "start", move |manager| {
+                manager.start(&session_id, &request)
+            })
+            .await
+            .map(ManagedAgentSnapshot::Terminal),
+            Err(error) => Err(error),
+        };
+    let result = match result {
+        Ok(snapshot) => {
+            crate::daemon::automation_kill_switch::fence_started_managed_agent(&state, snapshot)
+                .await
+        }
+        Err(error) => Err(error),
+    };
     timed_json(
         "POST",
         http_paths::SESSION_MANAGED_AGENTS_TERMINAL,
@@ -88,15 +101,30 @@ pub(super) async fn post_codex_agent_start(
     if let Err(response) = authorize_control_request(&headers, &state, &mut request) {
         return *response;
     }
-    let run_session_id = session_id.clone();
-    let result = with_managed_agent_lock(&state, &session_id, "codex:start", || {
-        run_codex_agent_blocking(&state, "start", move |controller| {
-            controller
-                .start_run(&run_session_id, &request)
-                .map(ManagedAgentSnapshot::Codex)
-        })
-    })
-    .await;
+    let result =
+        match crate::daemon::automation_kill_switch::require_automation_kill_switch_clear(&state)
+            .await
+        {
+            Ok(()) => {
+                let run_session_id = session_id.clone();
+                with_managed_agent_lock(&state, &session_id, "codex:start", || {
+                    run_codex_agent_blocking(&state, "start", move |controller| {
+                        controller
+                            .start_run(&run_session_id, &request)
+                            .map(ManagedAgentSnapshot::Codex)
+                    })
+                })
+                .await
+            }
+            Err(error) => Err(error),
+        };
+    let result = match result {
+        Ok(snapshot) => {
+            crate::daemon::automation_kill_switch::fence_started_managed_agent(&state, snapshot)
+                .await
+        }
+        Err(error) => Err(error),
+    };
     timed_json(
         "POST",
         http_paths::SESSION_MANAGED_AGENTS_CODEX,

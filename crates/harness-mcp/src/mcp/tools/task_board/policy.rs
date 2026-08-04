@@ -21,7 +21,7 @@ fn spawn_gate_descriptors() -> [TaskBoardToolDescriptor; 5] {
         },
         TaskBoardToolDescriptor {
             name: ws_methods::POLICY_CANVAS_SET_SPAWN_KILL_SWITCH,
-            description: "Toggle the emergency spawn kill switch.",
+            description: "Toggle the emergency app-wide automation kill switch.",
             input_schema: global_enforcement_schema,
         },
         TaskBoardToolDescriptor {

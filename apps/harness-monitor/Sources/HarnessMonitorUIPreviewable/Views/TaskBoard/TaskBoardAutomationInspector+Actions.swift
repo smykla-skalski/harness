@@ -27,6 +27,36 @@ struct TaskBoardAutomationInspectorActions: Equatable {
   }
 
   @MainActor
+  func enqueuePolicyAutomation(enabled: Bool) {
+    guard isActive, isOnline, state.pendingPolicyAutomationEnabled == nil else { return }
+    state.pendingPolicyAutomationEnabled = enabled
+    let state = state
+    HarnessMonitorAsyncWorkQueue.shared.submit(
+      .init(title: "Updating policy automation") {
+        _ = await store.setPolicyCanvasGlobalEnforcement(enabled: enabled)
+        await MainActor.run {
+          state.pendingPolicyAutomationEnabled = nil
+        }
+      }
+    )
+  }
+
+  @MainActor
+  func enqueueTriageAutomation(enabled: Bool) {
+    guard isActive, isOnline, state.pendingTriageAutomationEnabled == nil else { return }
+    state.pendingTriageAutomationEnabled = enabled
+    let state = state
+    HarnessMonitorAsyncWorkQueue.shared.submit(
+      .init(title: "Updating automatic triage") {
+        _ = await store.setTaskBoardTriageAutomation(enabled: enabled)
+        await MainActor.run {
+          state.pendingTriageAutomationEnabled = nil
+        }
+      }
+    )
+  }
+
+  @MainActor
   private func enqueueHistory(force: Bool) {
     guard isActive, isOnline,
       let request = state.beginInitialHistoryLoad(force: force)

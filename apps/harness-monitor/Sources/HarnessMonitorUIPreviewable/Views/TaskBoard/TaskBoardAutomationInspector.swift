@@ -93,6 +93,15 @@ struct TaskBoardAutomationInspector: View {
     )
 
     TaskBoardSection(title: "Automation") {
+      TaskBoardAutomationSystemControls(
+        store: store,
+        state: state,
+        presentation: cachedPresentation,
+        metrics: metrics,
+        isPresentationCurrent: isPresentationCurrent,
+        actions: actions
+      )
+
       HarnessMonitorSegmentedPicker(
         title: "Automation inspector surface",
         selection: Binding(

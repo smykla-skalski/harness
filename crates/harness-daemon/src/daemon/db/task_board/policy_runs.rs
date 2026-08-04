@@ -1,9 +1,10 @@
 use chrono::{DateTime, Utc};
-use sqlx::{Sqlite, Transaction, query, query_as};
+use sqlx::{Sqlite, Transaction, query, query_as, query_scalar};
 
 use super::POLICY_RUNTIME_CHANGE_SCOPE;
 use super::items::bump_change_in_tx;
 use super::mapper::{label, parse_json, to_json};
+use crate::daemon::db::prelude::*;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::policy_runtime::events::run_matches_event;
 use crate::task_board::policy_runtime::models::{
@@ -13,7 +14,6 @@ use crate::task_board::policy_runtime::repository::{
     BeginRunOutcome, begin_run_in_document, claim_waiting_run_in_document, save_run_in_document,
 };
 use crate::task_board::policy_runtime::scheduler::timer_wait_is_due;
-use crate::daemon::db::prelude::*;
 
 /// Real implementations behind the matching [`PolicyRuntimeQueries`] methods,
 /// called from the single consolidated trait impl in
@@ -143,6 +143,37 @@ pub(super) async fn policy_runs_ready_for_timer(
             .then_with(|| left.created_at.cmp(&right.created_at))
     });
     Ok(runs)
+}
+
+pub(super) async fn cancel_active_policy_workflow_runs(
+    db: &AsyncDaemonDb,
+    reason: &str,
+) -> Result<usize, CliError> {
+    let active = query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM policy_workflow_runs WHERE status IN ('running', 'waiting')",
+    )
+    .fetch_one(db.pool())
+    .await
+    .map_err(|error| db_error(format!("count active policy workflow runs: {error}")))?;
+    if active == 0 {
+        return Ok(0);
+    }
+    update_policy_runs(db, "policy run automation stop", |document| {
+        let mut cancelled = 0;
+        for run in &mut document.runs {
+            if matches!(
+                run.status,
+                crate::task_board::policy_runtime::models::PolicyRunStatus::Running
+                    | crate::task_board::policy_runtime::models::PolicyRunStatus::Waiting
+            ) {
+                run.mark_cancelled(reason);
+                cancelled += 1;
+            }
+        }
+        Ok(cancelled)
+    })
+    .await
+    .map(|(cancelled, _)| cancelled)
 }
 
 async fn update_policy_runs<R>(

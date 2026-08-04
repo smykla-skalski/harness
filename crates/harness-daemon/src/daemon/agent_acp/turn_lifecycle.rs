@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use crate::agents::turn::{AgentTurnId, AgentTurnRequest};
+use crate::agents::turn::{AgentTurnId, AgentTurnRequest, AgentTurnRuntime};
 use crate::daemon::agent_acp::{
     AcpAgentInspectResponse, AcpAgentSessionState, AcpAgentSnapshot, AcpAgentStartRequest,
 };
@@ -10,6 +10,7 @@ use crate::session::types::SessionRole;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::AcpAgentManagerHandle;
+use crate::daemon::db::task_board::prelude::AutomationKillSwitchQueries;
 
 mod persistence;
 
@@ -251,6 +252,13 @@ impl OpenRouterAgentTurnRuntime {
         request: AgentTurnRequest,
         resume_session_id: Option<String>,
     ) -> Result<AgentTurnId, CliError> {
+        if let Some(store) = &self.store
+            && store.automation_kill_switch_engaged().await?
+        {
+            return Err(
+                CliErrorKind::invalid_transition("automation kill switch is engaged").into(),
+            );
+        }
         let expected_resume_session_id = resume_session_id.clone();
         let request = request.into_validated()?;
         let source_revision = request
@@ -311,6 +319,15 @@ impl OpenRouterAgentTurnRuntime {
                 );
             }
             return Err(error);
+        }
+        if let Some(store) = &self.store
+            && store.automation_kill_switch_engaged().await?
+        {
+            <Self as AgentTurnRuntime>::cancel(self, &id).await?;
+            return Err(CliErrorKind::invalid_transition(
+                "automation kill switch engaged while starting an agent turn",
+            )
+            .into());
         }
         Ok(id)
     }

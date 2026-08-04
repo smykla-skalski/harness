@@ -13,6 +13,7 @@ use crate::daemon::protocol::{
     CodexAgentInspectResponse, CodexRunEvent, CodexRunListResponse, CodexRunRequest,
     CodexRunSnapshot, CodexRunStatus, CodexTranscriptResponse, StreamEvent,
 };
+use crate::daemon::reviews_store::PolicyGraphSyncQueries;
 use crate::daemon::state;
 use crate::infra::io::validate_safe_segment;
 use crate::session::types::ManagedAgentRef;
@@ -146,6 +147,7 @@ impl CodexControllerHandle {
         prepare: impl FnOnce(&Self, String) -> Result<CodexRunSnapshot, CliError>,
     ) -> Result<CodexRunSnapshot, CliError> {
         validate_safe_segment(&run_id)?;
+        self.ensure_automation_kill_switch_clear()?;
         let reservation = match self.state.active_runs.reserve(run_id.clone())? {
             ActiveRunRegistration::Acquired(reservation) => reservation,
             ActiveRunRegistration::Waiting(waiter) => {
@@ -174,6 +176,26 @@ impl CodexControllerHandle {
             worker.run().await;
         });
         Ok(snapshot)
+    }
+
+    fn ensure_automation_kill_switch_clear(&self) -> Result<(), CliError> {
+        let Some(database) = self.state.db.get() else {
+            return Ok(());
+        };
+        let database = database.lock().map_err(|_| {
+            CliError::from(CliErrorKind::workflow_io(
+                "daemon database lock is poisoned",
+            ))
+        })?;
+        if database
+            .load_policy_workspace()?
+            .is_some_and(|workspace| workspace.spawn_kill_switch)
+        {
+            return Err(
+                CliErrorKind::invalid_transition("automation kill switch is engaged").into(),
+            );
+        }
+        Ok(())
     }
 
     pub(super) fn prepare_durable_run(

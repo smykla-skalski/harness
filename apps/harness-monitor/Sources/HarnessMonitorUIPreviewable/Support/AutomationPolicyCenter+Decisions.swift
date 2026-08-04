@@ -11,6 +11,13 @@ extension AutomationPolicyCenter {
   ) -> AutomationPolicyDecision {
     let policies = document.policies(for: source)
     let fallbackPolicy = policies.first ?? AutomationPolicyDocument.defaultPolicy(for: source)
+    guard !isKillSwitchEngaged else {
+      return AutomationPolicyDecision(
+        policy: fallbackPolicy,
+        isAllowed: false,
+        reason: "Automation kill switch is engaged"
+      )
+    }
     guard document.isEnabled else {
       return AutomationPolicyDecision(
         policy: fallbackPolicy,

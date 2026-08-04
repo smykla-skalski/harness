@@ -111,11 +111,12 @@ pub(crate) async fn update_orchestrator_settings(
     validate_orchestrator_settings_update_admission_policy(request).map_err(|error| {
         CliErrorKind::workflow_parse(format!("invalid task-board admission policy: {error}"))
     })?;
-    service::update_task_board_orchestrator_settings_db(
-        require_async_db(state, "task board orchestrator settings update")?,
-        request,
-    )
-    .await
+    let db = require_async_db(state, "task board orchestrator settings update")?;
+    let response = service::update_task_board_orchestrator_settings_db(db, request).await?;
+    if request.triage_automation_enabled == Some(false) {
+        crate::daemon::automation_kill_switch::enforce_triage_automation_control(state, db).await?;
+    }
+    Ok(response)
 }
 
 pub(crate) async fn runtime_config(

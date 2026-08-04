@@ -87,6 +87,9 @@ pub(super) async fn enforced_database_reviews_policy_active(
         .load_policy_workspace()
         .await?
         .as_ref()
+        .filter(|workspace| {
+            workspace.global_policy_enforcement_enabled && !workspace.spawn_kill_switch
+        })
         .and_then(|workspace| workspace.active_live_document())
         .is_some_and(|document| document.mode == PolicyGraphMode::Enforced))
 }

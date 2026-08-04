@@ -15,8 +15,7 @@ extension HarnessMonitorAccessibility {
   public static let policyCanvasMakeLiveButton = "harness.policy-canvas.action.make-live"
   public static let policyCanvasGoLiveSheet = "harness.policy-canvas.go-live.sheet"
   public static let policyCanvasGoLiveDiff = "harness.policy-canvas.go-live.diff"
-  public static let policyCanvasGlobalEnforcementButton =
-    "harness.policy-canvas.action.global-enforcement"
+  public static let automationKillSwitchButton = "harness.automation.kill-switch"
   public static let policyCanvasReloadButton = "harness.policy-canvas.action.reload"
   public static let policyCanvasZoomControls = "harness.policy-canvas.zoom"
   public static let policyCanvasZoomOutButton = "harness.policy-canvas.zoom.out"

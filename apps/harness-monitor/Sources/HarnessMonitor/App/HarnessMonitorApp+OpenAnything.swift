@@ -68,6 +68,7 @@ extension HarnessMonitorApp {
     restartOpenAnythingCorpusDriver(
       loadedSessionOverride: appOpenAnythingLoadedSessionOverride
     )
+    appAutomationPolicyRuntimeService.start(store: appStore)
     appClipboardAutomationPolicyService.start(openWindow: openWindow)
   }
 

@@ -649,9 +649,8 @@ private let previewHostTarget: Target = .target(
             "CODE_SIGNING_ALLOWED": "YES",
             "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.previews",
             "PRODUCT_NAME": "HarnessMonitorPreviewHost",
-            "INFOPLIST_KEY_NSPrincipalClass": "NSApplication",
-            "INFOPLIST_KEY_NSHumanReadableCopyright": "",
-            "INFOPLIST_KEY_LSUIElement": "YES"
+            "GENERATE_INFOPLIST_FILE": "NO",
+            "INFOPLIST_FILE": "Resources/HarnessMonitorPreviewHost-Info.plist"
         ],
         configurations: [
             .debug(name: "Debug"),

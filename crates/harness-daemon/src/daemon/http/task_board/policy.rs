@@ -260,12 +260,8 @@ pub(super) async fn post_policy_canvas_set_global_enforcement(
         Ok(parts) => parts,
         Err(response) => return *response,
     };
-    let workspace = match require_async_db(&state, "policy canvas global enforcement") {
-        Ok(db) => {
-            task_board_route_executor::set_policy_canvas_global_enforcement(db, &request).await
-        }
-        Err(error) => Err(error),
-    };
+    let workspace =
+        task_board_route_executor::set_policy_canvas_global_enforcement(&state, &request).await;
     timed_json(
         "POST",
         http_paths::POLICY_CANVASES_GLOBAL_ENFORCEMENT,

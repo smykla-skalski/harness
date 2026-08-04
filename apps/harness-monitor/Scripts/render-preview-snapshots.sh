@@ -106,7 +106,54 @@ case "$suite" in
     HARNESS_TASK_BOARD_LANE_ALIGNMENT_PREVIEW_DUMP="$staging_directory" "$host"
     ;;
   task-board-inspector)
-    HARNESS_TASK_BOARD_INSPECTOR_PREVIEW_DUMP="$staging_directory" "$host"
+    focused_stdout="$staging_directory/.focused-preview.stdout"
+    focused_stderr="$staging_directory/.focused-preview.stderr"
+    open -n -W "$derived_data/Build/Products/Preview/HarnessMonitorPreviewHost.app" \
+      --stdout "$focused_stdout" \
+      --stderr "$focused_stderr" \
+      --env "HARNESS_TASK_BOARD_INSPECTOR_PREVIEW_DUMP=$staging_directory" \
+      --env "HARNESS_MONITOR_FOCUSED_PREVIEW_CAPTURE=1" &
+    focused_launcher_pid=$!
+    for focused_name in \
+      automation-controls-mixed \
+      automation-controls-kill-switch-engaged; do
+      focused_request="$staging_directory/.capture-request-$focused_name"
+      focused_complete="$staging_directory/.capture-complete-$focused_name"
+      for _ in $(seq 1 200); do
+        [[ -s "$focused_request" ]] && break
+        kill -0 "$focused_launcher_pid" 2>/dev/null || break
+        sleep 0.05
+      done
+      if [[ ! -s "$focused_request" ]]; then
+        printf 'error: focused preview did not publish a window for %s\n' "$focused_name" >&2
+        wait "$focused_launcher_pid" || true
+        [[ ! -s "$focused_stderr" ]] || cat "$focused_stderr" >&2
+        exit 1
+      fi
+      IFS= read -r focused_window_id < "$focused_request"
+      if [[ ! "$focused_window_id" =~ ^[1-9][0-9]*$ ]]; then
+        printf 'error: invalid focused preview window id for %s: %s\n' \
+          "$focused_name" "$focused_window_id" >&2
+        wait "$focused_launcher_pid" || true
+        exit 1
+      fi
+      screencapture -l "$focused_window_id" -o "$staging_directory/$focused_name.png"
+      touch "$focused_complete"
+    done
+    wait "$focused_launcher_pid" || true
+    [[ ! -s "$focused_stderr" ]] || cat "$focused_stderr" >&2
+    if [[ ! -s "$staging_directory/.focused-preview-render-complete" ]]; then
+      printf 'error: focused inspector preview did not complete\n' >&2
+      exit 1
+    fi
+    for focused_name in \
+      automation-controls-mixed \
+      automation-controls-kill-switch-engaged; do
+      if [[ ! -s "$staging_directory/$focused_name.png" ]]; then
+        printf 'error: focused preview capture missing for %s\n' "$focused_name" >&2
+        exit 1
+      fi
+    done
     ;;
   task-board-review-report)
     HARNESS_TASK_BOARD_REVIEW_REPORT_PREVIEW_DUMP="$staging_directory" "$host"

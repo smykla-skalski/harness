@@ -297,8 +297,8 @@ pub(crate) use reviews::{
     start_reviews_policy_run_with_audit_db,
 };
 pub use reviews_files::{
-    fetch_review_file_blob, list_review_files,
-    mark_review_files_viewed, patch_review_files, preview_review_files,
+    fetch_review_file_blob, list_review_files, mark_review_files_viewed, patch_review_files,
+    preview_review_files,
 };
 pub use reviews_thread_resolve::set_review_thread_resolved;
 pub use reviews_timeline::{clear_reviews_caches_with_timeline, fetch_review_timeline};
@@ -360,9 +360,9 @@ pub use task_board_host::{
     task_board_host_list, task_board_host_local, task_board_host_set_project_types,
 };
 pub(crate) use task_board_orchestrator_control::{
-    start_task_board_orchestrator_db, stop_task_board_orchestrator_db,
-    task_board_orchestrator_settings_db, task_board_orchestrator_status_db,
-    update_task_board_orchestrator_settings_db,
+    enforce_task_board_orchestrator_kill_switch_db, start_task_board_orchestrator_db,
+    stop_task_board_orchestrator_db, task_board_orchestrator_settings_db,
+    task_board_orchestrator_status_db, update_task_board_orchestrator_settings_db,
 };
 pub(crate) use task_board_orchestrator_db::{
     run_task_board_orchestrator_once_db, run_task_board_orchestrator_once_with_session_db,

@@ -138,6 +138,9 @@ pub(super) fn apply_settings_update(
     settings: &mut TaskBoardOrchestratorSettings,
     update: &TaskBoardOrchestratorSettingsUpdateRequest,
 ) {
+    if let Some(triage_automation_enabled) = update.triage_automation_enabled {
+        settings.triage_automation_enabled = triage_automation_enabled;
+    }
     if let Some(workflows) = &update.enabled_workflows {
         settings.enabled_workflows.clone_from(workflows);
     }

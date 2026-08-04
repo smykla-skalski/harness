@@ -105,7 +105,7 @@ pub fn apply_set_spawn_requires_live_policy(ws: &mut PolicyCanvasWorkspace, enab
     ws.spawn_requires_live_policy
 }
 
-/// Set the emergency spawn kill switch.
+/// Set the emergency app-wide automation kill switch.
 pub fn apply_set_spawn_kill_switch(ws: &mut PolicyCanvasWorkspace, enabled: bool) -> bool {
     ws.spawn_kill_switch = enabled;
     ws.spawn_kill_switch

@@ -53,6 +53,8 @@ struct TaskBoardAutomationActionRequest: Sendable {
 final class TaskBoardAutomationInspectorState {
   var surface = TaskBoardAutomationInspectorSurface.automation
   var activeAction: TaskBoardAutomationInspectorAction?
+  var pendingPolicyAutomationEnabled: Bool?
+  var pendingTriageAutomationEnabled: Bool?
   var historyLoad = TaskBoardAutomationHistoryLoad.idle
   var isMetricsLoading = false
   var isDetailLoading = false
@@ -178,6 +180,8 @@ final class TaskBoardAutomationInspectorState {
     detail = nil
     metrics = nil
     activeAction = nil
+    pendingPolicyAutomationEnabled = nil
+    pendingTriageAutomationEnabled = nil
     pendingForceCancelTarget = nil
     presentationRevision &+= 1
   }

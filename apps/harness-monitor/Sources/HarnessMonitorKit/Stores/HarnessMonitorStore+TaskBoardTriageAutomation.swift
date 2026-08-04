@@ -2,7 +2,7 @@ import Foundation
 
 extension HarnessMonitorStore {
   @discardableResult
-  public func setTaskBoardDryRunDefault(enabled: Bool) async -> Bool {
+  public func setTaskBoardTriageAutomation(enabled: Bool) async -> Bool {
     guard
       let client,
       globalTaskBoardOrchestratorStatus != nil
@@ -26,7 +26,9 @@ extension HarnessMonitorStore {
 
     do {
       let settings = try await client.updateTaskBoardOrchestratorSettings(
-        request: TaskBoardOrchestratorSettingsUpdateRequest(dryRunDefault: enabled)
+        request: TaskBoardOrchestratorSettingsUpdateRequest(
+          triageAutomationEnabled: enabled
+        )
       )
       confirmTaskBoardOrchestratorSettings(settings)
       applyTaskBoardOrchestratorSettings(settings)
@@ -35,23 +37,6 @@ extension HarnessMonitorStore {
     } catch {
       presentFailureFeedback(error.localizedDescription)
       return false
-    }
-  }
-
-  func applyTaskBoardOrchestratorSettings(
-    _ settings: TaskBoardOrchestratorSettings
-  ) {
-    guard let status = globalTaskBoardOrchestratorStatus else { return }
-    let updatedStatus = taskBoardOrchestratorStatus(status, applying: settings)
-    let didChangeStatus = updatedStatus != status
-    withUISyncBatch {
-      globalTaskBoardOrchestratorStatus = updatedStatus
-    }
-    if didChangeStatus {
-      scheduleTaskBoardSnapshotCacheWrite(
-        items: globalTaskBoardItems,
-        orchestratorStatus: updatedStatus
-      )
     }
   }
 }

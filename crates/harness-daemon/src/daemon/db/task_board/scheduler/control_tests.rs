@@ -2,14 +2,16 @@ use chrono::Duration;
 use sqlx::{query, query_scalar};
 
 use super::test_support::{database, instant};
+use crate::daemon::db::task_board::import_lifecycle_queries::ImportLifecycleQueries;
+use crate::daemon::db::task_board::orchestrator_settings_queries::OrchestratorSettingsQueries;
+use crate::daemon::db::task_board::scheduler::queries::TaskBoardAutomationSchedulerQueries;
+use crate::daemon::reviews_store::PolicyGraphQueries;
+use crate::task_board::policy_graph::PolicyCanvasWorkspace;
 use crate::task_board::{
     TaskBoardAutomationAdmissionState, TaskBoardAutomationDesiredMode,
     TaskBoardAutomationWakeEntityKind, TaskBoardAutomationWakePayload,
     TaskBoardAutomationWakeRequest, TaskBoardOrchestratorSettings,
 };
-use crate::daemon::db::task_board::import_lifecycle_queries::ImportLifecycleQueries;
-use crate::daemon::db::task_board::orchestrator_settings_queries::OrchestratorSettingsQueries;
-use crate::daemon::db::task_board::scheduler::queries::TaskBoardAutomationSchedulerQueries;
 
 #[tokio::test]
 async fn control_defaults_without_persisted_intent() {
@@ -27,6 +29,30 @@ async fn control_defaults_without_persisted_intent() {
     );
     assert_eq!(control.stop_generation, 0);
     assert!(control.updated_at.is_empty());
+}
+
+#[tokio::test]
+async fn app_kill_switch_rejects_automation_start() {
+    let db = database().await;
+    let mut workspace = PolicyCanvasWorkspace::seeded();
+    workspace.spawn_kill_switch = true;
+    db.replace_policy_workspace(&workspace)
+        .await
+        .expect("engage app kill switch");
+
+    let error = db
+        .start_task_board_automation(
+            TaskBoardAutomationDesiredMode::Continuous,
+            instant("2026-07-15T06:45:00Z"),
+        )
+        .await
+        .expect_err("kill switch must reject start");
+
+    assert!(
+        error
+            .to_string()
+            .contains("automation kill switch is engaged")
+    );
 }
 
 #[tokio::test]

@@ -2907,7 +2907,7 @@
         "tags": [
           "policy"
         ],
-        "description": "Toggle the emergency spawn kill switch that blocks all new agent spawns, and return the updated workspace snapshot",
+        "description": "Toggle the emergency app kill switch that stops active managed-agent and automation work, blocks new managed-agent and automation work, and returns the updated workspace snapshot",
         "operationId": "post_policy_canvas_set_spawn_kill_switch",
         "requestBody": {
           "content": {
@@ -2921,7 +2921,7 @@
         },
         "responses": {
           "200": {
-            "description": "Workspace after toggling the spawn kill switch",
+            "description": "Workspace after toggling the automation kill switch",
             "content": {
               "application/json": {
                 "schema": {
@@ -31897,6 +31897,9 @@
           },
           "step_mode": {
             "type": "boolean"
+          },
+          "triage_automation_enabled": {
+            "type": "boolean"
           }
         }
       },
@@ -32035,6 +32038,12 @@
             ]
           },
           "step_mode": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "triage_automation_enabled": {
             "type": [
               "boolean",
               "null"

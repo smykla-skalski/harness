@@ -309,7 +309,7 @@ extension HarnessMonitorStore {
   @discardableResult
   public func setPolicyCanvasSpawnKillSwitch(enabled: Bool) async -> Bool {
     await mutatePolicySpawnGate(
-      actionName: enabled ? "Engaged spawn kill switch" : "Disengaged spawn kill switch"
+      actionName: enabled ? "Engaged automation kill switch" : "Disengaged automation kill switch"
     ) { client in
       try await client.setPolicyCanvasSpawnKillSwitch(
         request: PolicyCanvasSetSpawnKillSwitchRequest(enabled: enabled)

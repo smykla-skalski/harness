@@ -83,6 +83,11 @@ pub(super) async fn apply_active_triage_in_tx(
     suppress_placement: bool,
     existing_override: Option<&TaskBoardTriageOverride>,
 ) -> Result<Option<TriageOutcome>, CliError> {
+    if super::automation_kill_switch::automation_kill_switch_engaged_in_tx(transaction).await?
+        || !super::automation_kill_switch::triage_automation_enabled_in_tx(transaction).await?
+    {
+        return Ok(None);
+    }
     let Some(active) = load_active_rule_set_in_tx(transaction).await? else {
         return apply_builtin_v1_triage_in_tx(
             transaction,

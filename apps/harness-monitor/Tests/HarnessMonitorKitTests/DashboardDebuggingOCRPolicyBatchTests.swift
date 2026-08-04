@@ -101,6 +101,42 @@ struct DashboardDebuggingOCRPolicyBatchTests {
     #expect(center.clipboardRuntimeState == .matched("Clipboard Image OCR"))
   }
 
+  @Test("Kill switch discards OCR that finishes after automation stops")
+  func killSwitchDiscardsInFlightBackgroundOCR() async throws {
+    let directory = temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let center = AutomationPolicyCenter(eventDirectoryURL: directory)
+    let recentStore = DashboardOCRRecentImageStore(
+      directoryURL: directory.appendingPathComponent("recents", isDirectory: true),
+      maxItems: 4
+    )
+    var policy = AutomationPolicyDocument.defaultPolicy(for: .clipboard)
+    policy.isEnabled = true
+    policy.actions = [.ocrImage, .rememberRecentScan, .recordMetadata]
+    policy.postprocessors = [.persistResult, .auditEvent]
+    let dispatch = ClipboardAutomationDispatch(
+      candidates: [
+        imageCandidate(image: syntheticImage(), sourceName: "Stopped clipboard.png")
+      ],
+      shouldOpenDashboardDebugging: false,
+      policyDecision: AutomationPolicyDecision(policy: policy, isAllowed: true, reason: nil),
+      sourceApplication: nil
+    )
+
+    await ClipboardAutomationBackgroundOCRProcessor.process(
+      dispatch,
+      center: center,
+      recentStore: recentStore
+    ) { _ in
+      center.setKillSwitchEngaged(true)
+      return .success("Discarded recognized text")
+    }
+
+    #expect(try recentStore.load().isEmpty)
+    #expect(center.recentAutomationEvents.isEmpty)
+    #expect(center.clipboardRuntimeState == .paused("Automation kill switch is engaged"))
+  }
+
   @Test("Pending clipboard policy OCR keeps first matched policy when manual paste also queues")
   func pendingClipboardPolicyOCRKeepsFirstMatchedPolicyWhenManualPasteAlsoQueues() throws {
     DashboardDebuggingOCRPasteboardRequests.resetForTesting()

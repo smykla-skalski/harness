@@ -24,12 +24,12 @@ use crate::daemon::db::task_board::prelude::*;
 
 mod read_only_start_revision_support;
 
+use crate::daemon::db::prelude::*;
 pub(super) use read_only_start_revision_support::{admission_state_counts, intent_status};
 use read_only_start_revision_support::{
     bump_settings_revision, codex_run_count, current_intent_claim, engage_spawn_kill_switch,
     intent_compensation_pending, workflow_execution_count,
 };
-use crate::daemon::db::prelude::*;
 
 #[tokio::test]
 async fn workflow_dispatch_persists_before_any_codex_start() {
@@ -173,7 +173,7 @@ impl FinalStartDrift {
             Self::SettingsRevision => {
                 "read-only workflow configuration revision changed before worker start"
             }
-            Self::SpawnKillSwitch => "spawn kill switch engaged; worker start refused",
+            Self::SpawnKillSwitch => "automation kill switch engaged; worker start refused",
         }
     }
 }

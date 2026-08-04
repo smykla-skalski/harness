@@ -21,7 +21,7 @@ pub(super) async fn engage_spawn_kill_switch(db: &AsyncDaemonDb) {
         Ok(())
     })
     .await
-    .expect("engage spawn kill switch");
+    .expect("engage automation kill switch");
 }
 
 pub(super) async fn codex_run_count(db: &AsyncDaemonDb) -> i64 {

@@ -155,6 +155,7 @@ public enum TaskBoardInspectorPreviewRenderer {
         directory: directory
       )
       && TaskBoardOrchestratorControlsPreviewRenderer.dump(toDirectory: directory)
+      && TaskBoardAutomationControlsPreviewRenderer.dump(toDirectory: directory)
       && TaskBoardReviewReportPreviewRenderer.dump(toDirectory: directory)
   }
 

@@ -172,7 +172,7 @@ struct SessionWindowToolbar: ToolbarContent {
       ToolbarSpacer(.fixed, placement: .primaryAction)
         .sharedBackgroundVisibility(.hidden)
 
-      GlobalPolicyEnforcementToolbarGroup(store: store)
+      AutomationKillSwitchToolbarGroup(store: store)
     }
   }
 

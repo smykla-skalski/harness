@@ -2,11 +2,11 @@ use sqlx::{Sqlite, Transaction, query, query_as, query_scalar};
 use uuid::Uuid;
 
 use super::triage_apply_agent::apply_agent_triage_verdict_in_tx;
+use crate::daemon::db::prelude::*;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
 use crate::task_board::{
     TaskBoardTriageEscalationStatus, TaskBoardTriageEscalationVerdictOutcome, TriageVerdict,
 };
-use crate::daemon::db::prelude::*;
 
 /// One `pending` row claimed by the executor and moved to `running`, ready
 /// to spawn an agent for.
@@ -71,6 +71,12 @@ pub(super) async fn claim_pending_task_board_triage_escalations(
     let mut transaction = db
         .begin_immediate_transaction("task board triage escalation claim")
         .await?;
+    if super::automation_kill_switch::automation_kill_switch_engaged_in_tx(&mut transaction).await?
+        || !super::automation_kill_switch::triage_automation_enabled_in_tx(&mut transaction).await?
+    {
+        commit(transaction, "blocked task board triage escalation claim").await?;
+        return Ok(Vec::new());
+    }
     let candidates = load_pending_escalation_candidates_in_tx(&mut transaction, limit).await?;
     let now = utc_now();
     let mut claimed = Vec::with_capacity(candidates.len());

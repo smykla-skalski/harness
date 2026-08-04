@@ -37,6 +37,8 @@ pub struct TaskBoardGitHubInboxConfig {
 pub struct TaskBoardOrchestratorSettings {
     #[serde(default)]
     pub step_mode: bool,
+    #[serde(default = "default_triage_automation_enabled")]
+    pub triage_automation_enabled: bool,
     #[serde(default = "default_enabled_workflows")]
     pub enabled_workflows: Vec<TaskBoardOrchestratorWorkflow>,
     #[serde(default = "default_dry_run_default")]
@@ -71,6 +73,8 @@ pub struct TaskBoardOrchestratorSettings {
 pub struct TaskBoardOrchestratorSettingsUpdateRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub step_mode: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub triage_automation_enabled: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub enabled_workflows: Option<Vec<TaskBoardOrchestratorWorkflow>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -173,6 +177,7 @@ impl Default for TaskBoardOrchestratorSettings {
     fn default() -> Self {
         Self {
             step_mode: false,
+            triage_automation_enabled: true,
             enabled_workflows: default_enabled_workflows(),
             dry_run_default: default_dry_run_default(),
             dispatch_status_filter: Some(TaskBoardStatus::Todo),
@@ -201,6 +206,10 @@ fn default_enabled_workflows() -> Vec<TaskBoardOrchestratorWorkflow> {
 }
 
 const fn default_dry_run_default() -> bool {
+    true
+}
+
+const fn default_triage_automation_enabled() -> bool {
     true
 }
 

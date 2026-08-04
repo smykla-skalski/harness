@@ -5,6 +5,7 @@ use tokio::task::JoinHandle;
 use tokio::time::{MissedTickBehavior, interval};
 use tracing::warn;
 
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{
     AsyncDaemonDb, ClaimedTaskBoardDispatch, ClaimedTaskBoardDispatchPreparation,
     TaskBoardDispatchClaimAction, TaskBoardPreparationRelease,
@@ -18,7 +19,6 @@ use crate::daemon::task_board_managed_agents::{
 use crate::daemon::task_board_read_only_coordinator::reconcile_task_board_read_only_workflows;
 use crate::task_board::managed_worker_id;
 use harness_kernel::errors::CliError;
-use crate::daemon::db::task_board::prelude::*;
 
 const RECOVERY_INTERVAL: Duration = Duration::from_secs(1);
 const MAX_RECOVERIES_PER_TICK: usize = 16;
@@ -56,6 +56,19 @@ async fn run_task_board_dispatch_loop(
     reason = "recovery drains preparation and worker intent queues while preserving per-claim errors"
 )]
 async fn recover_pending_dispatches(state: &DaemonHttpState, db: &AsyncDaemonDb) {
+    match crate::daemon::automation_kill_switch::enforce_automation_kill_switch(state, db).await {
+        Ok(true) => return,
+        Ok(false) => {}
+        Err(error) => {
+            warn!(%error, "automation kill switch enforcement failed");
+            return;
+        }
+    }
+    if let Err(error) =
+        crate::daemon::automation_kill_switch::enforce_policy_automation_control(db).await
+    {
+        warn!(%error, "policy automation control enforcement failed");
+    }
     if let Err(error) = Box::pin(super::recover_remote_assignments_before_local_work(
         state, db,
     ))

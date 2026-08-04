@@ -1,5 +1,3 @@
-#[cfg(test)]
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -7,21 +5,24 @@ use serde_json::json;
 
 use crate::daemon::audit_events::{AuditEventDraft, record_audit_result};
 use crate::daemon::db::AsyncDaemonDb;
+#[cfg(test)]
+use crate::daemon::db::task_board::prelude::PolicyRuntimeQueries;
 use crate::daemon::service::reviews::token::{github_token, missing_token_error};
-use crate::reviews::policy::{ReviewsPolicyActionExecutor, ReviewsPolicyProvider};
+use crate::reviews::policy::ReviewsPolicyActionExecutor;
 use crate::reviews::{ReviewTarget, ReviewsGitHubClient};
 use crate::task_board::github::{
     ActionGateRequirement, GitHubMergeMethod, GitHubPullRequestEvidenceSource, MergeLedgerOutcome,
     PullRequestAction, PullRequestActionKind, PullRequestIdentity, merge_with_ledger,
 };
-use crate::task_board::policy_runtime::handoff::HandoffPolicyProvider;
-use crate::task_board::policy_runtime::notification::NotificationPolicyProvider;
-use crate::task_board::policy_runtime::providers::PolicyProviderRegistry;
-use crate::task_board::policy_runtime::task_creation::TaskCreationPolicyProvider;
 use harness_kernel::errors::CliError;
 use harness_kernel::errors::CliErrorKind;
+
+#[path = "policy_executor_providers.rs"]
+mod providers;
+
+pub(crate) use providers::build_database_policy_provider_registry;
 #[cfg(test)]
-use crate::daemon::db::task_board::prelude::PolicyRuntimeQueries;
+pub(crate) use providers::build_policy_provider_registry;
 
 pub(crate) struct DaemonReviewsPolicyExecutor {
     client: ReviewsGitHubClient,
@@ -162,47 +163,12 @@ async fn record_reviews_policy_action_audit_result<T>(
     .await;
 }
 
-/// Build the legacy file-backed provider registry used by explicit compatibility
-/// tests. Production callers use [`build_database_policy_provider_registry`].
-#[cfg(test)]
-pub(crate) fn build_policy_provider_registry<E>(
-    executor: E,
-    root: PathBuf,
-) -> PolicyProviderRegistry
-where
-    E: ReviewsPolicyActionExecutor + Send + Sync + 'static,
-{
-    let mut providers = PolicyProviderRegistry::default();
-    providers.register(ReviewsPolicyProvider::new(executor));
-    providers.register(HandoffPolicyProvider::new(root.clone()));
-    providers.register(NotificationPolicyProvider::new(root.clone()));
-    providers.register(TaskCreationPolicyProvider::new(root));
-    providers
-}
-
-/// Build the production registry with every durable non-reviews side effect
-/// written to the canonical daemon database.
-pub(crate) fn build_database_policy_provider_registry<E>(
-    executor: E,
-    database: Arc<AsyncDaemonDb>,
-) -> PolicyProviderRegistry
-where
-    E: ReviewsPolicyActionExecutor + Send + Sync + 'static,
-{
-    let mut providers = PolicyProviderRegistry::default();
-    providers.register(ReviewsPolicyProvider::new(executor));
-    providers.register(HandoffPolicyProvider::new_database(Arc::clone(&database)));
-    providers.register(NotificationPolicyProvider::new_database(Arc::clone(
-        &database,
-    )));
-    providers.register(TaskCreationPolicyProvider::new_database(database));
-    providers
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::daemon::db::AsyncAuditQueries;
+    use crate::daemon::reviews_store::PolicyGraphQueries;
+    use crate::task_board::policy_graph::PolicyCanvasWorkspace;
     use crate::task_board::policy_runtime::handoff::{HANDOFF_ACTION_KEY, HANDOFF_PROVIDER};
     use crate::task_board::policy_runtime::models::{
         PolicyActionDescriptor, PolicyRunSubject, PolicyRunTrigger,
@@ -392,6 +358,64 @@ mod tests {
                 .len(),
             1
         );
+    }
+
+    #[tokio::test]
+    async fn database_registry_refuses_actions_when_app_kill_switch_is_engaged() {
+        let dir = tempdir().expect("tempdir");
+        let database = Arc::new(
+            AsyncDaemonDb::connect(&dir.path().join("harness.db"))
+                .await
+                .expect("open async daemon db"),
+        );
+        let mut workspace = PolicyCanvasWorkspace::seeded();
+        workspace.spawn_kill_switch = true;
+        database
+            .replace_policy_workspace(&workspace)
+            .await
+            .expect("engage app kill switch");
+        let registry = build_database_policy_provider_registry(NoopExecutor, database);
+        let action = PolicyActionDescriptor {
+            provider: HANDOFF_PROVIDER.to_owned(),
+            action_key: HANDOFF_ACTION_KEY.to_owned(),
+            payload: Some(serde_json::json!({ "handoff_key": "next-handler" })),
+        };
+
+        let error = registry
+            .execute(&action, &execution_context())
+            .await
+            .expect_err("kill switch must block policy action");
+
+        assert!(error.to_string().contains("policy automation is disabled"));
+    }
+
+    #[tokio::test]
+    async fn database_registry_refuses_actions_when_policy_automation_is_disabled() {
+        let dir = tempdir().expect("tempdir");
+        let database = Arc::new(
+            AsyncDaemonDb::connect(&dir.path().join("harness.db"))
+                .await
+                .expect("open async daemon db"),
+        );
+        let mut workspace = PolicyCanvasWorkspace::seeded();
+        workspace.global_policy_enforcement_enabled = false;
+        database
+            .replace_policy_workspace(&workspace)
+            .await
+            .expect("disable policy automation");
+        let registry = build_database_policy_provider_registry(NoopExecutor, database);
+        let action = PolicyActionDescriptor {
+            provider: HANDOFF_PROVIDER.to_owned(),
+            action_key: HANDOFF_ACTION_KEY.to_owned(),
+            payload: Some(serde_json::json!({ "handoff_key": "next-handler" })),
+        };
+
+        let error = registry
+            .execute(&action, &execution_context())
+            .await
+            .expect_err("disabled policy automation must block action");
+
+        assert!(error.to_string().contains("policy automation is disabled"));
     }
 
     #[tokio::test]

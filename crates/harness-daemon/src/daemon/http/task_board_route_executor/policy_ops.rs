@@ -19,6 +19,8 @@ use crate::daemon::protocol::{
 use crate::daemon::service;
 use harness_kernel::errors::CliError;
 
+use super::super::{DaemonHttpState, require_async_db};
+
 pub(crate) async fn policy_canvas_workspace(
     db: &AsyncDaemonDb,
 ) -> Result<PolicyCanvasWorkspaceResponse, CliError> {
@@ -61,10 +63,15 @@ pub(crate) async fn delete_policy_canvas(
 }
 
 pub(crate) async fn set_policy_canvas_global_enforcement(
-    db: &AsyncDaemonDb,
+    state: &DaemonHttpState,
     request: &PolicyCanvasSetGlobalEnforcementRequest,
 ) -> Result<PolicyCanvasWorkspaceResponse, CliError> {
-    service::set_policy_canvas_global_enforcement(db, request).await
+    let db = require_async_db(state, "policy canvas global enforcement")?;
+    let workspace = service::set_policy_canvas_global_enforcement(db, request).await?;
+    if !request.enabled {
+        crate::daemon::automation_kill_switch::enforce_policy_automation_control(db).await?;
+    }
+    Ok(workspace)
 }
 
 pub(crate) async fn set_policy_canvas_spawn_requires_live_policy(
@@ -75,10 +82,15 @@ pub(crate) async fn set_policy_canvas_spawn_requires_live_policy(
 }
 
 pub(crate) async fn set_policy_canvas_spawn_kill_switch(
-    db: &AsyncDaemonDb,
+    state: &DaemonHttpState,
     request: &PolicyCanvasSetSpawnKillSwitchRequest,
 ) -> Result<PolicyCanvasWorkspaceResponse, CliError> {
-    service::set_policy_canvas_spawn_kill_switch(db, request).await
+    let db = require_async_db(state, "policy canvas automation kill switch")?;
+    let workspace = service::set_policy_canvas_spawn_kill_switch(db, request).await?;
+    if request.enabled {
+        crate::daemon::automation_kill_switch::enforce_automation_kill_switch(state, db).await?;
+    }
+    Ok(workspace)
 }
 
 pub(crate) async fn list_policy_approval_grants(

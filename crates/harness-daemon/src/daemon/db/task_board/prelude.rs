@@ -8,6 +8,7 @@
 //! specific trait backs which method, and a new trait only needs adding here
 //! once rather than at every call site that ends up needing it.
 
+pub(crate) use super::automation_kill_switch::AutomationKillSwitchQueries;
 pub(crate) use super::dispatch_admission_queries::DispatchAdmissionQueries;
 pub(crate) use super::import_lifecycle_queries::ImportLifecycleQueries;
 pub(crate) use super::item_core_queries::ItemCoreQueries;

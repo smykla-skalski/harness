@@ -42,7 +42,7 @@ pub(crate) async fn set_policy_canvas_spawn_requires_live_policy(
     Ok(policy_canvas_workspace_response(&workspace))
 }
 
-/// Toggle the emergency spawn kill switch.
+/// Toggle the emergency app-wide automation kill switch.
 ///
 /// # Errors
 /// Returns `CliError` when durable policy state cannot be written.

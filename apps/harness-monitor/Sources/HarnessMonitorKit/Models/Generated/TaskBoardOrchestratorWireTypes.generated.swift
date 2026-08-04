@@ -27,6 +27,7 @@ public struct TaskBoardGitHubInboxConfigWire: Codable, Equatable, Sendable {
 
 public struct TaskBoardOrchestratorSettingsWire: Codable, Equatable, Sendable {
   public var stepMode: Bool
+  public var triageAutomationEnabled: Bool
   public var enabledWorkflows: [TaskBoardOrchestratorWorkflow]
   public var dryRunDefault: Bool
   public var dispatchStatusFilter: TaskBoardStatus?
@@ -41,6 +42,7 @@ public struct TaskBoardOrchestratorSettingsWire: Codable, Equatable, Sendable {
 
   public init(
     stepMode: Bool = false,
+    triageAutomationEnabled: Bool = true,
     enabledWorkflows: [TaskBoardOrchestratorWorkflow] = [],
     dryRunDefault: Bool = true,
     dispatchStatusFilter: TaskBoardStatus? = nil,
@@ -54,6 +56,7 @@ public struct TaskBoardOrchestratorSettingsWire: Codable, Equatable, Sendable {
     policyVersion: String = "task-board-policy-v1"
   ) {
     self.stepMode = stepMode
+    self.triageAutomationEnabled = triageAutomationEnabled
     self.enabledWorkflows = enabledWorkflows
     self.dryRunDefault = dryRunDefault
     self.dispatchStatusFilter = dispatchStatusFilter
@@ -70,6 +73,7 @@ public struct TaskBoardOrchestratorSettingsWire: Codable, Equatable, Sendable {
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     stepMode = try container.decodeIfPresent(Bool.self, forKey: .stepMode) ?? false
+    triageAutomationEnabled = try container.decodeIfPresent(Bool.self, forKey: .triageAutomationEnabled) ?? true
     enabledWorkflows = try container.decodeIfPresent([TaskBoardOrchestratorWorkflow].self, forKey: .enabledWorkflows) ?? []
     dryRunDefault = try container.decodeIfPresent(Bool.self, forKey: .dryRunDefault) ?? true
     dispatchStatusFilter = try container.decodeIfPresent(TaskBoardStatus.self, forKey: .dispatchStatusFilter)
@@ -85,6 +89,7 @@ public struct TaskBoardOrchestratorSettingsWire: Codable, Equatable, Sendable {
 
   enum CodingKeys: String, CodingKey {
     case stepMode = "step_mode"
+    case triageAutomationEnabled = "triage_automation_enabled"
     case enabledWorkflows = "enabled_workflows"
     case dryRunDefault = "dry_run_default"
     case dispatchStatusFilter = "dispatch_status_filter"

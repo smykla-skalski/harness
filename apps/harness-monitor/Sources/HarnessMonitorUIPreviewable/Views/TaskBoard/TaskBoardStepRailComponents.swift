@@ -282,7 +282,7 @@ struct TaskBoardPolicyGuardsView: View {
         enabledTint: HarnessMonitorTheme.caution
       )
       policyGuardStatus(
-        "Spawn kill switch",
+        "Automation kill switch",
         isEnabled: workspace?.spawnKillSwitch ?? false,
         enabledTint: HarnessMonitorTheme.danger
       )

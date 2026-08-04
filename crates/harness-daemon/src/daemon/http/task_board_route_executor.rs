@@ -135,6 +135,9 @@ pub(crate) async fn run_once_with_trigger(
     trigger: TaskBoardAutomationRunTrigger,
 ) -> Result<TaskBoardOrchestratorRunOnceResponse, CliError> {
     let async_db = require_async_db(state, "task board orchestrator run once")?;
+    if async_db.automation_kill_switch_engaged().await? {
+        return Err(CliErrorKind::invalid_transition("automation kill switch is engaged").into());
+    }
     Box::pin(serve::recover_remote_assignments_before_local_work(
         state, async_db,
     ))

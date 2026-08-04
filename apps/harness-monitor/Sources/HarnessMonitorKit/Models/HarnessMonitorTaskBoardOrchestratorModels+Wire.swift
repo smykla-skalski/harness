@@ -17,6 +17,7 @@ extension TaskBoardOrchestratorSettings {
   init(wire: TaskBoardOrchestratorSettingsWire) {
     self.init(
       stepMode: wire.stepMode,
+      triageAutomationEnabled: wire.triageAutomationEnabled,
       enabledWorkflows: wire.enabledWorkflows,
       dryRunDefault: wire.dryRunDefault,
       dispatchStatusFilter: wire.dispatchStatusFilter,

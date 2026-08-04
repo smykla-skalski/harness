@@ -3,13 +3,13 @@ use sqlx::{Sqlite, Transaction, query, query_as};
 
 use super::super::ORCHESTRATOR_CHANGE_SCOPE;
 use super::super::items::bump_change_in_tx;
+use crate::daemon::db::prelude::*;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::{
     TaskBoardAutomationAdmissionState, TaskBoardAutomationDesiredMode,
     TaskBoardAutomationWakeEntityKind, TaskBoardAutomationWakePayload,
     TaskBoardAutomationWakeRequest, TaskBoardOrchestratorSettings,
 };
-use crate::daemon::db::prelude::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TaskBoardAutomationControlRecord {
@@ -106,8 +106,23 @@ async fn start_task_board_automation_inner(
     let mut transaction = db
         .begin_immediate_transaction("task board automation start")
         .await?;
+    ensure_automation_kill_switch_clear(&mut transaction).await?;
     apply_automation_start_in_tx(&mut transaction, desired_mode, wake, now).await?;
     load_and_commit_control(transaction, "task board automation start").await
+}
+
+async fn ensure_automation_kill_switch_clear(
+    transaction: &mut Transaction<'_, Sqlite>,
+) -> Result<(), CliError> {
+    if super::super::automation_kill_switch::automation_kill_switch_engaged_in_tx(transaction)
+        .await?
+    {
+        return Err(crate::daemon::db::CliErrorKind::invalid_transition(
+            "automation kill switch is engaged",
+        )
+        .into());
+    }
+    Ok(())
 }
 
 pub(super) async fn replace_task_board_orchestrator_settings_for_automation(

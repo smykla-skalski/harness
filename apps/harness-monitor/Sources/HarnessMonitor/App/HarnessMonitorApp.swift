@@ -38,6 +38,7 @@ struct HarnessMonitorApp: App {
   @State private var openAnythingReviews: OpenAnythingDashboardReviewRegistry
   @State private var openAnythingPaletteController: OpenAnythingPaletteWindowController
   @State private var globalHotKeyController: GlobalHotKeyController
+  @State private var automationPolicyRuntimeService: AutomationPolicyRuntimeService
   @State private var clipboardAutomationPolicyService: ClipboardAutomationPolicyService
   @State private var hasInstalledAppSceneServices = false
   @State private var hasBoundOpenAnythingExecutor = false
@@ -160,6 +161,7 @@ struct HarnessMonitorApp: App {
       initialValue: OpenAnythingPaletteWindowController(model: coordinator.palette)
     )
     _globalHotKeyController = State(initialValue: GlobalHotKeyController())
+    _automationPolicyRuntimeService = State(initialValue: AutomationPolicyRuntimeService())
     _clipboardAutomationPolicyService = State(initialValue: ClipboardAutomationPolicyService())
     _settingsSelectedSection = State(
       initialValue: SettingsRestorationDefaults.initialSelectedSection(
@@ -297,6 +299,10 @@ struct HarnessMonitorApp: App {
 
   var appClipboardAutomationPolicyService: ClipboardAutomationPolicyService {
     clipboardAutomationPolicyService
+  }
+
+  var appAutomationPolicyRuntimeService: AutomationPolicyRuntimeService {
+    automationPolicyRuntimeService
   }
 
   var hasInstalledAppSceneServicesFlag: Bool {

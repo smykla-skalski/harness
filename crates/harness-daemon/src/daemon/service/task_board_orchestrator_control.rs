@@ -13,6 +13,7 @@ use crate::task_board::{
     TaskBoardWorkflowExecutionCount, TaskBoardWorkflowStatus,
 };
 use harness_kernel::errors::CliError;
+use harness_kernel::errors::CliErrorKind;
 
 use super::task_board_db::task_board_host_local_db;
 use super::task_board_orchestrator_settings::{apply_settings_update, normalize_github_inbox};
@@ -36,6 +37,9 @@ async fn start_task_board_orchestrator_with_durable(
     db: &AsyncDaemonDb,
     durable_enabled: bool,
 ) -> Result<TaskBoardOrchestratorStatusResponse, CliError> {
+    if db.automation_kill_switch_engaged().await? {
+        return Err(CliErrorKind::invalid_transition("automation kill switch is engaged").into());
+    }
     if durable_enabled {
         let settings = db.task_board_orchestrator_settings().await?;
         let desired_mode = desired_mode_for_settings(&settings);
@@ -64,6 +68,29 @@ pub(crate) async fn stop_task_board_orchestrator_db(
     db: &AsyncDaemonDb,
 ) -> Result<TaskBoardOrchestratorStatusResponse, CliError> {
     stop_task_board_orchestrator_with_durable(db, task_board_automation_v2_enabled_from_env()).await
+}
+
+pub(crate) async fn enforce_task_board_orchestrator_kill_switch_db(
+    db: &AsyncDaemonDb,
+) -> Result<(), CliError> {
+    let durable_enabled = task_board_automation_v2_enabled_from_env();
+    if durable_enabled {
+        let control = db.task_board_automation_control().await?;
+        if control.desired_mode != TaskBoardAutomationDesiredMode::Off
+            || control.admission_state == TaskBoardAutomationAdmissionState::Accepting
+        {
+            db.stop_task_board_automation(Utc::now()).await?;
+        }
+        db.finish_task_board_automation_drain_if_idle(Utc::now())
+            .await?;
+    }
+    let mut state = db.task_board_orchestrator_state().await?;
+    if state.enabled || state.running {
+        state.enabled = false;
+        state.running = false;
+        db.replace_task_board_orchestrator_state(&state).await?;
+    }
+    Ok(())
 }
 
 async fn stop_task_board_orchestrator_with_durable(

@@ -114,7 +114,7 @@ extension HarnessMonitorUITestAccessibilityRegistryMoreTests {
     #expect(dashboardToolbar.contains("var inspectorToolbarPresentation:"))
     #expect(
       dashboardToolbar.contains(
-        "GlobalPolicyEnforcementToolbarGroup(store: store)\n\n    if let inspector"
+        "AutomationKillSwitchToolbarGroup(store: store)\n\n    if let inspector"
       )
     )
     #expect(
@@ -142,23 +142,25 @@ extension HarnessMonitorUITestAccessibilityRegistryMoreTests {
     #expect(dashboardToolbar.contains(".harnessMCPButton("))
   }
 
-  @Test("Global enforcement button stays out of auxiliary windows")
-  func globalEnforcementButtonStaysOutOfAuxiliaryWindows() throws {
-    let globalEnforcementToolbar = try sourceFile(
-      named: "Toolbar/GlobalPolicyEnforcementToolbarGroup.swift"
+  @Test("Automation kill switch stays out of auxiliary windows")
+  func automationKillSwitchStaysOutOfAuxiliaryWindows() throws {
+    let automationKillSwitchToolbar = try sourceFile(
+      named: "Toolbar/AutomationKillSwitchToolbarGroup.swift"
     )
     let dashboardToolbar = try sourceFile(named: "DashboardWindowToolbar.swift")
     let sessionToolbar = try sourceFile(named: "SessionWindowToolbar.swift")
     let settingsView = try sourceFile(named: "SettingsView.swift")
     let policyCanvasLabSources = try sourceFiles(pathContaining: "PolicyCanvasLab")
 
-    #expect(globalEnforcementToolbar.contains("ToolbarItemGroup(placement: .primaryAction)"))
-    #expect(globalEnforcementToolbar.contains("store.connectionState != .online"))
-    #expect(globalEnforcementToolbar.contains("globalEnforcementActionBlocked"))
-    #expect(globalEnforcementToolbar.contains(".disabled(globalEnforcementButtonDisabled)"))
-    #expect(!globalEnforcementToolbar.contains(".bounce.up.wholeSymbol"))
-    #expect(!globalEnforcementToolbar.contains(".buttonStyle(.glass)"))
-    #expect(!globalEnforcementToolbar.contains(".sharedBackgroundVisibility(.hidden)"))
+    #expect(automationKillSwitchToolbar.contains("ToolbarItemGroup(placement: .primaryAction)"))
+    #expect(automationKillSwitchToolbar.contains("store.connectionState != .online"))
+    #expect(!automationKillSwitchToolbar.contains("store.isDaemonActionInFlight"))
+    #expect(automationKillSwitchToolbar.contains(".disabled(store.connectionState != .online)"))
+    #expect(!automationKillSwitchToolbar.contains(".bounce.up.wholeSymbol"))
+    #expect(!automationKillSwitchToolbar.contains(".buttonStyle(.glass)"))
+    #expect(!automationKillSwitchToolbar.contains(".buttonStyle(.borderedProminent)"))
+    #expect(automationKillSwitchToolbar.contains(".frame(width: 14, height: 14)"))
+    #expect(!automationKillSwitchToolbar.contains(".sharedBackgroundVisibility(.hidden)"))
     #expect(
       dashboardToolbar.contains(
         """
@@ -170,7 +172,7 @@ extension HarnessMonitorUITestAccessibilityRegistryMoreTests {
             ToolbarSpacer(.fixed, placement: .primaryAction)
               .sharedBackgroundVisibility(.hidden)
 
-            GlobalPolicyEnforcementToolbarGroup(store: store)
+            AutomationKillSwitchToolbarGroup(store: store)
         """
       )
     )
@@ -185,11 +187,11 @@ extension HarnessMonitorUITestAccessibilityRegistryMoreTests {
               ToolbarSpacer(.fixed, placement: .primaryAction)
                 .sharedBackgroundVisibility(.hidden)
 
-              GlobalPolicyEnforcementToolbarGroup(store: store)
+              AutomationKillSwitchToolbarGroup(store: store)
         """
       )
     )
-    #expect(!settingsView.contains("GlobalPolicyEnforcementToolbarGroup(store: store)"))
+    #expect(!settingsView.contains("AutomationKillSwitchToolbarGroup(store: store)"))
     #expect(
       settingsView.contains(
         """
@@ -210,7 +212,7 @@ extension HarnessMonitorUITestAccessibilityRegistryMoreTests {
     )
     #expect(
       policyCanvasLabSources.allSatisfy {
-        !$0.contains("GlobalPolicyEnforcementToolbarGroup(store: store)")
+        !$0.contains("AutomationKillSwitchToolbarGroup(store: store)")
       }
     )
   }

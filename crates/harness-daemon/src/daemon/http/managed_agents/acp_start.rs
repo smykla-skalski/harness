@@ -41,11 +41,18 @@ pub(super) async fn post_acp_agent_start(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let result = match ensure_acp_enabled().and_then(|()| {
-        state
-            .acp_agent_manager
-            .ensure_session_accepts_acp_start(&session_id)
-    }) {
+    let result =
+        match crate::daemon::automation_kill_switch::require_automation_kill_switch_clear(&state)
+            .await
+        {
+            Ok(()) => ensure_acp_enabled().and_then(|()| {
+                state
+                    .acp_agent_manager
+                    .ensure_session_accepts_acp_start(&session_id)
+            }),
+            Err(error) => Err(error),
+        };
+    let result = match result {
         Ok(()) => {
             let lock_agent_id = request.agent.clone();
             let start_session_id = session_id.clone();
@@ -59,6 +66,13 @@ pub(super) async fn post_acp_agent_start(
                     .map(ManagedAgentSnapshot::Acp)
             })
             .await
+        }
+        Err(error) => Err(error),
+    };
+    let result = match result {
+        Ok(snapshot) => {
+            crate::daemon::automation_kill_switch::fence_started_managed_agent(&state, snapshot)
+                .await
         }
         Err(error) => Err(error),
     };

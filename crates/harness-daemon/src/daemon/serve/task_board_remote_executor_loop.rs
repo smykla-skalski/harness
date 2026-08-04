@@ -1,6 +1,7 @@
 //! Host-local executor loop for durable remote Task Board attempts.
 //! It owns checkout/runtime work; the controller owns progression and local paths never cross hosts.
 
+use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{
     AsyncDaemonDb, TaskBoardRemoteAssignmentRecord, TaskBoardRemoteExecutorIdentity,
     TaskBoardRemoteExecutorStartAuthority, TaskBoardRemoteExecutorStartIoPermit,
@@ -17,7 +18,6 @@ use std::time::Duration;
 use tokio::sync::watch;
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
-use crate::daemon::db::task_board::prelude::*;
 #[path = "task_board_remote_executor_loop/adoption.rs"]
 mod adoption;
 #[path = "task_board_remote_executor_loop/cleanup.rs"]
@@ -237,6 +237,12 @@ async fn reconcile_active_remote_worker(
     let existing = db
         .task_board_remote_executor_run(&offer, &identity.run_id)
         .await?;
+    if db.automation_kill_switch_engaged().await? {
+        if let Some(run) = existing.as_ref().filter(|run| run.status.is_active()) {
+            stop_remote_run(state, db, run).await?;
+        }
+        return Ok(());
+    }
     let action = worker_action(record.state, existing.as_ref().map(|run| run.status));
     if action == RemoteWorkerAction::Hold {
         return Ok(());

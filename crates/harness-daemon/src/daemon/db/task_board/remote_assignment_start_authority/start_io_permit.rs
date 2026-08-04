@@ -9,6 +9,7 @@ use super::{
     TaskBoardRemoteExecutorIdentity, TaskBoardRemoteExecutorStartAuthority,
     executor_settings_still_match, executor_start_authority, start_authority_eligible,
 };
+use crate::daemon::db::prelude::*;
 use crate::daemon::db::task_board::ORCHESTRATOR_CHANGE_SCOPE;
 use crate::daemon::db::task_board::items::bump_change_in_tx;
 use crate::daemon::db::task_board::remote_assignment_lease::{commit_noop, require_assignment};
@@ -17,7 +18,6 @@ use crate::daemon::db::task_board::remote_assignment_model::{
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::TaskBoardRemoteAssignmentState;
-use crate::daemon::db::prelude::*;
 
 const START_IO_PERMIT_DOMAIN: &str = "harness.task-board.remote-executor-start-io-permit.v1";
 
@@ -87,6 +87,18 @@ pub(crate) async fn claim_task_board_remote_executor_start_io_permit(
         || record.executor_stop_pending.is_some()
     {
         commit_noop(transaction, "stale remote executor Start I/O permit").await?;
+        return Ok(TaskBoardRemoteExecutorStartIoPermitOutcome::Stale);
+    }
+    if crate::daemon::db::task_board::automation_kill_switch::automation_kill_switch_engaged_in_tx(
+        &mut transaction,
+    )
+    .await?
+    {
+        commit_noop(
+            transaction,
+            "automation-killed remote executor Start I/O permit",
+        )
+        .await?;
         return Ok(TaskBoardRemoteExecutorStartIoPermitOutcome::Stale);
     }
     if let Some(permit) = executor_start_io_permit(&record)? {

@@ -31,6 +31,7 @@ public final class AutomationPolicyCenter {
 
   public private(set) var document: AutomationPolicyDocument
   public private(set) var clipboardRuntimeState: ClipboardAutomationRuntimeState = .off
+  public private(set) var isKillSwitchEngaged = false
   public private(set) var lastClipboardEventSummary: String?
   public private(set) var lastClipboardEventAt: Date?
   public private(set) var recentAutomationEvents: [AutomationPolicyEventRecord]
@@ -51,11 +52,11 @@ public final class AutomationPolicyCenter {
   }
 
   public var isAutomationEnabled: Bool {
-    document.isEnabled
+    document.isEnabled && !isKillSwitchEngaged
   }
 
   public var isClipboardMonitorEnabled: Bool {
-    document.isEnabled && document.policies(for: .clipboard).contains(where: \.isEnabled)
+    isAutomationEnabled && document.policies(for: .clipboard).contains(where: \.isEnabled)
   }
 
   public var clipboardPolicy: AutomationPolicy {
@@ -63,6 +64,9 @@ public final class AutomationPolicyCenter {
   }
 
   public var policySummaryText: String {
+    if isKillSwitchEngaged {
+      return "Paused by automation kill switch"
+    }
     let activeCount = document.policies.count { document.isEnabled && $0.isEnabled }
     return "\(activeCount) of \(document.policies.count) policies enabled"
   }
@@ -78,6 +82,18 @@ public final class AutomationPolicyCenter {
   public func setAutomationEnabled(_ isEnabled: Bool) {
     updateDocument(document.replacingEnabled(isEnabled))
     updateClipboardRuntimeStateAfterPolicyChange()
+  }
+
+  public func setKillSwitchEngaged(_ isEngaged: Bool) {
+    guard isKillSwitchEngaged != isEngaged else {
+      return
+    }
+    isKillSwitchEngaged = isEngaged
+    if isEngaged {
+      updateClipboardRuntimeState(.paused("Automation kill switch is engaged"))
+    } else {
+      updateClipboardRuntimeStateAfterPolicyChange()
+    }
   }
 
   func updateClipboardRuntimeState(_ state: ClipboardAutomationRuntimeState) {

@@ -11,7 +11,9 @@ enum ClipboardAutomationBackgroundOCRProcessor {
     recentStore: DashboardOCRRecentImageStore = .shared,
     recognize: @escaping Recognize = DashboardOCRRecognizer.recognizeText(in:)
   ) async {
-    guard dispatch.policyDecision.shouldOCRImages, !dispatch.candidates.isEmpty else {
+    guard !center.isKillSwitchEngaged, dispatch.policyDecision.shouldOCRImages,
+      !dispatch.candidates.isEmpty
+    else {
       return
     }
     let recognitionPolicy = DashboardOCRRecognitionPolicy(
@@ -26,10 +28,19 @@ enum ClipboardAutomationBackgroundOCRProcessor {
     )
     var failures: [String] = []
     for candidate in dispatch.candidates {
+      guard !center.isKillSwitchEngaged, !Task.isCancelled else {
+        return
+      }
       let result = await process(candidate, context: context, recognize: recognize)
+      guard !center.isKillSwitchEngaged, !Task.isCancelled else {
+        return
+      }
       if let errorMessage = result.errorMessage {
         failures.append(errorMessage)
       }
+    }
+    guard !center.isKillSwitchEngaged, !Task.isCancelled else {
+      return
     }
     if let failure = failures.first {
       center.updateClipboardRuntimeState(.failed(failure))
@@ -46,6 +57,9 @@ enum ClipboardAutomationBackgroundOCRProcessor {
     var item = DashboardOCRImageItem(candidate: candidate)
     item.status = .recognizing
     let result = await recognize(item.image)
+    guard !context.center.isKillSwitchEngaged, !Task.isCancelled else {
+      return .success("")
+    }
     if let errorMessage = result.errorMessage {
       item.status = .failed(errorMessage)
       item.recognizedText = ""

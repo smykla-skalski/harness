@@ -21,6 +21,11 @@ pub(crate) async fn dispatch_managed_agent_start_terminal(
     request: &WsRequest,
     state: &DaemonHttpState,
 ) -> WsResponse {
+    if let Err(error) =
+        crate::daemon::automation_kill_switch::require_automation_kill_switch_clear(state).await
+    {
+        return error_response(&request.id, error.code(), &error.message());
+    }
     let Some(session_id) = extract_session_id(&request.params) else {
         return error_response(&request.id, "MISSING_PARAM", "missing session_id");
     };
@@ -39,6 +44,13 @@ pub(crate) async fn dispatch_managed_agent_start_terminal(
     })
     .await
     .map(ManagedAgentSnapshot::Terminal);
+    let result = match result {
+        Ok(snapshot) => {
+            crate::daemon::automation_kill_switch::fence_started_managed_agent(state, snapshot)
+                .await
+        }
+        Err(error) => Err(error),
+    };
     dispatch_managed_agent_response(request, state, result).await
 }
 
@@ -46,6 +58,11 @@ pub(crate) async fn dispatch_managed_agent_start_codex(
     request: &WsRequest,
     state: &DaemonHttpState,
 ) -> WsResponse {
+    if let Err(error) =
+        crate::daemon::automation_kill_switch::require_automation_kill_switch_clear(state).await
+    {
+        return error_response(&request.id, error.code(), &error.message());
+    }
     let Some(session_id) = extract_session_id(&request.params) else {
         return error_response(&request.id, "MISSING_PARAM", "missing session_id");
     };
@@ -70,6 +87,13 @@ pub(crate) async fn dispatch_managed_agent_start_codex(
         })
     })
     .await;
+    let result = match result {
+        Ok(snapshot) => {
+            crate::daemon::automation_kill_switch::fence_started_managed_agent(state, snapshot)
+                .await
+        }
+        Err(error) => Err(error),
+    };
     dispatch_managed_agent_response(request, state, result).await
 }
 
@@ -77,6 +101,11 @@ pub(crate) async fn dispatch_managed_agent_start_acp(
     request: &WsRequest,
     state: &DaemonHttpState,
 ) -> WsResponse {
+    if let Err(error) =
+        crate::daemon::automation_kill_switch::require_automation_kill_switch_clear(state).await
+    {
+        return error_response(&request.id, error.code(), &error.message());
+    }
     if let Err(error) = ensure_acp_enabled() {
         return error_response(&request.id, error.code(), &error.message());
     }
@@ -113,6 +142,13 @@ pub(crate) async fn dispatch_managed_agent_start_acp(
         })
     })
     .await;
+    let result = match result {
+        Ok(snapshot) => {
+            crate::daemon::automation_kill_switch::fence_started_managed_agent(state, snapshot)
+                .await
+        }
+        Err(error) => Err(error),
+    };
     dispatch_managed_agent_response(request, state, result).await
 }
 

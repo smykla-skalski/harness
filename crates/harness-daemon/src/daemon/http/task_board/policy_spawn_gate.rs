@@ -74,10 +74,10 @@ pub(super) async fn post_policy_canvas_set_spawn_requires_live_policy(
     post,
     path = "/v1/policy-canvases/spawn-kill-switch",
     tag = "policy",
-    description = "Toggle the emergency spawn kill switch that blocks all new agent spawns, and return the updated workspace snapshot",
+    description = "Toggle the emergency app kill switch that stops active managed-agent and automation work, blocks new managed-agent and automation work, and returns the updated workspace snapshot",
     request_body = PolicyCanvasSetSpawnKillSwitchRequest,
     responses(
-        (status = 200, description = "Workspace after toggling the spawn kill switch", body = PolicyCanvasWorkspaceResponse),
+        (status = 200, description = "Workspace after toggling the automation kill switch", body = PolicyCanvasWorkspaceResponse),
         (status = 400, description = "Request error", body = DaemonErrorBody),
     ),
 )]
@@ -90,12 +90,8 @@ pub(super) async fn post_policy_canvas_set_spawn_kill_switch(
         Ok(parts) => parts,
         Err(response) => return *response,
     };
-    let workspace = match require_async_db(&state, "policy canvas spawn kill switch") {
-        Ok(db) => {
-            task_board_route_executor::set_policy_canvas_spawn_kill_switch(db, &request).await
-        }
-        Err(error) => Err(error),
-    };
+    let workspace =
+        task_board_route_executor::set_policy_canvas_spawn_kill_switch(&state, &request).await;
     timed_json(
         "POST",
         http_paths::POLICY_CANVASES_SPAWN_KILL_SWITCH,

@@ -34,7 +34,7 @@ pub enum TaskBoardPolicyCommand {
     /// Toggle the fail-closed live-policy requirement for worker spawning.
     #[command(visible_alias = "set-spawn-requires-live-policy")]
     SpawnRequiresLivePolicy(TaskBoardPolicyToggleArgs),
-    /// Toggle the emergency worker-spawn kill switch.
+    /// Toggle the emergency app-wide automation kill switch.
     #[command(visible_alias = "set-spawn-kill-switch")]
     SpawnKillSwitch(TaskBoardPolicyToggleArgs),
 }

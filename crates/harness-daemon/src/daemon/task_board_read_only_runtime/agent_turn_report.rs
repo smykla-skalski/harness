@@ -9,10 +9,11 @@ use crate::agents::turn::{AgentTurnPullRequestContext, AgentTurnRequest, AgentTu
 use crate::daemon::agent_acp::{
     AgentTurnSettlement, OpenRouterAgentTurnRuntime, OpenRouterRunCorrelation,
 };
+use crate::daemon::db::prelude::*;
+use crate::daemon::db::task_board::prelude::AutomationKillSwitchQueries;
 use crate::daemon::db::{AgentTurnRunSnapshot, AgentTurnRunStatus, AsyncDaemonDb};
 use crate::daemon::http::DaemonHttpState;
 use harness_kernel::errors::{CliError, CliErrorKind};
-use crate::daemon::db::prelude::*;
 
 /// Everything an agent-turn report start needs from the frozen attempt, apart
 /// from the runtime handle the production state supplies.
@@ -41,6 +42,14 @@ pub(crate) async fn start_agent_turn_report_run(
     state: &DaemonHttpState,
     start: AgentTurnReportStart<'_>,
 ) -> Result<(), CliError> {
+    let store = state.async_db.get().cloned().ok_or_else(|| {
+        CliError::from(CliErrorKind::workflow_io(
+            "agent-turn report run needs the canonical async database",
+        ))
+    })?;
+    if store.automation_kill_switch_engaged().await? {
+        return Err(CliErrorKind::invalid_transition("automation kill switch is engaged").into());
+    }
     if start.runtime != "openrouter" {
         return Err(CliErrorKind::invalid_transition(format!(
             "unsupported agent-turn reviewer runtime '{}'",
@@ -48,16 +57,11 @@ pub(crate) async fn start_agent_turn_report_run(
         ))
         .into());
     }
-    let store = state.async_db.get().cloned().ok_or_else(|| {
-        CliError::from(CliErrorKind::workflow_io(
-            "agent-turn report run needs the canonical async database",
-        ))
-    })?;
     let runtime = OpenRouterAgentTurnRuntime::new_correlated(
         state.acp_agent_manager.clone(),
         start.session_id.to_string(),
         start.project_dir,
-        store,
+        store.clone(),
         OpenRouterRunCorrelation {
             run_id: start.run_id.to_string(),
             board_item_id: Some(start.board_item_id.to_string()),
@@ -65,14 +69,21 @@ pub(crate) async fn start_agent_turn_report_run(
             task_id: None,
         },
     );
-    runtime
+    let turn_id = runtime
         .start(AgentTurnRequest {
             prompt: start.prompt,
             requested_model: start.requested_model,
             pull_request: start.pull_request,
         })
-        .await
-        .map(|_| ())
+        .await?;
+    if store.automation_kill_switch_engaged().await? {
+        runtime.cancel(&turn_id).await?;
+        return Err(CliErrorKind::invalid_transition(
+            "automation kill switch engaged while starting an agent turn",
+        )
+        .into());
+    }
+    Ok(())
 }
 
 /// Load one durable agent-turn report and harvest a live terminal ACP result when available.

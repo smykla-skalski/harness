@@ -160,11 +160,8 @@ pub(super) async fn dispatch_policy_canvas_set_global_enforcement(
     let Ok(body) = parse_params::<PolicyCanvasSetGlobalEnforcementRequest>(request) else {
         return invalid_params(request);
     };
-    let db = match require_async_db(state, "policy canvas global enforcement") {
-        Ok(db) => db,
-        Err(error) => return dispatch_query_result(&request.id, Err::<(), _>(error)),
-    };
-    let result = task_board_route_executor::set_policy_canvas_global_enforcement(db, &body).await;
+    let result =
+        task_board_route_executor::set_policy_canvas_global_enforcement(state, &body).await;
     super::super::record_task_board_audit_result(
         state,
         "policy_canvas.set_global_enforcement",
@@ -209,15 +206,11 @@ pub(super) async fn dispatch_policy_canvas_set_spawn_kill_switch(
     let Ok(body) = parse_params::<PolicyCanvasSetSpawnKillSwitchRequest>(request) else {
         return invalid_params(request);
     };
-    let db = match require_async_db(state, "policy canvas spawn kill switch") {
-        Ok(db) => db,
-        Err(error) => return dispatch_query_result(&request.id, Err::<(), _>(error)),
-    };
-    let result = task_board_route_executor::set_policy_canvas_spawn_kill_switch(db, &body).await;
+    let result = task_board_route_executor::set_policy_canvas_spawn_kill_switch(state, &body).await;
     super::super::record_task_board_audit_result(
         state,
         "policy_canvas.set_spawn_kill_switch",
-        "Set spawn kill switch",
+        "Set automation kill switch",
         None,
         serde_json::json!({ "enabled": body.enabled }),
         &result,

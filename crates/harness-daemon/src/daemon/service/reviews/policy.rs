@@ -3,6 +3,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::reviews_store::PolicyGraphQueries;
 use crate::daemon::service::observe_async_db;
 use crate::daemon::service::reviews::policy_audit::record_policy_run_start_result;
 use crate::daemon::service::reviews::policy_enrichment::{
@@ -41,7 +43,6 @@ use crate::task_board::policy_runtime::models::{
 #[cfg(test)]
 use crate::task_board::policy_runtime::repository::PolicyRuntimeRepository;
 use harness_kernel::errors::{CliError, CliErrorKind};
-use crate::daemon::db::task_board::prelude::*;
 
 #[cfg(test)]
 pub(crate) use super::policy_resume::{
@@ -94,6 +95,7 @@ pub(crate) async fn start_reviews_policy_run_with_audit_db(
     audit_db: Option<Arc<AsyncDaemonDb>>,
 ) -> Result<ReviewsPolicyRunResponse, CliError> {
     let audit_db = require_policy_runtime_db(audit_db)?;
+    ensure_policy_automation_enabled(&audit_db).await?;
     let target = enrich_policy_target_for_execution(&request.target).await;
     let request = ReviewsPolicyRunStartRequest {
         target,
@@ -102,6 +104,22 @@ pub(crate) async fn start_reviews_policy_run_with_audit_db(
     let executor =
         daemon_policy_executor_with_audit(&request.target.repository, Some(Arc::clone(&audit_db)))?;
     start_reviews_policy_run_with_database(executor, &request, audit_db).await
+}
+
+async fn ensure_policy_automation_enabled(database: &AsyncDaemonDb) -> Result<(), CliError> {
+    let workspace = database.load_policy_workspace().await?;
+    let Some(workspace) = workspace else {
+        return Err(
+            CliErrorKind::invalid_transition("policy automation state is unavailable").into(),
+        );
+    };
+    if workspace.spawn_kill_switch {
+        return Err(CliErrorKind::invalid_transition("automation kill switch is engaged").into());
+    }
+    if !workspace.global_policy_enforcement_enabled {
+        return Err(CliErrorKind::invalid_transition("policy automation is disabled").into());
+    }
+    Ok(())
 }
 
 pub(crate) async fn start_background_reviews_policy_runs(items: &[ReviewItem]) {
@@ -480,3 +498,7 @@ fn non_actionable_plan_message(workflow_id: &str, plan: &ReviewsPolicyPlan) -> S
         format!("reviews policy workflow '{workflow_id}' is not actionable for this pull request")
     })
 }
+
+#[cfg(test)]
+#[path = "policy_automation_control_tests.rs"]
+mod automation_control_tests;

@@ -1,5 +1,7 @@
 use async_trait::async_trait;
 
+use crate::daemon::db::prelude::*;
+use crate::daemon::db::task_board::prelude::AutomationKillSwitchQueries;
 use crate::daemon::db::{AgentTurnRunSnapshot, AsyncDaemonDb};
 use crate::daemon::http::{DaemonHttpState, run_codex_agent_blocking};
 use crate::daemon::protocol::{CodexRunMode, CodexRunRequest, CodexRunSnapshot};
@@ -19,7 +21,6 @@ pub(crate) mod agent_turn_report;
 mod git_evidence;
 
 pub(crate) use agent_turn_report::AgentTurnReportStart;
-use crate::daemon::db::prelude::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum TaskBoardPublishVerification {
@@ -167,6 +168,7 @@ impl TaskBoardReadOnlyRuntime for ProductionTaskBoardReadOnlyRuntime<'_> {
         request: &CodexRunRequest,
         run_id: &str,
     ) -> Result<CodexRunSnapshot, CliError> {
+        ensure_automation_kill_switch_clear(self.db).await?;
         if request.mode != CodexRunMode::Report {
             return Err(invalid_transition(
                 "read-only workflow runtime only starts Codex Report runs",
@@ -175,12 +177,13 @@ impl TaskBoardReadOnlyRuntime for ProductionTaskBoardReadOnlyRuntime<'_> {
         let session_id = session_id.to_owned();
         let request = request.clone();
         let run_id = run_id.to_owned();
-        run_codex_agent_blocking(
+        let snapshot = run_codex_agent_blocking(
             self.state,
             "task-board read-only report start",
             move |handle| handle.start_run_with_id(&session_id, &request, run_id),
         )
-        .await
+        .await?;
+        stop_codex_run_if_killed(self.state, self.db, snapshot).await
     }
 
     async fn load_codex_workspace_run(
@@ -196,6 +199,7 @@ impl TaskBoardReadOnlyRuntime for ProductionTaskBoardReadOnlyRuntime<'_> {
         request: &CodexRunRequest,
         run_id: &str,
     ) -> Result<CodexRunSnapshot, CliError> {
+        ensure_automation_kill_switch_clear(self.db).await?;
         if request.mode != CodexRunMode::WorkspaceWrite {
             return Err(invalid_transition(
                 "write workflow runtime only starts Codex WorkspaceWrite runs",
@@ -204,18 +208,20 @@ impl TaskBoardReadOnlyRuntime for ProductionTaskBoardReadOnlyRuntime<'_> {
         let session_id = session_id.to_owned();
         let request = request.clone();
         let run_id = run_id.to_owned();
-        run_codex_agent_blocking(
+        let snapshot = run_codex_agent_blocking(
             self.state,
             "task-board write workspace start",
             move |handle| handle.start_run_with_id(&session_id, &request, run_id),
         )
-        .await
+        .await?;
+        stop_codex_run_if_killed(self.state, self.db, snapshot).await
     }
 
     async fn start_agent_turn_report_run(
         &self,
         start: AgentTurnReportStart<'_>,
     ) -> Result<(), CliError> {
+        ensure_automation_kill_switch_clear(self.db).await?;
         agent_turn_report::start_agent_turn_report_run(self.state, start).await
     }
 
@@ -349,6 +355,32 @@ impl TaskBoardReadOnlyRuntime for ProductionTaskBoardReadOnlyRuntime<'_> {
         .await
         .map(TaskBoardPublishVerification::Applied)
     }
+}
+
+async fn ensure_automation_kill_switch_clear(db: &AsyncDaemonDb) -> Result<(), CliError> {
+    if db.automation_kill_switch_engaged().await? {
+        return Err(invalid_transition("automation kill switch is engaged"));
+    }
+    Ok(())
+}
+
+async fn stop_codex_run_if_killed(
+    state: &DaemonHttpState,
+    db: &AsyncDaemonDb,
+    snapshot: CodexRunSnapshot,
+) -> Result<CodexRunSnapshot, CliError> {
+    if !db.automation_kill_switch_engaged().await? {
+        return Ok(snapshot);
+    }
+    let run_id = snapshot.run_id.clone();
+    let target = run_id.clone();
+    run_codex_agent_blocking(state, "automation kill switch", move |controller| {
+        controller.stop(&target)
+    })
+    .await?;
+    Err(invalid_transition(format!(
+        "automation kill switch engaged while starting run '{run_id}'"
+    )))
 }
 
 async fn resolve_pr_review(

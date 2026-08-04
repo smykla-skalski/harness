@@ -10,12 +10,12 @@ use super::audit::{
     broadcast_automation_audits, insert_automation_audit, parse_scope, terminal_event_type,
 };
 use super::control::{TaskBoardAutomationControlRecord, ensure_control_row, load_control_in_tx};
+use crate::daemon::db::prelude::*;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::daemon::protocol::HarnessMonitorAuditEvent;
 use crate::task_board::{
     TaskBoardAutomationRunOutcome, TaskBoardAutomationRunTrigger, TaskBoardAutomationScope,
 };
-use crate::daemon::db::prelude::*;
 
 const RUN_LEASE_SECONDS: i64 = 30;
 
@@ -84,8 +84,13 @@ pub(super) async fn try_acquire_task_board_automation_run(
     let observed = evaluate_run_admission_in_tx(&mut transaction, request).await?;
     let control = match observed.decision {
         RunAdmissionDecision::Refuse { admission, context } => {
-            return commit_non_acquired_run(transaction, observed.expired_events, admission, context)
-                .await;
+            return commit_non_acquired_run(
+                transaction,
+                observed.expired_events,
+                admission,
+                context,
+            )
+            .await;
         }
         RunAdmissionDecision::Acquire(control) => control,
     };
@@ -138,8 +143,16 @@ pub(super) async fn finalize_task_board_automation_run(
     }
     let control = load_control_in_tx(&mut transaction).await?;
     let outcome = final_outcome(lease, &control, &row.state, outcome);
-    let event =
-        finalize_run_in_tx(&mut transaction, lease, &row, outcome, error_kind, error, now).await?;
+    let event = finalize_run_in_tx(
+        &mut transaction,
+        lease,
+        &row,
+        outcome,
+        error_kind,
+        error,
+        now,
+    )
+    .await?;
     commit(transaction, "task board automation run finalization").await?;
     broadcast_automation_audits(slice::from_ref(&event));
     Ok(outcome)
@@ -151,6 +164,17 @@ async fn evaluate_run_admission_in_tx(
 ) -> Result<ObservedRunAdmission, CliError> {
     ensure_control_row(transaction, request.now).await?;
     let expired_events = super::recovery::expire_stale_runs(transaction, request.now).await?;
+    if super::super::automation_kill_switch::automation_kill_switch_engaged_in_tx(transaction)
+        .await?
+    {
+        return Ok(ObservedRunAdmission {
+            expired_events,
+            decision: RunAdmissionDecision::Refuse {
+                admission: TaskBoardAutomationRunAdmission::Disabled,
+                context: "kill-switch",
+            },
+        });
+    }
     if let Some(run_id) = active_run_id(transaction).await? {
         return Ok(ObservedRunAdmission {
             expired_events,

@@ -39,6 +39,7 @@ public enum TaskBoardOrchestratorWorkflow: TaskBoardOpenEnum, CaseIterable, Iden
 
 public struct TaskBoardOrchestratorSettings: Codable, Equatable, Sendable {
   public let stepMode: Bool
+  public let triageAutomationEnabled: Bool
   public let enabledWorkflows: [TaskBoardOrchestratorWorkflow]
   public let dryRunDefault: Bool
   public let dispatchStatusFilter: TaskBoardStatus?
@@ -55,6 +56,7 @@ public struct TaskBoardOrchestratorSettings: Codable, Equatable, Sendable {
 
   public init(
     stepMode: Bool = false,
+    triageAutomationEnabled: Bool = true,
     enabledWorkflows: [TaskBoardOrchestratorWorkflow] = [],
     dryRunDefault: Bool = true,
     dispatchStatusFilter: TaskBoardStatus? = nil,
@@ -68,6 +70,7 @@ public struct TaskBoardOrchestratorSettings: Codable, Equatable, Sendable {
     policyVersion: String
   ) {
     self.stepMode = stepMode
+    self.triageAutomationEnabled = triageAutomationEnabled
     self.enabledWorkflows = enabledWorkflows
     self.dryRunDefault = dryRunDefault
     self.dispatchStatusFilter = dispatchStatusFilter
@@ -83,6 +86,7 @@ public struct TaskBoardOrchestratorSettings: Codable, Equatable, Sendable {
 
   enum CodingKeys: String, CodingKey {
     case stepMode
+    case triageAutomationEnabled
     case enabledWorkflows
     case dryRunDefault
     case dispatchStatusFilter
@@ -100,6 +104,10 @@ public struct TaskBoardOrchestratorSettings: Codable, Equatable, Sendable {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     self.init(
       stepMode: try container.decodeIfPresent(Bool.self, forKey: .stepMode) ?? false,
+      triageAutomationEnabled: try container.decodeIfPresent(
+        Bool.self,
+        forKey: .triageAutomationEnabled
+      ) ?? true,
       enabledWorkflows: try container.decode(
         [TaskBoardOrchestratorWorkflow].self,
         forKey: .enabledWorkflows
@@ -169,6 +177,7 @@ public struct TaskBoardOrchestratorSettings: Codable, Equatable, Sendable {
 
 public struct TaskBoardOrchestratorSettingsUpdateRequest: Codable, Equatable, Sendable {
   public let stepMode: Bool?
+  public let triageAutomationEnabled: Bool?
   public let enabledWorkflows: [TaskBoardOrchestratorWorkflow]?
   public let dryRunDefault: Bool?
   public let dispatchStatusFilter: TaskBoardStatus?
@@ -185,6 +194,7 @@ public struct TaskBoardOrchestratorSettingsUpdateRequest: Codable, Equatable, Se
 
   public init(
     stepMode: Bool? = nil,
+    triageAutomationEnabled: Bool? = nil,
     enabledWorkflows: [TaskBoardOrchestratorWorkflow]? = nil,
     dryRunDefault: Bool? = nil,
     dispatchStatusFilter: TaskBoardStatus? = nil,
@@ -197,6 +207,7 @@ public struct TaskBoardOrchestratorSettingsUpdateRequest: Codable, Equatable, Se
     policyVersion: String? = nil
   ) {
     self.stepMode = stepMode
+    self.triageAutomationEnabled = triageAutomationEnabled
     self.enabledWorkflows = enabledWorkflows
     self.dryRunDefault = dryRunDefault
     self.dispatchStatusFilter = dispatchStatusFilter

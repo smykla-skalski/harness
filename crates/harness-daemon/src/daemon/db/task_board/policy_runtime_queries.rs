@@ -129,6 +129,8 @@ pub(crate) trait PolicyRuntimeQueries: Send + Sync {
         &self,
         now: DateTime<Utc>,
     ) -> Result<Vec<PolicyWorkflowRun>, CliError>;
+
+    async fn cancel_active_policy_workflow_runs(&self, reason: &str) -> Result<usize, CliError>;
 }
 
 /// The trait's one and only impl for [`AsyncDaemonDb`]. Every method is a
@@ -250,5 +252,9 @@ impl PolicyRuntimeQueries for AsyncDaemonDb {
         now: DateTime<Utc>,
     ) -> Result<Vec<PolicyWorkflowRun>, CliError> {
         super::policy_runs::policy_runs_ready_for_timer(self, now).await
+    }
+
+    async fn cancel_active_policy_workflow_runs(&self, reason: &str) -> Result<usize, CliError> {
+        super::policy_runs::cancel_active_policy_workflow_runs(self, reason).await
     }
 }

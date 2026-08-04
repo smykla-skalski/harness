@@ -9,12 +9,14 @@ use super::test_support::{
 };
 use super::{TaskBoardAutomationRunAdmission, TaskBoardAutomationRunFence};
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::task_board::import_lifecycle_queries::ImportLifecycleQueries;
+use crate::daemon::db::task_board::scheduler::queries::TaskBoardAutomationSchedulerQueries;
+use crate::daemon::reviews_store::PolicyGraphQueries;
+use crate::task_board::policy_graph::PolicyCanvasWorkspace;
 use crate::task_board::{
     TaskBoardAutomationAdmissionState, TaskBoardAutomationDesiredMode,
     TaskBoardAutomationRunOutcome, TaskBoardAutomationRunTrigger,
 };
-use crate::daemon::db::task_board::import_lifecycle_queries::ImportLifecycleQueries;
-use crate::daemon::db::task_board::scheduler::queries::TaskBoardAutomationSchedulerQueries;
 
 #[tokio::test]
 async fn run_lease_serializes_manual_and_scheduled_triggers() {
@@ -65,6 +67,31 @@ async fn run_lease_serializes_manual_and_scheduled_triggers() {
         .expect("acquire next scheduled run"),
         TaskBoardAutomationRunAdmission::Acquired(_)
     ));
+}
+
+#[tokio::test]
+async fn app_kill_switch_rejects_run_admission() {
+    let db = database().await;
+    let now = instant("2026-07-15T08:15:00Z");
+    db.start_task_board_automation(TaskBoardAutomationDesiredMode::Continuous, now)
+        .await
+        .expect("start automation");
+    let mut workspace = PolicyCanvasWorkspace::seeded();
+    workspace.spawn_kill_switch = true;
+    db.replace_policy_workspace(&workspace)
+        .await
+        .expect("engage app kill switch");
+
+    let admission = db
+        .try_acquire_task_board_automation_run(&acquire_request(
+            "run-killed",
+            TaskBoardAutomationRunTrigger::Manual,
+            now,
+        ))
+        .await
+        .expect("evaluate admission");
+
+    assert_eq!(admission, TaskBoardAutomationRunAdmission::Disabled);
 }
 
 #[tokio::test]
