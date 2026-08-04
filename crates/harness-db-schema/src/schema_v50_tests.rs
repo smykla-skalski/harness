@@ -1,6 +1,6 @@
 use tempfile::tempdir;
 
-use harness_daemon::daemon::db::{AsyncDaemonDb, DaemonDb};
+use harness_daemon::daemon::db::{AsyncDaemonDb, DaemonDb, DaemonDbOpen};
 
 const DROP_V50_SQL: &str = "
 ALTER TABLE codex_runs RENAME TO codex_runs_v50;

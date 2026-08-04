@@ -58,7 +58,7 @@ fn column_exists(conn: &Connection, table: &str, column: &str) -> Result<bool, C
 #[cfg(test)]
 mod tests {
     use super::run;
-    use harness_daemon::daemon::db::{DaemonDb, SCHEMA_VERSION};
+    use harness_daemon::daemon::db::{DaemonDb, DaemonDbOpen, SCHEMA_VERSION};
 
     #[test]
     fn current_schema_has_parent_link_columns_and_index() {

@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use rusqlite::Connection;
 use tempfile::tempdir;
 
-use harness_daemon::daemon::db::{AsyncDaemonDb, DaemonDb};
+use harness_daemon::daemon::db::{AsyncDaemonDb, DaemonDb, DaemonDbOpen};
 use harness_task_board::project_color::TaskBoardProjectColor;
 use harness_task_board::project_shape::{TaskBoardProjectShape, organization_of};
 

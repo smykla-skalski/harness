@@ -21,7 +21,7 @@ pub(crate) use super::{
     AsyncAgentResolutionQueries, AsyncAgentTurnRunQueries, AsyncChangeTrackingQueries,
     AsyncConversationSyncQueries, AsyncDaemonTransactions, AsyncDiagnosticsQueries,
     AsyncRuntimeSnapshotQueries, AsyncSessionStateQueries, AsyncSessionWriteQueries,
-    AsyncSignalIndexQueries, AsyncSignalReadQueries, AsyncTimelineWindowQueries,
+    AsyncSignalIndexQueries, AsyncSignalReadQueries, AsyncTimelineWindowQueries, DaemonDbOpen,
     RuntimeSnapshotQueries, SessionCoreQueries, SessionSummaryQueries, SessionWriteQueries,
     SignalIndexQueries,
 };

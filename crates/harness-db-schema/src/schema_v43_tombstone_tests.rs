@@ -3,7 +3,9 @@ use tempfile::tempdir;
 
 use super::tests::{legacy_v40_fixture, legacy_v40_fixture_at};
 use super::*;
-use harness_daemon::daemon::db::{AsyncDaemonDb, DaemonDb, schema_query_test_support};
+use harness_daemon::daemon::db::{
+    AsyncDaemonDb, DaemonDb, DaemonDbOpen, schema_query_test_support,
+};
 use harness_task_board::{TaskBoardExecutionHostConfig, remote_spki_pin};
 
 const LEGACY_LEAF_SHA256: &str = "1111111111111111111111111111111111111111111111111111111111111111";

@@ -12,6 +12,7 @@ use harness_testkit::with_isolated_harness_env;
 use tempfile::tempdir;
 
 use crate::daemon::db::DaemonDb;
+use crate::daemon::db_open::DaemonDbOpen;
 use crate::daemon::service::adopt_session_record;
 use crate::session::adopter::SessionAdopter;
 use crate::session::types::CURRENT_VERSION;

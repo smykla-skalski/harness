@@ -1,7 +1,7 @@
 use tempfile::tempdir;
 
 use super::shape_needs_repair;
-use harness_daemon::daemon::db::DaemonDb;
+use harness_daemon::daemon::db::{DaemonDb, DaemonDbOpen};
 
 #[test]
 fn fresh_v49_database_reopens_without_a_shape_repair_error() {

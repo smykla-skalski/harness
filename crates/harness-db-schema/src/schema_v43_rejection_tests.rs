@@ -1,6 +1,6 @@
 use super::tests::legacy_v40_fixture;
 use super::*;
-use harness_daemon::daemon::db::DaemonDb;
+use harness_daemon::daemon::db::{DaemonDb, DaemonDbOpen};
 use rusqlite::params;
 
 const EXECUTION_SHA: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";

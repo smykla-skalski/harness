@@ -51,6 +51,8 @@ pub mod codex_controller;
 pub mod codex_transport;
 #[cfg(feature = "daemon-runtime")]
 pub mod db;
+#[cfg(feature = "daemon-runtime")]
+mod db_open;
 // `discovery` moved natively into `harness-daemon-discovery`, which
 // `harness-bridge` now depends on directly instead of duplicating this
 // module's source through a `#[path]` include. A thin re-export over the

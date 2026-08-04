@@ -1,4 +1,6 @@
-use harness_daemon::daemon::db::{DaemonDb, RemoteAcmeQueries, RemoteIdentitySyncQueries};
+use harness_daemon::daemon::db::{
+    DaemonDb, DaemonDbOpen, RemoteAcmeQueries, RemoteIdentitySyncQueries,
+};
 use harness_daemon::daemon::remote_acme::{RemoteAcmeAccountCredentials, RemoteCertificateBundle};
 use harness_remote_trust::remote::{RemoteAccessScope, RemoteRole};
 use harness_remote_trust::remote_identity::RemoteClientRegistration;

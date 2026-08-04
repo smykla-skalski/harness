@@ -1,5 +1,5 @@
 use super::*;
-use harness_daemon::daemon::db::DaemonDb;
+use harness_daemon::daemon::db::{DaemonDb, DaemonDbOpen};
 use rusqlite::params;
 
 const OFFER_DIGEST: &str = "1111111111111111111111111111111111111111111111111111111111111111";

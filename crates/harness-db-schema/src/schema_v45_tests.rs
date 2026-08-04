@@ -1,5 +1,5 @@
 use super::*;
-use harness_daemon::daemon::db::{DaemonDb, SCHEMA_VERSION};
+use harness_daemon::daemon::db::{DaemonDb, DaemonDbOpen, SCHEMA_VERSION};
 
 const CONTROLLER_SCAN_INDEX: &str = "task_board_remote_assignments_controller_scan";
 const SETTLEMENT_RECEIPT_DELETE_GUARD: &str =

@@ -11,7 +11,7 @@ pub fn run(conn: &Connection) -> Result<(), CliError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use harness_daemon::daemon::db::{AsyncDaemonDb, DaemonDb, SCHEMA_VERSION};
+    use harness_daemon::daemon::db::{AsyncDaemonDb, DaemonDb, DaemonDbOpen, SCHEMA_VERSION};
     use sqlx::query_scalar;
     use tempfile::tempdir;
 

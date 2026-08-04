@@ -13,6 +13,7 @@ use super::{
     spawn_remote_acme_renewal_loop_with,
 };
 use crate::daemon::db::DaemonDb;
+use crate::daemon::db_open::DaemonDbOpen;
 use crate::daemon::remote::{RemoteAcmeChallenge, RemoteDaemonServeConfig};
 use crate::daemon::remote_acme::{
     RemoteAcmeAccountCredentials, RemoteAcmeAutomaticRenewalIssuer, RemoteAcmeRenewalRequest,

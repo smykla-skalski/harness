@@ -2,6 +2,7 @@ use sqlx::query;
 use tempfile::{TempDir, tempdir};
 
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
+use crate::daemon::db_open::DaemonDbOpen;
 use crate::daemon::reviews_store::{PolicyGraphQueries, PolicyGraphSyncQueries};
 use crate::task_board::policy_graph::{PolicyCanvasWorkspace, apply_duplicate};
 use harness_kernel::errors::{CliError, CliErrorKind};

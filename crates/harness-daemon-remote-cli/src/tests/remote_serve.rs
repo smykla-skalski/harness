@@ -9,7 +9,9 @@ use std::time::Duration;
 use tokio::sync::{Notify, watch as tokio_watch};
 use tokio::time::{sleep, timeout};
 
-use harness_daemon::daemon::db::{DaemonDb, RemoteAcmeQueries, RemoteIdentitySyncQueries};
+use harness_daemon::daemon::db::{
+    DaemonDb, DaemonDbOpen, RemoteAcmeQueries, RemoteIdentitySyncQueries,
+};
 use harness_daemon::daemon::http::DaemonHttpAuthMode;
 use harness_daemon::daemon::remote::RemoteDaemonServeConfig;
 use harness_daemon::daemon::remote_acme::{

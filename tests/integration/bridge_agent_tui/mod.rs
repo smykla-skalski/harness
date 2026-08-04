@@ -10,7 +10,7 @@ use harness::daemon::agent_tui::{
     AgentTuiStartRequest, AgentTuiStatus,
 };
 use harness::daemon::bridge::{AgentTuiStartSpec, BridgeClient, BridgeStatusReport};
-use harness::daemon::db::{DaemonDb, SessionWriteQueries};
+use harness::daemon::db::{DaemonDb, DaemonDbOpen, SessionWriteQueries};
 use harness::daemon::protocol::{SessionStartRequest, StreamEvent};
 use harness::daemon::service as daemon_service;
 use harness::session::types::SessionRole;

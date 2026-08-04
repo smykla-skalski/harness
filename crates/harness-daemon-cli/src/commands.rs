@@ -10,6 +10,7 @@ use harness_daemon::daemon::cli_support::{
     adopt_daemon_root_for_transport_command, print_daemon_control_response, print_json,
 };
 use harness_daemon::daemon::codex_transport::codex_transport_from_env;
+use harness_daemon::daemon::db::DaemonDbOpen;
 use harness_daemon::daemon::serve::{self, DaemonServeConfig, ProviderCredentialStartupMode};
 use harness_daemon::daemon::{launchd, service, state};
 use harness_daemon::feature_flags;

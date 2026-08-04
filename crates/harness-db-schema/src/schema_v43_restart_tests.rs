@@ -3,7 +3,7 @@ use std::path::Path;
 use tempfile::tempdir;
 
 use super::tests::legacy_v40_fixture_at;
-use harness_daemon::daemon::db::{AsyncDaemonDb, DaemonDb};
+use harness_daemon::daemon::db::{AsyncDaemonDb, DaemonDb, DaemonDbOpen};
 
 const LEGACY_LEAF_SHA256: &str = "1111111111111111111111111111111111111111111111111111111111111111";
 const QUARANTINE_TABLE: &str = "task_board_remote_host_quarantines";

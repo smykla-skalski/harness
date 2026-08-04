@@ -2,7 +2,7 @@ use super::tests::{
     insert_strict_assignment, legacy_v40_fixture, legacy_v40_fixture_at, strict_request,
 };
 use super::*;
-use harness_daemon::daemon::db::{AsyncDaemonDb, DaemonDb};
+use harness_daemon::daemon::db::{AsyncDaemonDb, DaemonDb, DaemonDbOpen};
 use rusqlite::params;
 
 const DIGEST_A: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";

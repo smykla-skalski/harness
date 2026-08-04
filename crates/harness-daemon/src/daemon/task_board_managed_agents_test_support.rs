@@ -11,6 +11,7 @@ use crate::daemon::agent_tui::{
 };
 use crate::daemon::codex_controller::CodexControllerHandle;
 use crate::daemon::db::DaemonDb;
+use crate::daemon::db_open::DaemonDbOpen;
 use crate::daemon::http::{
     AsyncDaemonDbSlot, DaemonHttpState, ManagedAgentMutationLocks, connect_async_db_for_tests,
 };

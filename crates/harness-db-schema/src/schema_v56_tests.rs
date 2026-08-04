@@ -2,7 +2,7 @@ use rusqlite::Connection;
 use tempfile::tempdir;
 
 use super::run;
-use harness_daemon::daemon::db::{AsyncDaemonDb, DaemonDb};
+use harness_daemon::daemon::db::{AsyncDaemonDb, DaemonDb, DaemonDbOpen};
 
 fn value(conn: &Connection, table: &str, column: &str, id: &str, id_value: &str) -> String {
     let query = format!("SELECT {column} FROM {table} WHERE {id} = ?1");

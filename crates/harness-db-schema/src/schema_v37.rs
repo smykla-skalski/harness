@@ -16,7 +16,7 @@ pub fn run(conn: &Connection) -> Result<(), CliError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use harness_daemon::daemon::db::DaemonDb;
+    use harness_daemon::daemon::db::{DaemonDb, DaemonDbOpen};
 
     #[test]
     fn migration_rewrites_only_persisted_task_board_status_fields() {

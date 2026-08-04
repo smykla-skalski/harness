@@ -1,6 +1,8 @@
 use clap::Parser;
 
-use harness_daemon::daemon::db::{DaemonDb, RemoteAcmeQueries, RemoteIdentitySyncQueries};
+use harness_daemon::daemon::db::{
+    DaemonDb, DaemonDbOpen, RemoteAcmeQueries, RemoteIdentitySyncQueries,
+};
 use harness_daemon::daemon::remote::{
     RemoteAcmeChallenge, RemoteDaemonServeConfig, RemoteDnsProvider,
 };
