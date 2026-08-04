@@ -1,8 +1,10 @@
 //! `db`'s interface onto [`DaemonDb`] and [`AsyncDaemonDb`] for remote client
 //! identity, tokens, and their audit trail.
 //!
-//! `db/remote_identity.rs` (sync) and `db/remote_identity_async.rs` (async)
-//! keep this area's SQL and row parsing, but the traits and their impls live
+//! `db/remote_identity.rs` keeps this area's SQL and row parsing (its audit
+//! retention prune, shared with `db/schema.rs`/`db/async_pool.rs`'s own
+//! open/connect paths, lives in `db/audit_event_retention(_async).rs`
+//! instead), but the traits and their impls live
 //! here, next to the domain code that calls them (`daemon::http::auth`,
 //! `daemon::websocket::connection`, `harness-daemon-remote-cli`) rather than
 //! inside `db`. `db` doesn't own either type's callers, and an inherent
@@ -22,12 +24,12 @@ use sqlx::query;
 
 use harness_kernel::errors::CliError;
 
+use crate::daemon::db::audit_event_retention_async::prune_remote_audit_events_in_transaction as prune_remote_audit_events_async_in_transaction;
 use crate::daemon::db::db_error;
 use crate::daemon::db::remote_identity::{
     INSERT_REMOTE_AUDIT_EVENT_SQL, record_remote_audit_event_in_transaction, remote_client,
     remote_client_from_row, scopes_to_json,
 };
-use crate::daemon::db::remote_identity_async::prune_remote_audit_events_in_transaction as prune_remote_audit_events_async_in_transaction;
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
 
 use super::remote_identity::{
@@ -372,7 +374,7 @@ impl RemoteIdentitySyncQueries for DaemonDb {
     }
 
     fn prune_remote_audit_events(&self) -> Result<u64, CliError> {
-        crate::daemon::db::remote_identity::prune_remote_audit_events(self)
+        crate::daemon::db::audit_event_retention::prune_remote_audit_events(self)
     }
 
     fn mark_remote_audit_event_failed(

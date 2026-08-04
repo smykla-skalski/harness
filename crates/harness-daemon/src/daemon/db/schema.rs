@@ -1,4 +1,4 @@
-use super::remote_identity::prune_remote_audit_events;
+use super::audit_event_retention::prune_remote_audit_events;
 use super::schema_sql::CREATE_SCHEMA;
 use super::{CliError, Connection, DaemonDb, Path, SessionState, db_error};
 use rusqlite::ffi::ErrorCode;

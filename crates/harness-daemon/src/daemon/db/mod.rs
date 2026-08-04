@@ -43,6 +43,8 @@ pub(crate) use harness_daemon_snapshot as daemon_snapshot;
 
 pub(crate) mod activity_fold;
 mod async_agent_turn_runs;
+pub(crate) mod audit_event_retention;
+pub(crate) mod audit_event_retention_async;
 pub(crate) use async_agent_turn_runs::{
     AgentTurnRunSnapshot, AgentTurnRunStatus, AsyncAgentTurnRunQueries,
 };
@@ -92,7 +94,6 @@ mod rebuild;
 pub(crate) use rebuild::TaskReviewRebuild;
 pub(crate) mod remote_acme;
 pub(crate) mod remote_identity;
-pub(crate) mod remote_identity_async;
 pub(crate) mod remote_pairing_revoke;
 pub(crate) use crate::daemon::remote_pairing_queries::RemotePairingOwner;
 pub(crate) use crate::daemon::remote_pairing_queries::RemotePairingRevokeOutcome;

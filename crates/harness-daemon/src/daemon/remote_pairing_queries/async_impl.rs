@@ -3,8 +3,8 @@ use sqlx::query;
 use harness_kernel::errors::CliError;
 
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::audit_event_retention_async::prune_remote_audit_events_in_transaction as prune_remote_audit_events_async_in_transaction;
 use crate::daemon::db::db_error;
-use crate::daemon::db::remote_identity_async::prune_remote_audit_events_in_transaction as prune_remote_audit_events_async_in_transaction;
 use crate::daemon::db::remote_pairing_revoke::{
     decide_pairing_revoke_outcome_in_tx, finish_missing_pairing_revoke, record_revoke_audit,
 };
