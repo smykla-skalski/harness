@@ -8,33 +8,50 @@ struct DashboardAgentDecisionCard: View {
   let store: HarnessMonitorStore
   let item: DashboardDecisionItem
   @State private var isResolving = false
+  @State private var isPresentingSnooze = false
 
   var body: some View {
-    HStack(alignment: .top, spacing: 0) {
-      Rectangle()
-        .fill(item.severity.chipColor)
-        .frame(width: 3)
-      VStack(alignment: .leading, spacing: 10) {
-        header
-        Text(item.summary.withoutTrailingPeriod)
-          .scaledFont(.callout)
-          .textSelection(.enabled)
-          .frame(maxWidth: .infinity, alignment: .leading)
-        if !item.suggestedActions.isEmpty {
-          actionRow
-        } else {
-          Text("This decision stays pending until the daemon accepts a resolution")
-            .scaledFont(.caption)
-            .foregroundStyle(.secondary)
-        }
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+      header
+      Text(item.summary.withoutTrailingPeriod)
+        .scaledFont(.callout)
+        .textSelection(.enabled)
+        .frame(maxWidth: .infinity, alignment: .leading)
+      if !item.suggestedActions.isEmpty {
+        actionRow
+      } else {
+        Text("This decision stays pending until the daemon accepts a resolution")
+          .scaledFont(.caption)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       }
-      .padding(14)
     }
+    .foregroundStyle(HarnessMonitorTheme.ink)
+    .padding(HarnessMonitorTheme.spacingMD)
     .frame(maxWidth: .infinity, alignment: .leading)
-    .background(item.severity.chipColor.opacity(0.08))
-    .clipShape(RoundedRectangle(cornerRadius: 12))
+    .background(
+      item.severity.chipColor.opacity(0.08),
+      in: .rect(cornerRadius: HarnessMonitorTheme.cornerRadiusSM)
+    )
+    .overlay {
+      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM)
+        .strokeBorder(item.severity.chipColor.opacity(0.22))
+    }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardAgentDecisionCard(item.id))
+    .confirmationDialog(
+      "Snooze Decision",
+      isPresented: $isPresentingSnooze,
+      titleVisibility: .visible
+    ) {
+      ForEach(SnoozeOption.allCases) { option in
+        Button(option.actionTitle) {
+          snooze(duration: option.duration)
+        }
+      }
+      Button("Cancel", role: .cancel) {}
+    } message: {
+      Text("Pause this decision for a fixed interval")
+    }
   }
 
   private var header: some View {
@@ -61,7 +78,7 @@ struct DashboardAgentDecisionCard: View {
       Spacer()
       ForEach(item.suggestedActions) { action in
         Button(action.title, role: action.isDashboardDestructive ? .destructive : nil) {
-          resolve(action.id)
+          perform(action)
         }
         .disabled(isResolving)
         .accessibilityIdentifier(
@@ -71,8 +88,19 @@ struct DashboardAgentDecisionCard: View {
     }
   }
 
-  private func resolve(_ actionID: String) {
+  private func perform(_ action: SuggestedAction) {
     guard !isResolving else { return }
+    switch DashboardDecisionActionRoute(action: action) {
+    case .resolve(let actionID):
+      resolve(actionID)
+    case .dismiss:
+      dismiss()
+    case .snooze:
+      isPresentingSnooze = true
+    }
+  }
+
+  private func resolve(_ actionID: String) {
     isResolving = true
     let decisionID = item.id
     let outcome = DecisionOutcome(chosenActionID: actionID, note: nil)
@@ -82,6 +110,48 @@ struct DashboardAgentDecisionCard: View {
         await MainActor.run { isResolving = false }
       }
     )
+  }
+
+  private func dismiss() {
+    isResolving = true
+    let decisionID = item.id
+    HarnessMonitorAsyncWorkQueue.shared.submit(
+      .init(title: "Dismissing decision") {
+        await store.dismissDashboardSupervisorDecision(decisionID: decisionID)
+        await MainActor.run { isResolving = false }
+      }
+    )
+  }
+
+  private func snooze(duration: TimeInterval) {
+    isResolving = true
+    let decisionID = item.id
+    HarnessMonitorAsyncWorkQueue.shared.submit(
+      .init(title: "Snoozing decision") {
+        await store.snoozeDashboardSupervisorDecision(
+          decisionID: decisionID,
+          duration: duration
+        )
+        await MainActor.run { isResolving = false }
+      }
+    )
+  }
+}
+
+enum DashboardDecisionActionRoute: Equatable {
+  case resolve(actionID: String)
+  case dismiss
+  case snooze
+
+  init(action: SuggestedAction) {
+    switch action.kind {
+    case .dismiss:
+      self = .dismiss
+    case .snooze:
+      self = .snooze
+    default:
+      self = .resolve(actionID: action.id)
+    }
   }
 }
 

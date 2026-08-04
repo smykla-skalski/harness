@@ -38,7 +38,7 @@ extension DashboardAgentsPreviewFixtures {
   /// falls into a workspace bucket.
   static var previewDecisions: [Decision] {
     [
-      decision(
+      PreviewDecisionFixture(
         id: "stuck-agent:preview-acp",
         severity: .critical,
         ruleID: "stuck-agent",
@@ -48,8 +48,8 @@ extension DashboardAgentsPreviewFixtures {
           .init(id: "nudge", title: "Nudge agent", kind: .nudge, payloadJSON: "{}"),
           .init(id: "dismiss", title: "Dismiss", kind: .dismiss, payloadJSON: "{}"),
         ]
-      ),
-      decision(
+      ).decision,
+      PreviewDecisionFixture(
         id: "failed-nudge-loop:preview-codex",
         severity: .needsUser,
         ruleID: "failed-nudge-loop",
@@ -60,8 +60,8 @@ extension DashboardAgentsPreviewFixtures {
           .init(id: "snooze", title: "Snooze", kind: .snooze, payloadJSON: "{}"),
           .init(id: "dismiss", title: "Dismiss", kind: .dismiss, payloadJSON: "{}"),
         ]
-      ),
-      decision(
+      ).decision,
+      PreviewDecisionFixture(
         id: "manual-session-window:preview-terminal",
         severity: .warn,
         ruleID: "manual-session-window",
@@ -70,8 +70,8 @@ extension DashboardAgentsPreviewFixtures {
         actions: [
           .init(id: "dismiss", title: "Acknowledge", kind: .dismiss, payloadJSON: "{}")
         ]
-      ),
-      decision(
+      ).decision,
+      PreviewDecisionFixture(
         id: "unassigned-task:mesh-4821",
         severity: .needsUser,
         ruleID: "unassigned-task",
@@ -83,20 +83,31 @@ extension DashboardAgentsPreviewFixtures {
           .init(id: "assign", title: "Assign agent", kind: .assignTask, payloadJSON: "{}"),
           .init(id: "dismiss", title: "Dismiss", kind: .dismiss, payloadJSON: "{}"),
         ]
-      ),
+      ).decision,
+      PreviewDecisionFixture(
+        id: "quarantine:observer-issue-escalation",
+        severity: .critical,
+        ruleID: "observer-issue-escalation",
+        sessionID: nil,
+        agentID: nil,
+        summary: "Observer issue escalation was quarantined after repeated failures",
+        actions: []
+      ).decision,
     ]
   }
+}
 
-  private static func decision(
-    id: String,
-    severity: DecisionSeverity,
-    ruleID: String,
-    sessionID: String? = "opaque-preview-correlation",
-    agentID: String?,
-    taskID: String? = nil,
-    summary: String,
-    actions: [SuggestedAction]
-  ) -> Decision {
+private struct PreviewDecisionFixture {
+  let id: String
+  let severity: DecisionSeverity
+  let ruleID: String
+  var sessionID: String? = "opaque-preview-correlation"
+  let agentID: String?
+  var taskID: String?
+  let summary: String
+  let actions: [SuggestedAction]
+
+  var decision: Decision {
     Decision(
       id: id,
       severity: severity,
@@ -106,11 +117,11 @@ extension DashboardAgentsPreviewFixtures {
       taskID: taskID,
       summary: summary,
       contextJSON: "{}",
-      suggestedActionsJSON: encodedActions(actions)
+      suggestedActionsJSON: encodedActions
     )
   }
 
-  private static func encodedActions(_ actions: [SuggestedAction]) -> String {
+  private var encodedActions: String {
     guard let data = try? JSONEncoder().encode(actions),
       let json = String(data: data, encoding: .utf8)
     else {

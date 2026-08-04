@@ -23,7 +23,7 @@ struct DashboardDecisionAttributionTests {
       sessionID: "s1",
       sessionAgentID: "sa-1"
     )
-    let decision = input(
+    let decision = AttributionInputFixture(
       id: "acp-permission:b1",
       ruleID: "acp-permission",
       severity: .warn,
@@ -31,7 +31,7 @@ struct DashboardDecisionAttributionTests {
       sessionAgentID: "sa-1",
       managedAgentID: "acp-7",
       workspace: ws
-    )
+    ).input
 
     let resolution = DashboardDecisionAttributor.resolve(inputs: [decision], agents: [managed])
 
@@ -52,7 +52,7 @@ struct DashboardDecisionAttributionTests {
       sessionID: "s1",
       sessionAgentID: "sa-9"
     )
-    let decision = input(
+    let decision = AttributionInputFixture(
       id: "stuck-agent:1",
       ruleID: "stuck-agent",
       severity: .critical,
@@ -60,7 +60,7 @@ struct DashboardDecisionAttributionTests {
       sessionAgentID: "sa-9",
       managedAgentID: nil,
       workspace: ws
-    )
+    ).input
 
     let resolution = DashboardDecisionAttributor.resolve(inputs: [decision], agents: [managed])
 
@@ -71,7 +71,7 @@ struct DashboardDecisionAttributionTests {
   @Test("Task-scoped decision with no agent becomes a work item in its workspace bucket")
   func taskScopedBucket() {
     let ws = workspace(projectID: "harness", checkoutID: "feature")
-    let decision = input(
+    let decision = AttributionInputFixture(
       id: "unassigned-task:1",
       ruleID: "unassigned-task",
       severity: .needsUser,
@@ -80,7 +80,7 @@ struct DashboardDecisionAttributionTests {
       taskID: "task-42",
       managedAgentID: nil,
       workspace: ws
-    )
+    ).input
 
     let resolution = DashboardDecisionAttributor.resolve(inputs: [decision], agents: [])
 
@@ -93,7 +93,7 @@ struct DashboardDecisionAttributionTests {
   @Test("Session-only decision with no agent or task becomes a workspace target")
   func workspaceScoped() {
     let ws = workspace(projectID: "harness", checkoutID: "main")
-    let decision = input(
+    let decision = AttributionInputFixture(
       id: "daemon-disconnect",
       ruleID: "daemon-disconnect",
       severity: .critical,
@@ -101,7 +101,7 @@ struct DashboardDecisionAttributionTests {
       sessionAgentID: nil,
       managedAgentID: nil,
       workspace: ws
-    )
+    ).input
 
     let resolution = DashboardDecisionAttributor.resolve(inputs: [decision], agents: [])
 
@@ -111,7 +111,7 @@ struct DashboardDecisionAttributionTests {
   @Test("Decision whose managed agent is not loaded falls back to its workspace bucket")
   func unloadedAgentFallsBackToWorkspace() {
     let ws = workspace(projectID: "harness", checkoutID: "main")
-    let decision = input(
+    let decision = AttributionInputFixture(
       id: "acp-permission:b2",
       ruleID: "acp-permission",
       severity: .warn,
@@ -119,7 +119,7 @@ struct DashboardDecisionAttributionTests {
       sessionAgentID: "sa-x",
       managedAgentID: "acp-unloaded",
       workspace: ws
-    )
+    ).input
 
     let resolution = DashboardDecisionAttributor.resolve(inputs: [decision], agents: [])
 
@@ -129,7 +129,7 @@ struct DashboardDecisionAttributionTests {
 
   @Test("Decision with no resolvable workspace is unattributed")
   func unattributed() {
-    let decision = input(
+    let decision = AttributionInputFixture(
       id: "x",
       ruleID: "idle-session",
       severity: .info,
@@ -137,12 +137,13 @@ struct DashboardDecisionAttributionTests {
       sessionAgentID: nil,
       managedAgentID: nil,
       workspace: nil
-    )
+    ).input
 
     let resolution = DashboardDecisionAttributor.resolve(inputs: [decision], agents: [])
 
     #expect(resolution.unattributedItems.count == 1)
     #expect(resolution.workspaceBuckets.isEmpty)
+    #expect(resolution.hasDecisionDestinations)
   }
 
   @Test("Worst severity and ordering reflect the highest-rank decision for an agent")
@@ -155,7 +156,7 @@ struct DashboardDecisionAttributionTests {
       sessionID: "s1",
       sessionAgentID: "sa-1"
     )
-    let warn = input(
+    let warn = AttributionInputFixture(
       id: "d1",
       ruleID: "acp-permission",
       severity: .warn,
@@ -163,8 +164,8 @@ struct DashboardDecisionAttributionTests {
       sessionAgentID: "sa-1",
       managedAgentID: "acp-7",
       workspace: ws
-    )
-    let critical = input(
+    ).input
+    let critical = AttributionInputFixture(
       id: "d2",
       ruleID: "stuck-agent",
       severity: .critical,
@@ -172,9 +173,12 @@ struct DashboardDecisionAttributionTests {
       sessionAgentID: "sa-1",
       managedAgentID: nil,
       workspace: ws
-    )
+    ).input
 
-    let resolution = DashboardDecisionAttributor.resolve(inputs: [warn, critical], agents: [managed])
+    let resolution = DashboardDecisionAttributor.resolve(
+      inputs: [warn, critical],
+      agents: [managed]
+    )
 
     #expect(resolution.summaryByAgent[managed.identity]?.count == 2)
     #expect(resolution.summaryByAgent[managed.identity]?.worstSeverity == .critical)
@@ -220,26 +224,37 @@ private func agentSummary(
   )
 }
 
-private func input(
-  id: String,
-  ruleID: String,
-  severity: DecisionSeverity,
-  sessionID: String?,
-  sessionAgentID: String?,
-  taskID: String? = nil,
-  managedAgentID: String?,
-  workspace: DashboardAgentWorkspace?
-) -> DashboardDecisionAttributionInput {
-  DashboardDecisionAttributionInput(
-    id: id,
-    ruleID: ruleID,
-    severity: severity,
-    summary: id,
-    createdAt: Date(timeIntervalSince1970: 1_000),
-    sessionID: sessionID,
-    sessionAgentID: sessionAgentID,
-    taskID: taskID,
-    managedAgentID: managedAgentID,
-    workspace: workspace
-  )
+private struct AttributionInputFixture {
+  let id: String
+  let ruleID: String
+  let severity: DecisionSeverity
+  let sessionID: String?
+  let sessionAgentID: String?
+  var taskID: String?
+  let managedAgentID: String?
+  let workspace: DashboardAgentWorkspace?
+
+  var input: DashboardDecisionAttributionInput {
+    DashboardDecisionAttributionInput(
+      id: id,
+      ruleID: ruleID,
+      severity: severity,
+      summary: id,
+      createdAt: Date(timeIntervalSince1970: 1_000),
+      sessionID: sessionID,
+      sessionAgentID: sessionAgentID,
+      taskID: taskID,
+      managedAgentID: managedAgentID,
+      managedAgentKind: managedAgentKind(for: ruleID),
+      workspace: workspace
+    )
+  }
+}
+
+private func managedAgentKind(for ruleID: String) -> DashboardAgentRuntimeKind? {
+  switch ruleID {
+  case "acp-permission": .acp
+  case "codex-approval": .codex
+  default: nil
+  }
 }

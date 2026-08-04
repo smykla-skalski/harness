@@ -12,6 +12,7 @@ public struct DashboardDecisionAttributionInput: Equatable, Sendable {
   public let sessionAgentID: String?
   public let taskID: String?
   public let managedAgentID: String?
+  public let managedAgentKind: DashboardAgentRuntimeKind?
   public let workspace: DashboardAgentWorkspace?
   public let suggestedActions: [SuggestedAction]
 
@@ -25,6 +26,7 @@ public struct DashboardDecisionAttributionInput: Equatable, Sendable {
     sessionAgentID: String?,
     taskID: String?,
     managedAgentID: String?,
+    managedAgentKind: DashboardAgentRuntimeKind? = nil,
     workspace: DashboardAgentWorkspace?,
     suggestedActions: [SuggestedAction] = []
   ) {
@@ -37,6 +39,7 @@ public struct DashboardDecisionAttributionInput: Equatable, Sendable {
     self.sessionAgentID = sessionAgentID
     self.taskID = taskID
     self.managedAgentID = managedAgentID
+    self.managedAgentKind = managedAgentKind
     self.workspace = workspace
     self.suggestedActions = suggestedActions
   }
@@ -73,6 +76,10 @@ public struct DashboardDecisionResolution: Equatable, Sendable {
     workspaceBuckets: [],
     unattributedItems: []
   )
+
+  public var hasDecisionDestinations: Bool {
+    !workspaceBuckets.isEmpty || !unattributedItems.isEmpty
+  }
 }
 
 /// Pure mapping from open decisions to their Dashboard Agents grouping. Agent attribution matches a
@@ -90,8 +97,11 @@ public enum DashboardDecisionAttributor {
     var agentBySessionAgent: [SessionAgentKey: DashboardAgentIdentity] = [:]
     for agent in agents {
       guard let sessionAgentID = agent.sessionAgentID else { continue }
-      agentBySessionAgent[SessionAgentKey(sessionID: agent.sessionID, sessionAgentID: sessionAgentID)]
-        = agent.identity
+      let key = SessionAgentKey(
+        sessionID: agent.sessionID,
+        sessionAgentID: sessionAgentID
+      )
+      agentBySessionAgent[key] = agent.identity
     }
 
     let items = inputs.map { input in
@@ -103,7 +113,11 @@ public enum DashboardDecisionAttributor {
     }
 
     var itemsByAgent: [DashboardAgentIdentity: [DashboardDecisionItem]] = [:]
-    var bucketItems: [DashboardAgentWorkspaceIdentity: (DashboardAgentWorkspace, [DashboardDecisionItem])] = [:]
+    typealias WorkspaceBucket = (
+      workspace: DashboardAgentWorkspace,
+      items: [DashboardDecisionItem]
+    )
+    var bucketItems: [DashboardAgentWorkspaceIdentity: WorkspaceBucket] = [:]
     var unattributed: [DashboardDecisionItem] = []
     for item in items {
       switch item.target {
@@ -114,7 +128,7 @@ public enum DashboardDecisionAttributor {
           unattributed.append(item)
           continue
         }
-        var existing = bucketItems[workspaceID]?.1 ?? []
+        var existing = bucketItems[workspaceID]?.items ?? []
         existing.append(item)
         bucketItems[workspaceID] = (workspace, existing)
       case .unattributed:
@@ -125,7 +139,12 @@ public enum DashboardDecisionAttributor {
     itemsByAgent = itemsByAgent.mapValues { $0.sorted(by: worstFirst) }
     let summaryByAgent = itemsByAgent.mapValues(summary(for:))
     let workspaceBuckets = bucketItems.values
-      .map { DashboardDecisionWorkspaceBucket(workspace: $0.0, items: $0.1.sorted(by: worstFirst)) }
+      .map {
+        DashboardDecisionWorkspaceBucket(
+          workspace: $0.workspace,
+          items: $0.items.sorted(by: worstFirst)
+        )
+      }
       .sorted(by: bucketOrdering)
 
     return DashboardDecisionResolution(
@@ -147,7 +166,8 @@ public enum DashboardDecisionAttributor {
       agentsByIdentity: agentsByIdentity,
       agentBySessionAgent: agentBySessionAgent
     )
-    let workspace = input.workspace ?? target.agentIdentity.flatMap { agentsByIdentity[$0]?.workspace }
+    let workspace =
+      input.workspace ?? target.agentIdentity.flatMap { agentsByIdentity[$0]?.workspace }
     return DashboardDecisionItem(
       id: input.id,
       ruleID: input.ruleID,
@@ -166,16 +186,22 @@ public enum DashboardDecisionAttributor {
     agentsByIdentity: [DashboardAgentIdentity: DashboardAgentSummary],
     agentBySessionAgent: [SessionAgentKey: DashboardAgentIdentity]
   ) -> DashboardDecisionTarget {
-    if let managedAgentID = input.managedAgentID, let workspace = input.workspace {
+    if let managedAgentID = input.managedAgentID,
+      let managedAgentKind = input.managedAgentKind,
+      let workspace = input.workspace
+    {
       let identity = DashboardAgentIdentity(
         workspace: workspace.identity,
-        runtimeKind: .acp,
+        runtimeKind: managedAgentKind,
         managedAgentID: managedAgentID
       )
       if agentsByIdentity[identity] != nil { return .agent(identity) }
     }
-    if let sessionID = input.sessionID, let sessionAgentID = input.sessionAgentID,
-      let identity = agentBySessionAgent[SessionAgentKey(sessionID: sessionID, sessionAgentID: sessionAgentID)]
+    if let sessionID = input.sessionID,
+      let sessionAgentID = input.sessionAgentID,
+      let identity = agentBySessionAgent[
+        SessionAgentKey(sessionID: sessionID, sessionAgentID: sessionAgentID)
+      ]
     {
       return .agent(identity)
     }

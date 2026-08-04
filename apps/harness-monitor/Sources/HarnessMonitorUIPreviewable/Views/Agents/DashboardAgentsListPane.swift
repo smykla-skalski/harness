@@ -6,10 +6,11 @@ struct DashboardAgentsListPane: View {
   @Binding var selection: DashboardAgentsSelection?
   let decisionSummaries: [DashboardAgentIdentity: DashboardAgentDecisionSummary]
   let workspaceBuckets: [DashboardDecisionWorkspaceBucket]
+  let unattributedItems: [DashboardDecisionItem]
 
   var body: some View {
     Group {
-      switch state.contentState {
+      switch state.contentState(hasDecisionDestinations: hasDecisionDestinations) {
       case .firstRun:
         DashboardAgentsEmptyState(
           title: "Agents are ready to browse",
@@ -40,8 +41,20 @@ struct DashboardAgentsListPane: View {
     DashboardAgentsListSection.make(groups: state.groups, buckets: workspaceBuckets)
   }
 
+  private var hasDecisionDestinations: Bool {
+    !workspaceBuckets.isEmpty || !unattributedItems.isEmpty
+  }
+
   private var agentList: some View {
     List(selection: $selection) {
+      if !unattributedItems.isEmpty {
+        Section {
+          DashboardGlobalDecisionsRow(items: unattributedItems)
+            .tag(DashboardAgentsSelection.globalDecisions)
+        } header: {
+          Text("All workspaces")
+        }
+      }
       ForEach(sections) { section in
         Section {
           ForEach(section.agents) { agent in
@@ -81,6 +94,36 @@ struct DashboardAgentsListPane: View {
     case nil:
       "person.2.slash"
     }
+  }
+}
+
+private struct DashboardGlobalDecisionsRow: View {
+  let items: [DashboardDecisionItem]
+
+  var body: some View {
+    HStack(spacing: 10) {
+      Image(systemName: "globe")
+        .foregroundStyle(worstSeverity.chipColor)
+        .frame(width: 16)
+
+      Text("Global decisions")
+        .lineLimit(1)
+
+      Spacer(minLength: 4)
+
+      DashboardAgentDecisionBadge(
+        summary: DashboardAgentDecisionSummary(
+          count: items.count,
+          worstSeverity: worstSeverity
+        )
+      )
+    }
+    .accessibilityElement(children: .combine)
+    .accessibilityLabel("Global decisions, \(items.count) pending")
+  }
+
+  private var worstSeverity: DecisionSeverity {
+    items.map(\.severity).max(by: { $0.sortKey < $1.sortKey }) ?? .info
   }
 }
 

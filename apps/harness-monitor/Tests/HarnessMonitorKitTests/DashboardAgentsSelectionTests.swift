@@ -39,4 +39,33 @@ struct DashboardAgentsSelectionTests {
     #expect(DashboardAgentsSelection(rawValue: "") == nil)
     #expect(DashboardAgentsSelection(rawValue: "wsd:not-base64!") == nil)
   }
+
+  @Test("Global decision selection round-trips without colliding with agent identity")
+  func globalDecisionRoundTrip() {
+    let selection = DashboardAgentsSelection.globalDecisions
+
+    #expect(DashboardAgentsSelection(rawValue: selection.rawValue) == selection)
+    #expect(selection.agentIdentity == nil)
+    #expect(selection.workspaceIdentity == nil)
+    #expect(DashboardAgentIdentity(selectionRawValue: selection.rawValue) == nil)
+  }
+}
+
+@Suite("Dashboard decision action routing")
+struct DashboardDecisionActionRoutingTests {
+  @Test("Resolve, dismiss, and snooze actions retain their semantic route")
+  func routesActionKinds() {
+    let resolve = SuggestedAction(id: "nudge", title: "Nudge", kind: .nudge, payloadJSON: "{}")
+    let dismiss = SuggestedAction(
+      id: "dismiss",
+      title: "Dismiss",
+      kind: .dismiss,
+      payloadJSON: "{}"
+    )
+    let snooze = SuggestedAction(id: "snooze", title: "Snooze", kind: .snooze, payloadJSON: "{}")
+
+    #expect(DashboardDecisionActionRoute(action: resolve) == .resolve(actionID: "nudge"))
+    #expect(DashboardDecisionActionRoute(action: dismiss) == .dismiss)
+    #expect(DashboardDecisionActionRoute(action: snooze) == .snooze)
+  }
 }

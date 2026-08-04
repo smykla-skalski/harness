@@ -23,12 +23,24 @@ extension HarnessMonitorStore {
     await supervisorDecisionActionHandler().resolve(decisionID: decisionID, outcome: outcome)
   }
 
+  public func dismissDashboardSupervisorDecision(decisionID: String) async {
+    await supervisorDecisionActionHandler().dismiss(decisionID: decisionID)
+  }
+
+  public func snoozeDashboardSupervisorDecision(
+    decisionID: String,
+    duration: TimeInterval
+  ) async {
+    await supervisorDecisionActionHandler().snooze(decisionID: decisionID, duration: duration)
+  }
+
   func dashboardDecisionAttributionInput(
     for decision: Decision
   ) -> DashboardDecisionAttributionInput {
     let workspace = decision.sessionID
       .flatMap { sessionIndex.sessionSummary(for: $0) }
       .map(Self.dashboardAgentWorkspace)
+    let managedAgent = dashboardDecisionManagedAgent(for: decision)
     return DashboardDecisionAttributionInput(
       id: decision.id,
       ruleID: decision.ruleID,
@@ -38,32 +50,41 @@ extension HarnessMonitorStore {
       sessionID: decision.sessionID,
       sessionAgentID: decision.agentID,
       taskID: decision.taskID,
-      managedAgentID: dashboardDecisionManagedAgentID(for: decision),
+      managedAgentID: managedAgent?.id,
+      managedAgentKind: managedAgent?.kind,
       workspace: workspace,
-      suggestedActions: Self.dashboardDecisionSuggestedActions(from: decision)
+      suggestedActions: DecisionDetailViewModel.prepareContent(
+        input: .init(decision: decision)
+      ).suggestedActions
     )
-  }
-
-  private static func dashboardDecisionSuggestedActions(
-    from decision: Decision
-  ) -> [SuggestedAction] {
-    guard let data = decision.suggestedActionsJSON.data(using: .utf8),
-      let actions = try? JSONDecoder().decode([SuggestedAction].self, from: data)
-    else {
-      return []
-    }
-    return actions
   }
 
   /// The daemon-managed agent handle for an ACP permission decision. Prefers the live sync cache and
   /// falls back to decoding the persisted row, so a cold cache still attributes the decision.
-  private func dashboardDecisionManagedAgentID(for decision: Decision) -> String? {
-    guard decision.ruleID == AcpPermissionDecisionPayload.ruleID else { return nil }
-    if let cached = acpPermissionDecisionPayload(for: decision.id)?.agent.managedAgentID,
-      !cached.isEmpty
-    {
-      return cached
+  private func dashboardDecisionManagedAgent(
+    for decision: Decision
+  ) -> DashboardDecisionManagedAgent? {
+    if decision.ruleID == AcpPermissionDecisionPayload.ruleID {
+      if let cached = acpPermissionDecisionPayload(for: decision.id)?.agent.managedAgentID,
+        !cached.isEmpty
+      {
+        return DashboardDecisionManagedAgent(id: cached, kind: .acp)
+      }
+      guard let decoded = AcpPermissionDecisionPayload.decode(from: decision)?.agent.managedAgentID,
+        !decoded.isEmpty
+      else {
+        return nil
+      }
+      return DashboardDecisionManagedAgent(id: decoded, kind: .acp)
     }
-    return AcpPermissionDecisionPayload.decode(from: decision)?.agent.managedAgentID
+    guard decision.ruleID == "codex-approval", let runID = decision.agentID, !runID.isEmpty else {
+      return nil
+    }
+    return DashboardDecisionManagedAgent(id: runID, kind: .codex)
   }
+}
+
+private struct DashboardDecisionManagedAgent {
+  let id: String
+  let kind: DashboardAgentRuntimeKind
 }

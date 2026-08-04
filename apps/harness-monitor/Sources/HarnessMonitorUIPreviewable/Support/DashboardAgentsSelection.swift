@@ -9,8 +9,10 @@ import HarnessMonitorKit
 enum DashboardAgentsSelection: Hashable {
   case agent(DashboardAgentIdentity)
   case workspaceDecisions(DashboardAgentWorkspaceIdentity)
+  case globalDecisions
 
   private static let workspacePrefix = "wsd:"
+  private static let globalRawValue = "global-decisions"
 
   var rawValue: String {
     switch self {
@@ -18,11 +20,17 @@ enum DashboardAgentsSelection: Hashable {
       identity.selectionRawValue
     case .workspaceDecisions(let workspace):
       Self.workspacePrefix + workspace.selectionRawValue
+    case .globalDecisions:
+      Self.globalRawValue
     }
   }
 
   init?(rawValue: String) {
     guard !rawValue.isEmpty else { return nil }
+    if rawValue == Self.globalRawValue {
+      self = .globalDecisions
+      return
+    }
     if rawValue.hasPrefix(Self.workspacePrefix) {
       let encoded = String(rawValue.dropFirst(Self.workspacePrefix.count))
       guard let workspace = DashboardAgentWorkspaceIdentity(selectionRawValue: encoded) else {

@@ -34,7 +34,7 @@ struct DashboardStoreDecisionResolutionTests {
     #expect(resolution.itemsByAgent.isEmpty)
   }
 
-  @Test("ACP permission decision attaches to a loaded managed agent by decoding the persisted handle")
+  @Test("ACP permission attaches to its loaded managed agent")
   func acpDecisionAttachesToLoadedAgent() async {
     let store = await makeBootstrappedStore()
     let session = PreviewFixtures.summary
@@ -69,6 +69,74 @@ struct DashboardStoreDecisionResolutionTests {
     #expect(resolution.itemsByAgent[agent.identity]?.first?.kind == .acpPermission)
     #expect(resolution.summaryByAgent[agent.identity]?.count == 1)
     #expect(resolution.workspaceBuckets.isEmpty)
+  }
+
+  @Test("Codex approval attaches by managed run identity instead of session agent identity")
+  func codexApprovalAttachesToManagedRun() async {
+    let store = await makeBootstrappedStore()
+    let session = PreviewFixtures.summary
+    _ = store.sessionIndex.applySessionSummary(session)
+    store.supervisorOpenDecisions = [
+      Decision(
+        id: "codex-approval:\(session.sessionId):approval-1",
+        severity: .needsUser,
+        ruleID: "codex-approval",
+        sessionID: session.sessionId,
+        agentID: "codex-run-1",
+        taskID: nil,
+        summary: "Approve command",
+        contextJSON: "{}",
+        suggestedActionsJSON: "[]"
+      )
+    ]
+    let workspace = HarnessMonitorStore.dashboardAgentWorkspace(session)
+    let agent = DashboardAgentSummary(
+      identity: DashboardAgentIdentity(
+        workspace: workspace.identity,
+        runtimeKind: .codex,
+        managedAgentID: "codex-run-1"
+      ),
+      workspace: workspace,
+      sessionID: session.sessionId,
+      sessionAgentID: "session-agent-1",
+      displayName: "Codex",
+      lifecycle: .waiting,
+      summary: nil,
+      projectDirectory: workspace.checkoutRoot,
+      createdAt: "2026-08-02T07:00:00Z",
+      updatedAt: "2026-08-02T08:00:00Z",
+      source: .live
+    )
+
+    let resolution = store.dashboardDecisionResolution(agents: [agent])
+
+    #expect(resolution.itemsByAgent[agent.identity]?.count == 1)
+    #expect(resolution.workspaceBuckets.isEmpty)
+  }
+
+  @Test("Supervisor decision with no encoded actions receives fallback dismiss")
+  func supervisorDecisionReceivesFallbackDismiss() async {
+    let store = await makeBootstrappedStore()
+    let session = PreviewFixtures.summary
+    _ = store.sessionIndex.applySessionSummary(session)
+    store.supervisorOpenDecisions = [
+      Decision(
+        id: "observer-issue-escalation:\(session.sessionId)",
+        severity: .warn,
+        ruleID: "observer-issue-escalation",
+        sessionID: session.sessionId,
+        agentID: nil,
+        taskID: nil,
+        summary: "Observer reported repeated issues",
+        contextJSON: "{}",
+        suggestedActionsJSON: "[]"
+      )
+    ]
+
+    let resolution = store.dashboardDecisionResolution(agents: [])
+    let actions = resolution.workspaceBuckets.first?.items.first?.suggestedActions
+
+    #expect(actions?.map(\.kind) == [.dismiss])
   }
 
   private func makeBatch(sessionID: String) -> AcpPermissionBatch {

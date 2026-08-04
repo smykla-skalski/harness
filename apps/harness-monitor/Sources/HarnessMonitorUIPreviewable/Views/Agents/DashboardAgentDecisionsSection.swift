@@ -22,5 +22,6 @@ struct DashboardAgentDecisionsSection: View {
 
 extension HarnessMonitorAccessibility {
   public static let dashboardAgentDecisions = "harness.dashboard.agents.decisions"
-  public static let dashboardWorkspaceDecisionsDetail = "harness.dashboard.agents.workspace-decisions"
+  public static let dashboardWorkspaceDecisionsDetail =
+    "harness.dashboard.agents.workspace-decisions"
 }

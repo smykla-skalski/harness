@@ -24,6 +24,10 @@ struct DashboardAgentBrowserViewState: Equatable, Sendable {
     return hasAttemptedLoad ? .empty : .firstRun
   }
 
+  func contentState(hasDecisionDestinations: Bool) -> DashboardAgentsContentState {
+    hasDecisionDestinations ? .content : contentState
+  }
+
   var groups: [DashboardAgentWorkspaceGroup] {
     DashboardAgentWorkspaceGroup.make(from: agents)
   }
@@ -35,6 +39,11 @@ struct DashboardAgentBrowserViewState: Equatable, Sendable {
     case .loading, .content:
       false
     }
+  }
+
+  func presentsAsFullWidthState(hasDecisionDestinations: Bool) -> Bool {
+    if hasDecisionDestinations { return false }
+    return presentsAsFullWidthState
   }
 }
 
