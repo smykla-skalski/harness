@@ -13,6 +13,7 @@ use crate::agents::acp::supervision::kill_process_group;
 use crate::daemon::state;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
+use super::codex_output::CodexStderrCapture;
 use super::core::{BridgeCodexMetadata, BridgeCodexProcess, CodexEndpointScheme};
 use super::helpers::detect_codex_version;
 use super::server::BridgeServer;
@@ -113,12 +114,15 @@ fn wait_for_codex_process_ready(process: &mut BridgeCodexProcess) -> Result<(), 
             .map_err(|error| CliErrorKind::workflow_io(format!("poll codex app-server: {error}")))?
         {
             let exit_status = exit_status.to_string();
+            kill_codex_process_group(process);
+            let stderr_tail = process.stderr.finish();
             tracing::error!(
                 %endpoint,
                 %readyz_url,
                 port,
                 pid,
                 exit_status = %exit_status,
+                stderr_tail = %stderr_tail,
                 "codex app-server exited before readiness"
             );
             state::append_event_best_effort(
@@ -148,12 +152,15 @@ fn wait_for_codex_process_ready(process: &mut BridgeCodexProcess) -> Result<(), 
         }
 
         if started_at.elapsed() >= CODEX_READY_TIMEOUT {
+            kill_codex_process_group(process);
+            let stderr_tail = process.stderr.finish();
             tracing::error!(
                 %endpoint,
                 %readyz_url,
                 port,
                 pid,
                 probe_error = %probe_error,
+                stderr_tail = %stderr_tail,
                 timeout_ms = CODEX_READY_TIMEOUT.as_millis(),
                 "codex app-server readiness timed out"
             );
@@ -161,7 +168,6 @@ fn wait_for_codex_process_ready(process: &mut BridgeCodexProcess) -> Result<(), 
                 "error",
                 &format!("codex host bridge readiness timed out on {endpoint}: {probe_error}"),
             );
-            kill_codex_process_group(process);
             return Err(CliErrorKind::workflow_io(format!(
                 "codex app-server did not become ready on {endpoint}: {probe_error}"
             ))
@@ -198,15 +204,26 @@ pub(super) fn spawn_codex_process(
         ))
         .into());
     }
-    let child = Command::new(binary)
+    let mut child = Command::new(binary)
         .args(["app-server", "--listen", &listen_address])
         .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
         .process_group(0)
         .spawn()
         .map_err(|error| CliErrorKind::workflow_io(format!("spawn codex app-server: {error}")))?;
-    let version = detect_codex_version(binary);
+    let Some(stderr) = child.stderr.take() else {
+        let _ = child.kill();
+        let _ = child.wait();
+        return Err(CliErrorKind::workflow_io("capture codex app-server stderr").into());
+    };
     let codex_pid = child.id();
     let group_leader = codex_pid.cast_signed();
+    let stderr = CodexStderrCapture::start(stderr).map_err(|error| {
+        kill_process_group(group_leader, &mut child);
+        CliErrorKind::workflow_io(format!("capture codex app-server stderr: {error}"))
+    })?;
+    let version = detect_codex_version(binary);
     tracing::info!(
         binary_path = %binary.display(),
         endpoint = %listen_address,
@@ -221,6 +238,7 @@ pub(super) fn spawn_codex_process(
     );
     let mut process = BridgeCodexProcess {
         child,
+        stderr,
         pgid: group_leader,
         endpoint: listen_address,
         metadata: BridgeCodexMetadata {
@@ -247,15 +265,14 @@ pub(super) fn spawn_codex_monitor(server: Arc<BridgeServer>) {
                 let Some(process) = codex.as_mut() else {
                     return;
                 };
-                process
-                    .child
-                    .try_wait()
-                    .ok()
-                    .flatten()
-                    .map(|status| status.to_string())
+                process.child.try_wait().ok().flatten().map(|status| {
+                    kill_codex_process_group(process);
+                    let stderr_tail = process.stderr.finish();
+                    (status.to_string(), stderr_tail)
+                })
             };
-            if let Some(status) = result {
-                let _ = server.mark_codex_unhealthy(&status);
+            if let Some((status, stderr_tail)) = result {
+                let _ = server.mark_codex_unhealthy(&status, &stderr_tail);
                 return;
             }
             thread::sleep(Duration::from_millis(250));

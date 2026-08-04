@@ -9,6 +9,7 @@ mod bridge_state;
 mod capability_lifecycle;
 mod client;
 mod client_acp;
+mod codex_output;
 mod codex_process;
 mod commands;
 mod control;

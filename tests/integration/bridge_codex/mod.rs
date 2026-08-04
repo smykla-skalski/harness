@@ -11,6 +11,7 @@ use tempfile::tempdir;
 
 use super::helpers::{ManagedChild, TcpPortLease};
 
+mod output_capture;
 mod readiness;
 mod reconfigure;
 mod support;

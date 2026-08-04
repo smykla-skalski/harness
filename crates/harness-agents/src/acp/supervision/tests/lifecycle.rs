@@ -1,3 +1,4 @@
+use std::fs;
 use std::process::Command;
 use std::sync::Arc;
 use std::time::Duration;
@@ -267,6 +268,46 @@ fn kill_process_group_escalates_when_child_traps_sigterm() {
     };
     assert_eq!(status.signal(), Some(Signal::SIGKILL as i32));
     wait_for_file_marker(&log_path, "term");
+}
+
+#[test]
+#[cfg(unix)]
+fn kill_process_group_terminates_descendant_after_leader_exits() {
+    use std::os::unix::process::CommandExt;
+
+    let temp = ok(tempfile::tempdir(), "tempdir");
+    let pid_path = temp.path().join("descendant.pid");
+    let mut command = Command::new("sh");
+    command
+        .arg("-c")
+        .arg("trap '' TERM; sleep 60 & echo $! > \"$HARNESS_TEST_PID_PATH\"")
+        .env("HARNESS_TEST_PID_PATH", &pid_path);
+    command.process_group(0);
+    let mut child = ok(command.spawn(), "spawn leader");
+    let pgid = child.id().cast_signed();
+    wait_for_file_marker(&pid_path, "\n");
+    let descendant_pid = ok(fs::read_to_string(&pid_path), "read descendant pid");
+    let descendant_pid = ok(descendant_pid.trim().parse::<u32>(), "parse descendant pid");
+    let _ = ok(child.wait(), "wait for leader");
+
+    kill_process_group(pgid, &mut child);
+
+    assert!(
+        !process_is_running(descendant_pid),
+        "descendant process should not be running"
+    );
+}
+
+#[cfg(unix)]
+fn process_is_running(pid: u32) -> bool {
+    let output = ok(
+        Command::new("/bin/ps")
+            .args(["-o", "stat=", "-p", &pid.to_string()])
+            .output(),
+        "inspect descendant process",
+    );
+    let state = String::from_utf8_lossy(&output.stdout);
+    output.status.success() && !state.trim_start().starts_with('Z')
 }
 
 #[test]

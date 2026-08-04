@@ -15,6 +15,7 @@ use crate::daemon::protocol::StreamEvent;
 use crate::workspace::utc_now;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
+use super::codex_output::CodexStderrCapture;
 use super::types::{AgentTuiStartSpec, BridgeCapability, PersistedBridgeConfig};
 
 #[derive(Debug, Clone)]
@@ -168,6 +169,7 @@ impl BridgeResponse {
 
 pub(super) struct BridgeCodexProcess {
     pub(super) child: Child,
+    pub(super) stderr: CodexStderrCapture,
     /// Process group leader id of the spawned codex child.
     ///
     /// Codex is spawned with `process_group(0)` so it heads its own group.

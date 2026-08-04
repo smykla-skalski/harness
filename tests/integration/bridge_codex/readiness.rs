@@ -96,12 +96,26 @@ fn bridge_start_records_error_when_codex_exits_before_readiness() {
                 .env_isolated_home(&host_home)
                 .env("MOCK_CODEX_EXIT_BEFORE_READY", "1")
                 .env("MOCK_CODEX_EXIT_STATUS", "23")
+                .env("MOCK_CODEX_OUTPUT_BYTES", (64 * 1024).to_string())
                 .env_remove("HARNESS_APP_GROUP_ID")
                 .env_remove("HARNESS_SANDBOXED"),
         )
         .expect("run bridge");
 
     assert!(!output.status.success(), "bridge unexpectedly succeeded");
+    let captured = output_text(&output);
+    assert!(
+        captured.contains("mock-codex-stderr-end"),
+        "failed startup should retain the end of stderr: {captured}"
+    );
+    assert!(
+        !captured.contains("mock-codex-stdout"),
+        "failed startup should not retain routine stdout"
+    );
+    assert!(
+        captured.len() < 64 * 1024,
+        "failed startup diagnostics should stay bounded"
+    );
     assert!(
         !tmp.path()
             .join("harness/daemon/managed/bridge.json")

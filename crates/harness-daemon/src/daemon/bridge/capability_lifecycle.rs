@@ -46,7 +46,11 @@ impl BridgeServer {
         self.persist_state()
     }
 
-    pub(super) fn mark_codex_unhealthy(&self, last_exit_status: &str) -> Result<(), CliError> {
+    pub(super) fn mark_codex_unhealthy(
+        &self,
+        last_exit_status: &str,
+        stderr_tail: &str,
+    ) -> Result<(), CliError> {
         let mut capabilities = self.capabilities()?;
         let Some(codex) = capabilities.get_mut(BRIDGE_CAPABILITY_CODEX) else {
             return Ok(());
@@ -66,6 +70,7 @@ impl BridgeServer {
             %endpoint,
             port,
             exit_status = %last_exit_status,
+            stderr_tail = %stderr_tail,
             "codex host bridge capability became unhealthy"
         );
         state::append_event_best_effort(

@@ -4,7 +4,7 @@ use std::process::Child;
 use std::thread;
 
 #[cfg(unix)]
-use nix::sys::signal::{Signal, killpg};
+use nix::sys::signal::{Signal, kill, killpg};
 #[cfg(unix)]
 use nix::unistd::Pid;
 #[cfg(unix)]
@@ -31,27 +31,22 @@ pub fn kill_process_group(pgid: i32, child: &mut Child) {
 
     thread::sleep(SIGTERM_GRACE_PERIOD);
 
+    if kill(Pid::from_raw(-pgid), None).is_ok() {
+        warn!(
+            pgid,
+            "process group did not exit within grace period; sending SIGKILL"
+        );
+        if let Err(e) = killpg(Pid::from_raw(pgid), Signal::SIGKILL) {
+            warn!(pgid, error = %e, "SIGKILL to process group failed");
+        }
+    }
+
     match child.try_wait() {
-        Ok(Some(status)) => {
-            debug!(pgid, ?status, "process exited after SIGTERM");
-        }
+        Ok(Some(status)) => debug!(pgid, ?status, "process exited after group termination"),
         Ok(None) => {
-            warn!(
-                pgid,
-                "process did not exit within grace period; sending SIGKILL"
-            );
-            if let Err(e) = killpg(Pid::from_raw(pgid), Signal::SIGKILL) {
-                warn!(pgid, error = %e, "SIGKILL to process group failed");
-            }
             let _ = child.wait();
         }
-        Err(e) => {
-            warn!(pgid, error = %e, "failed to check process status; sending SIGKILL");
-            if let Err(e) = killpg(Pid::from_raw(pgid), Signal::SIGKILL) {
-                warn!(pgid, error = %e, "SIGKILL to process group failed");
-            }
-            let _ = child.wait();
-        }
+        Err(e) => warn!(pgid, error = %e, "failed to reap process-group leader"),
     }
 }
 

@@ -35,6 +35,11 @@ port = int(port)
 delay_ms = int(os.environ.get("MOCK_CODEX_READY_DELAY_MS", "0"))
 exit_before_ready = os.environ.get("MOCK_CODEX_EXIT_BEFORE_READY") == "1"
 exit_status = int(os.environ.get("MOCK_CODEX_EXIT_STATUS", "17"))
+output_bytes = int(os.environ.get("MOCK_CODEX_OUTPUT_BYTES", "0"))
+
+if output_bytes > 0:
+    print("mock-codex-stdout:" + ("o" * output_bytes) + ":mock-codex-stdout-end", flush=True)
+    print("mock-codex-stderr:" + ("e" * output_bytes) + ":mock-codex-stderr-end", file=sys.stderr, flush=True)
 
 if delay_ms > 0:
     time.sleep(delay_ms / 1000.0)
