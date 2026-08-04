@@ -5,12 +5,12 @@ use crate::agents::turn::{AgentTurnId, AgentTurnRequest, AgentTurnRuntime};
 use crate::daemon::agent_acp::{
     AcpAgentInspectResponse, AcpAgentSessionState, AcpAgentSnapshot, AcpAgentStartRequest,
 };
-use crate::daemon::db::AsyncDaemonDb;
-use crate::session::types::SessionRole;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::AcpAgentManagerHandle;
 use crate::daemon::db::task_board::prelude::AutomationKillSwitchQueries;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
+use crate::session::types::SessionRole;
 
 mod persistence;
 
@@ -117,7 +117,7 @@ pub struct OpenRouterAgentTurnRuntime {
     /// do not exercise persistence; the production `new` path always supplies
     /// one so every turn is recorded the moment it starts and settles to one
     /// terminal outcome that survives a restart.
-    store: Option<Arc<AsyncDaemonDb>>,
+    store: Option<Arc<AsyncDaemonDbHandle>>,
     /// Caller-owned run identity. `None` keeps the run keyed on the ACP turn id;
     /// `Some` keys it on the coordinator's attempt lifecycle. One turn runs per
     /// instance, so a single correlation covers it.
@@ -130,7 +130,7 @@ impl OpenRouterAgentTurnRuntime {
         manager: AcpAgentManagerHandle,
         session_id: impl Into<String>,
         project_dir: Option<String>,
-        store: Arc<AsyncDaemonDb>,
+        store: Arc<AsyncDaemonDbHandle>,
     ) -> Self {
         Self {
             manager: Arc::new(manager),
@@ -149,7 +149,7 @@ impl OpenRouterAgentTurnRuntime {
         manager: AcpAgentManagerHandle,
         session_id: impl Into<String>,
         project_dir: Option<String>,
-        store: Arc<AsyncDaemonDb>,
+        store: Arc<AsyncDaemonDbHandle>,
         correlation: OpenRouterRunCorrelation,
     ) -> Self {
         Self {
@@ -183,7 +183,7 @@ impl OpenRouterAgentTurnRuntime {
         manager: Arc<dyn OpenRouterTurnManager>,
         session_id: String,
         project_dir: Option<String>,
-        store: Arc<AsyncDaemonDb>,
+        store: Arc<AsyncDaemonDbHandle>,
     ) -> Self {
         Self {
             manager,
@@ -200,7 +200,7 @@ impl OpenRouterAgentTurnRuntime {
         manager: Arc<dyn OpenRouterTurnManager>,
         session_id: String,
         project_dir: Option<String>,
-        store: Arc<AsyncDaemonDb>,
+        store: Arc<AsyncDaemonDbHandle>,
         correlation: OpenRouterRunCorrelation,
     ) -> Self {
         Self {

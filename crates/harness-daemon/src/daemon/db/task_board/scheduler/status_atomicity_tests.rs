@@ -178,7 +178,7 @@ async fn wake_acknowledgement_uses_the_pinned_read_snapshot() {
     assert_eq!(current.heartbeat_at, timestamp(processed_at));
 }
 
-async fn ready_database() -> AsyncDaemonDb {
+async fn ready_database() -> crate::daemon::db_handle::AsyncDaemonDbHandle {
     let db = database().await;
     let settings =
         serde_json::to_string(&crate::task_board::TaskBoardOrchestratorSettings::default())
@@ -205,7 +205,10 @@ async fn ready_database() -> AsyncDaemonDb {
     db
 }
 
-async fn assert_policy_revision(db: &AsyncDaemonDb, workspace: &PolicyCanvasWorkspace) {
+async fn assert_policy_revision(
+    db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
+    workspace: &PolicyCanvasWorkspace,
+) {
     let expected = workspace
         .active_live_document()
         .map_or(0, |document| document.revision);

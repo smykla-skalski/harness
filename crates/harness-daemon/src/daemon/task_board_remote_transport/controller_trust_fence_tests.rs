@@ -8,8 +8,8 @@ use super::controller_prepared_test_support::{
 };
 use super::controller_settlement_tests::{settlement, settlement_ready_controller};
 use super::controller_tests::{cancel_request, cancel_response};
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::task_board::TaskBoardRemoteAssignmentState;
 
 #[tokio::test]
@@ -321,7 +321,7 @@ async fn settlement_response_cannot_cross_a_host_trust_rotation() {
     );
 }
 
-async fn rotate_host_trust(db: &AsyncDaemonDb) {
+async fn rotate_host_trust(db: &AsyncDaemonDbHandle) {
     let mut settings = db
         .task_board_orchestrator_settings()
         .await
@@ -339,7 +339,7 @@ async fn rotate_host_trust(db: &AsyncDaemonDb) {
 }
 
 async fn load_assignment(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     assignment_id: &str,
 ) -> crate::daemon::db::TaskBoardRemoteAssignmentRecord {
     db.task_board_remote_assignment(assignment_id)

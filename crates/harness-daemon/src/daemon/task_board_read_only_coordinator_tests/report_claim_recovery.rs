@@ -9,6 +9,7 @@ use super::load_execution;
 use super::prepared_report_fixture::seed_dispatched_initial_report;
 use super::runtime::{FakeReadOnlyRuntime, PlannedReport};
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 #[tokio::test]
@@ -214,6 +215,7 @@ async fn prepared_initial_report_survives_restart_and_starts_once() {
     let restarted = AsyncDaemonDb::connect(&fixture.test.path)
         .await
         .expect("reopen workflow database after simulated restart");
+    let restarted = AsyncDaemonDbHandle(restarted);
     let restarted_runtime = FakeReadOnlyRuntime::new([PlannedReport::running_review()])
         .with_durable_db(restarted.clone());
     let first = super::super::task_board_read_only_coordinator::
@@ -274,14 +276,14 @@ async fn prepared_initial_report_survives_restart_and_starts_once() {
     );
 }
 
-async fn codex_run_count(db: &AsyncDaemonDb) -> i64 {
+async fn codex_run_count(db: &AsyncDaemonDbHandle) -> i64 {
     sqlx::query_scalar("SELECT COUNT(*) FROM codex_runs")
         .fetch_one(db.pool())
         .await
         .expect("count Codex runs")
 }
 
-async fn workflow_intent(db: &AsyncDaemonDb, execution_id: &str) -> (String, String) {
+async fn workflow_intent(db: &AsyncDaemonDbHandle, execution_id: &str) -> (String, String) {
     sqlx::query_as(
         "SELECT intent_id, status FROM task_board_dispatch_intents
          WHERE workflow_execution_id = ?1",
@@ -292,7 +294,7 @@ async fn workflow_intent(db: &AsyncDaemonDb, execution_id: &str) -> (String, Str
     .expect("load workflow dispatch intent")
 }
 
-async fn admission_states(db: &AsyncDaemonDb, intent_id: &str) -> Vec<(String, String)> {
+async fn admission_states(db: &AsyncDaemonDbHandle, intent_id: &str) -> Vec<(String, String)> {
     sqlx::query_as(
         "SELECT l.kind, l.state
          FROM task_board_dispatch_admission_ledger AS l

@@ -35,7 +35,7 @@ const ADMISSION_LEDGER_TABLE: &str = "task_board_dispatch_admission_ledger";
 const OBSOLETE_ACTIVE_INDEX: &str = "task_board_remote_assignments_one_active_phase";
 const DISPATCH_ACTIVE_INDEX: &str = "idx_task_board_dispatch_active_item";
 const MIGRATION_SQL: &str = include_str!(
-    "../../harness-daemon/src/daemon/db/migrations/0037_daemon_v43_task_board_remote_execution.sql"
+    "../../harness-daemon-db-core/src/migrations/0037_daemon_v43_task_board_remote_execution.sql"
 );
 
 const LEGACY_HOST_TABLE_SQL: &str = "

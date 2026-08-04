@@ -1,6 +1,7 @@
 use tempfile::tempdir;
 
 use harness::daemon::db::{AsyncDaemonDb, AsyncDaemonDbConnect};
+use harness::daemon::db_handle::AsyncDaemonDbHandle;
 use harness::task_board::external::{
     ExternalSyncClient, ExternalSyncOptions, TaskBoardSyncStore, sync_external_tasks,
 };
@@ -32,6 +33,7 @@ async fn pull_report_is_remote_authoritative_but_prefer_local_is_explicit() {
         let db = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
             .await
             .expect("database");
+        let db = AsyncDaemonDbHandle(db);
         db.create_item(linked_item(
             item_id,
             "Local title",

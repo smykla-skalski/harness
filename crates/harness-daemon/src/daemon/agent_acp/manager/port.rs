@@ -133,7 +133,13 @@ pub(in crate::daemon::agent_acp) trait AcpManagerPort:
     #[cfg(all(test, feature = "daemon-runtime"))]
     fn daemon_db_slot(
         &self,
-    ) -> Option<Arc<std::sync::OnceLock<Arc<std::sync::Mutex<crate::daemon::db::DaemonDb>>>>> {
+    ) -> Option<
+        Arc<
+            std::sync::OnceLock<
+                Arc<std::sync::Mutex<crate::daemon::db_handle::DaemonDbOwnedHandle>>,
+            >,
+        >,
+    > {
         None
     }
 }
@@ -434,7 +440,13 @@ impl AcpAgentManagerHandle {
     #[cfg(all(test, feature = "daemon-runtime"))]
     pub(in crate::daemon::agent_acp) fn daemon_db_slot(
         &self,
-    ) -> Option<Arc<std::sync::OnceLock<Arc<std::sync::Mutex<crate::daemon::db::DaemonDb>>>>> {
+    ) -> Option<
+        Arc<
+            std::sync::OnceLock<
+                Arc<std::sync::Mutex<crate::daemon::db_handle::DaemonDbOwnedHandle>>,
+            >,
+        >,
+    > {
         self.state.port.daemon_db_slot()
     }
 }

@@ -2,8 +2,6 @@ use std::collections::BTreeSet;
 
 use chrono::Utc;
 
-use crate::daemon::db::AsyncDaemonDb;
-use crate::daemon::http::DaemonHttpState;
 use crate::task_board::TaskBoardWorkflowExecutionRecord;
 use crate::task_board::task_board_remote_execution_target;
 use harness_kernel::errors::CliError;
@@ -12,6 +10,8 @@ use super::task_board_read_only_runtime::{
     ProductionTaskBoardReadOnlyRuntime, TaskBoardReadOnlyRuntime,
 };
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
+use crate::daemon::http::DaemonHttpState;
 
 mod agent_turn_reports;
 mod attempt_recovery;
@@ -47,7 +47,7 @@ pub(super) struct TaskBoardReadOnlyReconcileReport {
 )]
 pub(crate) async fn reconcile_task_board_read_only_workflows(
     state: &DaemonHttpState,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
 ) -> Result<(), CliError> {
     let runtime = ProductionTaskBoardReadOnlyRuntime::new(state, db);
     let report = Box::pin(reconcile_task_board_read_only_workflows_with_runtime(
@@ -74,7 +74,7 @@ pub(crate) async fn reconcile_task_board_read_only_workflows(
     reason = "sequential project/recoverable/ready passes, each already its own helper"
 )]
 pub(super) async fn reconcile_task_board_read_only_workflows_with_runtime<R>(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     runtime: &R,
     now: &str,
     limit: usize,
@@ -118,7 +118,7 @@ where
 }
 
 async fn reconcile_candidate<R>(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     runtime: &R,
     execution: TaskBoardWorkflowExecutionRecord,
     now: &str,
@@ -143,7 +143,7 @@ async fn reconcile_candidate<R>(
 }
 
 async fn project_terminal_executions(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     limit: usize,
     report: &mut TaskBoardReadOnlyReconcileReport,
 ) -> Result<(), CliError> {

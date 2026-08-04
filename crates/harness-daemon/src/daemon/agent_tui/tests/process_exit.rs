@@ -12,6 +12,7 @@ use super::support::{
     WAIT_TIMEOUT, recv_broadcast_events, sample_snapshot, wait_until, with_agent_tui_home,
 };
 use crate::daemon::db::prelude::*;
+use crate::daemon::db_handle::DaemonDbOwnedHandle;
 
 // `saw_sessions_updated`/`saw_session_updated` deliberately mirror the two
 // event names under test (`sessions_updated_delta` and `session_updated`);
@@ -20,6 +21,7 @@ use crate::daemon::db::prelude::*;
 #[test]
 fn final_tui_snapshot_disconnects_registered_agent_and_broadcasts_session_refresh() {
     let db = DaemonDb::open_in_memory().expect("open db");
+    let db = DaemonDbOwnedHandle(db);
     let tmp = tempfile::tempdir().expect("tempdir");
     let project_dir = tmp.path().join("project");
     let context_root = tmp.path().join("context-root");
@@ -139,6 +141,7 @@ fn live_refresh_disconnects_joined_agent_when_child_process_exits() {
         let context_root = tmp.path().join("context-root");
         fs_err::create_dir_all(&project_dir).expect("project dir");
         let db = DaemonDb::open_in_memory().expect("open db");
+        let db = DaemonDbOwnedHandle(db);
         let project = crate::daemon::index::DiscoveredProject {
             project_id: "project-tui-child-exit".into(),
             name: "project".into(),

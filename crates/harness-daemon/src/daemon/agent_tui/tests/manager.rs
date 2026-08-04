@@ -13,6 +13,7 @@ use crate::workspace::utc_now;
 
 use super::support::{WAIT_TIMEOUT, sample_snapshot, wait_until, with_agent_tui_home};
 use crate::daemon::db::prelude::*;
+use crate::daemon::db_handle::DaemonDbOwnedHandle;
 
 #[test]
 fn refresh_local_snapshot_does_not_rewrite_unchanged_transcript() {
@@ -22,6 +23,7 @@ fn refresh_local_snapshot_does_not_rewrite_unchanged_transcript() {
         let context_root = tmp.path().join("context-root");
         fs_err::create_dir_all(&project_dir).expect("project dir");
         let db = DaemonDb::open_in_memory().expect("open db");
+        let db = DaemonDbOwnedHandle(db);
         let project = crate::daemon::index::DiscoveredProject {
             project_id: "project-tui-transcript-refresh".into(),
             name: "project".into(),
@@ -122,6 +124,7 @@ fn refresh_local_snapshot_marks_missing_running_process_exited() {
     let tmp = tempfile::tempdir().expect("tempdir");
     with_agent_tui_home(tmp.path(), || {
         let db = DaemonDb::open_in_memory().expect("open db");
+        let db = DaemonDbOwnedHandle(db);
         let db_slot = Arc::new(OnceLock::new());
         db_slot
             .set(Arc::new(Mutex::new(db)))
@@ -161,6 +164,7 @@ fn list_marks_orphaned_running_snapshot_inactive_and_persists_it() {
         let context_root = tmp.path().join("context-root");
         fs_err::create_dir_all(&project_dir).expect("project dir");
         let db = DaemonDb::open_in_memory().expect("open db");
+        let db = DaemonDbOwnedHandle(db);
         let project = crate::daemon::index::DiscoveredProject {
             project_id: "project-tui-orphaned-list".into(),
             name: "project".into(),
@@ -230,6 +234,7 @@ fn manager_start_does_not_pre_register() {
         let project_dir = tmp.path().join("project");
         fs_err::create_dir_all(&project_dir).expect("project dir");
         let db = DaemonDb::open_in_memory().expect("open db");
+        let db = DaemonDbOwnedHandle(db);
         let project = crate::daemon::index::DiscoveredProject {
             project_id: "project-no-prereg".into(),
             name: "project".into(),
@@ -311,6 +316,7 @@ fn manager_auto_join_prompt_in_transcript() {
         let project_dir = tmp.path().join("project");
         fs_err::create_dir_all(&project_dir).expect("project dir");
         let db = DaemonDb::open_in_memory().expect("open db");
+        let db = DaemonDbOwnedHandle(db);
         let project = crate::daemon::index::DiscoveredProject {
             project_id: "project-auto-join".into(),
             name: "project".into(),
@@ -397,6 +403,7 @@ fn manager_start_threads_leader_recovery_prompt_into_process_args() {
         let project_dir = tmp.path().join("project");
         fs_err::create_dir_all(&project_dir).expect("project dir");
         let db = DaemonDb::open_in_memory().expect("open db");
+        let db = DaemonDbOwnedHandle(db);
         let project = crate::daemon::index::DiscoveredProject {
             project_id: "project-recovery-prompt".into(),
             name: "project".into(),

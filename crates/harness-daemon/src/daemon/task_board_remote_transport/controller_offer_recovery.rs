@@ -2,9 +2,8 @@ use super::controller::{
     RemoteExecutionControllerClient, RemoteExecutionControllerError, binding_error,
 };
 use crate::daemon::db::task_board::prelude::*;
-use crate::daemon::db::{
-    AsyncDaemonDb, TaskBoardRemoteMutationOutcome, TaskBoardRemoteOperationTrustFence,
-};
+use crate::daemon::db::{TaskBoardRemoteMutationOutcome, TaskBoardRemoteOperationTrustFence};
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::task_board::remote_wire::wire::{
     RemoteOfferDisposition, RemoteOfferRequest, RemoteOfferResponse,
 };
@@ -20,7 +19,7 @@ pub(crate) enum RemotePredecessorOfferRecoveryOutcome {
 impl RemoteExecutionControllerClient {
     pub(crate) async fn recover_predecessor_offer(
         &self,
-        db: &AsyncDaemonDb,
+        db: &AsyncDaemonDbHandle,
         request: &RemoteOfferRequest,
         trust: &TaskBoardRemoteOperationTrustFence,
     ) -> Result<RemotePredecessorOfferRecoveryOutcome, RemoteExecutionControllerError> {
@@ -47,7 +46,7 @@ impl RemoteExecutionControllerClient {
     /// `None` when the successor instance has never seen this offer.
     async fn replay_recovered_offer_receipt(
         &self,
-        db: &AsyncDaemonDb,
+        db: &AsyncDaemonDbHandle,
         request: &RemoteOfferRequest,
     ) -> Result<Option<RemotePredecessorOfferRecoveryOutcome>, RemoteExecutionControllerError> {
         let Some(receipt) = db
@@ -72,7 +71,7 @@ impl RemoteExecutionControllerClient {
 
     async fn place_recovered_offer(
         &self,
-        db: &AsyncDaemonDb,
+        db: &AsyncDaemonDbHandle,
         request: &RemoteOfferRequest,
         trust: &TaskBoardRemoteOperationTrustFence,
     ) -> Result<RemotePredecessorOfferRecoveryOutcome, RemoteExecutionControllerError> {

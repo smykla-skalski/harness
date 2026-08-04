@@ -3,7 +3,7 @@ use rusqlite::Connection;
 use super::{CliError, db_error};
 
 const BACKLOG_MIGRATION_SQL: &str = include_str!(
-    "../../harness-daemon/src/daemon/db/migrations/0031_daemon_v37_task_board_backlog.sql"
+    "../../harness-daemon-db-core/src/migrations/0031_daemon_v37_task_board_backlog.sql"
 );
 
 /// # Errors

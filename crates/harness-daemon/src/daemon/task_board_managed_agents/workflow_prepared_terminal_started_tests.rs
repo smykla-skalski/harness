@@ -53,7 +53,10 @@ async fn terminal_local_start_charges_prepared_admission_before_release() {
     );
 }
 
-async fn terminalize_started_attempt(db: &crate::daemon::db::AsyncDaemonDb, execution_id: &str) {
+async fn terminalize_started_attempt(
+    db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
+    execution_id: &str,
+) {
     let current = db
         .task_board_workflow_execution(execution_id)
         .await

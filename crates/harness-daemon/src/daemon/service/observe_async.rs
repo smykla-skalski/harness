@@ -8,8 +8,8 @@ use super::{
     observe_actor_id, session_detail_from_async_daemon_db, session_not_found, session_observe,
     start_daemon_observe_loop, sync_resolved_liveness_async,
 };
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::index::ResolvedSession;
 use crate::observe::types::Issue;
 use crate::session::observe::{should_observe, should_tick_liveness};
@@ -34,7 +34,7 @@ pub(super) struct ObserveWatchState {
 pub(crate) async fn observe_session_async(
     session_id: &str,
     request: Option<&ObserveSessionRequest>,
-    async_db: &AsyncDaemonDb,
+    async_db: &AsyncDaemonDbHandle,
 ) -> Result<SessionDetail, CliError> {
     let actor_id = observe_actor_id(request);
     let mut resolved = async_db
@@ -61,7 +61,7 @@ pub(crate) async fn run_daemon_observe_task_async(
     project_dir: PathBuf,
     poll_interval: Duration,
     actor_id: Option<String>,
-    async_db: &AsyncDaemonDb,
+    async_db: &AsyncDaemonDbHandle,
 ) -> Result<i32, CliError> {
     let mut cycle = ObserveWatchState::default();
     loop {
@@ -86,7 +86,7 @@ async fn watch_cycle_async(
     session_id: &str,
     project_dir: &Path,
     actor_id: Option<&str>,
-    async_db: &AsyncDaemonDb,
+    async_db: &AsyncDaemonDbHandle,
     cycle: &mut ObserveWatchState,
 ) -> Result<bool, CliError> {
     let Some(mut resolved) = resolve_observable_session(async_db, session_id).await? else {
@@ -112,7 +112,7 @@ async fn watch_cycle_async(
 }
 
 async fn resolve_observable_session(
-    async_db: &AsyncDaemonDb,
+    async_db: &AsyncDaemonDbHandle,
     session_id: &str,
 ) -> Result<Option<ResolvedSession>, CliError> {
     let resolved = async_db
@@ -127,7 +127,7 @@ async fn resolve_observable_session(
 }
 
 pub(super) async fn process_incremental_observe(
-    async_db: &AsyncDaemonDb,
+    async_db: &AsyncDaemonDbHandle,
     resolved: &mut ResolvedSession,
     actor_id: Option<&str>,
     project_dir: &Path,
@@ -159,7 +159,7 @@ pub(super) async fn process_incremental_observe(
 }
 
 async fn sync_runtime_transcripts_if_changed(
-    async_db: &AsyncDaemonDb,
+    async_db: &AsyncDaemonDbHandle,
     resolved: &ResolvedSession,
     changed: bool,
 ) -> Result<(), CliError> {
@@ -170,7 +170,7 @@ async fn sync_runtime_transcripts_if_changed(
 }
 
 async fn run_periodic_sweep_async(
-    async_db: &AsyncDaemonDb,
+    async_db: &AsyncDaemonDbHandle,
     resolved: &mut ResolvedSession,
     actor_id: Option<&str>,
     project_dir: &Path,

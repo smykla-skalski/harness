@@ -1,9 +1,10 @@
 use futures_util::future::join_all;
 use std::collections::BTreeSet;
 
+use crate::daemon::db::AgentTurnStopTarget;
 use crate::daemon::db::prelude::AsyncAgentTurnRunQueries;
 use crate::daemon::db::task_board::prelude::{AutomationKillSwitchQueries, PolicyRuntimeQueries};
-use crate::daemon::db::{AgentTurnStopTarget, AsyncDaemonDb};
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::http::{
     DaemonHttpState, run_acp_agent_blocking, run_codex_agent_blocking, run_terminal_agent_blocking,
 };
@@ -13,7 +14,7 @@ use harness_kernel::errors::CliError;
 
 pub(crate) async fn enforce_automation_kill_switch(
     state: &DaemonHttpState,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
 ) -> Result<bool, CliError> {
     let plan = db.automation_kill_switch_stop_plan().await?;
     if !plan.engaged {
@@ -41,7 +42,7 @@ pub(crate) async fn enforce_automation_kill_switch(
 }
 
 pub(crate) async fn enforce_policy_automation_control(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
 ) -> Result<bool, CliError> {
     let workspace = db.load_policy_workspace().await?;
     let disabled = workspace.is_some_and(|workspace| {
@@ -56,7 +57,7 @@ pub(crate) async fn enforce_policy_automation_control(
 
 pub(crate) async fn enforce_triage_automation_control(
     state: &DaemonHttpState,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
 ) -> Result<bool, CliError> {
     let plan = db.triage_automation_stop_plan().await?;
     if !plan.disabled {
@@ -208,7 +209,7 @@ async fn stop_acp_runs(state: &DaemonHttpState, run_ids: Vec<String>) -> Vec<Cli
 }
 
 async fn cancel_agent_turns(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     targets: Vec<AgentTurnStopTarget>,
 ) -> Vec<CliError> {
     join_all(targets.into_iter().map(|target| {

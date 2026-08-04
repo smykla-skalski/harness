@@ -79,7 +79,7 @@ async fn run_default_task_review_prior_bundle_case(tls: &TestTlsMaterial) {
 }
 
 async fn advance_default_task_to_review(
-    db: &crate::daemon::db::AsyncDaemonDb,
+    db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
     execution_id: &str,
     result_head: &str,
 ) {

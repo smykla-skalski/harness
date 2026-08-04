@@ -1,13 +1,12 @@
 use crate::daemon::db::prelude::*;
-use crate::daemon::db::{
-    AsyncDaemonDb, TaskBoardAdmissionMissingRunRecovery, TaskBoardAdmissionWorkerRecovery,
-};
+use crate::daemon::db::{TaskBoardAdmissionMissingRunRecovery, TaskBoardAdmissionWorkerRecovery};
 use crate::daemon::protocol::{CodexRunSnapshot, TaskBoardEvaluateRequest};
 use crate::daemon::service as daemon_service;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::handle::CodexControllerHandle;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 const MISSING_RUN_RECOVERY_REASON: &str = "Codex worker was missing after daemon restart";
 
@@ -33,7 +32,7 @@ impl CodexControllerHandle {
     )]
     async fn reconcile_one_admission_worker(
         &self,
-        db: &AsyncDaemonDb,
+        db: &AsyncDaemonDbHandle,
         recovery: &TaskBoardAdmissionWorkerRecovery,
     ) -> Result<(), CliError> {
         if !recovery.managed_worker_id.starts_with("codex-") {
@@ -54,7 +53,7 @@ impl CodexControllerHandle {
 
     async fn reconcile_existing_admission_run(
         &self,
-        db: &AsyncDaemonDb,
+        db: &AsyncDaemonDbHandle,
         run: CodexRunSnapshot,
     ) -> Result<(), CliError> {
         if !run.status.is_active() {
@@ -70,7 +69,7 @@ impl CodexControllerHandle {
     )]
     async fn reconcile_missing_admission_run(
         &self,
-        db: &AsyncDaemonDb,
+        db: &AsyncDaemonDbHandle,
         recovery: &TaskBoardAdmissionWorkerRecovery,
     ) -> Result<(), CliError> {
         let Some(outcome) = db
@@ -107,7 +106,7 @@ impl CodexControllerHandle {
 
     async fn publish_missing_admission_recovery(
         &self,
-        db: &AsyncDaemonDb,
+        db: &AsyncDaemonDbHandle,
         outcome: &TaskBoardAdmissionMissingRunRecovery,
     ) -> Result<(), CliError> {
         if !outcome.session_changed {

@@ -2,8 +2,8 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::reviews_store::PolicyGraphQueries;
 use crate::daemon::service::observe_async_db;
 use crate::daemon::service::reviews::policy_audit::record_policy_run_start_result;
@@ -65,7 +65,7 @@ pub async fn preview_reviews_policy(
 
 pub(crate) async fn preview_reviews_policy_with_audit_db(
     request: &ReviewsPolicyPreviewRequest,
-    database: Option<Arc<AsyncDaemonDb>>,
+    database: Option<Arc<AsyncDaemonDbHandle>>,
 ) -> Result<ReviewsPolicyPreviewResponse, CliError> {
     let database = require_policy_runtime_db(database)?;
     preview_database_reviews_policy(&database, request).await
@@ -92,7 +92,7 @@ pub async fn start_reviews_policy_run(
 
 pub(crate) async fn start_reviews_policy_run_with_audit_db(
     request: &ReviewsPolicyRunStartRequest,
-    audit_db: Option<Arc<AsyncDaemonDb>>,
+    audit_db: Option<Arc<AsyncDaemonDbHandle>>,
 ) -> Result<ReviewsPolicyRunResponse, CliError> {
     let audit_db = require_policy_runtime_db(audit_db)?;
     ensure_policy_automation_enabled(&audit_db).await?;
@@ -106,7 +106,7 @@ pub(crate) async fn start_reviews_policy_run_with_audit_db(
     start_reviews_policy_run_with_database(executor, &request, audit_db).await
 }
 
-async fn ensure_policy_automation_enabled(database: &AsyncDaemonDb) -> Result<(), CliError> {
+async fn ensure_policy_automation_enabled(database: &AsyncDaemonDbHandle) -> Result<(), CliError> {
     let workspace = database.load_policy_workspace().await?;
     let Some(workspace) = workspace else {
         return Err(
@@ -189,7 +189,7 @@ fn log_background_runtime_database_error(target: &ReviewTarget, error: &CliError
 
 fn resolve_background_run_executor(
     target: &ReviewTarget,
-    audit_db: Option<Arc<AsyncDaemonDb>>,
+    audit_db: Option<Arc<AsyncDaemonDbHandle>>,
 ) -> Option<impl ReviewsPolicyActionExecutor + 'static> {
     daemon_policy_executor_with_audit(&target.repository, audit_db)
         .inspect_err(|error| log_background_executor_resolve_error(target, error))
@@ -225,7 +225,7 @@ fn log_background_run_start_error(target: &ReviewTarget, error: &CliError) {
 async fn start_reviews_policy_run_with_database<E>(
     executor: E,
     request: &ReviewsPolicyRunStartRequest,
-    database: Arc<AsyncDaemonDb>,
+    database: Arc<AsyncDaemonDbHandle>,
 ) -> Result<ReviewsPolicyRunResponse, CliError>
 where
     E: ReviewsPolicyActionExecutor + Send + Sync + 'static,
@@ -253,7 +253,7 @@ async fn start_actionable_database_run<E>(
     request: &ReviewsPolicyRunStartRequest,
     workflow_id: String,
     plan: ReviewsPolicyPlan,
-    database: &Arc<AsyncDaemonDb>,
+    database: &Arc<AsyncDaemonDbHandle>,
 ) -> Result<ReviewsPolicyRunResponse, CliError>
 where
     E: ReviewsPolicyActionExecutor + Send + Sync + 'static,
@@ -294,7 +294,7 @@ pub(crate) async fn start_reviews_policy_run_with_executor_and_audit_db<E>(
     root: PathBuf,
     executor: E,
     request: &ReviewsPolicyRunStartRequest,
-    audit_db: Option<Arc<AsyncDaemonDb>>,
+    audit_db: Option<Arc<AsyncDaemonDbHandle>>,
 ) -> Result<ReviewsPolicyRunResponse, CliError>
 where
     E: ReviewsPolicyActionExecutor + Send + Sync + 'static,
@@ -346,7 +346,7 @@ async fn maybe_start_background_reviews_policy_run_with_database<E>(
     executor: E,
     target: &ReviewTarget,
     method: GitHubMergeMethod,
-    database: Arc<AsyncDaemonDb>,
+    database: Arc<AsyncDaemonDbHandle>,
 ) -> Result<Option<ReviewsPolicyRunResponse>, CliError>
 where
     E: ReviewsPolicyActionExecutor + Send + Sync + 'static,
@@ -393,7 +393,7 @@ pub async fn reviews_policy_status(
 
 pub(crate) async fn reviews_policy_status_with_audit_db(
     request: &ReviewsPolicyStatusRequest,
-    database: Option<Arc<AsyncDaemonDb>>,
+    database: Option<Arc<AsyncDaemonDbHandle>>,
 ) -> Result<ReviewsPolicyStatusResponse, CliError> {
     request.validate()?;
     let database = require_policy_runtime_db(database)?;
@@ -441,7 +441,7 @@ fn reject_disabled_background_request(
 }
 
 async fn terminal_database_run_matches_target_head(
-    database: &AsyncDaemonDb,
+    database: &AsyncDaemonDbHandle,
     workflow_id: &str,
     target: &ReviewTarget,
 ) -> Result<bool, CliError> {
@@ -472,8 +472,8 @@ fn terminal_run_matches_target(runs: &[PolicyWorkflowRun], target: &ReviewTarget
 }
 
 pub(super) fn require_policy_runtime_db(
-    database: Option<Arc<AsyncDaemonDb>>,
-) -> Result<Arc<AsyncDaemonDb>, CliError> {
+    database: Option<Arc<AsyncDaemonDbHandle>>,
+) -> Result<Arc<AsyncDaemonDbHandle>, CliError> {
     database.ok_or_else(|| {
         CliErrorKind::workflow_io("reviews policy runtime database is unavailable").into()
     })

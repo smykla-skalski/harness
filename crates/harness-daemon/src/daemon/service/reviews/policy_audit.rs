@@ -3,7 +3,7 @@ use std::sync::Arc;
 use serde_json::json;
 
 use crate::daemon::audit_events::{AuditEventRecordDraft, record_audit_event};
-use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::reviews::{
     ReviewsPolicyRunResponse, ReviewsPolicyRunStartRequest, ReviewsPolicyRunStatus,
 };
@@ -11,7 +11,7 @@ use crate::task_board::policy_runtime::models::PolicyRunTrigger;
 use harness_kernel::errors::CliError;
 
 pub(crate) async fn record_policy_run_start_result(
-    audit_db: Option<&Arc<AsyncDaemonDb>>,
+    audit_db: Option<&Arc<AsyncDaemonDbHandle>>,
     request: &ReviewsPolicyRunStartRequest,
     result: &Result<ReviewsPolicyRunResponse, CliError>,
 ) {
@@ -75,7 +75,7 @@ pub(crate) async fn record_policy_run_start_result(
 }
 
 pub(crate) async fn record_policy_run_resume_result(
-    audit_db: Option<&Arc<AsyncDaemonDb>>,
+    audit_db: Option<&Arc<AsyncDaemonDbHandle>>,
     trigger: PolicyRunTrigger,
     run: &ReviewsPolicyRunResponse,
 ) {
@@ -112,7 +112,7 @@ pub(crate) async fn record_policy_run_resume_result(
 }
 
 async fn record_policy_run_status_event(
-    audit_db: Option<&Arc<AsyncDaemonDb>>,
+    audit_db: Option<&Arc<AsyncDaemonDbHandle>>,
     run: &ReviewsPolicyRunResponse,
 ) {
     let descriptor = PolicyRunAuditDescriptor::from_status(run.status);

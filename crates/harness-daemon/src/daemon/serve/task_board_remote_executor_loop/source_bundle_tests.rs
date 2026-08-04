@@ -5,12 +5,12 @@ use sha2::{Digest as _, Sha256};
 use crate::daemon::db::prelude::*;
 use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{
-    AsyncDaemonDb, REMOTE_EXECUTOR_PRINCIPAL, RemoteExecutorFixture,
-    TaskBoardRemoteAssignmentRecord, TaskBoardRemoteExecutorStartAuthority,
-    TaskBoardRemoteExecutorStopAuthority, TaskBoardRemoteExecutorStopReason,
-    TaskBoardRemoteMutationOutcome, accept_remote_executor, remote_executor_claim_request,
-    remote_executor_fixture, remote_executor_identity,
+    REMOTE_EXECUTOR_PRINCIPAL, RemoteExecutorFixture, TaskBoardRemoteAssignmentRecord,
+    TaskBoardRemoteExecutorStartAuthority, TaskBoardRemoteExecutorStopAuthority,
+    TaskBoardRemoteExecutorStopReason, TaskBoardRemoteMutationOutcome, accept_remote_executor,
+    remote_executor_claim_request, remote_executor_fixture, remote_executor_identity,
 };
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::protocol::{CodexRunSnapshot, CodexRunStatus};
 use crate::git::bundle_export::GitBundleExportPlan;
 use crate::task_board::remote_wire::wire::{
@@ -118,7 +118,7 @@ async fn prior_phase_import_ref_is_cleaned_before_durable_cleanup_marker() {
 }
 
 async fn assert_ref_drift_blocks_cleanup(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     record: &TaskBoardRemoteAssignmentRecord,
     source: &BundleSource,
     import_ref: &str,
@@ -388,7 +388,7 @@ fn invalid_run(
     }
 }
 
-async fn settle_unknown(db: &AsyncDaemonDb, record: &TaskBoardRemoteAssignmentRecord) {
+async fn settle_unknown(db: &AsyncDaemonDbHandle, record: &TaskBoardRemoteAssignmentRecord) {
     let offer = record.require_offer().expect("strict source-backed offer");
     let settlement = RemoteSettledRequest {
         schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,

@@ -2,7 +2,6 @@
 //! switches and the durable approval-grant list/resolve/revoke routes. Split out of
 //! `policy_canvas.rs` to keep each file under the source-length cap.
 
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{
     PolicyApprovalGrantResolveRequest, PolicyApprovalGrantResolveResponse,
     PolicyApprovalGrantRevokeRequest, PolicyApprovalGrantRevokeResponse,
@@ -14,6 +13,7 @@ use harness_kernel::errors::CliError;
 
 use super::policy_canvas::{bump_change_policy, feed_gate_cache};
 use super::policy_canvas_response::policy_canvas_workspace_response;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::reviews_store::PolicyGraphQueries;
 
 /// Default actor recorded on a grant resolution when the caller omits one.
@@ -24,7 +24,7 @@ const DEFAULT_APPROVAL_ACTOR: &str = "operator";
 /// # Errors
 /// Returns `CliError` when durable policy state cannot be written.
 pub(crate) async fn set_policy_canvas_spawn_requires_live_policy(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &PolicyCanvasSetSpawnRequiresLivePolicyRequest,
 ) -> Result<PolicyCanvasWorkspaceResponse, CliError> {
     let enabled = request.enabled;
@@ -47,7 +47,7 @@ pub(crate) async fn set_policy_canvas_spawn_requires_live_policy(
 /// # Errors
 /// Returns `CliError` when durable policy state cannot be written.
 pub(crate) async fn set_policy_canvas_spawn_kill_switch(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &PolicyCanvasSetSpawnKillSwitchRequest,
 ) -> Result<PolicyCanvasWorkspaceResponse, CliError> {
     let enabled = request.enabled;
@@ -70,7 +70,7 @@ pub(crate) async fn set_policy_canvas_spawn_kill_switch(
 /// # Errors
 /// Returns `CliError` when durable policy state cannot be read.
 pub(crate) async fn list_policy_approval_grants(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
 ) -> Result<PolicyApprovalGrantsListResponse, CliError> {
     let grants = db.list_pending_approval_grants().await?;
     Ok(PolicyApprovalGrantsListResponse { grants })
@@ -82,7 +82,7 @@ pub(crate) async fn list_policy_approval_grants(
 /// Returns `CliError` when the grant is missing, already resolved, or the write
 /// fails.
 pub(crate) async fn resolve_policy_approval_grant(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &PolicyApprovalGrantResolveRequest,
 ) -> Result<PolicyApprovalGrantResolveResponse, CliError> {
     let actor = request.actor.as_deref().unwrap_or(DEFAULT_APPROVAL_ACTOR);
@@ -99,7 +99,7 @@ pub(crate) async fn resolve_policy_approval_grant(
 /// Returns `CliError` when the grant is missing, terminal, consumed, expired,
 /// or the write fails.
 pub(crate) async fn revoke_policy_approval_grant(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &PolicyApprovalGrantRevokeRequest,
 ) -> Result<PolicyApprovalGrantRevokeResponse, CliError> {
     let actor = request.actor.as_deref().unwrap_or(DEFAULT_APPROVAL_ACTOR);

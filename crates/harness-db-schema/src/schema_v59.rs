@@ -2,9 +2,8 @@ use rusqlite::Connection;
 
 use super::CliError;
 
-const AGENT_TURN_RUNS_SQL: &str = include_str!(
-    "../../harness-daemon/src/daemon/db/migrations/0058_daemon_v59_agent_turn_runs.sql"
-);
+const AGENT_TURN_RUNS_SQL: &str =
+    include_str!("../../harness-daemon-db-core/src/migrations/0058_daemon_v59_agent_turn_runs.sql");
 
 /// Safe to repeat: the table and indexes guard with IF NOT EXISTS and the stamp
 /// is idempotent, so the repair replay can re-run this step.

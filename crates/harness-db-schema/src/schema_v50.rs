@@ -3,7 +3,7 @@ use rusqlite::Connection;
 use super::CliError;
 
 const MIGRATION_SQL: &str = include_str!(
-    "../../harness-daemon/src/daemon/db/migrations/0044_daemon_v50_codex_runs_nullable_session.sql"
+    "../../harness-daemon-db-core/src/migrations/0044_daemon_v50_codex_runs_nullable_session.sql"
 );
 
 /// The forward sqlx migrator runs the raw migration file against a database

@@ -4,9 +4,10 @@ use tokio::task::spawn_blocking;
 
 use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{
-    AsyncDaemonDb, REMOTE_IMPLEMENTATION_BUNDLE_PATH, TaskBoardRemoteAssignmentRecord,
+    REMOTE_IMPLEMENTATION_BUNDLE_PATH, TaskBoardRemoteAssignmentRecord,
     TaskBoardRemoteResultAdoptionOutcome, TaskBoardRemoteResultImportRequest,
 };
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::git::bundle::{GitBundleImportEvidence, GitBundleImportPlan};
 use crate::task_board::remote_wire::wire::RemoteAssignmentWireState;
 use crate::task_board::{
@@ -21,7 +22,7 @@ use harness_kernel::errors::{CliError, CliErrorKind};
     reason = "sequential import/adopt/cleanup steps, each already its own helper"
 )]
 pub(crate) async fn import_and_adopt_task_board_remote_implementation_result(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     assignment_id: &str,
     fencing_epoch: u64,
 ) -> Result<TaskBoardRemoteResultAdoptionOutcome, CliError> {
@@ -52,7 +53,7 @@ pub(crate) async fn import_and_adopt_task_board_remote_implementation_result(
 }
 
 async fn import_request(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     assignment_id: &str,
     fencing_epoch: u64,
 ) -> Result<

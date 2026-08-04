@@ -1,4 +1,4 @@
-use crate::daemon::db::{AgentTurnRunSnapshot, AsyncDaemonDb};
+use crate::daemon::db::AgentTurnRunSnapshot;
 use crate::daemon::protocol::CodexRunSnapshot;
 use crate::task_board::{
     TaskBoardAiReviewReportRecord, TaskBoardAiReviewReportStatus, TaskBoardExecutionAttemptRecord,
@@ -9,9 +9,10 @@ use harness_kernel::errors::CliError;
 
 use super::attempts::invalid_transition;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 pub(super) async fn retain_completed_review_run(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
     run: &CodexRunSnapshot,
@@ -38,7 +39,7 @@ pub(super) async fn retain_completed_review_run(
 }
 
 pub(super) async fn retain_failed_review_run(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
     run: &CodexRunSnapshot,
@@ -56,7 +57,7 @@ pub(super) async fn retain_failed_review_run(
 }
 
 pub(super) async fn retain_cancelled_review_run(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
     run: &CodexRunSnapshot,
@@ -74,7 +75,7 @@ pub(super) async fn retain_cancelled_review_run(
 }
 
 pub(super) async fn retain_invalid_review_run(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
     run: &CodexRunSnapshot,
@@ -92,7 +93,7 @@ pub(super) async fn retain_invalid_review_run(
 }
 
 pub(super) async fn retain_completed_agent_turn_review_run(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
     run: &AgentTurnRunSnapshot,
@@ -115,7 +116,7 @@ pub(super) async fn retain_completed_agent_turn_review_run(
 }
 
 pub(super) async fn retain_failed_agent_turn_review_run(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
     run: &AgentTurnRunSnapshot,
@@ -133,7 +134,7 @@ pub(super) async fn retain_failed_agent_turn_review_run(
 }
 
 pub(super) async fn retain_cancelled_agent_turn_review_run(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
     run: &AgentTurnRunSnapshot,
@@ -151,7 +152,7 @@ pub(super) async fn retain_cancelled_agent_turn_review_run(
 }
 
 async fn retain_unsuccessful_review_run(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
     run: &CodexRunSnapshot,
@@ -171,7 +172,7 @@ async fn retain_unsuccessful_review_run(
 }
 
 async fn retain_unsuccessful_agent_turn_review_run(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
     run: &AgentTurnRunSnapshot,

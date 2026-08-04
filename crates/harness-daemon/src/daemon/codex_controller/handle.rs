@@ -8,7 +8,6 @@ use uuid::Uuid;
 
 use crate::agents::runtime::models::validate_model;
 use crate::agents::turn::AgentTurnPullRequest;
-use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
 use crate::daemon::protocol::{
     CodexAgentInspectResponse, CodexRunEvent, CodexRunListResponse, CodexRunRequest,
     CodexRunSnapshot, CodexRunStatus, CodexTranscriptResponse, StreamEvent,
@@ -26,6 +25,7 @@ use super::queued_run::{QueuedRunIdentity, queued_run_snapshot};
 use super::transcript::codex_transcript_entries;
 use super::worker::CodexRunWorker;
 use crate::daemon::db::prelude::*;
+use crate::daemon::db_handle::{AsyncDaemonDbHandle, DaemonDbOwnedHandle};
 
 #[derive(Clone)]
 pub struct CodexControllerHandle {
@@ -34,8 +34,8 @@ pub struct CodexControllerHandle {
 
 pub(super) struct CodexControllerState {
     pub(super) sender: broadcast::Sender<StreamEvent>,
-    pub(super) db: Arc<OnceLock<Arc<Mutex<DaemonDb>>>>,
-    pub(super) async_db: Arc<OnceLock<Arc<AsyncDaemonDb>>>,
+    pub(super) db: Arc<OnceLock<Arc<Mutex<DaemonDbOwnedHandle>>>>,
+    pub(super) async_db: Arc<OnceLock<Arc<AsyncDaemonDbHandle>>>,
     pub(super) runtime: Option<Handle>,
     pub(super) active_runs: ActiveRuns,
     pub(super) sandboxed: bool,
@@ -51,7 +51,7 @@ impl CodexControllerHandle {
     #[must_use]
     pub fn new(
         sender: broadcast::Sender<StreamEvent>,
-        db: Arc<OnceLock<Arc<Mutex<DaemonDb>>>>,
+        db: Arc<OnceLock<Arc<Mutex<DaemonDbOwnedHandle>>>>,
         sandboxed: bool,
     ) -> Self {
         Self::new_with_async_db(sender, db, Arc::new(OnceLock::new()), sandboxed)
@@ -60,8 +60,8 @@ impl CodexControllerHandle {
     #[must_use]
     pub(crate) fn new_with_async_db(
         sender: broadcast::Sender<StreamEvent>,
-        db: Arc<OnceLock<Arc<Mutex<DaemonDb>>>>,
-        async_db: Arc<OnceLock<Arc<AsyncDaemonDb>>>,
+        db: Arc<OnceLock<Arc<Mutex<DaemonDbOwnedHandle>>>>,
+        async_db: Arc<OnceLock<Arc<AsyncDaemonDbHandle>>>,
         sandboxed: bool,
     ) -> Self {
         Self {
@@ -465,7 +465,9 @@ pub(super) fn preferred_codex_project_dir(
     path.display().to_string()
 }
 
-pub(super) fn lock_db(db: &Arc<Mutex<DaemonDb>>) -> Result<MutexGuard<'_, DaemonDb>, CliError> {
+pub(super) fn lock_db(
+    db: &Arc<Mutex<DaemonDbOwnedHandle>>,
+) -> Result<MutexGuard<'_, DaemonDbOwnedHandle>, CliError> {
     db.lock().map_err(|error| {
         CliErrorKind::workflow_io(format!("daemon database lock poisoned: {error}")).into()
     })

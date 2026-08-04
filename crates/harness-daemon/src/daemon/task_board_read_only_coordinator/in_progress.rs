@@ -1,4 +1,3 @@
-use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::{
     TaskBoardAttemptState, TaskBoardExecutionAttemptRecord, TaskBoardExecutionPhase,
     TaskBoardWorkflowExecutionRecord,
@@ -7,12 +6,13 @@ use harness_kernel::errors::CliError;
 
 use super::super::task_board_read_only_runtime::TaskBoardReadOnlyRuntime;
 use super::{dependency_triage, lifecycle, reports};
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 /// Drives an attempt that is already under way. `Ok(true)` means this pass is
 /// finished with the execution; `Ok(false)` means no in-progress attempt
 /// claimed it and the caller continues down its own reconciliation path.
 pub(super) async fn reconcile_active_attempt_in_progress<R>(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     runtime: &R,
     execution: &TaskBoardWorkflowExecutionRecord,
     active_attempt: Option<&TaskBoardExecutionAttemptRecord>,

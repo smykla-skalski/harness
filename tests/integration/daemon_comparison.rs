@@ -1,6 +1,7 @@
 use tempfile::tempdir;
 
 use harness::daemon::db::{DaemonDb, DaemonDbImports, DaemonDbOpen};
+use harness::daemon::db_handle::DaemonDbOwnedHandle;
 use harness::daemon::service;
 use harness::daemon::state::{self, DaemonManifest, DaemonOwnership, HostBridgeManifest};
 use harness::session::service as session_service;
@@ -137,6 +138,7 @@ fn file_and_db_reads_produce_identical_output() {
 
     let db_path = tmp.path().join("harness/daemon/managed/harness.db");
     let db = DaemonDb::open(&db_path).expect("open db");
+    let db = DaemonDbOwnedHandle(db);
     with_isolated_harness_env(tmp.path(), || db.import_from_files()).expect("import");
 
     with_comparison_test_env(tmp.path(), "comparison-session", || {

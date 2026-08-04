@@ -1,6 +1,5 @@
 use chrono::{DateTime, Utc};
 
-use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::{
     TaskBoardAttemptRetryDecision, TaskBoardAttemptState, TaskBoardExecutionAttemptRecord,
     TaskBoardExecutionDiagnostic, TaskBoardExecutionPhase, TaskBoardExecutionState,
@@ -12,9 +11,10 @@ use harness_kernel::errors::CliError;
 
 use super::attempts::{invalid_transition, require_human};
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 pub(super) async fn recover_terminal_attempt_state(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     now: &str,
 ) -> Result<bool, CliError> {
@@ -86,7 +86,7 @@ fn retry_is_due(attempt: &TaskBoardExecutionAttemptRecord, now: &str) -> Result<
 }
 
 async fn recover_retry_wait(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
     now: &str,
@@ -156,7 +156,7 @@ fn attempt_action_pending(
 }
 
 pub(super) async fn schedule_resolution_retry(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     action_key: &str,
     detail: &str,

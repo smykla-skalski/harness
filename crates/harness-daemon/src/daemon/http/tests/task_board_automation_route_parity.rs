@@ -10,8 +10,7 @@ use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 
 use crate::daemon::db::{
-    AsyncAuditQueries, AsyncDaemonDb, accept_remote_controller, claim_remote_controller,
-    remote_controller_fixture,
+    AsyncAuditQueries, accept_remote_controller, claim_remote_controller, remote_controller_fixture,
 };
 use crate::daemon::protocol::{
     HarnessMonitorAuditEventsRequest, TaskBoardAutomationForceCancelRequest, http_paths, ws_methods,
@@ -21,6 +20,7 @@ use crate::task_board::TaskBoardAutomationDesiredMode;
 
 use super::task_board_route_parity_support::{get_json, post_json, serve_http, ws_result};
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 #[test]
 fn automation_observability_http_and_websocket_routes_match() {
@@ -119,7 +119,7 @@ async fn run_force_cancel_parity() {
     let _ = server.await;
 }
 
-async fn assert_bound_force_cancel_audit(db: &AsyncDaemonDb) {
+async fn assert_bound_force_cancel_audit(db: &AsyncDaemonDbHandle) {
     let events = db
         .load_audit_events(&HarnessMonitorAuditEventsRequest {
             action_keys: vec!["task_board.automation.execution.force_cancel".into()],
@@ -226,7 +226,7 @@ async fn assert_missing_detail_parity(client: &reqwest::Client, base_url: &str) 
     assert_eq!(websocket["error"]["data"], http_error);
 }
 
-async fn seed_terminal_run(db: &AsyncDaemonDb, run_id: &str) {
+async fn seed_terminal_run(db: &AsyncDaemonDbHandle, run_id: &str) {
     let at = instant("2026-07-15T12:00:00Z").to_rfc3339();
     query(
         "INSERT INTO task_board_orchestrator_runs (

@@ -1,6 +1,7 @@
 use super::super::*;
 use super::CONTROL_PLANE_ACTOR_ID;
 use crate::daemon::db::prelude::*;
+use crate::daemon::db_handle::DaemonDbOwnedHandle;
 
 #[test]
 fn create_task_db_direct_writes_to_sqlite() {
@@ -238,6 +239,7 @@ fn start_session_db_direct_registers_fresh_project_for_discovery() {
         use crate::daemon::protocol::SessionStartRequest;
 
         let db = crate::daemon::db::DaemonDb::open_in_memory().expect("open db");
+        let db = DaemonDbOwnedHandle(db);
         let canonical_project = project.canonicalize().expect("canonicalize project");
 
         let state = start_session_direct(

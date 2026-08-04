@@ -29,7 +29,7 @@ use super::{
 use crate::daemon::db::prelude::*;
 
 async fn resolve_async(
-    async_db: &super::db::AsyncDaemonDb,
+    async_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
     session_id: &str,
 ) -> Result<daemon_index::ResolvedSession, CliError> {
     async_db
@@ -38,7 +38,10 @@ async fn resolve_async(
         .ok_or_else(|| session_not_found(session_id))
 }
 
-async fn bump_async(async_db: &super::db::AsyncDaemonDb, session_id: &str) -> Result<(), CliError> {
+async fn bump_async(
+    async_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
+    session_id: &str,
+) -> Result<(), CliError> {
     async_db.bump_change(session_id).await?;
     async_db.bump_change("global").await
 }
@@ -51,7 +54,7 @@ pub(crate) async fn submit_for_review_async(
     session_id: &str,
     task_id: &str,
     request: &TaskSubmitForReviewRequest,
-    async_db: &super::db::AsyncDaemonDb,
+    async_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
 ) -> Result<SessionDetail, CliError> {
     let now = utc_now();
     let (prev_status, new_status) = async_db
@@ -90,7 +93,7 @@ async fn finalize_submit_for_review_async(
     prev_status: Option<TaskStatus>,
     new_status: Option<TaskStatus>,
     now: &str,
-    async_db: &super::db::AsyncDaemonDb,
+    async_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
 ) -> Result<(), CliError> {
     sync_file_state_from_async_db(async_db, session_id).await?;
     append_task_status_change_log(
@@ -120,7 +123,7 @@ async fn maybe_materialize_spawn_reviewer_async(
     task_id: &str,
     resolved: &daemon_index::ResolvedSession,
     now: &str,
-    async_db: &super::db::AsyncDaemonDb,
+    async_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
 ) -> Result<(), CliError> {
     let Some(record) = maybe_emit_spawn_reviewer(&resolved.state, task_id, now) else {
         return Ok(());
@@ -159,7 +162,7 @@ pub(crate) async fn claim_review_async(
     session_id: &str,
     task_id: &str,
     request: &TaskClaimReviewRequest,
-    async_db: &super::db::AsyncDaemonDb,
+    async_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
 ) -> Result<SessionDetail, CliError> {
     let now = utc_now();
     let (prev_status, new_status) = async_db
@@ -196,7 +199,7 @@ pub(crate) async fn submit_review_async(
     session_id: &str,
     task_id: &str,
     request: &TaskSubmitReviewRequest,
-    async_db: &super::db::AsyncDaemonDb,
+    async_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
 ) -> Result<SessionDetail, CliError> {
     let resolved = resolve_async(async_db, session_id).await?;
     let now = utc_now();
@@ -240,7 +243,7 @@ async fn finalize_submit_review_async(
     prev_status: Option<TaskStatus>,
     new_status: Option<TaskStatus>,
     prepared: &super::review_submit_txn::PreparedSubmitReview,
-    async_db: &super::db::AsyncDaemonDb,
+    async_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
 ) -> Result<(), CliError> {
     async_db
         .insert_task_review(session_id, task_id, &prepared.review)
@@ -271,7 +274,7 @@ fn review_layout(
 }
 
 async fn append_task_status_change_log(
-    async_db: &super::db::AsyncDaemonDb,
+    async_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
     session_id: &str,
     task_id: &str,
     actor: &str,
@@ -301,7 +304,7 @@ pub(crate) async fn respond_review_async(
     session_id: &str,
     task_id: &str,
     request: &TaskRespondReviewRequest,
-    async_db: &super::db::AsyncDaemonDb,
+    async_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
 ) -> Result<SessionDetail, CliError> {
     let now = utc_now();
     let (prev_status, new_status) = async_db
@@ -346,7 +349,7 @@ pub(crate) async fn arbitrate_async(
     session_id: &str,
     task_id: &str,
     request: &TaskArbitrateRequest,
-    async_db: &super::db::AsyncDaemonDb,
+    async_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
 ) -> Result<SessionDetail, CliError> {
     let now = utc_now();
     let (prev_status, new_status) = async_db

@@ -71,7 +71,9 @@ pub(in crate::daemon::http) fn test_http_state_with_db_path(
     let (sender, _) = broadcast::channel(8);
     let db_slot = Arc::new(OnceLock::new());
     let async_db = Arc::new(OnceLock::new());
-    let db = Arc::new(Mutex::new(DaemonDb::open(db_path).expect("open file db")));
+    let db = Arc::new(Mutex::new(crate::daemon::db_handle::DaemonDbOwnedHandle(
+        DaemonDb::open(db_path).expect("open file db"),
+    )));
     db_slot.set(db).expect("install db");
     async_db
         .set(super::super::connect_async_db_for_tests(db_path))
@@ -160,7 +162,9 @@ pub(in crate::daemon::http) fn test_http_state_with_sync_db_only(
     let (sender, _) = broadcast::channel(8);
     let db_slot = Arc::new(OnceLock::new());
     let async_db = Arc::new(OnceLock::new());
-    let db = Arc::new(Mutex::new(DaemonDb::open(db_path).expect("open file db")));
+    let db = Arc::new(Mutex::new(crate::daemon::db_handle::DaemonDbOwnedHandle(
+        DaemonDb::open(db_path).expect("open file db"),
+    )));
     db_slot.set(db).expect("install db");
     let manifest: DaemonManifest = serde_json::from_value(serde_json::json!({
         "version": "20.6.0",

@@ -2,7 +2,6 @@
 use std::path::Path;
 use std::slice::from_ref;
 
-use crate::daemon::db::AsyncDaemonDb;
 #[cfg(test)]
 use crate::reviews::policy::authored_reviews_policy_plan;
 use crate::reviews::policy::{ReviewsPolicyPlan, authored_reviews_policy_plan_from_document};
@@ -17,10 +16,11 @@ use harness_kernel::errors::CliError;
 use super::policy_mapping::preview_step;
 use super::preview::{preview_action_target, preview_action_warnings};
 use super::token::github_token;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::reviews_store::PolicyGraphQueries;
 
 pub(super) async fn authored_database_reviews_policy_plan(
-    database: &AsyncDaemonDb,
+    database: &AsyncDaemonDbHandle,
     workflow_id: &str,
     target: &ReviewTarget,
     method: GitHubMergeMethod,
@@ -34,7 +34,7 @@ pub(super) async fn authored_database_reviews_policy_plan(
 }
 
 pub(super) async fn preview_database_reviews_policy(
-    database: &AsyncDaemonDb,
+    database: &AsyncDaemonDbHandle,
     request: &ReviewsPolicyPreviewRequest,
 ) -> Result<ReviewsPolicyPreviewResponse, CliError> {
     let mut response = preview_database_reviews_policy_plan(database, request).await?;
@@ -54,7 +54,7 @@ pub(super) async fn preview_database_reviews_policy(
 }
 
 pub(super) async fn preview_database_reviews_policy_plan(
-    database: &AsyncDaemonDb,
+    database: &AsyncDaemonDbHandle,
     request: &ReviewsPolicyPreviewRequest,
 ) -> Result<ReviewsPolicyPreviewResponse, CliError> {
     request.validate()?;
@@ -81,7 +81,7 @@ pub(super) fn preview_legacy_reviews_policy(
 }
 
 pub(super) async fn enforced_database_reviews_policy_active(
-    database: &AsyncDaemonDb,
+    database: &AsyncDaemonDbHandle,
 ) -> Result<bool, CliError> {
     Ok(database
         .load_policy_workspace()

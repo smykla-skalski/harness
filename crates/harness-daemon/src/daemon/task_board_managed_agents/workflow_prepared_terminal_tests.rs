@@ -337,7 +337,7 @@ async fn terminal_before_first_target_closes_prepared_dispatch_and_reservation()
     assert_eq!(released, ledger_rows_before);
 }
 
-async fn expire_admission(db: &crate::daemon::db::AsyncDaemonDb, intent_id: &str) {
+async fn expire_admission(db: &crate::daemon::db_handle::AsyncDaemonDbHandle, intent_id: &str) {
     sqlx::query(
         "UPDATE task_board_dispatch_admission_ledger
          SET reserved_at = '1999-01-01T00:00:00Z',
@@ -350,7 +350,7 @@ async fn expire_admission(db: &crate::daemon::db::AsyncDaemonDb, intent_id: &str
     .expect("expire admission reservation");
 }
 
-async fn install_invalid_current_policy(db: &crate::daemon::db::AsyncDaemonDb) {
+async fn install_invalid_current_policy(db: &crate::daemon::db_handle::AsyncDaemonDbHandle) {
     let snapshot = db
         .task_board_orchestrator_settings_snapshot()
         .await
@@ -373,7 +373,7 @@ async fn install_invalid_current_policy(db: &crate::daemon::db::AsyncDaemonDb) {
 /// Selects the local target and reloads, so a first start's side-effect claim finds its target
 /// (a targetless Preparing attempt cannot claim local runtime).
 pub(super) async fn select_first_local_target(
-    db: &crate::daemon::db::AsyncDaemonDb,
+    db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
     execution_id: &str,
 ) -> crate::task_board::TaskBoardWorkflowExecutionRecord {
     let prepared = db
@@ -399,7 +399,7 @@ pub(super) async fn select_first_local_target(
 }
 
 pub(super) async fn claim_local_target_and_start(
-    db: &crate::daemon::db::AsyncDaemonDb,
+    db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
     claim: &crate::daemon::db::ClaimedTaskBoardDispatch,
     execution_id: &str,
 ) {
@@ -426,7 +426,10 @@ pub(super) async fn claim_local_target_and_start(
         .expect("persist confirmed local run");
 }
 
-async fn set_concurrency_policy(db: &crate::daemon::db::AsyncDaemonDb, limit: Option<u64>) {
+async fn set_concurrency_policy(
+    db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
+    limit: Option<u64>,
+) {
     let mut settings = db
         .task_board_orchestrator_settings()
         .await

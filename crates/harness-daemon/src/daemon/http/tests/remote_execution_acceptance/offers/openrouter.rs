@@ -4,6 +4,7 @@ use super::{RepositoryCase, RepositorySource, seed_repository_case};
 use crate::daemon::db::prelude::*;
 use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{AgentTurnRunStatus, AsyncDaemonDb};
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::daemon::http::tests::support::remote_execution_acceptance::fixture::{
     AcceptanceFixture, HOST_INSTANCE, TlsRouterServer, assignment,
@@ -188,11 +189,12 @@ async fn run_openrouter_restart_case(tls: &TestTlsMaterial) {
     let reopened = AsyncDaemonDb::connect(&fixture.controller_path)
         .await
         .expect("reopen originating controller database");
+    let reopened = AsyncDaemonDbHandle(reopened);
     assert_openrouter_ticket_runtime(&reopened, &execution_id).await;
     server.stop().await;
 }
 
-async fn select_openrouter_reviewer(db: &AsyncDaemonDb) {
+async fn select_openrouter_reviewer(db: &AsyncDaemonDbHandle) {
     let mut settings = db
         .task_board_orchestrator_settings()
         .await
@@ -214,7 +216,7 @@ async fn select_openrouter_reviewer(db: &AsyncDaemonDb) {
 async fn wait_for_retry_assignment(
     controller: &crate::daemon::http::DaemonHttpState,
     executor: &crate::daemon::http::DaemonHttpState,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution_id: &str,
     first: &crate::daemon::db::TaskBoardRemoteAssignmentRecord,
 ) -> crate::daemon::db::TaskBoardRemoteAssignmentRecord {
@@ -271,7 +273,7 @@ async fn wait_for_retry_assignment(
     panic!("controller never claimed a fresh OpenRouter retry assignment: {last_execution:#?}")
 }
 
-async fn assert_openrouter_ticket_runtime(db: &AsyncDaemonDb, execution_id: &str) {
+async fn assert_openrouter_ticket_runtime(db: &AsyncDaemonDbHandle, execution_id: &str) {
     let execution = db
         .task_board_workflow_execution(execution_id)
         .await

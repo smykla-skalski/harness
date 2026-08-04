@@ -18,7 +18,7 @@ use crate::task_board::{
 
 struct HeldFixture {
     _dir: TempDir,
-    db: AsyncDaemonDb,
+    db: crate::daemon::db_handle::AsyncDaemonDbHandle,
     item_id: String,
     grant: PolicyApprovalGrant,
     graph: PolicyGraph,
@@ -26,9 +26,11 @@ struct HeldFixture {
 
 async fn held_fixture() -> HeldFixture {
     let dir = tempdir().expect("tempdir");
-    let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
-        .await
-        .expect("connect");
+    let db = crate::daemon::db_handle::AsyncDaemonDbHandle(
+        AsyncDaemonDb::connect(&dir.path().join("harness.db"))
+            .await
+            .expect("connect"),
+    );
     let item_id = "held-policy-item".to_string();
     let mut item = TaskBoardItem::new(
         item_id.clone(),

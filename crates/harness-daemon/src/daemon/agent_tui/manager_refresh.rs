@@ -10,7 +10,7 @@ use tokio::runtime::{Builder, Handle, RuntimeFlavor};
 use tokio::task::block_in_place;
 
 use crate::daemon::bridge::{BridgeCapability, BridgeClient};
-use crate::daemon::db::{AsyncDaemonDb, DaemonDb, ensure_shared_db};
+use crate::daemon::db::ensure_shared_db;
 use crate::daemon::protocol::StreamEvent;
 use crate::daemon::service::{
     broadcast_session_snapshot, broadcast_session_snapshot_async, disconnect_agent_direct,
@@ -24,13 +24,14 @@ use super::manager::{ActiveAgentTui, AgentTuiManagerHandle};
 use super::model::{AgentTuiSnapshot, AgentTuiStatus, session_disconnect_reason};
 use super::support::{agent_id_for_tui, lock, lock_db};
 use crate::daemon::db::prelude::*;
+use crate::daemon::db_handle::{AsyncDaemonDbHandle, DaemonDbOwnedHandle};
 
 impl AgentTuiManagerHandle {
-    pub(super) fn db(&self) -> Result<Arc<Mutex<DaemonDb>>, CliError> {
+    pub(super) fn db(&self) -> Result<Arc<Mutex<DaemonDbOwnedHandle>>, CliError> {
         ensure_shared_db(&self.state.db)
     }
 
-    pub(super) fn async_db(&self) -> Option<Arc<AsyncDaemonDb>> {
+    pub(super) fn async_db(&self) -> Option<Arc<AsyncDaemonDbHandle>> {
         self.state.async_db.get().cloned()
     }
 
@@ -42,7 +43,7 @@ impl AgentTuiManagerHandle {
 
     pub(super) fn run_with_async_db<T, F, Fut>(&self, task: F) -> Option<Result<T, CliError>>
     where
-        F: FnOnce(Arc<AsyncDaemonDb>) -> Fut,
+        F: FnOnce(Arc<AsyncDaemonDbHandle>) -> Fut,
         Fut: Future<Output = Result<T, CliError>> + Send + 'static,
         T: Send + 'static,
     {

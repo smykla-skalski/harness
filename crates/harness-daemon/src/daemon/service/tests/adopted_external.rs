@@ -12,6 +12,7 @@ use harness_testkit::with_isolated_harness_env;
 use tempfile::tempdir;
 
 use crate::daemon::db::DaemonDb;
+use crate::daemon::db_handle::DaemonDbOwnedHandle;
 use crate::daemon::db_open::DaemonDbOpen;
 use crate::daemon::service::adopt_session_record;
 use crate::session::adopter::SessionAdopter;
@@ -74,6 +75,7 @@ fn discover_sessions_finds_adopted_external_session_root() {
         let outcome =
             SessionAdopter::register(probed, &data_root_sessions).expect("register adoption");
         let db = DaemonDb::open_in_memory().expect("open db");
+        let db = DaemonDbOwnedHandle(db);
         adopt_session_record(&outcome, &db).expect("record adoption");
 
         crate::session::storage::update_state(&outcome.layout, |state| {

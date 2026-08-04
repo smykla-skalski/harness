@@ -20,7 +20,10 @@ use tokio::task::block_in_place;
 use tracing::Instrument as _;
 use tracing::field::{Empty, display};
 
-use crate::daemon::db::{AsyncDaemonDb, DaemonDb, canonical_db_unavailable};
+#[cfg(test)]
+use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::canonical_db_unavailable;
+use crate::daemon::db_handle::{AsyncDaemonDbHandle, DaemonDbOwnedHandle};
 #[cfg(test)]
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::daemon::remote_pairing::{RemotePairingRateLimiter, RemotePairingStatusRateLimiter};
@@ -91,12 +94,12 @@ pub use server_state::{
     RecoverySnapshotCache, RemoteRequestLimitConfig, RemoteRequestLimits,
 };
 
-pub type AsyncDaemonDbSlot = server_state::AsyncDaemonDbSlot<AsyncDaemonDb>;
+pub type AsyncDaemonDbSlot = server_state::AsyncDaemonDbSlot<AsyncDaemonDbHandle>;
 
 pub(crate) fn require_async_db<'a>(
     state: &'a DaemonHttpState,
     operation: &str,
-) -> Result<&'a AsyncDaemonDb, CliError> {
+) -> Result<&'a AsyncDaemonDbHandle, CliError> {
     state
         .async_db
         .get()
@@ -128,7 +131,7 @@ impl Connected<IncomingStream<'_, TcpListener>> for DaemonConnectInfo {
 }
 
 #[cfg(test)]
-pub(crate) fn connect_async_db_for_tests(path: &std::path::Path) -> Arc<AsyncDaemonDb> {
+pub(crate) fn connect_async_db_for_tests(path: &std::path::Path) -> Arc<AsyncDaemonDbHandle> {
     let path = path.to_path_buf();
 
     match Handle::try_current() {
@@ -137,11 +140,11 @@ pub(crate) fn connect_async_db_for_tests(path: &std::path::Path) -> Arc<AsyncDae
                 let runtime = current;
                 block_in_place(move || {
                     runtime.block_on(async move {
-                        Arc::new(
+                        Arc::new(AsyncDaemonDbHandle(
                             AsyncDaemonDb::connect(&path)
                                 .await
                                 .expect("open async daemon db"),
-                        )
+                        ))
                     })
                 })
             }
@@ -151,21 +154,21 @@ pub(crate) fn connect_async_db_for_tests(path: &std::path::Path) -> Arc<AsyncDae
                     .build()
                     .expect("build async daemon db test runtime")
                     .block_on(async move {
-                        Arc::new(
+                        Arc::new(AsyncDaemonDbHandle(
                             AsyncDaemonDb::connect(&path)
                                 .await
                                 .expect("open async daemon db"),
-                        )
+                        ))
                     })
             })
             .join()
             .expect("join async daemon db thread"),
             _ => current.block_on(async move {
-                Arc::new(
+                Arc::new(AsyncDaemonDbHandle(
                     AsyncDaemonDb::connect(&path)
                         .await
                         .expect("open async daemon db"),
-                )
+                ))
             }),
         },
         Err(_) => tokio::runtime::Builder::new_current_thread()
@@ -173,11 +176,11 @@ pub(crate) fn connect_async_db_for_tests(path: &std::path::Path) -> Arc<AsyncDae
             .build()
             .expect("build async daemon db test runtime")
             .block_on(async move {
-                Arc::new(
+                Arc::new(AsyncDaemonDbHandle(
                     AsyncDaemonDb::connect(&path)
                         .await
                         .expect("open async daemon db"),
-                )
+                ))
             }),
     }
 }
@@ -188,8 +191,11 @@ pub(crate) fn connect_async_db_for_tests(path: &std::path::Path) -> Arc<AsyncDae
 // alias, to avoid the cycle its own doc comment explains; both resolve to the
 // identical monomorphized type, which is what lets its routes merge into this
 // module's `OpenApiRouter`.
-pub type DaemonHttpState =
-    server_state::DaemonHttpState<DaemonDb, AsyncDaemonDb, companion::CompanionRouter>;
+pub type DaemonHttpState = server_state::DaemonHttpState<
+    DaemonDbOwnedHandle,
+    AsyncDaemonDbHandle,
+    companion::CompanionRouter,
+>;
 
 /// Build the default remote pairing rate limiter used by daemon HTTP state.
 #[must_use]

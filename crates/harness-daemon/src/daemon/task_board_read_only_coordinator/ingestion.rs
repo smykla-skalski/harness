@@ -1,4 +1,3 @@
-use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::{
     TaskBoardAttemptResultArtifact, TaskBoardAttemptState, TaskBoardDependencyRouteRecord,
     TaskBoardDependencyRouteStatus, TaskBoardExecutionAttemptRecord, TaskBoardExecutionPhase,
@@ -12,6 +11,7 @@ use harness_kernel::errors::CliError;
 use super::super::task_board_read_only_runtime::TaskBoardReadOnlyRuntime;
 use super::attempts::{invalid_transition, require_human};
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 pub(super) fn unapplied_completed_attempt(
     execution: &TaskBoardWorkflowExecutionRecord,
@@ -23,7 +23,7 @@ pub(super) fn unapplied_completed_attempt(
 }
 
 pub(super) async fn ingest_completed_attempt<R>(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     runtime: &R,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
@@ -85,7 +85,7 @@ where
 }
 
 async fn apply_dependency_triage(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     route: &TaskBoardDependencyRouteRecord,
     revisions: &TaskBoardWorkflowRevisionGuard,
@@ -138,7 +138,7 @@ async fn apply_dependency_triage(
 }
 
 async fn complete_report_only(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     route: &TaskBoardDependencyRouteRecord,
     now: &str,
@@ -162,7 +162,7 @@ async fn complete_report_only(
 }
 
 async fn ensure_frozen_head<R>(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     runtime: &R,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
@@ -205,7 +205,7 @@ where
 }
 
 async fn ensure_implementation_ancestry<R>(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     runtime: &R,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
@@ -271,7 +271,7 @@ fn expected_attempt_head<'a>(
 }
 
 async fn advance(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     revisions: &TaskBoardWorkflowRevisionGuard,
     now: &str,
@@ -289,7 +289,7 @@ async fn advance(
 }
 
 async fn advance_with_head(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     revisions: &TaskBoardWorkflowRevisionGuard,
     head: &str,
@@ -308,7 +308,7 @@ async fn advance_with_head(
 }
 
 async fn advance_publication(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     revisions: &TaskBoardWorkflowRevisionGuard,
     external_url: Option<&str>,
@@ -368,7 +368,7 @@ fn parse_pull_request_url(url: &str) -> Result<TaskBoardPullRequestIdentity, Cli
 }
 
 async fn ingest_evaluation(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     revisions: &TaskBoardWorkflowRevisionGuard,
     verdict: TaskBoardPhaseVerdict,

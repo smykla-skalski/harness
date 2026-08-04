@@ -7,7 +7,7 @@ use harness_kernel::errors::CliError;
 /// Returns `CliError` on DB failures.
 pub fn adopt_session_record(
     outcome: &AdoptionOutcome,
-    db: &super::db::DaemonDb,
+    db: &crate::daemon::db_handle::DaemonDbOwnedHandle,
 ) -> Result<(), CliError> {
     harness_daemon_session_service::adopt_session_record(outcome, db)
 }
@@ -18,7 +18,7 @@ pub fn adopt_session_record(
 /// Returns `CliError` on DB failures.
 pub(crate) async fn adopt_session_record_async(
     outcome: &AdoptionOutcome,
-    async_db: &super::db::AsyncDaemonDb,
+    async_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
 ) -> Result<(), CliError> {
     harness_daemon_session_service::adopt_session_record_async(outcome, async_db).await
 }

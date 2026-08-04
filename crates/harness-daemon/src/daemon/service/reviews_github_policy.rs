@@ -1,3 +1,6 @@
+#[cfg(test)]
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
+use crate::daemon::db_handle::DaemonDbOwnedHandle;
 use crate::daemon::db_open::DaemonDbOpen;
 #[cfg(test)]
 use crate::daemon::reviews_store::PolicyGraphQueries;
@@ -188,6 +191,7 @@ pub(crate) fn enforce_review_pull_request_policy(
 
 fn enforced_review_text_paste_policy_canvas() -> Result<(String, PolicyGraph), CliError> {
     let db = DaemonDb::open(&state::daemon_root().join("harness.db"))?;
+    let db = DaemonDbOwnedHandle(db);
     let Some(workspace) = db.load_policy_workspace()? else {
         return Err(disabled_reviews_policy_error(
             ReviewsGitHubMutation::Approve,
@@ -207,6 +211,7 @@ fn enforced_reviews_github_policy_entry(
     mutation: ReviewsGitHubMutation,
 ) -> Result<EnforcedReviewsPolicy, CliError> {
     let db = DaemonDb::open(&state::daemon_root().join("harness.db"))?;
+    let db = DaemonDbOwnedHandle(db);
     let Some(workspace) = db.load_policy_workspace()? else {
         return Err(disabled_reviews_policy_error(
             mutation,
@@ -423,6 +428,7 @@ mod tests {
         let db = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
             .await
             .expect("connect policy db");
+        let db = AsyncDaemonDbHandle(db);
         db.replace_policy_workspace(workspace)
             .await
             .expect("write policy workspace");

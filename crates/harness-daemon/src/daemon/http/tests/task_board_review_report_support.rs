@@ -1,5 +1,5 @@
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::task_board::{
     AgentMode, TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION, TaskBoardAttemptState,
     TaskBoardExecutionAttemptCas, TaskBoardExecutionAttemptRecord, TaskBoardExecutionState,
@@ -9,7 +9,7 @@ use crate::task_board::{
 };
 
 pub(super) async fn seed_running_execution(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     item_id: &str,
 ) -> TaskBoardWorkflowExecutionRecord {
     let execution_id = format!("execution-{item_id}");
@@ -93,7 +93,7 @@ pub(super) async fn seed_running_execution(
 }
 
 pub(super) async fn settle_active_review_attempt(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
 ) {
     let attempt = execution.attempts.first().expect("active review attempt");

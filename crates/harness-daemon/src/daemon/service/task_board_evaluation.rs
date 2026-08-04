@@ -1,9 +1,6 @@
 use tracing::warn;
 
 use crate::agents::runtime::runtime_for_name;
-use crate::daemon::db::AsyncDaemonDb;
-#[cfg(test)]
-use crate::daemon::db::DaemonDb;
 use crate::daemon::index::ResolvedSession;
 use crate::daemon::protocol::{
     SessionDetail, TaskBoardEvaluateRequest, TaskBoardEvaluationResponse,
@@ -32,6 +29,9 @@ use super::index;
 use super::{build_log_entry, effective_project_dir, session_not_found};
 use crate::daemon::db::prelude::*;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
+#[cfg(test)]
+use crate::daemon::db_handle::DaemonDbOwnedHandle;
 
 /// Evaluate linked task-board items against their session work-item state.
 ///
@@ -40,7 +40,7 @@ use crate::daemon::db::task_board::prelude::*;
 #[cfg(test)]
 pub fn evaluate_task_board(
     request: &TaskBoardEvaluateRequest,
-    db: Option<&DaemonDb>,
+    db: Option<&DaemonDbOwnedHandle>,
 ) -> Result<TaskBoardEvaluationResponse, CliError> {
     let board = store();
     let items = selected_items(&board, request)?;
@@ -96,7 +96,7 @@ fn log_signal_failure(failure: &EvaluationSignalFailure) {
 )]
 pub(crate) async fn evaluate_task_board_async(
     request: &TaskBoardEvaluateRequest,
-    async_db: &AsyncDaemonDb,
+    async_db: &AsyncDaemonDbHandle,
 ) -> Result<TaskBoardEvaluationResponse, CliError> {
     let items = selected_items_async(async_db, request).await?;
     let mut summary = TaskBoardEvaluationSummary::default();
@@ -163,7 +163,7 @@ fn selected_items(
 }
 
 async fn selected_items_async(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &TaskBoardEvaluateRequest,
 ) -> Result<Vec<TaskBoardItem>, CliError> {
     if let Some(item_id) = request.item_id.as_deref() {
@@ -270,7 +270,7 @@ fn evaluate_linked_item(
 }
 
 async fn evaluate_linked_item_async(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     item: &TaskBoardItem,
     task: &WorkItem,
     dry_run: bool,
@@ -304,7 +304,7 @@ fn materialize_reviewer_signal(
     item: &TaskBoardItem,
     task: &WorkItem,
     record: &TaskBoardEvaluationRecord,
-    db: Option<&DaemonDb>,
+    db: Option<&DaemonDbOwnedHandle>,
 ) -> Result<(), CliError> {
     if !should_materialize_reviewer_signal(task, record) {
         return Ok(());
@@ -320,7 +320,7 @@ async fn materialize_reviewer_signal_async(
     item: &TaskBoardItem,
     task: &WorkItem,
     record: &TaskBoardEvaluationRecord,
-    async_db: &AsyncDaemonDb,
+    async_db: &AsyncDaemonDbHandle,
 ) -> Result<(), CliError> {
     if !should_materialize_reviewer_signal(task, record) {
         return Ok(());
@@ -341,7 +341,10 @@ fn should_materialize_reviewer_signal(task: &WorkItem, record: &TaskBoardEvaluat
 }
 
 #[cfg(test)]
-fn resolve_session(session_id: &str, db: Option<&DaemonDb>) -> Result<ResolvedSession, CliError> {
+fn resolve_session(
+    session_id: &str,
+    db: Option<&DaemonDbOwnedHandle>,
+) -> Result<ResolvedSession, CliError> {
     if let Some(db) = db
         && let Some(resolved) = db.resolve_session(session_id)?
     {
@@ -354,7 +357,7 @@ fn resolve_session(session_id: &str, db: Option<&DaemonDb>) -> Result<ResolvedSe
 fn write_reviewer_signal(
     resolved: &ResolvedSession,
     task: &WorkItem,
-    db: Option<&DaemonDb>,
+    db: Option<&DaemonDbOwnedHandle>,
 ) -> Result<(), CliError> {
     let now = utc_now();
     let Some(record) =
@@ -389,7 +392,7 @@ fn write_reviewer_signal(
 async fn write_reviewer_signal_async(
     resolved: &ResolvedSession,
     task: &WorkItem,
-    async_db: &AsyncDaemonDb,
+    async_db: &AsyncDaemonDbHandle,
 ) -> Result<(), CliError> {
     let now = utc_now();
     let Some(record) =
@@ -465,7 +468,7 @@ fn failure_record(
 }
 
 async fn failure_record_async(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     item: &TaskBoardItem,
     mut record: TaskBoardEvaluationRecord,
     step: &'static str,

@@ -4,17 +4,16 @@ use std::collections::BTreeSet;
 use std::time::Instant;
 
 use super::super::{
-    liveness_project_dir_for_resolved, refresh_resolved_session_from_files_if_newer,
-    sync_resolved_liveness,
+    ResolvedSession, liveness_project_dir_for_resolved,
+    refresh_resolved_session_from_files_if_newer, sync_resolved_liveness,
 };
 use crate::daemon::db::prelude::*;
-use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
-use crate::daemon::index::ResolvedSession;
+use crate::daemon::db_handle::{AsyncDaemonDbHandle, DaemonDbOwnedHandle};
 use harness_kernel::errors::CliError;
 
 pub(super) fn reconcile_active_session_liveness_for_reads(
     _include_all: bool,
-    db: Option<&DaemonDb>,
+    db: Option<&DaemonDbOwnedHandle>,
 ) -> Result<(), CliError> {
     let Some(db) = db else {
         return Ok(());
@@ -35,13 +34,13 @@ pub(super) fn reconcile_active_session_liveness_for_reads(
 }
 
 pub(crate) fn reconcile_active_session_liveness_background(
-    db: Option<&DaemonDb>,
+    db: Option<&DaemonDbOwnedHandle>,
 ) -> Result<(), CliError> {
     reconcile_active_session_liveness_for_reads(true, db)
 }
 
 pub(crate) async fn reconcile_active_session_liveness_background_async(
-    async_db: Option<&AsyncDaemonDb>,
+    async_db: Option<&AsyncDaemonDbHandle>,
 ) -> Result<(), CliError> {
     harness_daemon_session_service::reconcile_active_session_liveness_background_async(async_db)
         .await
@@ -72,7 +71,7 @@ pub(crate) fn clear_session_liveness_refresh_cache_entry(session_id: &str) {
 
 pub(super) fn reconcile_session_liveness_for_read(
     session_id: &str,
-    db: Option<&DaemonDb>,
+    db: Option<&DaemonDbOwnedHandle>,
 ) -> Result<(), CliError> {
     let Some(db) = db else {
         return Ok(());
@@ -89,7 +88,7 @@ pub(super) fn reconcile_session_liveness_for_read(
 /// would read back.
 pub(super) fn reconcile_session_liveness_for_read_returning(
     session_id: &str,
-    db: &DaemonDb,
+    db: &DaemonDbOwnedHandle,
 ) -> Result<Option<ResolvedSession>, CliError> {
     let Some(mut resolved) = db.resolve_session(session_id)? else {
         return Ok(None);

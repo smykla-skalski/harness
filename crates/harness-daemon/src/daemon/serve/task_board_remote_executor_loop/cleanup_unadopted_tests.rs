@@ -20,6 +20,7 @@ use super::super::source::ensure_remote_session;
 use super::tests::{CLAIMED_AT, SETTLED_AT, STARTED_AT, UNKNOWN_AT, active_count, git_repository};
 use crate::daemon::db::prelude::*;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 const EXPIRED_AT: &str = "2026-07-19T10:11:00Z";
@@ -200,6 +201,7 @@ async fn preclaim_superseded_cleanup_is_restart_safe_and_mutation_free() {
     let reopened = crate::daemon::db::AsyncDaemonDb::connect(&database_path)
         .await
         .expect("reopen before preclaim settlement");
+    let reopened = AsyncDaemonDbHandle(reopened);
     reopened
         .settle_task_board_remote_assignment(&settlement, REMOTE_EXECUTOR_PRINCIPAL, SETTLED_AT)
         .await

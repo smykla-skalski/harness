@@ -2,6 +2,7 @@ use chrono::{Duration as ChronoDuration, SecondsFormat, Utc};
 use sqlx::{Executor as _, query, query_scalar};
 
 use super::*;
+use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::{
     PreparedRemoteOffer, REMOTE_EXECUTOR_PRINCIPAL, RemoteExecutorFixture,
     TaskBoardRemoteOfferOutcome, authorize_and_start_remote_executor, prepare_remote_offer,
@@ -106,6 +107,7 @@ async fn top_level_recovery_query_failure_still_blocks_callback() {
     let db = AsyncDaemonDb::connect(&directory.path().join("broken.db"))
         .await
         .expect("open recovery db");
+    let db = AsyncDaemonDbHandle(db);
     query("ALTER TABLE task_board_remote_assignments RENAME TO unavailable_assignments")
         .execute(db.pool())
         .await
@@ -388,13 +390,13 @@ async fn poisoned_recovery_fixture(poison_count: u32) -> RecoveryFixture {
 }
 
 struct RecoveryFixture {
-    db: AsyncDaemonDb,
+    db: AsyncDaemonDbHandle,
     _prepared: PreparedRemoteOffer,
     execution: crate::task_board::TaskBoardWorkflowExecutionRecord,
     offered_at: String,
 }
 
-async fn insert_malformed_assignments(db: &AsyncDaemonDb, count: u32) {
+async fn insert_malformed_assignments(db: &AsyncDaemonDbHandle, count: u32) {
     let mut connection = db
         .pool()
         .acquire()
@@ -446,7 +448,7 @@ async fn insert_malformed_assignments(db: &AsyncDaemonDb, count: u32) {
         .expect("restore strict constraints");
 }
 
-async fn quarantine_count(db: &AsyncDaemonDb, assignment_id: &str) -> i64 {
+async fn quarantine_count(db: &AsyncDaemonDbHandle, assignment_id: &str) -> i64 {
     query_scalar(
         "SELECT COUNT(*) FROM task_board_remote_recovery_quarantine
          WHERE assignment_id = ?1",
@@ -457,7 +459,7 @@ async fn quarantine_count(db: &AsyncDaemonDb, assignment_id: &str) -> i64 {
     .expect("load recovery quarantine count")
 }
 
-async fn offer_receipt_count(db: &AsyncDaemonDb, assignment_id: &str) -> i64 {
+async fn offer_receipt_count(db: &AsyncDaemonDbHandle, assignment_id: &str) -> i64 {
     query_scalar("SELECT COUNT(*) FROM task_board_remote_offer_receipts WHERE assignment_id = ?1")
         .bind(assignment_id)
         .fetch_one(db.pool())

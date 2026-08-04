@@ -2,20 +2,23 @@ use chrono::{Duration, Utc};
 use sqlx::{query, query_as};
 
 use super::*;
+use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::{TaskBoardAutomationRunAdmission, TaskBoardRunAcquireRequest};
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::task_board::{
     TaskBoardAutomationScope, TaskBoardAutomationWakeEvent, TaskBoardAutomationWakePayload,
 };
 
-async fn database() -> AsyncDaemonDb {
+async fn database() -> AsyncDaemonDbHandle {
     let temp = tempfile::tempdir().expect("tempdir");
-    AsyncDaemonDb::connect(&temp.keep().join("harness.db"))
-        .await
-        .expect("open database")
+    AsyncDaemonDbHandle(
+        AsyncDaemonDb::connect(&temp.keep().join("harness.db"))
+            .await
+            .expect("open database"),
+    )
 }
 
-async fn acquire_run(db: &AsyncDaemonDb, run_id: &str, now: chrono::DateTime<Utc>) {
+async fn acquire_run(db: &AsyncDaemonDbHandle, run_id: &str, now: chrono::DateTime<Utc>) {
     db.start_task_board_automation(TaskBoardAutomationDesiredMode::Continuous, now)
         .await
         .expect("start automation");
@@ -37,7 +40,7 @@ async fn acquire_run(db: &AsyncDaemonDb, run_id: &str, now: chrono::DateTime<Utc
     ));
 }
 
-async fn expire_run(db: &AsyncDaemonDb, run_id: &str, now: chrono::DateTime<Utc>) {
+async fn expire_run(db: &AsyncDaemonDbHandle, run_id: &str, now: chrono::DateTime<Utc>) {
     query("UPDATE task_board_orchestrator_runs SET lease_expires_at = ?2 WHERE run_id = ?1")
         .bind(run_id)
         .bind((now - Duration::seconds(1)).to_rfc3339())

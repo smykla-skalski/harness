@@ -11,7 +11,7 @@ use super::{
     FakeRenewalIssuer, RemoteAcmeRenewalCheckOutcome, RenewalFixture, at, certificate_bundle,
     run_remote_acme_renewal_check,
 };
-use crate::daemon::db::DaemonDb;
+use crate::daemon::db_handle::DaemonDbOwnedHandle;
 use crate::daemon::remote_acme::{
     RemoteAcmeAutomaticRenewalIssuer, RemoteAcmeRenewalRequest, RemoteCertificateBundle,
 };
@@ -144,7 +144,7 @@ async fn persisted_tls_reload_failure_logs_early_renewal_fallback() {
 }
 
 struct ConcurrentRenewalIssuer {
-    db: Arc<Mutex<DaemonDb>>,
+    db: Arc<Mutex<DaemonDbOwnedHandle>>,
     manually_renewed: RemoteCertificateBundle,
     automatic_result: RemoteCertificateBundle,
 }
@@ -162,7 +162,7 @@ impl RemoteAcmeAutomaticRenewalIssuer for ConcurrentRenewalIssuer {
 }
 
 struct ConcurrentActiveRenewalIssuer {
-    db: Arc<Mutex<DaemonDb>>,
+    db: Arc<Mutex<DaemonDbOwnedHandle>>,
     tls: RemoteTlsConfigHandle,
     manually_renewed: RemoteCertificateBundle,
     automatic_result: RemoteCertificateBundle,
@@ -188,7 +188,7 @@ impl RemoteAcmeAutomaticRenewalIssuer for ConcurrentActiveRenewalIssuer {
 }
 
 fn persist_manual_renewal(
-    db: &Arc<Mutex<DaemonDb>>,
+    db: &Arc<Mutex<DaemonDbOwnedHandle>>,
     bundle: &RemoteCertificateBundle,
 ) -> Result<(), String> {
     db.lock()

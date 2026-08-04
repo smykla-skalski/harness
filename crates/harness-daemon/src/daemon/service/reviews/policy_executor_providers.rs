@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::reviews_store::PolicyGraphQueries;
 use crate::reviews::policy::{ReviewsPolicyActionExecutor, ReviewsPolicyProvider};
 use crate::task_board::policy_runtime::handoff::HandoffPolicyProvider;
@@ -38,7 +38,7 @@ where
 /// written to the canonical daemon database.
 pub(crate) fn build_database_policy_provider_registry<E>(
     executor: E,
-    database: Arc<AsyncDaemonDb>,
+    database: Arc<AsyncDaemonDbHandle>,
 ) -> PolicyProviderRegistry
 where
     E: ReviewsPolicyActionExecutor + Send + Sync + 'static,
@@ -65,11 +65,11 @@ where
 
 struct AutomationControlledPolicyProvider<P> {
     provider: P,
-    database: Arc<AsyncDaemonDb>,
+    database: Arc<AsyncDaemonDbHandle>,
 }
 
 impl<P> AutomationControlledPolicyProvider<P> {
-    fn new(provider: P, database: Arc<AsyncDaemonDb>) -> Self {
+    fn new(provider: P, database: Arc<AsyncDaemonDbHandle>) -> Self {
         Self { provider, database }
     }
 }

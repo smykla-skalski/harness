@@ -1,6 +1,7 @@
 use tempfile::{TempDir, tempdir};
 
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::daemon::reviews_store::PolicyGraphQueries;
 use crate::task_board::policy_graph::RecordedPolicyDecision;
@@ -8,11 +9,12 @@ use crate::task_board::{
     PolicyAction, PolicyDecision, PolicyEvidence, PolicyInput, PolicyReasonCode, PolicySubject,
 };
 
-async fn connect() -> (TempDir, AsyncDaemonDb) {
+async fn connect() -> (TempDir, AsyncDaemonDbHandle) {
     let dir = tempdir().expect("tempdir");
     let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
         .await
         .expect("connect async daemon db");
+    let db = AsyncDaemonDbHandle(db);
     (dir, db)
 }
 

@@ -2,7 +2,7 @@ use crate::agents::turn::{
     AgentTurnPullRequest, AgentTurnPullRequestContext, AgentTurnReadOnlyContent,
 };
 use crate::daemon::agent_acp::dependency_triage_prompt;
-use crate::daemon::db::{AgentTurnRunSnapshot, AgentTurnRunStatus, AsyncDaemonDb};
+use crate::daemon::db::{AgentTurnRunSnapshot, AgentTurnRunStatus};
 use crate::task_board::{
     TASK_BOARD_DEPENDENCY_TRIAGE_MODEL, TaskBoardAttemptResultArtifact, TaskBoardAttemptState,
     TaskBoardExecutionAttemptRecord, TaskBoardExecutionState, TaskBoardWorkflowExecutionRecord,
@@ -19,11 +19,12 @@ use super::reports::{
 };
 use super::requests::run_context;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 pub(super) const DEPENDENCY_TRIAGE_ACTION: &str = "dependency_triage";
 
 pub(super) async fn reconcile<R>(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     runtime: &R,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
@@ -58,7 +59,7 @@ where
 }
 
 async fn start<R>(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     runtime: &R,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
@@ -145,7 +146,7 @@ fn pull_request_context(
 }
 
 async fn mark_running(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
     now: &str,
@@ -171,7 +172,7 @@ async fn mark_running(
 }
 
 async fn settle_terminal(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
     run: &AgentTurnRunSnapshot,

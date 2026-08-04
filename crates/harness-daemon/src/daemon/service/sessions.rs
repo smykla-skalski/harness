@@ -37,7 +37,9 @@ use liveness::{reconcile_active_session_liveness_for_reads, reconcile_session_li
 ///
 /// # Errors
 /// Returns [`CliError`] on project discovery failures.
-pub fn list_projects(db: Option<&super::db::DaemonDb>) -> Result<Vec<ProjectSummary>, CliError> {
+pub fn list_projects(
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
+) -> Result<Vec<ProjectSummary>, CliError> {
     harness_daemon_session_service::list_projects(db)
 }
 
@@ -46,7 +48,7 @@ pub fn list_projects(db: Option<&super::db::DaemonDb>) -> Result<Vec<ProjectSumm
 /// # Errors
 /// Returns [`CliError`] on query failures.
 pub(crate) async fn list_projects_async(
-    async_db: Option<&super::db::AsyncDaemonDb>,
+    async_db: Option<&crate::daemon::db_handle::AsyncDaemonDbHandle>,
 ) -> Result<Vec<ProjectSummary>, CliError> {
     harness_daemon_session_service::list_projects_async(async_db).await
 }
@@ -57,7 +59,7 @@ pub(crate) async fn list_projects_async(
 /// Returns [`CliError`] on session discovery failures.
 pub fn list_sessions(
     include_all: bool,
-    db: Option<&super::db::DaemonDb>,
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
 ) -> Result<Vec<SessionSummary>, CliError> {
     reconcile_active_session_liveness_for_reads(include_all, db)?;
     if let Some(db) = db {
@@ -72,7 +74,7 @@ pub fn list_sessions(
 /// Returns [`CliError`] on query failures.
 pub(crate) async fn list_sessions_async(
     include_all: bool,
-    async_db: Option<&super::db::AsyncDaemonDb>,
+    async_db: Option<&crate::daemon::db_handle::AsyncDaemonDbHandle>,
 ) -> Result<Vec<SessionSummary>, CliError> {
     harness_daemon_session_service::list_sessions_async(include_all, async_db).await
 }
@@ -87,7 +89,7 @@ pub(crate) async fn list_sessions_async(
 pub(crate) async fn resolve_runtime_session_agent_async(
     runtime_name: &str,
     runtime_session_id: &str,
-    async_db: Option<&super::db::AsyncDaemonDb>,
+    async_db: Option<&crate::daemon::db_handle::AsyncDaemonDbHandle>,
 ) -> Result<Option<ResolvedRuntimeSessionAgent>, CliError> {
     harness_daemon_session_service::resolve_runtime_session_agent_async(
         runtime_name,
@@ -103,7 +105,7 @@ pub(crate) async fn resolve_runtime_session_agent_async(
 /// Returns [`CliError`] when the session cannot be resolved or loaded.
 pub fn session_detail(
     session_id: &str,
-    db: Option<&super::db::DaemonDb>,
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
 ) -> Result<SessionDetail, CliError> {
     if let Some(db) = db {
         reconcile_expired_pending_signals_for_db(session_id, db)?;
@@ -129,7 +131,7 @@ pub fn session_detail(
 /// Returns [`CliError`] when the session cannot be resolved or loaded.
 pub(crate) fn session_detail_from_daemon_db(
     session_id: &str,
-    db: &super::db::DaemonDb,
+    db: &crate::daemon::db_handle::DaemonDbOwnedHandle,
 ) -> Result<SessionDetail, CliError> {
     harness_daemon_session_service::session_detail_from_storage(session_id, db)
 }
@@ -140,7 +142,7 @@ pub(crate) fn session_detail_from_daemon_db(
 /// Returns [`CliError`] when the session cannot be resolved or loaded.
 pub(crate) async fn session_detail_async(
     session_id: &str,
-    async_db: Option<&super::db::AsyncDaemonDb>,
+    async_db: Option<&crate::daemon::db_handle::AsyncDaemonDbHandle>,
 ) -> Result<SessionDetail, CliError> {
     harness_daemon_session_service::session_detail_async(session_id, async_db).await
 }
@@ -155,7 +157,7 @@ pub(crate) async fn session_detail_async(
 /// Returns [`CliError`] when the session cannot be resolved or loaded.
 pub(crate) async fn session_detail_from_async_daemon_db(
     session_id: &str,
-    async_db: &super::db::AsyncDaemonDb,
+    async_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
 ) -> Result<SessionDetail, CliError> {
     harness_daemon_session_service::session_detail_from_storage_async(session_id, async_db).await
 }
@@ -167,7 +169,7 @@ pub(crate) async fn session_detail_from_async_daemon_db(
 /// Returns [`CliError`] when the session cannot be resolved or loaded.
 pub(crate) async fn session_detail_core_async(
     session_id: &str,
-    async_db: Option<&super::db::AsyncDaemonDb>,
+    async_db: Option<&crate::daemon::db_handle::AsyncDaemonDbHandle>,
 ) -> Result<SessionDetail, CliError> {
     harness_daemon_session_service::session_detail_core_async(session_id, async_db).await
 }
@@ -180,7 +182,7 @@ pub(crate) async fn session_detail_core_async(
 pub(crate) async fn session_timeline_window_async(
     session_id: &str,
     request: &TimelineWindowRequest,
-    async_db: Option<&super::db::AsyncDaemonDb>,
+    async_db: Option<&crate::daemon::db_handle::AsyncDaemonDbHandle>,
 ) -> Result<TimelineWindowResponse, CliError> {
     harness_daemon_session_service::session_timeline_window_async(session_id, request, async_db)
         .await
@@ -193,7 +195,7 @@ pub(crate) async fn session_timeline_window_async(
 /// cannot be loaded.
 pub(crate) async fn session_acp_transcript_async(
     session_id: &str,
-    async_db: Option<&super::db::AsyncDaemonDb>,
+    async_db: Option<&crate::daemon::db_handle::AsyncDaemonDbHandle>,
 ) -> Result<AcpTranscriptResponse, CliError> {
     harness_daemon_session_service::session_acp_transcript_async(session_id, async_db).await
 }
@@ -204,7 +206,7 @@ pub(crate) async fn session_acp_transcript_async(
 /// Returns [`CliError`] when the session cannot be resolved or timeline sources fail.
 pub fn session_timeline(
     session_id: &str,
-    db: Option<&super::db::DaemonDb>,
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
 ) -> Result<Vec<TimelineEntry>, CliError> {
     session_timeline_with_scope(session_id, timeline::TimelinePayloadScope::Full, db)
 }
@@ -216,7 +218,7 @@ pub fn session_timeline(
 pub(crate) fn session_timeline_with_scope(
     session_id: &str,
     payload_scope: timeline::TimelinePayloadScope,
-    db: Option<&super::db::DaemonDb>,
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
 ) -> Result<Vec<TimelineEntry>, CliError> {
     if let Some(db) = db {
         reconcile_expired_pending_signals_for_db(session_id, db)?;
@@ -241,7 +243,7 @@ pub(crate) fn session_timeline_with_scope(
 pub(crate) fn session_timeline_window(
     session_id: &str,
     request: &TimelineWindowRequest,
-    db: Option<&super::db::DaemonDb>,
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
 ) -> Result<TimelineWindowResponse, CliError> {
     if let Some(db) = db {
         db.resolve_session(session_id)?
@@ -350,7 +352,7 @@ pub(crate) fn cursor_from_entry(entry: &TimelineEntry) -> TimelineCursor {
 /// Returns [`CliError`] when the session cannot be resolved.
 pub fn session_detail_core(
     session_id: &str,
-    db: Option<&super::db::DaemonDb>,
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
 ) -> Result<SessionDetail, CliError> {
     if let Some(db) = db {
         reconcile_expired_pending_signals_for_db(session_id, db)?;
@@ -373,7 +375,7 @@ pub fn session_detail_core(
 /// Returns [`CliError`] when the session cannot be resolved or extension loading fails.
 pub fn session_extensions(
     session_id: &str,
-    db: Option<&super::db::DaemonDb>,
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
 ) -> Result<SessionExtensionsPayload, CliError> {
     if let Some(db) = db {
         reconcile_expired_pending_signals_for_db(session_id, db)?;
@@ -396,7 +398,7 @@ pub fn session_extensions(
 /// Returns [`CliError`] when the session cannot be resolved or extension loading fails.
 pub(crate) async fn session_extensions_async(
     session_id: &str,
-    async_db: Option<&super::db::AsyncDaemonDb>,
+    async_db: Option<&crate::daemon::db_handle::AsyncDaemonDbHandle>,
 ) -> Result<SessionExtensionsPayload, CliError> {
     harness_daemon_session_service::session_extensions_async(session_id, async_db).await
 }

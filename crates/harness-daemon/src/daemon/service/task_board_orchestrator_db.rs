@@ -2,7 +2,6 @@ use std::collections::BTreeSet;
 
 use uuid::Uuid;
 
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{
     TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorRunOnceResponse, TaskBoardSyncRequest,
 };
@@ -31,17 +30,18 @@ use super::task_board_orchestrator_execution::{
 };
 use super::task_board_repository_scope::{scoped_task_board_item_db, scoped_task_board_items_db};
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::reviews_store::PolicyGraphQueries;
 
 pub(crate) async fn run_task_board_orchestrator_once_db(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &TaskBoardOrchestratorRunOnceRequest,
 ) -> Result<TaskBoardOrchestratorRunOnceResponse, CliError> {
     run_task_board_orchestrator_once_inner(db, request, None).await
 }
 
 pub(crate) async fn run_task_board_orchestrator_once_with_session_db(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &TaskBoardOrchestratorRunOnceRequest,
     session: &TaskBoardAutomationRunSession,
 ) -> Result<TaskBoardOrchestratorRunOnceResponse, CliError> {
@@ -53,7 +53,7 @@ pub(crate) async fn run_task_board_orchestrator_once_with_session_db(
     reason = "sequential prepare/execute/complete-or-fail pipeline, each already its own helper"
 )]
 async fn run_task_board_orchestrator_once_inner(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &TaskBoardOrchestratorRunOnceRequest,
     session: Option<&TaskBoardAutomationRunSession>,
 ) -> Result<TaskBoardOrchestratorRunOnceResponse, CliError> {
@@ -86,7 +86,7 @@ async fn run_task_board_orchestrator_once_inner(
 }
 
 async fn prepare_run(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &TaskBoardOrchestratorRunOnceRequest,
     settings: &TaskBoardOrchestratorSettings,
     durable_run_id: Option<&str>,
@@ -122,7 +122,7 @@ async fn prepare_run(
     reason = "sequential begin/run/finish stages, each phase already its own helper"
 )]
 async fn execute_run(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     settings: &TaskBoardOrchestratorSettings,
     prepared: &mut TaskBoardOrchestratorPreparedRun,
     progress: &mut (
@@ -238,7 +238,7 @@ fn github_discovery_request(dry_run: bool) -> TaskBoardSyncRequest {
 }
 
 async fn sync_github_tasks(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     settings: &TaskBoardOrchestratorSettings,
     prepared: &mut TaskBoardOrchestratorPreparedRun,
     session: Option<&TaskBoardAutomationRunSession>,
@@ -263,7 +263,7 @@ async fn sync_github_tasks(
 }
 
 async fn audit_summary(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     items: &[TaskBoardItem],
 ) -> Result<TaskBoardAuditSummary, CliError> {
     let workspace = db.load_policy_workspace().await?;
@@ -306,7 +306,7 @@ fn dispatch_input(
 }
 
 async fn items_for_input(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     input: &TaskBoardOrchestratorDispatchInput,
 ) -> Result<Vec<TaskBoardItem>, CliError> {
     let items = if let Some(item_id) = input.item_id.as_deref() {
@@ -326,7 +326,7 @@ async fn items_for_input(
 }
 
 pub(super) async fn record_tick(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     run_id: &str,
     started_at: &str,
     dry_run: bool,
@@ -345,7 +345,7 @@ pub(super) async fn record_tick(
 }
 
 async fn complete_run(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     prepared: TaskBoardOrchestratorPreparedRun,
     dispatch: DispatchExecutionSummary,
     evaluation: TaskBoardEvaluationSummary,
@@ -362,7 +362,7 @@ async fn complete_run(
 }
 
 async fn record_failed_run(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     prepared: &TaskBoardOrchestratorPreparedRun,
     progress: (
         Option<DispatchExecutionSummary>,
@@ -424,7 +424,7 @@ fn policy_trace_ids(
 }
 
 async fn save_run_summary(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     summary: TaskBoardOrchestratorRunSummary,
     phase: TaskBoardOrchestratorTickPhase,
 ) -> Result<(), CliError> {

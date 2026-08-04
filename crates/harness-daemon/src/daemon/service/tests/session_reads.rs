@@ -204,11 +204,11 @@ fn archived_sessions_are_hidden_from_async_db_summary_detail_and_timeline_reads(
 
         let runtime = tokio::runtime::Runtime::new().expect("runtime");
         runtime.block_on(async {
-            let async_db = Arc::new(
+            let async_db = Arc::new(crate::daemon::db_handle::AsyncDaemonDbHandle(
                 crate::daemon::db::AsyncDaemonDb::connect(&project.join("daemon.sqlite"))
                     .await
                     .expect("open async daemon db"),
-            );
+            ));
             let resolved_project = index::discovered_project_for_checkout(project);
             async_db
                 .sync_project(&resolved_project)

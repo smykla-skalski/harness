@@ -3,10 +3,10 @@ use rusqlite::Connection;
 use super::CliError;
 
 const SHAPE_COLUMN_SQL: &str = include_str!(
-    "../../harness-daemon/src/daemon/db/migrations/0050_daemon_v53_task_board_project_shape.sql"
+    "../../harness-daemon-db-core/src/migrations/0050_daemon_v53_task_board_project_shape.sql"
 );
 pub(super) const SHAPE_BACKFILL_SQL: &str = include_str!(
-    "../../harness-daemon/src/daemon/db/migrations/0051_daemon_v53_task_board_project_shape_backfill.sql"
+    "../../harness-daemon-db-core/src/migrations/0051_daemon_v53_task_board_project_shape_backfill.sql"
 );
 
 /// # Errors

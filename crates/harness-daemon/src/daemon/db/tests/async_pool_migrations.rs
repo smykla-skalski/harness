@@ -459,7 +459,9 @@ const SHIPPED_MIGRATION_CHECKSUMS: &[(&str, &str)] = &[
 fn shipped_daemon_async_migration_checksums_remain_stable() {
     // This test runs in harness-daemon's own `--lib` test target, so
     // `CARGO_MANIFEST_DIR` is this crate's own root (`crates/harness-daemon`).
-    let migrations_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/daemon/db/migrations");
+    // The migrations themselves moved into `harness-daemon-db-core` for #1231.
+    let migrations_dir =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../harness-daemon-db-core/src/migrations");
     let mut migration_files = std::fs::read_dir(&migrations_dir)
         .expect("read migrations directory")
         .map(|entry| {

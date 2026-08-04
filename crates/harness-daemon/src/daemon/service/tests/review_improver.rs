@@ -5,6 +5,7 @@ use crate::daemon::protocol::{
 use crate::session::types::{SessionRole, TaskStatus};
 
 use super::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 #[test]
@@ -21,6 +22,7 @@ fn improver_apply_async_resolves_session_via_async_db_for_dry_run() {
             let async_db = crate::daemon::db::AsyncDaemonDb::connect(&db_path)
                 .await
                 .expect("open async daemon db");
+            let async_db = AsyncDaemonDbHandle(async_db);
 
             let state = start_direct_session_async(
                 &async_db,

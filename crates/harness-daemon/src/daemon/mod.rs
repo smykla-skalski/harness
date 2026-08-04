@@ -52,6 +52,8 @@ pub mod codex_transport;
 #[cfg(feature = "daemon-runtime")]
 pub mod db;
 #[cfg(feature = "daemon-runtime")]
+pub mod db_handle;
+#[cfg(feature = "daemon-runtime")]
 mod db_open;
 #[cfg(feature = "daemon-runtime")]
 mod db_timeline_source;

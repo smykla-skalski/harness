@@ -13,6 +13,7 @@ async fn cached_reviews_query_creates_only_matching_task_board_reviews_idempoten
     let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
         .await
         .expect("open database");
+    let db = AsyncDaemonDbHandle(db);
     configure_review_inbox(&db, &["acme/api"], &["task-board"]).await;
     let request = cached_projection_request("acme/api");
     let response = ReviewsQueryResponse::new(
@@ -60,6 +61,7 @@ async fn cached_reviews_projection_preserves_user_selected_status() {
     let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
         .await
         .expect("open database");
+    let db = AsyncDaemonDbHandle(db);
     configure_review_inbox(&db, &["status/preserved"], &[]).await;
     let request = cached_projection_request("status/preserved");
     let response = ReviewsQueryResponse::new(
@@ -123,6 +125,7 @@ async fn cached_reviews_projection_reopens_done_task_when_review_is_requested_ag
     let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
         .await
         .expect("open database");
+    let db = AsyncDaemonDbHandle(db);
     configure_review_inbox(&db, &["status/reopened"], &[]).await;
     let request = cached_projection_request("status/reopened");
     let review = requested_review_item("status/reopened", "pr_status_reopened", 32, &[]);
@@ -169,6 +172,7 @@ async fn failed_cached_projection_is_retried_without_refetching_reviews() {
     let failed_db = AsyncDaemonDb::connect(&failed_dir.path().join("harness.db"))
         .await
         .expect("open failed database");
+    let failed_db = AsyncDaemonDbHandle(failed_db);
     configure_review_inbox(&failed_db, &["retry/project"], &[]).await;
     let request = cached_projection_request("retry/project");
     let response = ReviewsQueryResponse::new(
@@ -191,6 +195,7 @@ async fn failed_cached_projection_is_retried_without_refetching_reviews() {
     let recovered_db = AsyncDaemonDb::connect(&recovered_dir.path().join("harness.db"))
         .await
         .expect("open recovered database");
+    let recovered_db = AsyncDaemonDbHandle(recovered_db);
     configure_review_inbox(&recovered_db, &["retry/project"], &[]).await;
     let retried = query_reviews_with_database(&request, Some(&recovered_db))
         .await
@@ -218,6 +223,7 @@ async fn targeted_missing_refresh_completes_only_matching_imported_review() {
     let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
         .await
         .expect("open database");
+    let db = AsyncDaemonDbHandle(db);
     Box::pin(create_imported_review(
         &db,
         "missing-review",

@@ -2,6 +2,7 @@ use chrono::{Duration as ChronoDuration, Utc};
 use sqlx::{query, query_as};
 
 use super::*;
+use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::{TaskBoardAutomationRunAdmission, TaskBoardRunAcquireRequest};
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::task_board::{
@@ -9,21 +10,23 @@ use crate::task_board::{
     TaskBoardItem, TaskBoardOrchestratorSettings, TaskBoardOrchestratorState,
 };
 
-async fn database() -> AsyncDaemonDb {
+async fn database() -> AsyncDaemonDbHandle {
     let temp = tempfile::tempdir().expect("tempdir");
-    AsyncDaemonDb::connect(&temp.keep().join("harness.db"))
-        .await
-        .expect("open database")
+    AsyncDaemonDbHandle(
+        AsyncDaemonDb::connect(&temp.keep().join("harness.db"))
+            .await
+            .expect("open database"),
+    )
 }
 
-async fn start_automation(db: &AsyncDaemonDb) {
+async fn start_automation(db: &AsyncDaemonDbHandle) {
     db.start_task_board_automation(TaskBoardAutomationDesiredMode::Continuous, Utc::now())
         .await
         .expect("start automation");
 }
 
 async fn enqueue_item_wake(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     entity_id: &str,
     revision: u64,
 ) -> TaskBoardAutomationWakeEvent {

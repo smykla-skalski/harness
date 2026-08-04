@@ -2,7 +2,6 @@ use serde_json::{Map, Value};
 use uuid::Uuid;
 
 use crate::daemon::audit_events::AuditEventStore;
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{HarnessMonitorAuditEvent, StreamEvent};
 use crate::daemon::service::observe_sender;
 use crate::task_board::TaskBoardExternalCreateIntent;
@@ -12,6 +11,7 @@ use harness_kernel::errors::CliError;
 use super::TaskBoardSyncAuditTrigger;
 use super::metrics::SyncExecutionMetrics;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 const SYNC_AUDIT_TITLE: &str = "Sync task-board providers";
 
@@ -72,7 +72,7 @@ impl SyncAuditClassification {
 }
 
 pub(super) async fn persist_sync_audit_result<T>(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     trigger: TaskBoardSyncAuditTrigger,
     correlation_id: Option<&str>,
     payload_json: Value,
@@ -92,7 +92,7 @@ pub(super) async fn persist_sync_audit_result<T>(
 }
 
 pub(in crate::daemon::service::task_board_db) async fn record_external_create_follow_ups(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     intents: &[TaskBoardExternalCreateIntent],
 ) -> Result<(), CliError> {
     for event in db

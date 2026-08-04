@@ -8,7 +8,7 @@ use serde_json::json;
 use tokio::runtime::{Builder, Handle, RuntimeFlavor};
 use tokio::task::block_in_place;
 
-use crate::daemon::db::{AsyncDaemonDb, DaemonDb, ensure_shared_db};
+use crate::daemon::db::ensure_shared_db;
 use crate::daemon::index;
 use crate::daemon::protocol::{CodexAgentInspectSnapshot, CodexRunSnapshot, CodexRunStatus};
 use crate::workspace::utc_now;
@@ -19,6 +19,7 @@ use super::handle::{
     CodexControllerHandle, lock_db, preferred_codex_project_dir, record_snapshot_event,
 };
 use crate::daemon::db::prelude::*;
+use crate::daemon::db_handle::{AsyncDaemonDbHandle, DaemonDbOwnedHandle};
 
 impl CodexControllerHandle {
     pub(super) fn load_run(&self, run_id: &str) -> Result<CodexRunSnapshot, CliError> {
@@ -149,7 +150,7 @@ impl CodexControllerHandle {
         ))
     }
 
-    pub(super) fn db(&self) -> Result<Arc<Mutex<DaemonDb>>, CliError> {
+    pub(super) fn db(&self) -> Result<Arc<Mutex<DaemonDbOwnedHandle>>, CliError> {
         ensure_shared_db(&self.state.db)
     }
 
@@ -193,7 +194,7 @@ impl CodexControllerHandle {
 
     pub(super) fn run_with_async_db<T, F, Fut>(&self, task: F) -> Option<Result<T, CliError>>
     where
-        F: FnOnce(Arc<AsyncDaemonDb>) -> Fut,
+        F: FnOnce(Arc<AsyncDaemonDbHandle>) -> Fut,
         Fut: Future<Output = Result<T, CliError>> + Send + 'static,
         T: Send + 'static,
     {

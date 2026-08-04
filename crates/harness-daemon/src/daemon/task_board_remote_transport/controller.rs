@@ -7,9 +7,10 @@ use super::controller_clock::ControllerClock;
 use crate::daemon::db::TaskBoardRemoteIoAuthority;
 use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{
-    AsyncDaemonDb, TaskBoardRemoteArtifact, TaskBoardRemoteAssignmentRecord,
-    TaskBoardRemoteHostTrustFence, TaskBoardRemoteMutationOutcome, TaskBoardRemoteOperationKind,
+    TaskBoardRemoteArtifact, TaskBoardRemoteAssignmentRecord, TaskBoardRemoteHostTrustFence,
+    TaskBoardRemoteMutationOutcome, TaskBoardRemoteOperationKind,
 };
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::task_board::TaskBoardRemoteAssignmentState;
 use crate::task_board::remote_wire::wire::{
     RemoteArtifactFetchRequest, RemoteCancelRequest, RemoteCancelResponse, RemoteClaimRequest,
@@ -64,7 +65,7 @@ impl From<CliError> for RemoteExecutionControllerError {
 impl RemoteExecutionControllerClient {
     pub(crate) async fn offer(
         &self,
-        db: &AsyncDaemonDb,
+        db: &AsyncDaemonDbHandle,
         request: &RemoteOfferRequest,
     ) -> Result<(RemoteOfferResponse, TaskBoardRemoteMutationOutcome), RemoteExecutionControllerError>
     {
@@ -87,7 +88,7 @@ impl RemoteExecutionControllerClient {
 
     pub(crate) async fn claim(
         &self,
-        db: &AsyncDaemonDb,
+        db: &AsyncDaemonDbHandle,
         request: &RemoteClaimRequest,
     ) -> Result<(RemoteClaimResponse, TaskBoardRemoteMutationOutcome), RemoteExecutionControllerError>
     {
@@ -141,7 +142,7 @@ impl RemoteExecutionControllerClient {
 
     pub(crate) async fn renew_lease(
         &self,
-        db: &AsyncDaemonDb,
+        db: &AsyncDaemonDbHandle,
         request: &RemoteLeaseRenewRequest,
     ) -> Result<
         (RemoteLeaseRenewResponse, TaskBoardRemoteMutationOutcome),
@@ -164,7 +165,7 @@ impl RemoteExecutionControllerClient {
 
     pub(crate) async fn status(
         &self,
-        db: &AsyncDaemonDb,
+        db: &AsyncDaemonDbHandle,
         request: &RemoteStatusRequest,
     ) -> Result<
         (RemoteStatusResponse, TaskBoardRemoteMutationOutcome),
@@ -206,7 +207,7 @@ impl RemoteExecutionControllerClient {
 
     pub(crate) async fn cancel(
         &self,
-        db: &AsyncDaemonDb,
+        db: &AsyncDaemonDbHandle,
         request: &RemoteCancelRequest,
     ) -> Result<
         (RemoteCancelResponse, TaskBoardRemoteMutationOutcome),
@@ -239,7 +240,7 @@ impl RemoteExecutionControllerClient {
 
     pub(crate) async fn settle(
         &self,
-        db: &AsyncDaemonDb,
+        db: &AsyncDaemonDbHandle,
         request: &RemoteSettledRequest,
     ) -> Result<RemoteSettledResponse, RemoteExecutionControllerError> {
         let trust = self
@@ -275,7 +276,7 @@ impl RemoteExecutionControllerClient {
 
     pub(crate) async fn fetch_artifact(
         &self,
-        db: &AsyncDaemonDb,
+        db: &AsyncDaemonDbHandle,
         request: &RemoteArtifactFetchRequest,
     ) -> Result<TaskBoardRemoteArtifact, RemoteExecutionControllerError> {
         if let Some(stored) = db
@@ -325,7 +326,7 @@ impl RemoteExecutionControllerClient {
 
     pub(super) async fn preflight(
         &self,
-        db: &AsyncDaemonDb,
+        db: &AsyncDaemonDbHandle,
         assignment_id: &str,
     ) -> Result<TaskBoardRemoteAssignmentRecord, RemoteExecutionControllerError> {
         db.task_board_remote_assignment(assignment_id)
@@ -335,7 +336,7 @@ impl RemoteExecutionControllerClient {
 
     pub(super) async fn preflight_lifecycle(
         &self,
-        db: &AsyncDaemonDb,
+        db: &AsyncDaemonDbHandle,
         assignment_id: &str,
         lease_id: &str,
         offer_digest: &str,

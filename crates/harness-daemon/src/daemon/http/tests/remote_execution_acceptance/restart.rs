@@ -105,7 +105,7 @@ async fn reach_durable_claim_and_stop_old_daemons(
 }
 
 async fn assert_pre_executor_tick_boundary(
-    db: &crate::daemon::db::AsyncDaemonDb,
+    db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
     record: &crate::daemon::db::TaskBoardRemoteAssignmentRecord,
 ) {
     assert_eq!(record.state, TaskBoardRemoteAssignmentState::Claimed);
@@ -121,7 +121,7 @@ async fn assert_pre_executor_tick_boundary(
 }
 
 async fn assert_restarted_prestart_unknown(
-    db: &crate::daemon::db::AsyncDaemonDb,
+    db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
     record: &crate::daemon::db::TaskBoardRemoteAssignmentRecord,
 ) {
     assert_eq!(record.state, TaskBoardRemoteAssignmentState::Unknown);
@@ -141,8 +141,8 @@ async fn assert_restarted_prestart_unknown(
 }
 
 async fn assert_restarted_unknown_completion(
-    controller_db: &crate::daemon::db::AsyncDaemonDb,
-    executor_db: &crate::daemon::db::AsyncDaemonDb,
+    controller_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
+    executor_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
     execution_id: &str,
     assignment_id: &str,
 ) {

@@ -3,7 +3,7 @@ use rusqlite::Connection;
 use super::CliError;
 
 const PULL_REQUEST_ACTIONS_SQL: &str = include_str!(
-    "../../harness-daemon/src/daemon/db/migrations/0056_daemon_v57_pull_request_actions.sql"
+    "../../harness-daemon-db-core/src/migrations/0056_daemon_v57_pull_request_actions.sql"
 );
 
 /// # Errors

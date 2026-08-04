@@ -3,13 +3,13 @@ use rusqlite::Connection;
 use super::CliError;
 
 const REQUESTED_RUNTIME_SQL: &str = include_str!(
-    "../../harness-daemon/src/daemon/db/migrations/0060_daemon_v61_ai_review_requested_runtime.sql"
+    "../../harness-daemon-db-core/src/migrations/0060_daemon_v61_ai_review_requested_runtime.sql"
 );
 const ACTUAL_RUNTIME_SQL: &str = include_str!(
-    "../../harness-daemon/src/daemon/db/migrations/0061_daemon_v61_ai_review_actual_runtime.sql"
+    "../../harness-daemon-db-core/src/migrations/0061_daemon_v61_ai_review_actual_runtime.sql"
 );
 const RUNTIME_BACKFILL_SQL: &str = include_str!(
-    "../../harness-daemon/src/daemon/db/migrations/0062_daemon_v61_ai_review_runtime_backfill.sql"
+    "../../harness-daemon-db-core/src/migrations/0062_daemon_v61_ai_review_runtime_backfill.sql"
 );
 
 /// Add explicit requested and actual runtime provenance to retained AI reviews.

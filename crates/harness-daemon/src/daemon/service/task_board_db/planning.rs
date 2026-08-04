@@ -1,4 +1,3 @@
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::protocol::{
     TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest, TaskBoardPlanRevokeRequest,
@@ -10,23 +9,24 @@ use crate::workspace::utc_now;
 use harness_kernel::errors::CliError;
 
 use super::super::task_board_repository_scope::scoped_task_board_item_db;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 pub(crate) async fn begin_task_board_planning_db(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &TaskBoardPlanBeginRequest,
 ) -> Result<TaskBoardPlanningResponse, CliError> {
     apply_planning_transition_db(db, &request.id, begin_planning).await
 }
 
 pub(crate) async fn submit_task_board_plan_db(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &TaskBoardPlanSubmitRequest,
 ) -> Result<TaskBoardPlanningResponse, CliError> {
     apply_planning_transition_db(db, &request.id, |item| submit_plan(item, &request.summary)).await
 }
 
 pub(crate) async fn approve_task_board_plan_db(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &TaskBoardPlanApproveRequest,
 ) -> Result<TaskBoardPlanningResponse, CliError> {
     let approved_at = request.approved_at.clone().unwrap_or_else(utc_now);
@@ -37,7 +37,7 @@ pub(crate) async fn approve_task_board_plan_db(
 }
 
 pub(crate) async fn revoke_task_board_plan_db(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &TaskBoardPlanRevokeRequest,
 ) -> Result<TaskBoardPlanningResponse, CliError> {
     apply_planning_transition_db(db, &request.id, |item| {
@@ -47,7 +47,7 @@ pub(crate) async fn revoke_task_board_plan_db(
 }
 
 async fn apply_planning_transition_db(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     id: &str,
     transition_for: impl FnOnce(&TaskBoardItem) -> PlanningTransition,
 ) -> Result<TaskBoardPlanningResponse, CliError> {

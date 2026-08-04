@@ -32,6 +32,11 @@ sha2 = "0.11.0"
 # duplicating `ensure_schema`'s orchestration a second time. See
 # `crates/harness-daemon/Cargo.toml`'s `test-support` feature.
 harness-daemon = { path = "../harness-daemon", version = "57.0.0", features = ["test-support"] }
+# `DaemonDb::open_in_memory` (via `harness-daemon`'s `test-support` feature)
+# calls into this crate's own `open_in_memory_with_hooks`, gated the same
+# way, so this build needs the feature unified onto it directly rather than
+# relying on `harness-daemon` to forward it.
+harness-daemon-db-core = { path = "../harness-daemon-db-core", version = "57.0.0", features = ["test-support"] }
 hex = "=0.4.3"
 sqlx = { version = "=0.9.0", default-features = false, features = ["sqlite", "sqlite-bundled", "runtime-tokio", "tls-rustls-ring", "migrate", "macros", "chrono", "uuid", "json"] }
 tempfile = "=3.27.0"

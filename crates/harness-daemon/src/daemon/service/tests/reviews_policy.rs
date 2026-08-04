@@ -18,6 +18,7 @@ use super::reviews_policy_fixtures::{
     review_target_fixture, reviews_policy_run_request, test_runtime_root,
     write_active_policy_graph,
 };
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 #[tokio::test]
@@ -480,10 +481,11 @@ async fn background_reviews_policy_run_supersedes_stale_waiting_head() {
     .await;
 }
 
-async fn open_reviews_policy_audit_db() -> (tempfile::TempDir, Arc<AsyncDaemonDb>) {
+async fn open_reviews_policy_audit_db() -> (tempfile::TempDir, Arc<AsyncDaemonDbHandle>) {
     let tmp = tempfile::tempdir().expect("tempdir");
     let db = AsyncDaemonDb::connect(&tmp.path().join("harness.db"))
         .await
         .expect("open async daemon db");
+    let db = AsyncDaemonDbHandle(db);
     (tmp, Arc::new(db))
 }

@@ -10,6 +10,7 @@ use super::AcpAgentManagerHandle;
 use crate::agents::runtime::RuntimeCapabilities;
 use crate::daemon::db::DaemonDb;
 use crate::daemon::db::prelude::*;
+use crate::daemon::db_handle::DaemonDbOwnedHandle;
 use crate::daemon::index::DiscoveredProject;
 use crate::daemon::protocol::StreamEvent;
 use crate::session::types::{
@@ -105,18 +106,18 @@ fn seeded_manager_with_sender(sender: broadcast::Sender<StreamEvent>) -> AcpAgen
     AcpAgentManagerHandle::new(sender, db_cell)
 }
 
-fn seed_daemon_db() -> DaemonDb {
-    let db = assert_ok(DaemonDb::open_in_memory(), "open db");
+fn seed_daemon_db() -> DaemonDbOwnedHandle {
+    let db = DaemonDbOwnedHandle(assert_ok(DaemonDb::open_in_memory(), "open db"));
     populate_daemon_db(&db);
     db
 }
 
 pub(super) fn seed_daemon_db_at(path: &Path) {
-    let db = assert_ok(DaemonDb::open(path), "open db");
+    let db = DaemonDbOwnedHandle(assert_ok(DaemonDb::open(path), "open db"));
     populate_daemon_db(&db);
 }
 
-fn populate_daemon_db(db: &DaemonDb) {
+fn populate_daemon_db(db: &DaemonDbOwnedHandle) {
     let project = sample_project();
     assert_ok(db.sync_project(&project), "sync project");
     for session_id in [

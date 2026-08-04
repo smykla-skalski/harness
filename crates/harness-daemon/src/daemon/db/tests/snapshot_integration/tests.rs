@@ -35,6 +35,7 @@ fn snapshot_round_trip_smoke_covers_public_surface() {
             let signals = daemon_snapshot::load_signals_for(&resolved.project, &resolved.state)
                 .expect("signals");
             let db = DaemonDb::open_in_memory().expect("open db");
+            let db = crate::daemon::db_handle::DaemonDbOwnedHandle(db);
             db.sync_project(&resolved.project).expect("sync project");
             db.sync_session(&resolved.project.project_id, &resolved.state)
                 .expect("sync session");
@@ -116,6 +117,7 @@ fn snapshot_summary_and_detail_preserve_adoption_metadata() {
             let detail_from_resolved =
                 daemon_snapshot::session_detail_from_resolved(&resolved).expect("resolved detail");
             let db = DaemonDb::open_in_memory().expect("open db");
+            let db = crate::daemon::db_handle::DaemonDbOwnedHandle(db);
             db.sync_project(&resolved.project).expect("sync project");
             db.sync_session(&resolved.project.project_id, &resolved.state)
                 .expect("sync session");
@@ -206,6 +208,7 @@ fn session_detail_with_db_refreshes_shared_runtime_signal_index() {
             .expect("write beta signal");
 
             let db = DaemonDb::open_in_memory().expect("open db");
+            let db = crate::daemon::db_handle::DaemonDbOwnedHandle(db);
             db.sync_project(&project).expect("sync project");
             db.sync_session(&project.project_id, &alpha_state)
                 .expect("sync alpha state");

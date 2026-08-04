@@ -16,8 +16,9 @@ use tokio::task::JoinHandle;
 use tokio::time::{MissedTickBehavior, interval};
 use tracing::warn;
 
+use crate::daemon::db::ClaimedTaskBoardTriageEscalation;
 use crate::daemon::db::task_board::prelude::*;
-use crate::daemon::db::{AsyncDaemonDb, ClaimedTaskBoardTriageEscalation};
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::http::{DaemonHttpState, run_codex_agent_blocking};
 use crate::daemon::protocol::{CodexRunMode, CodexRunRequest};
 use crate::session::types::{CONTROL_PLANE_ACTOR_ID, SessionRole};
@@ -70,7 +71,7 @@ async fn run_task_board_triage_escalation_loop(
 )]
 async fn drain_tick(
     state: &DaemonHttpState,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     config: &TaskBoardTriageEscalationConfig,
 ) {
     match crate::daemon::automation_kill_switch::enforce_triage_automation_control(state, db).await
@@ -166,7 +167,7 @@ async fn stop_escalation_worker(state: &DaemonHttpState, managed_run_id: &str) {
 
 async fn spawn_escalation_worker(
     state: &DaemonHttpState,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     escalation: &ClaimedTaskBoardTriageEscalation,
 ) -> Result<(), CliError> {
     ensure_triage_automation_enabled(db).await?;
@@ -209,14 +210,14 @@ async fn spawn_escalation_worker(
     Ok(())
 }
 
-async fn ensure_triage_automation_enabled(db: &AsyncDaemonDb) -> Result<(), CliError> {
+async fn ensure_triage_automation_enabled(db: &AsyncDaemonDbHandle) -> Result<(), CliError> {
     if !triage_automation_enabled(db).await? {
         return Err(triage_automation_disabled_error());
     }
     Ok(())
 }
 
-async fn triage_automation_enabled(db: &AsyncDaemonDb) -> Result<bool, CliError> {
+async fn triage_automation_enabled(db: &AsyncDaemonDbHandle) -> Result<bool, CliError> {
     Ok(!db.automation_kill_switch_engaged().await?
         && db
             .task_board_orchestrator_settings()
@@ -235,7 +236,7 @@ fn triage_automation_disabled_error() -> CliError {
 /// stale scratch directories are small, inert, and safe to leave for the
 /// same lifetime as the daemon's other run artifacts.
 fn ensure_escalation_scratch_dir(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     escalation_id: &str,
 ) -> Result<String, CliError> {
     let base = db.storage_path().parent().map_or_else(

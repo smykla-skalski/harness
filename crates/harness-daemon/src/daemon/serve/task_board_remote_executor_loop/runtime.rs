@@ -7,8 +7,7 @@ use std::pin::Pin;
 use crate::agents::turn::{AgentTurnRequest, AgentTurnRuntime};
 use crate::daemon::agent_acp::{OpenRouterAgentTurnRuntime, OpenRouterRunCorrelation};
 use crate::daemon::db::{
-    AsyncDaemonDb, TaskBoardRemoteExecutorRun, TaskBoardRemoteExecutorStartIoPermit,
-    TaskBoardRemoteRunStatus,
+    TaskBoardRemoteExecutorRun, TaskBoardRemoteExecutorStartIoPermit, TaskBoardRemoteRunStatus,
 };
 use crate::daemon::http::{DaemonHttpState, run_codex_agent_blocking};
 use crate::daemon::protocol::{CodexRunRequest, CodexRunSnapshot};
@@ -19,6 +18,7 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 use super::RemoteWorkerIdentity;
 use crate::daemon::db::prelude::*;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 /// The action the loop plans from durable state before it has authority to
 /// execute it. Only [`Start`](Self::Start)/[`Probe`](Self::Probe) can reach a
@@ -63,7 +63,7 @@ impl PreparedRemoteWorkerAction {
 
 pub(super) async fn execute_remote_worker_action(
     state: &DaemonHttpState,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     offer: &RemoteOfferRequest,
     identity: &RemoteWorkerIdentity,
     action: &PreparedRemoteWorkerAction,
@@ -102,7 +102,7 @@ pub(super) fn remote_run_request(offer: &RemoteOfferRequest) -> CodexRunRequest 
 
 async fn start_openrouter_run(
     state: &DaemonHttpState,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     offer: &RemoteOfferRequest,
     identity: &RemoteWorkerIdentity,
     workspace: &Path,
@@ -124,7 +124,7 @@ async fn start_openrouter_run(
 
 async fn probe_openrouter_run(
     state: &DaemonHttpState,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     offer: &RemoteOfferRequest,
     identity: &RemoteWorkerIdentity,
     workspace: &Path,
@@ -228,7 +228,7 @@ async fn stop_codex_run(state: &DaemonHttpState, run_id: &str) -> Result<(), Cli
 
 pub(super) fn stop_remote_run<'a>(
     state: &'a DaemonHttpState,
-    db: &'a AsyncDaemonDb,
+    db: &'a AsyncDaemonDbHandle,
     run: &'a TaskBoardRemoteExecutorRun,
 ) -> Pin<Box<dyn Future<Output = Result<(), CliError>> + Send + 'a>> {
     Box::pin(async move {

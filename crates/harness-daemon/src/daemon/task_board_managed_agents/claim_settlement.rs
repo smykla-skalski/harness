@@ -1,4 +1,3 @@
-use crate::daemon::db::{AsyncDaemonDb, ClaimedTaskBoardDispatch};
 use crate::daemon::http::DaemonHttpState;
 use crate::daemon::protocol::ManagedAgentSnapshot;
 use harness_kernel::errors::{CliError, CliErrorKind};
@@ -9,11 +8,13 @@ use super::{
     recover_same_applied_worker, start_worker_for_applied_task_in_lane, stop_worker_in_lane,
     validate_workflow_launch,
 };
+use crate::daemon::db::ClaimedTaskBoardDispatch;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 pub(crate) async fn settle_claimed_task_board_worker(
     state: &DaemonHttpState,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     claim: &mut ClaimedTaskBoardDispatch,
 ) -> Result<Option<ManagedAgentSnapshot>, CliError> {
     if is_workflow_dispatch(claim) {
@@ -48,7 +49,7 @@ pub(crate) async fn settle_claimed_task_board_worker(
 
 async fn finish_worker_settlement(
     state: &DaemonHttpState,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     claim: &mut ClaimedTaskBoardDispatch,
     worker_id: &str,
     worker: ManagedAgentSnapshot,
@@ -72,7 +73,7 @@ async fn finish_worker_settlement(
 /// item re-read rather than compensated away.
 async fn adopt_committed_settlement(
     state: &DaemonHttpState,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     claim: &mut ClaimedTaskBoardDispatch,
     worker_id: &str,
     worker: ManagedAgentSnapshot,
@@ -87,7 +88,7 @@ async fn adopt_committed_settlement(
 
 async fn settle_workflow_before_start(
     state: &DaemonHttpState,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     claim: &mut ClaimedTaskBoardDispatch,
 ) -> Result<Option<ManagedAgentSnapshot>, CliError> {
     let worker_id = managed_worker_id(&claim.applied, &claim.intent_id);
@@ -132,7 +133,7 @@ async fn probe_recovered_workflow_worker(
 /// surfaces the validation error untouched.
 async fn settle_or_compensate_workflow(
     state: &DaemonHttpState,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     claim: &mut ClaimedTaskBoardDispatch,
     worker_id: &str,
     existing: Option<ManagedAgentSnapshot>,
@@ -152,7 +153,7 @@ async fn settle_or_compensate_workflow(
 
 async fn commit_workflow_dispatch(
     state: &DaemonHttpState,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     claim: &mut ClaimedTaskBoardDispatch,
     worker_id: &str,
     existing: Option<ManagedAgentSnapshot>,
@@ -177,7 +178,7 @@ async fn commit_workflow_dispatch(
 
 async fn authorize_workflow_start(
     state: &DaemonHttpState,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     claim: &ClaimedTaskBoardDispatch,
 ) -> Result<(), CliError> {
     ensure_spawn_kill_switch_clear(state, &claim.applied.board_item_id).await?;
@@ -194,7 +195,7 @@ async fn authorize_workflow_start(
 }
 
 async fn rollback_unstarted_workflow(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     claim: &ClaimedTaskBoardDispatch,
     error: &CliError,
 ) -> Result<(), CliError> {
@@ -212,7 +213,7 @@ fn is_workflow_dispatch(claim: &ClaimedTaskBoardDispatch) -> bool {
 }
 
 async fn validate_worker_settlement(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     claim: &ClaimedTaskBoardDispatch,
 ) -> Result<(), CliError> {
     db.renew_task_board_dispatch_claim(&claim.intent_id, &claim.claim_token)
@@ -220,7 +221,7 @@ async fn validate_worker_settlement(
 }
 
 async fn complete_worker_settlement(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     claim: &mut ClaimedTaskBoardDispatch,
 ) -> Result<(), CliError> {
     claim.applied.item = db
@@ -234,7 +235,7 @@ async fn complete_worker_settlement(
 }
 
 async fn completion_was_committed(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     claim: &ClaimedTaskBoardDispatch,
 ) -> Result<bool, CliError> {
     let Some(execution_id) = claim.applied.item.workflow.execution_id.as_deref() else {
@@ -260,7 +261,7 @@ async fn completion_was_committed(
 }
 
 async fn handle_start_error(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     claim: &ClaimedTaskBoardDispatch,
     start_error: TaskBoardWorkerStartError,
 ) -> Result<Option<ManagedAgentSnapshot>, CliError> {
@@ -285,7 +286,7 @@ async fn handle_start_error(
 
 async fn compensate_settlement_failure(
     state: &DaemonHttpState,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     claim: &ClaimedTaskBoardDispatch,
     worker_id: &str,
     error: CliError,

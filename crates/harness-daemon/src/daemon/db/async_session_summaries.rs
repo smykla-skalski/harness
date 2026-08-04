@@ -88,7 +88,7 @@ impl AsyncSessionSummaryQueries for AsyncDaemonDb {
         trace_async_db_operation(
             "list_session_summaries",
             "read",
-            Some(&self.path),
+            Some(self.storage_path()),
             || async {
                 record_daemon_db_pool_state(
                     "async",
@@ -118,24 +118,29 @@ impl AsyncSessionSummaryQueries for AsyncDaemonDb {
         session_id: &str,
     ) -> Result<Option<daemon_index::ResolvedSession>, CliError> {
         storage::validate_session_id(session_id)?;
-        trace_async_db_operation("resolve_session", "read", Some(&self.path), || async {
-            record_daemon_db_pool_state(
-                "async",
-                u64::from(self.pool().size()),
-                u64::try_from(self.pool().num_idle()).unwrap_or(u64::MAX),
-            );
-            let row = query_as::<_, AsyncResolvedSessionRow>(RESOLVE_SESSION_SQL)
-                .bind(session_id)
-                .fetch_optional(self.pool())
-                .await
-                .map_err(|error| {
-                    db_error(format!("resolve async session {session_id}: {error}"))
-                })?;
-            match row {
-                Some(row) => row.into_resolved_session(self).await.map(Some),
-                None => Ok(None),
-            }
-        })
+        trace_async_db_operation(
+            "resolve_session",
+            "read",
+            Some(self.storage_path()),
+            || async {
+                record_daemon_db_pool_state(
+                    "async",
+                    u64::from(self.pool().size()),
+                    u64::try_from(self.pool().num_idle()).unwrap_or(u64::MAX),
+                );
+                let row = query_as::<_, AsyncResolvedSessionRow>(RESOLVE_SESSION_SQL)
+                    .bind(session_id)
+                    .fetch_optional(self.pool())
+                    .await
+                    .map_err(|error| {
+                        db_error(format!("resolve async session {session_id}: {error}"))
+                    })?;
+                match row {
+                    Some(row) => row.into_resolved_session(self).await.map(Some),
+                    None => Ok(None),
+                }
+            },
+        )
         .await
     }
 }

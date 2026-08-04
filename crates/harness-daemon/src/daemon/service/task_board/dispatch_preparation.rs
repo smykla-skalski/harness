@@ -8,9 +8,10 @@ use tokio::time::sleep;
 use crate::daemon::db::prelude::*;
 use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{
-    AsyncDaemonDb, ClaimedTaskBoardDispatchPreparation, ReservedTaskBoardDispatch,
-    TaskBoardPreparationClaim, TaskBoardPreparationUnavailable,
+    ClaimedTaskBoardDispatchPreparation, ReservedTaskBoardDispatch, TaskBoardPreparationClaim,
+    TaskBoardPreparationUnavailable,
 };
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::index::{self, DiscoveredProject};
 use crate::daemon::protocol::{SessionStartRequest, TaskBoardDispatchRequest, TaskCreateRequest};
 use crate::daemon::service::{
@@ -31,7 +32,7 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 const PREPARATION_HEARTBEAT_INTERVAL: Duration = Duration::from_secs(10);
 
 pub(super) async fn reserve_and_prepare_task_board_dispatch(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &TaskBoardDispatchRequest,
     plan: &DispatchPlan,
     hold_worker: bool,
@@ -114,7 +115,7 @@ fn unavailable_preparation_message(
 }
 
 pub(crate) async fn prepare_claimed_task_board_dispatch(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     claim: &ClaimedTaskBoardDispatchPreparation,
 ) -> Result<DispatchAppliedTask, (DispatchFailureKind, CliError)> {
     let mut heartbeat = tokio::spawn(maintain_preparation_claim(db.clone(), claim.clone()));
@@ -150,7 +151,7 @@ struct DispatchCheckout {
 }
 
 async fn prepare_dispatch_side_effects(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     claim: &ClaimedTaskBoardDispatchPreparation,
 ) -> Result<DispatchCheckout, (DispatchFailureKind, CliError)> {
     ensure_dispatch_session(db, claim)
@@ -218,7 +219,7 @@ async fn canonical_dispatch_worktree(worktree: PathBuf) -> Result<String, CliErr
 }
 
 async fn maintain_preparation_claim(
-    db: AsyncDaemonDb,
+    db: AsyncDaemonDbHandle,
     claim: ClaimedTaskBoardDispatchPreparation,
 ) -> Result<(), CliError> {
     loop {
@@ -242,7 +243,7 @@ fn heartbeat_error(result: Result<Result<(), CliError>, JoinError>) -> CliError 
 }
 
 async fn ensure_dispatch_session(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     claim: &ClaimedTaskBoardDispatchPreparation,
 ) -> Result<(), CliError> {
     let preparation = &claim.preparation;
@@ -278,7 +279,7 @@ async fn ensure_dispatch_session(
 }
 
 async fn recover_prepared_session(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     claim: &ClaimedTaskBoardDispatchPreparation,
     title: &str,
     context: Option<&str>,
@@ -391,7 +392,7 @@ fn clear_incomplete_session_artifacts(
 }
 
 async fn ensure_dispatch_task(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     claim: &ClaimedTaskBoardDispatchPreparation,
 ) -> Result<(), CliError> {
     let preparation = &claim.preparation;

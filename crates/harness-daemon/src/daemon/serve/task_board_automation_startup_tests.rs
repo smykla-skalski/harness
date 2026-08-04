@@ -10,11 +10,13 @@ use crate::task_board::{
     TaskBoardAutomationAdmissionState, TaskBoardAutomationDesiredMode, TaskBoardOrchestratorState,
 };
 
-async fn database() -> AsyncDaemonDb {
+async fn database() -> AsyncDaemonDbHandle {
     let temp = tempfile::tempdir().expect("tempdir");
-    AsyncDaemonDb::connect(&temp.keep().join("harness.db"))
-        .await
-        .expect("open database")
+    AsyncDaemonDbHandle(
+        AsyncDaemonDb::connect(&temp.keep().join("harness.db"))
+            .await
+            .expect("open database"),
+    )
 }
 
 #[tokio::test]

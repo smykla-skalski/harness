@@ -77,7 +77,9 @@ impl Execute for DaemonCommand {
             Self::Doctor => {
                 adopt_daemon_root_for_transport_command("daemon-doctor");
                 let db_path = state::daemon_root().join("harness.db");
-                let db = harness_daemon::daemon::db::DaemonDb::open(&db_path)?;
+                let db = harness_daemon::daemon::db_handle::DaemonDbOwnedHandle(
+                    harness_daemon::daemon::db::DaemonDb::open(&db_path)?,
+                );
                 let report = service::diagnostics_report(Some(&db))?;
                 print_json(&report)?;
                 Ok(0)

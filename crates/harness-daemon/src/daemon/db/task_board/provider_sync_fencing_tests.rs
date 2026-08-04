@@ -9,6 +9,7 @@ use tempfile::tempdir;
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::task_board::import_lifecycle_queries::ImportLifecycleQueries;
 use crate::daemon::db::task_board::provider_queries::ProviderQueries;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::task_board::external::{
     ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision,
@@ -26,6 +27,7 @@ async fn concurrent_scope_claims_admit_exactly_one_attempt() {
     let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
         .await
         .expect("database");
+    let db = AsyncDaemonDbHandle(db);
     let first_db = db.clone();
     let second_db = db.clone();
 
@@ -65,6 +67,7 @@ async fn active_attempt_fences_batch_without_duplicate_provider_call() {
     let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
         .await
         .expect("database");
+    let db = AsyncDaemonDbHandle(db);
     let calls = Arc::new(AtomicUsize::new(0));
     let client = CountingPullClient::successful(Arc::clone(&calls));
     let scope_id = ExternalProviderScopeIdentity::for_client(&client)
@@ -90,6 +93,7 @@ async fn stale_attempt_results_cannot_replace_newer_scope_state() {
     let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
         .await
         .expect("database");
+    let db = AsyncDaemonDbHandle(db);
     let success_scope = "v1:github:write:12:acme/widgets";
     let failure_scope = "v1:github:read:12:acme/widgets";
 
@@ -142,6 +146,7 @@ async fn persisted_exponential_backoff_caps_at_ten_minutes() {
     let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
         .await
         .expect("database");
+    let db = AsyncDaemonDbHandle(db);
     let scope_id = "v1:github:read:12:acme/widgets";
     let expected_delays = [30_i64, 120, 480, 600, 600, 600];
 
@@ -188,6 +193,7 @@ async fn dry_run_success_and_failure_leave_provider_state_unchanged() {
     let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
         .await
         .expect("database");
+    let db = AsyncDaemonDbHandle(db);
     let calls = Arc::new(AtomicUsize::new(0));
     let successful = CountingPullClient::successful(Arc::clone(&calls));
     let scope_id = ExternalProviderScopeIdentity::for_client(&successful)
@@ -231,6 +237,7 @@ async fn neutral_release_preserves_failure_count_without_backoff() {
     let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
         .await
         .expect("database");
+    let db = AsyncDaemonDbHandle(db);
     let scope_id = "v1:github:write:7:scope-a";
     let initial = start_attempt_for(
         &db,
@@ -288,6 +295,7 @@ async fn neutral_release_removes_a_new_attempt_row() {
     let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
         .await
         .expect("database");
+    let db = AsyncDaemonDbHandle(db);
     let scope_id = "v1:github:write:7:scope-b";
     let attempt = start_attempt_for(
         &db,

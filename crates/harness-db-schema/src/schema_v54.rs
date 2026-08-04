@@ -3,10 +3,10 @@ use rusqlite::{Connection, Transaction, TransactionBehavior};
 use super::CliError;
 
 const REMOVE_TODOIST_SQL: &str = include_str!(
-    "../../harness-daemon/src/daemon/db/migrations/0052_daemon_v54_task_board_remove_todoist.sql"
+    "../../harness-daemon-db-core/src/migrations/0052_daemon_v54_task_board_remove_todoist.sql"
 );
 const PROJECTS_SOURCE_SQL: &str = include_str!(
-    "../../harness-daemon/src/daemon/db/migrations/0053_daemon_v54_task_board_projects_source.sql"
+    "../../harness-daemon-db-core/src/migrations/0053_daemon_v54_task_board_projects_source.sql"
 );
 
 /// # Errors

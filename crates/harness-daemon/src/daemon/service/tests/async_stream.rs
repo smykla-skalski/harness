@@ -1,5 +1,6 @@
 use super::*;
 use crate::daemon::db::prelude::*;
+use crate::daemon::db_handle::{AsyncDaemonDbHandle, DaemonDbOwnedHandle};
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::daemon::test_liveness::LIVENESS;
 
@@ -18,6 +19,7 @@ fn global_stream_initial_events_async_include_current_session_index() {
         let db_dir = tempdir().expect("tempdir");
         let db_path = db_dir.path().join("harness.db");
         let db = crate::daemon::db::DaemonDb::open(&db_path).expect("open file db");
+        let db = DaemonDbOwnedHandle(db);
         let project_record = index::discovered_project_for_checkout(project);
         db.sync_project(&project_record).expect("sync project");
         db.sync_session(&project_record.project_id, &state)
@@ -29,6 +31,7 @@ fn global_stream_initial_events_async_include_current_session_index() {
             let async_db = crate::daemon::db::AsyncDaemonDb::connect(&db_path)
                 .await
                 .expect("open async daemon db");
+            let async_db = AsyncDaemonDbHandle(async_db);
             let events = global_stream_initial_events_async(Some(&async_db)).await;
             let snapshot = events
                 .iter()
@@ -63,6 +66,7 @@ fn session_stream_initial_events_async_include_current_session_snapshot() {
         let db_dir = tempdir().expect("tempdir");
         let db_path = db_dir.path().join("harness.db");
         let db = crate::daemon::db::DaemonDb::open(&db_path).expect("open file db");
+        let db = DaemonDbOwnedHandle(db);
         let project_record = index::discovered_project_for_checkout(project);
         db.sync_project(&project_record).expect("sync project");
         db.sync_session(&project_record.project_id, &state)
@@ -74,6 +78,7 @@ fn session_stream_initial_events_async_include_current_session_snapshot() {
             let async_db = crate::daemon::db::AsyncDaemonDb::connect(&db_path)
                 .await
                 .expect("open async daemon db");
+            let async_db = AsyncDaemonDbHandle(async_db);
             let events =
                 session_stream_initial_events_async(&state.session_id, Some(&async_db)).await;
             let update = events
@@ -109,11 +114,11 @@ fn typed_audit_writes_emit_global_push_events() {
     let runtime = tokio::runtime::Runtime::new().expect("runtime");
     runtime.block_on(async {
         let db_dir = tempdir().expect("tempdir");
-        let db = Arc::new(
+        let db = Arc::new(crate::daemon::db_handle::AsyncDaemonDbHandle(
             crate::daemon::db::AsyncDaemonDb::connect(&db_dir.path().join("harness.db"))
                 .await
                 .expect("open async daemon db"),
-        );
+        ));
         install_test_observe_async_db(Arc::clone(&db));
 
         let sender = observe_sender().expect("observe sender");

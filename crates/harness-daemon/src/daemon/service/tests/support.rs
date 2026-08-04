@@ -1,5 +1,6 @@
 use super::*;
 use crate::daemon::db::prelude::*;
+use crate::daemon::db_handle::DaemonDbOwnedHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 pub(super) fn install_test_observe_runtime(poll_interval: Duration) {
@@ -12,7 +13,9 @@ pub(super) fn install_test_observe_runtime(poll_interval: Duration) {
     );
 }
 
-pub(super) fn install_test_observe_async_db(async_db: Arc<crate::daemon::db::AsyncDaemonDb>) {
+pub(super) fn install_test_observe_async_db(
+    async_db: Arc<crate::daemon::db_handle::AsyncDaemonDbHandle>,
+) {
     install_test_observe_runtime(Duration::from_mins(1));
     let runtime = OBSERVE_RUNTIME.get().expect("observe runtime");
     let _ = runtime.async_db.set(async_db);
@@ -204,8 +207,10 @@ pub(super) fn setup_session_with_worker_logs(
 pub(super) fn setup_db_with_session(
     project: &Path,
     session_id: &str,
-) -> crate::daemon::db::DaemonDb {
-    let db = crate::daemon::db::DaemonDb::open_in_memory().expect("open in-memory db");
+) -> crate::daemon::db_handle::DaemonDbOwnedHandle {
+    let db = crate::daemon::db_handle::DaemonDbOwnedHandle(
+        crate::daemon::db::DaemonDb::open_in_memory().expect("open in-memory db"),
+    );
     let project_record = index::discovered_project_for_checkout(project);
     db.sync_project(&project_record).expect("sync project");
     let resolved = index::resolve_session(session_id).expect("resolve session");
@@ -218,13 +223,13 @@ pub(super) fn setup_db_with_session(
 pub(super) async fn setup_async_db_with_session(
     project: &Path,
     session_id: &str,
-) -> Arc<crate::daemon::db::AsyncDaemonDb> {
+) -> Arc<crate::daemon::db_handle::AsyncDaemonDbHandle> {
     let db_path = project.join("daemon.sqlite");
-    let async_db = Arc::new(
+    let async_db = Arc::new(crate::daemon::db_handle::AsyncDaemonDbHandle(
         crate::daemon::db::AsyncDaemonDb::connect(&db_path)
             .await
             .expect("open async daemon db"),
-    );
+    ));
     let resolved = index::resolve_session(session_id).expect("resolve session");
     async_db
         .sync_project(&resolved.project)
@@ -243,13 +248,15 @@ pub(super) async fn setup_async_db_with_session(
 pub(super) fn setup_db_only_session(
     project: &Path,
 ) -> (
-    crate::daemon::db::DaemonDb,
+    crate::daemon::db_handle::DaemonDbOwnedHandle,
     crate::session::types::SessionState,
 ) {
     use crate::daemon::protocol::SessionJoinRequest;
     use crate::session::service::build_new_session;
 
-    let db = crate::daemon::db::DaemonDb::open_in_memory().expect("open in-memory db");
+    let db = crate::daemon::db_handle::DaemonDbOwnedHandle(
+        crate::daemon::db::DaemonDb::open_in_memory().expect("open in-memory db"),
+    );
 
     let project_record = index::discovered_project_for_checkout(project);
     db.sync_project(&project_record).expect("sync project");
@@ -282,7 +289,7 @@ pub(super) fn setup_db_only_session(
 }
 
 pub(super) fn join_db_codex_worker(
-    db: &crate::daemon::db::DaemonDb,
+    db: &crate::daemon::db_handle::DaemonDbOwnedHandle,
     state: &crate::session::types::SessionState,
     project: &Path,
     runtime_session_id: &str,
@@ -314,7 +321,7 @@ pub(super) fn join_db_codex_worker(
 }
 
 pub(super) fn start_direct_session(
-    db: &crate::daemon::db::DaemonDb,
+    db: &crate::daemon::db_handle::DaemonDbOwnedHandle,
     project: &Path,
     session_id: &str,
     title: &str,
@@ -353,7 +360,7 @@ pub(super) fn start_direct_session(
 }
 
 pub(super) async fn start_direct_session_async(
-    async_db: &crate::daemon::db::AsyncDaemonDb,
+    async_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
     project: &Path,
     session_id: &str,
     title: &str,
@@ -394,7 +401,7 @@ pub(super) async fn start_direct_session_async(
 }
 
 pub(super) fn join_direct_codex(
-    db: &crate::daemon::db::DaemonDb,
+    db: &crate::daemon::db_handle::DaemonDbOwnedHandle,
     project: &Path,
     session_id: &str,
     runtime_session_id: &str,
@@ -421,8 +428,11 @@ pub(super) fn join_direct_codex(
     })
 }
 
-pub(super) fn setup_db_with_project(project: &Path) -> crate::daemon::db::DaemonDb {
+pub(super) fn setup_db_with_project(
+    project: &Path,
+) -> crate::daemon::db_handle::DaemonDbOwnedHandle {
     let db = crate::daemon::db::DaemonDb::open_in_memory().expect("open db");
+    let db = DaemonDbOwnedHandle(db);
     let project_record = index::discovered_project_for_checkout(project);
     db.sync_project(&project_record).expect("sync project");
     db

@@ -262,7 +262,7 @@ struct CompensationFixture {
 }
 
 async fn begin_compensation_with_grant(
-    db: &crate::daemon::db::AsyncDaemonDb,
+    db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
     item_id: &str,
 ) -> CompensationFixture {
     let item = approved_write_item(TaskBoardItem::new(
@@ -362,7 +362,7 @@ async fn assert_finalized_compensation(
 }
 
 async fn approved_grant(
-    db: &crate::daemon::db::AsyncDaemonDb,
+    db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
     item_id: &str,
 ) -> crate::task_board::PolicyApprovalGrant {
     let grant = db

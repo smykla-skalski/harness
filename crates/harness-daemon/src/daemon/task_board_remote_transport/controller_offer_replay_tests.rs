@@ -7,7 +7,8 @@ use super::controller_authority_test_support::{
 };
 use super::controller_authority_tests::assert_concurrent_database_error;
 use crate::daemon::db::task_board::prelude::*;
-use crate::daemon::db::{AsyncDaemonDb, TaskBoardRemoteMutationOutcome, utc_now};
+use crate::daemon::db::{TaskBoardRemoteMutationOutcome, utc_now};
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::task_board::TaskBoardRemoteAssignmentState;
 use crate::task_board::remote_wire::wire::{
     RemoteAssignmentWireState, RemoteCancelRequest, RemoteCancelResponse, RemoteLease,
@@ -99,7 +100,7 @@ async fn accepted_offer_receipt_replays_original_l1_after_claim_renewal_and_term
 }
 
 async fn persist_renewal(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     renewal: &RemoteLeaseRenewRequest,
     response: &RemoteLeaseRenewResponse,
 ) {

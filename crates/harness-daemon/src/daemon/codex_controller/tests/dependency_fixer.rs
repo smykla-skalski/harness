@@ -20,6 +20,7 @@ use crate::daemon::protocol::CodexRunMode;
 
 use super::test_support::{controller_with_db, with_isolated_async_harness_env};
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 const HEAD: &str = "0123456789abcdef0123456789abcdef01234567";
@@ -88,6 +89,7 @@ async fn daemon_sink_persists_human_required_audit_on_the_bound_ticket() {
     let db = AsyncDaemonDb::connect(&directory.path().join("harness.db"))
         .await
         .expect("open db");
+    let db = AsyncDaemonDbHandle(db);
     let mut item = TaskBoardItem::new(
         "item-1".into(),
         "Dependency update".into(),

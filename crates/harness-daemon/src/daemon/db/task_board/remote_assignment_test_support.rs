@@ -54,7 +54,7 @@ pub(super) const REPOSITORY: &str = "example/harness";
 pub(super) const SOURCE_REVISION: &str = "1111111111111111111111111111111111111111";
 
 pub(crate) struct ControllerFixture {
-    pub(crate) db: AsyncDaemonDb,
+    pub(crate) db: crate::daemon::db_handle::AsyncDaemonDbHandle,
     pub(crate) temp_dir: TempDir,
     pub(crate) execution: TaskBoardWorkflowExecutionRecord,
     pub(crate) attempt: TaskBoardExecutionAttemptRecord,
@@ -90,9 +90,11 @@ async fn controller_fixture_for_runtime(
     runtime: &str,
 ) -> ControllerFixture {
     let temp = tempfile::tempdir().expect("tempdir");
-    let db = AsyncDaemonDb::connect(&temp.path().join("controller.db"))
-        .await
-        .expect("open controller db");
+    let db = crate::daemon::db_handle::AsyncDaemonDbHandle(
+        AsyncDaemonDb::connect(&temp.path().join("controller.db"))
+            .await
+            .expect("open controller db"),
+    );
     configure_controller(&db, max_attempts).await;
     let execution = Box::pin(review_execution(&db, runtime)).await;
     let attempt = review_attempt(&execution.execution_id, 1, NOW);
@@ -151,7 +153,7 @@ pub(super) async fn offer_controller(fixture: &ControllerFixture) -> TaskBoardRe
 }
 
 pub(crate) struct ExecutorFixture {
-    pub(crate) db: AsyncDaemonDb,
+    pub(crate) db: crate::daemon::db_handle::AsyncDaemonDbHandle,
     pub(crate) temp_dir: TempDir,
     pub(crate) request: RemoteOfferRequest,
 }
@@ -160,9 +162,11 @@ pub(crate) async fn executor_fixture(capacity: u32) -> ExecutorFixture {
     let temp = tempfile::tempdir().expect("tempdir");
     let checkout = temp.path().join("checkout");
     std::fs::create_dir(&checkout).expect("create executor fixture checkout");
-    let db = AsyncDaemonDb::connect(&temp.path().join("executor.db"))
-        .await
-        .expect("open executor db");
+    let db = crate::daemon::db_handle::AsyncDaemonDbHandle(
+        AsyncDaemonDb::connect(&temp.path().join("executor.db"))
+            .await
+            .expect("open executor db"),
+    );
     let mut settings = db
         .task_board_orchestrator_settings()
         .await

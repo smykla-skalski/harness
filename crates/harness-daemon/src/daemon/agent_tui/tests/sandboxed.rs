@@ -8,6 +8,7 @@ use crate::daemon::agent_tui::{
 };
 use crate::daemon::db::DaemonDb;
 use crate::daemon::db::prelude::*;
+use crate::daemon::db_handle::DaemonDbOwnedHandle;
 use crate::session::service as session_service;
 use crate::session::types::SessionRole;
 use crate::workspace::utc_now;
@@ -19,6 +20,7 @@ fn sandboxed_stop_without_bridge_falls_back_to_local_cleanup() {
     let daemon_home = tmp.path().join("daemon-home");
     fs_err::create_dir_all(&project_dir).expect("project dir");
     let db = DaemonDb::open_in_memory().expect("open db");
+    let db = DaemonDbOwnedHandle(db);
     let project = crate::daemon::index::DiscoveredProject {
         project_id: "project-stop-test".into(),
         name: "project".into(),
@@ -105,6 +107,7 @@ fn sandboxed_start_without_bridge_does_not_join_agent() {
     let daemon_home = tmp.path().join("daemon-home");
     fs_err::create_dir_all(&project_dir).expect("project dir");
     let db = DaemonDb::open_in_memory().expect("open db");
+    let db = DaemonDbOwnedHandle(db);
     let project = crate::daemon::index::DiscoveredProject {
         project_id: "project-tui-manager".into(),
         name: "project".into(),

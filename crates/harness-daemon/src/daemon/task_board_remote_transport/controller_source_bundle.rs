@@ -1,8 +1,9 @@
 use super::controller::{
     RemoteExecutionControllerClient, RemoteExecutionControllerError, binding_error,
 };
+use crate::daemon::db::TaskBoardRemoteOperationTrustFence;
 use crate::daemon::db::task_board::prelude::*;
-use crate::daemon::db::{AsyncDaemonDb, TaskBoardRemoteOperationTrustFence};
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::task_board::remote_wire::wire::{
     RemoteSourceBundleUploadRequest, RemoteSourceBundleUploadResponse,
 };
@@ -24,7 +25,7 @@ pub(crate) enum RemoteSourceBundleRecoveryOutcome {
 impl RemoteExecutionControllerClient {
     pub(crate) async fn upload_source_bundle(
         &self,
-        db: &AsyncDaemonDb,
+        db: &AsyncDaemonDbHandle,
         request: &RemoteSourceBundleUploadRequest,
     ) -> Result<RemoteSourceBundleUploadResponse, RemoteExecutionControllerError> {
         if let Some(stored) = db
@@ -57,7 +58,7 @@ impl RemoteExecutionControllerClient {
 
     pub(crate) async fn verify_or_abandon_predecessor_source_bundle(
         &self,
-        db: &AsyncDaemonDb,
+        db: &AsyncDaemonDbHandle,
         request: &RemoteSourceBundleUploadRequest,
     ) -> Result<RemoteSourceBundleRecoveryOutcome, RemoteExecutionControllerError> {
         let trust = self.current_source_recovery_trust(db).await?;
@@ -91,7 +92,7 @@ impl RemoteExecutionControllerClient {
     /// either adopts that receipt or seals an abandonment for it.
     async fn adopt_or_abandon_predecessor_source_bundle(
         &self,
-        db: &AsyncDaemonDb,
+        db: &AsyncDaemonDbHandle,
         request: &RemoteSourceBundleUploadRequest,
         trust: TaskBoardRemoteOperationTrustFence,
     ) -> Result<RemoteSourceBundleRecoveryOutcome, RemoteExecutionControllerError> {

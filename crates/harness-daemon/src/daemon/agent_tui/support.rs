@@ -5,8 +5,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use crate::daemon::db::prelude::*;
-#[cfg(feature = "daemon-runtime")]
-use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
+use crate::daemon::db_handle::{AsyncDaemonDbHandle, DaemonDbOwnedHandle};
 #[cfg(feature = "daemon-runtime")]
 use crate::session::types::{ManagedAgentRef, SessionState};
 #[cfg(feature = "daemon-runtime")]
@@ -22,7 +21,9 @@ pub(super) fn lock<'a, T>(mutex: &'a Mutex<T>, name: &str) -> Result<MutexGuard<
 }
 
 #[cfg(feature = "daemon-runtime")]
-pub(super) fn lock_db(db: &Arc<Mutex<DaemonDb>>) -> Result<MutexGuard<'_, DaemonDb>, CliError> {
+pub(super) fn lock_db(
+    db: &Arc<Mutex<DaemonDbOwnedHandle>>,
+) -> Result<MutexGuard<'_, DaemonDbOwnedHandle>, CliError> {
     db.lock().map_err(|error| {
         CliErrorKind::workflow_io(format!("daemon database lock poisoned: {error}")).into()
     })
@@ -36,7 +37,7 @@ pub(super) struct ResolvedTuiProject {
 
 #[cfg(feature = "daemon-runtime")]
 pub(super) fn resolve_tui_project(
-    db: &DaemonDb,
+    db: &DaemonDbOwnedHandle,
     session_id: &str,
     project_dir: Option<&str>,
 ) -> Result<ResolvedTuiProject, CliError> {
@@ -65,7 +66,7 @@ pub(super) fn resolve_tui_project(
 
 #[cfg(feature = "daemon-runtime")]
 pub(super) async fn resolve_tui_project_async(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     session_id: &str,
     project_dir: Option<&str>,
 ) -> Result<ResolvedTuiProject, CliError> {

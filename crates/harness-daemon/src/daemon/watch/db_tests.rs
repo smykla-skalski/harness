@@ -21,6 +21,7 @@ use super::{
     liveness_reconcile_due, poll_change_tracking, poll_change_tracking_async,
 };
 use crate::daemon::db::prelude::*;
+use crate::daemon::db_handle::{AsyncDaemonDbHandle, DaemonDbOwnedHandle};
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 /// Mirrors `service::SESSION_LIVENESS_REFRESH_TTL` for tests that exercise the
@@ -36,23 +37,27 @@ const TEST_LIVENESS_REFRESH_TTL: Duration = Duration::from_secs(5);
 struct RecordingWatchServicePort;
 
 #[async_trait]
-impl WatchServicePort<DaemonDb, AsyncDaemonDb> for RecordingWatchServicePort {
+impl WatchServicePort<DaemonDbOwnedHandle, AsyncDaemonDbHandle> for RecordingWatchServicePort {
     fn liveness_refresh_ttl(&self) -> Duration {
         TEST_LIVENESS_REFRESH_TTL
     }
 
-    fn reconcile_liveness(&self, _db: Option<&DaemonDb>) -> Result<(), CliError> {
+    fn reconcile_liveness(&self, _db: Option<&DaemonDbOwnedHandle>) -> Result<(), CliError> {
         Ok(())
     }
 
     async fn reconcile_liveness_async(
         &self,
-        _async_db: Option<&AsyncDaemonDb>,
+        _async_db: Option<&AsyncDaemonDbHandle>,
     ) -> Result<(), CliError> {
         Ok(())
     }
 
-    fn broadcast_sessions_updated(&self, sender: &Sender<StreamEvent>, _db: Option<&DaemonDb>) {
+    fn broadcast_sessions_updated(
+        &self,
+        sender: &Sender<StreamEvent>,
+        _db: Option<&DaemonDbOwnedHandle>,
+    ) {
         send_stub_event(sender, "sessions_updated", None);
     }
 
@@ -60,7 +65,7 @@ impl WatchServicePort<DaemonDb, AsyncDaemonDb> for RecordingWatchServicePort {
         &self,
         sender: &Sender<StreamEvent>,
         session_id: &str,
-        _db: Option<&DaemonDb>,
+        _db: Option<&DaemonDbOwnedHandle>,
     ) {
         send_stub_event(sender, "session_updated", Some(session_id));
     }
@@ -69,7 +74,7 @@ impl WatchServicePort<DaemonDb, AsyncDaemonDb> for RecordingWatchServicePort {
         &self,
         sender: &Sender<StreamEvent>,
         session_id: &str,
-        _db: Option<&DaemonDb>,
+        _db: Option<&DaemonDbOwnedHandle>,
     ) {
         send_stub_event(sender, "session_extensions", Some(session_id));
     }
@@ -77,7 +82,7 @@ impl WatchServicePort<DaemonDb, AsyncDaemonDb> for RecordingWatchServicePort {
     async fn broadcast_sessions_updated_async(
         &self,
         sender: &Sender<StreamEvent>,
-        _async_db: Option<&AsyncDaemonDb>,
+        _async_db: Option<&AsyncDaemonDbHandle>,
     ) {
         send_stub_event(sender, "sessions_updated", None);
     }
@@ -86,7 +91,7 @@ impl WatchServicePort<DaemonDb, AsyncDaemonDb> for RecordingWatchServicePort {
         &self,
         sender: &Sender<StreamEvent>,
         session_id: &str,
-        _async_db: Option<&AsyncDaemonDb>,
+        _async_db: Option<&AsyncDaemonDbHandle>,
     ) {
         send_stub_event(sender, "session_updated", Some(session_id));
     }
@@ -95,7 +100,7 @@ impl WatchServicePort<DaemonDb, AsyncDaemonDb> for RecordingWatchServicePort {
         &self,
         sender: &Sender<StreamEvent>,
         session_id: &str,
-        _async_db: Option<&AsyncDaemonDb>,
+        _async_db: Option<&AsyncDaemonDbHandle>,
     ) {
         send_stub_event(sender, "session_extensions", Some(session_id));
     }
@@ -113,6 +118,7 @@ fn send_stub_event(sender: &Sender<StreamEvent>, event: &str, session_id: Option
 #[test]
 fn poll_change_tracking_accepts_raw_session_scope() {
     let db = DaemonDb::open_in_memory().expect("open db");
+    let db = DaemonDbOwnedHandle(db);
     db.bump_change("ae60b5c5-37cf-5a50-a816-8f454bb9e92e")
         .expect("bump change");
 
@@ -130,6 +136,7 @@ fn poll_change_tracking_accepts_raw_session_scope() {
 #[test]
 fn poll_change_tracking_uses_change_seq_index() {
     let db = DaemonDb::open_in_memory().expect("open db");
+    let db = DaemonDbOwnedHandle(db);
     let details: Vec<String> = db
         .connection()
         .prepare(&format!("EXPLAIN QUERY PLAN {LOAD_CHANGE_TRACKING_SQL}"))
@@ -152,12 +159,14 @@ async fn poll_change_tracking_async_accepts_raw_session_scope() {
     let db_dir = tempdir().expect("tempdir");
     let db_path = db_dir.path().join("watch-async.db");
     let db = DaemonDb::open(&db_path).expect("open db");
+    let db = DaemonDbOwnedHandle(db);
     db.bump_change("watch-async-sess").expect("bump change");
     drop(db);
 
     let async_db = AsyncDaemonDb::connect(&db_path)
         .await
         .expect("open async db");
+    let async_db = AsyncDaemonDbHandle(async_db);
     let mut last_change_seq = 0;
     let changes = poll_change_tracking_async(&async_db, &mut last_change_seq).await;
 
@@ -167,7 +176,9 @@ async fn poll_change_tracking_async_accepts_raw_session_scope() {
 
 #[test]
 fn emit_watch_changes_releases_db_lock_before_extensions() {
-    let db = Arc::new(Mutex::new(DaemonDb::open_in_memory().expect("open db")));
+    let db = Arc::new(Mutex::new(crate::daemon::db_handle::DaemonDbOwnedHandle(
+        DaemonDb::open_in_memory().expect("open db"),
+    )));
     let mut sessions_updated = false;
     let mut session_updated_core = false;
     let mut session_extensions = false;
@@ -214,11 +225,11 @@ fn emit_watch_changes_releases_db_lock_before_extensions() {
 async fn emit_watch_changes_prefers_async_broadcast_builders() {
     let db_dir = tempdir().expect("tempdir");
     let db_path = db_dir.path().join("watch.db");
-    let async_db = Arc::new(
+    let async_db = Arc::new(AsyncDaemonDbHandle(
         AsyncDaemonDb::connect(&db_path)
             .await
             .expect("open async db"),
-    );
+    ));
     let (sender, mut receiver) = tokio::sync::broadcast::channel(8);
 
     emit_watch_changes(
@@ -255,7 +266,9 @@ fn spawn_watch_loop_does_not_replay_historical_changes_on_startup() {
         let runtime = tokio::runtime::Runtime::new().expect("runtime");
         runtime.block_on(async {
             let db_path = tmp.path().join("watch-startup.db");
-            let db = Arc::new(Mutex::new(DaemonDb::open(&db_path).expect("open db")));
+            let db = Arc::new(Mutex::new(crate::daemon::db_handle::DaemonDbOwnedHandle(
+                DaemonDb::open(&db_path).expect("open db"),
+            )));
             {
                 let db_guard = db.lock().expect("db lock");
                 db_guard.bump_change("global").expect("bump global");
@@ -356,6 +369,7 @@ fn liveness_candidate_status_labels_match_eligible_statuses() {
 #[test]
 fn list_liveness_candidate_ids_filters_on_status_and_agents() {
     let db = DaemonDb::open_in_memory().expect("open db");
+    let db = DaemonDbOwnedHandle(db);
     let project = DiscoveredProject {
         project_id: "project-liveness".into(),
         name: "harness".into(),

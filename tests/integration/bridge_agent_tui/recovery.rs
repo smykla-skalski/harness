@@ -5,6 +5,7 @@ use std::time::Duration;
 
 use harness::daemon::agent_tui::{AgentTuiManagerHandle, AgentTuiSnapshot, AgentTuiStatus};
 use harness::daemon::db::{DaemonDb, DaemonDbOpen, SessionWriteQueries};
+use harness::daemon::db_handle::DaemonDbOwnedHandle;
 use harness::session::service;
 use harness::session::types::SessionRole;
 use tokio::sync::broadcast;
@@ -112,6 +113,7 @@ fn recovery_manager(
     })
     .expect("session status");
     let db = DaemonDb::open(&root.join("daemon.sqlite3")).expect("open daemon db");
+    let db = DaemonDbOwnedHandle(db);
     let discovered = harness::daemon::index::discovered_project_for_checkout(project);
     db.sync_project(&discovered).expect("sync project");
     db.sync_session(&discovered.project_id, &current_state)

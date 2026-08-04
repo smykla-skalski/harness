@@ -1,6 +1,5 @@
 use chrono::{DateTime, Utc};
 
-use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::{
     TaskBoardAttemptResultArtifact, TaskBoardAttemptRetryDecision, TaskBoardAttemptState,
     TaskBoardExecutionAttemptCas, TaskBoardExecutionAttemptRecord, TaskBoardExecutionDiagnostic,
@@ -12,9 +11,10 @@ use harness_kernel::errors::CliError;
 
 use super::invalid_transition;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 pub(super) async fn schedule_publish_verification_retry(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
     detail: &str,
@@ -93,7 +93,7 @@ pub(super) async fn schedule_publish_verification_retry(
 }
 
 pub(super) async fn mark_publish_unknown(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
     detail: &str,
@@ -115,7 +115,7 @@ pub(super) async fn mark_publish_unknown(
 }
 
 async fn store_publish_unknown(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
     detail: &str,

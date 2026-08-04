@@ -5,9 +5,11 @@ use std::time::{Duration, Instant};
 
 use uuid::Uuid;
 
-use super::db::AsyncDaemonDb;
 use super::remote::RemoteAccessScope;
 use super::remote_identity::{RemoteAuditEvent, RemoteAuditOutcome, RemoteAuditScopeDecision};
+#[cfg(test)]
+use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::workspace::utc_now;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
@@ -246,7 +248,7 @@ pub(crate) struct RemoteAuthorizationAuditReceipt {
 impl RemoteAuthorizationAuditReceipt {
     pub(crate) async fn mark_failed(
         &self,
-        db: Option<&Arc<AsyncDaemonDb>>,
+        db: Option<&Arc<AsyncDaemonDbHandle>>,
         error_detail: &str,
     ) -> Result<(), CliError> {
         if self.decision == RemoteAuditScopeDecision::Denied {
@@ -324,7 +326,7 @@ impl<'a> RemoteAuthorizationAudit<'a> {
     /// Returns [`CliError`] when the audit store is unavailable or rejects the event.
     pub(crate) async fn record(
         self,
-        db: Option<&Arc<AsyncDaemonDb>>,
+        db: Option<&Arc<AsyncDaemonDbHandle>>,
     ) -> Result<RemoteAuthorizationAuditReceipt, CliError> {
         let db = db.ok_or_else(remote_audit_store_unavailable)?;
         let event_id = format!("remote-auth-{}", Uuid::new_v4());
@@ -419,11 +421,11 @@ mod tests {
         let temp = tempdir().expect("create audit contention tempdir");
         let db_path = temp.path().join("harness.db");
         drop(DaemonDb::open(&db_path).expect("initialize daemon database"));
-        let db = Arc::new(
+        let db = Arc::new(AsyncDaemonDbHandle(
             AsyncDaemonDb::connect(&db_path)
                 .await
                 .expect("open async daemon database"),
-        );
+        ));
         let (writer_ready_tx, writer_ready_rx) = mpsc::channel();
         let (release_writer_tx, release_writer_rx) = mpsc::channel();
         let writer_path = db_path.clone();

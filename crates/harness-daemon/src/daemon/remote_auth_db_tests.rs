@@ -1,4 +1,5 @@
 use crate::daemon::db::DaemonDb;
+use crate::daemon::db_handle::DaemonDbOwnedHandle;
 use crate::daemon::db_open::DaemonDbOpen;
 use crate::daemon::remote::RemoteRole;
 use crate::daemon::remote_identity::RemoteClientRegistration;
@@ -7,6 +8,7 @@ use crate::daemon::remote_identity_queries::RemoteIdentitySyncQueries;
 #[test]
 fn revoked_execution_coordinator_token_cannot_be_reauthenticated() {
     let db = DaemonDb::open_in_memory().expect("daemon database");
+    let db = DaemonDbOwnedHandle(db);
     let registration = RemoteClientRegistration::new_for_tests(
         "executor-revoked",
         "Remote executor",

@@ -1,4 +1,3 @@
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::CodexRunSnapshot;
 use crate::task_board::{
     TaskBoardAttemptState, TaskBoardExecutionAttemptRecord, TaskBoardFailureClass,
@@ -11,9 +10,10 @@ use super::attempts::invalid_transition;
 use super::attempts::require_human;
 use super::reports::transition_attempt;
 use super::requests::AttemptRunIdentity;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 pub(super) async fn accept_completed_run(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
     run: &CodexRunSnapshot,

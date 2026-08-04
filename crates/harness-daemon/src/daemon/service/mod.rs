@@ -57,8 +57,8 @@ struct DaemonObserveRuntime {
     sender: broadcast::Sender<StreamEvent>,
     poll_interval: Duration,
     running_sessions: Arc<Mutex<BTreeMap<String, ObserveLoopRegistration>>>,
-    db: Arc<OnceLock<Arc<Mutex<super::db::DaemonDb>>>>,
-    async_db: Arc<OnceLock<Arc<super::db::AsyncDaemonDb>>>,
+    db: Arc<OnceLock<Arc<Mutex<crate::daemon::db_handle::DaemonDbOwnedHandle>>>>,
+    async_db: Arc<OnceLock<Arc<crate::daemon::db_handle::AsyncDaemonDbHandle>>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -96,7 +96,7 @@ static OBSERVE_RUNTIME: OnceLock<DaemonObserveRuntime> = OnceLock::new();
 pub(crate) static SHUTDOWN_SIGNAL: OnceLock<tokio_watch::Sender<bool>> = OnceLock::new();
 
 #[must_use]
-pub(crate) fn observe_async_db() -> Option<Arc<super::db::AsyncDaemonDb>> {
+pub(crate) fn observe_async_db() -> Option<Arc<crate::daemon::db_handle::AsyncDaemonDbHandle>> {
     OBSERVE_RUNTIME.get()?.async_db.get().cloned()
 }
 
@@ -113,8 +113,8 @@ pub(crate) fn observe_sender() -> Option<broadcast::Sender<StreamEvent>> {
 pub(crate) fn install_observe_runtime(
     sender: broadcast::Sender<StreamEvent>,
     poll_interval: Duration,
-    db: Arc<OnceLock<Arc<Mutex<super::db::DaemonDb>>>>,
-    async_db: Arc<OnceLock<Arc<super::db::AsyncDaemonDb>>>,
+    db: Arc<OnceLock<Arc<Mutex<crate::daemon::db_handle::DaemonDbOwnedHandle>>>>,
+    async_db: Arc<OnceLock<Arc<crate::daemon::db_handle::AsyncDaemonDbHandle>>>,
 ) {
     let broadcast_sender = sender.clone();
     if OBSERVE_RUNTIME

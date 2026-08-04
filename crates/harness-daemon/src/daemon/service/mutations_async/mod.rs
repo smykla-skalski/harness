@@ -32,7 +32,7 @@ pub(crate) use tasks::{
 };
 
 async fn resolved_session_for_mutation(
-    async_db: &super::db::AsyncDaemonDb,
+    async_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
     session_id: &str,
 ) -> Result<ResolvedSession, CliError> {
     async_db
@@ -42,7 +42,7 @@ async fn resolved_session_for_mutation(
 }
 
 async fn bump_session(
-    async_db: &super::db::AsyncDaemonDb,
+    async_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
     session_id: &str,
 ) -> Result<(), CliError> {
     async_db.bump_change(session_id).await?;
@@ -50,7 +50,7 @@ async fn bump_session(
 }
 
 async fn refresh_signal_index_for_resolved(
-    async_db: &super::db::AsyncDaemonDb,
+    async_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
     resolved: &ResolvedSession,
 ) -> Result<(), CliError> {
     let project = resolved.project.clone();
@@ -69,7 +69,7 @@ async fn refresh_signal_index_for_resolved(
 }
 
 async fn append_log(
-    async_db: &super::db::AsyncDaemonDb,
+    async_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
     session_id: &str,
     transition: SessionTransition,
     actor_id: &str,
@@ -85,7 +85,7 @@ async fn append_log(
 }
 
 async fn append_task_drop_effect_logs_async(
-    async_db: &super::db::AsyncDaemonDb,
+    async_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
     session_id: &str,
     actor_id: &str,
     effects: &[session_service::TaskDropEffect],
@@ -107,7 +107,7 @@ async fn append_task_drop_effect_logs_async(
 }
 
 async fn append_leave_signal_logs_async(
-    async_db: &super::db::AsyncDaemonDb,
+    async_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
     session_id: &str,
     actor_id: &str,
     signals: &[session_service::LeaveSignalRecord],
@@ -160,7 +160,7 @@ async fn try_wake_started_workers_async(
     effects: &[session_service::TaskDropEffect],
     session_id: &str,
     project_dir: &Path,
-    async_db: &super::db::AsyncDaemonDb,
+    async_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
     dispatch: WakeDispatch<'_>,
 ) {
     for effect in effects {
@@ -221,7 +221,7 @@ async fn wake_tui_async(
     record: &session_service::TaskStartSignalRecord,
     session_id: &str,
     project_dir: &Path,
-    async_db: &super::db::AsyncDaemonDb,
+    async_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
     managed_tui: ManagedTuiWake<'_>,
 ) {
     let coords = SignalCoords {
@@ -271,7 +271,7 @@ async fn wake_tui_async(
     reason = "task-drop persistence keeps ordered side effects explicit"
 )]
 async fn persist_task_signal_effects(
-    async_db: &super::db::AsyncDaemonDb,
+    async_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
     resolved: &ResolvedSession,
     session_id: &str,
     actor_id: &str,
@@ -305,7 +305,7 @@ async fn persist_task_signal_effects(
 }
 
 async fn persist_leave_signal_mutation(
-    async_db: &super::db::AsyncDaemonDb,
+    async_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
     resolved: &ResolvedSession,
     session_id: &str,
     actor_id: &str,

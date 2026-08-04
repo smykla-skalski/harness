@@ -132,7 +132,7 @@ async fn run_repository_case(tls: &TestTlsMaterial, case: &RepositoryCase) {
 
 async fn seed_repository_case(
     fixture: &AcceptanceFixture,
-    db: &crate::daemon::db::AsyncDaemonDb,
+    db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
     case: &RepositoryCase,
 ) -> String {
     let now = crate::workspace::utc_now();
@@ -386,8 +386,8 @@ fn assert_repository_source(
 }
 
 pub(super) async fn assert_accepted_without_claim(
-    controller_db: &crate::daemon::db::AsyncDaemonDb,
-    executor_db: &crate::daemon::db::AsyncDaemonDb,
+    controller_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
+    executor_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
     offer: &crate::task_board::remote_wire::wire::RemoteOfferRequest,
 ) {
     let controller = controller_db

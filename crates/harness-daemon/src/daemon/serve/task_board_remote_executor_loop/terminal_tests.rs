@@ -10,6 +10,7 @@ use crate::daemon::db::{
     TaskBoardRemoteMutationOutcome, accept_remote_executor, authorize_and_start_remote_executor,
     remote_executor_claim_request, remote_executor_fixture,
 };
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::daemon::protocol::CodexRunStatus;
 use crate::task_board::remote_wire::wire::{
@@ -70,6 +71,7 @@ async fn completed_review_persists_once_and_replays_after_restart() {
     let reopened = AsyncDaemonDb::connect(&database_path)
         .await
         .expect("reopen executor database");
+    let reopened = AsyncDaemonDbHandle(reopened);
     assert!(matches!(
         reopened
             .complete_task_board_remote_executor_terminal(&owner, &response, &artifacts)
@@ -253,7 +255,7 @@ fn review_result(
     }
 }
 
-async fn artifact_count(db: &AsyncDaemonDb, assignment_id: &str) -> i64 {
+async fn artifact_count(db: &AsyncDaemonDbHandle, assignment_id: &str) -> i64 {
     query_scalar("SELECT COUNT(*) FROM task_board_remote_artifacts WHERE assignment_id = ?1")
         .bind(assignment_id)
         .fetch_one(db.pool())

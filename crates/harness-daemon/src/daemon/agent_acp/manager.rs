@@ -1,3 +1,5 @@
+#[cfg(feature = "daemon-runtime")]
+use crate::daemon::db_handle::{AsyncDaemonDbHandle, DaemonDbOwnedHandle};
 use std::collections::{BTreeMap, BTreeSet};
 #[cfg(feature = "daemon-runtime")]
 use std::sync::OnceLock;
@@ -17,8 +19,6 @@ use super::permission_bridge::{AcpPermissionBatch, AcpPermissionDecision};
 use crate::agents::acp::catalog;
 #[cfg(all(test, feature = "daemon-runtime"))]
 use crate::agents::kind::DisconnectReason;
-#[cfg(feature = "daemon-runtime")]
-use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
 use crate::daemon::protocol::StreamEvent;
 use crate::daemon::sandboxed_from_env;
 #[cfg(feature = "daemon-runtime")]
@@ -91,7 +91,7 @@ impl AcpAgentManagerHandle {
     #[must_use]
     pub fn new(
         sender: broadcast::Sender<StreamEvent>,
-        db: Arc<OnceLock<Arc<Mutex<DaemonDb>>>>,
+        db: Arc<OnceLock<Arc<Mutex<DaemonDbOwnedHandle>>>>,
     ) -> Self {
         Self::new_with_async_db(sender, db, Arc::new(OnceLock::new()))
     }
@@ -100,8 +100,8 @@ impl AcpAgentManagerHandle {
     #[must_use]
     pub(crate) fn new_with_async_db(
         sender: broadcast::Sender<StreamEvent>,
-        db: Arc<OnceLock<Arc<Mutex<DaemonDb>>>>,
-        async_db: Arc<OnceLock<Arc<AsyncDaemonDb>>>,
+        db: Arc<OnceLock<Arc<Mutex<DaemonDbOwnedHandle>>>>,
+        async_db: Arc<OnceLock<Arc<AsyncDaemonDbHandle>>>,
     ) -> Self {
         Self::with_port(Arc::new(DaemonAcpManagerPort::new(sender, db, async_db)))
     }

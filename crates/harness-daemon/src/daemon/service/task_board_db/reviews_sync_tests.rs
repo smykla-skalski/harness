@@ -25,6 +25,7 @@ use super::{
     shared_review_request_clients_from_settings,
 };
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 const REVIEW_STACK_CHILD_ENV: &str = "HARNESS_TEST_SHARED_REVIEW_STACK_CHILD";
@@ -134,6 +135,7 @@ async fn backed_off_review_repository_does_not_block_another_repository() {
     let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
         .await
         .expect("database");
+    let db = AsyncDaemonDbHandle(db);
     let repositories = vec!["acme/broken".into(), "acme/widgets".into()];
     db.replace_task_board_orchestrator_settings(&TaskBoardOrchestratorSettings {
         github_inbox: TaskBoardGitHubInboxConfig {
@@ -184,6 +186,7 @@ async fn shared_review_ticket_records_intent_author_and_head() {
     let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
         .await
         .expect("database");
+    let db = AsyncDaemonDbHandle(db);
     let repositories = vec!["acme/widgets".into()];
     db.replace_task_board_orchestrator_settings(&TaskBoardOrchestratorSettings {
         github_inbox: TaskBoardGitHubInboxConfig {

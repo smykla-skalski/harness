@@ -40,22 +40,20 @@ pub(crate) use super::{
 pub(crate) use harness_daemon_snapshot as daemon_snapshot;
 
 pub(crate) mod activity_fold;
-pub(crate) mod activity_fold_cache;
-mod core_types;
-pub use core_types::{DaemonDb, SCHEMA_VERSION};
-pub(crate) use core_types::{
+pub(crate) use harness_daemon_db_core::activity_fold_cache;
+pub(crate) use harness_daemon_db_core::audit_event_retention;
+pub(crate) use harness_daemon_db_core::audit_event_retention_async;
+pub use harness_daemon_db_core::{DaemonDb, SCHEMA_VERSION};
+pub(crate) use harness_daemon_db_core::{
     LIVENESS_CANDIDATE_IDS_SQL, canonical_db_unavailable, db_error, i64_from_u64, u64_from_i64,
     usize_from_i64,
 };
 mod async_agent_turn_runs;
-pub(crate) mod audit_event_retention;
-pub(crate) mod audit_event_retention_async;
 pub(crate) use async_agent_turn_runs::{
     AgentTurnRunSnapshot, AgentTurnRunStatus, AsyncAgentTurnRunQueries,
 };
 mod async_agents;
 pub(crate) use async_agents::AsyncAgentResolutionQueries;
-mod async_bootstrap;
 mod async_change_tracking;
 pub(crate) use async_change_tracking::AsyncChangeTrackingQueries;
 mod async_conversation;
@@ -64,7 +62,6 @@ mod async_detail;
 pub(crate) use async_detail::AsyncSignalReadQueries;
 mod async_diagnostics;
 pub(crate) use async_diagnostics::AsyncDiagnosticsQueries;
-mod async_pool;
 mod async_reads;
 pub(crate) use async_reads::AsyncTimelineWindowQueries;
 mod async_resolved_session;
@@ -107,14 +104,11 @@ mod review_writes;
 pub(crate) use review_writes::{AsyncTaskReviewWrites, SyncTaskReviewWrites};
 mod runtime;
 pub use runtime::RuntimeSnapshotQueries;
-mod schema;
-mod schema_migrations;
 #[cfg(feature = "test-support")]
 pub mod schema_query_test_support;
-mod schema_sql;
 #[allow(dead_code)]
 pub(crate) mod task_board;
-mod task_board_sync_coordinator;
+pub(crate) use harness_daemon_db_core::TaskBoardSyncPermit;
 #[cfg(test)]
 pub(crate) use task_board::remote_assignment_terminal_handoff_tests::{
     detached_terminal_assignment, restore_parent_to_targetless_preparing,
@@ -175,7 +169,6 @@ pub(crate) use task_board::{
     ColorEdit, DisplayNameEdit, ProjectEdit, exact_active_remote_target,
     parent_points_to_assignment,
 };
-pub(crate) use task_board_sync_coordinator::TaskBoardSyncPermit;
 // `pub`, not `pub(crate)`: `harness-db-schema`'s own v43 controller-operation
 // migration test builds these trust-fence values directly to exercise the
 // paired lifecycle-trust columns the v43 migration adds.
@@ -195,7 +188,6 @@ pub use summaries::SessionSummaryQueries;
 mod summary_rows;
 mod task_row;
 mod task_writes;
-mod telemetry;
 pub(crate) mod timeline;
 mod timeline_store;
 mod writes;
@@ -203,7 +195,7 @@ pub use writes::SessionWriteQueries;
 pub(crate) mod prelude;
 
 #[cfg(test)]
-pub(crate) use async_bootstrap::all_migration_versions;
+pub(crate) use harness_daemon_db_core::all_migration_versions;
 // `pub`, not `pub(crate)`: `tests/integration_daemon.rs`'s task-board sync
 // scenarios link `harness` as an ordinary dependency and need this handle
 // directly, the same reason `daemon::state::test_support` is `pub` there.
@@ -213,7 +205,6 @@ pub use crate::daemon::remote_acme_queries::{
 };
 pub use crate::daemon::remote_identity_queries::RemoteIdentitySyncQueries;
 pub(crate) use crate::daemon::remote_pairing_queries::RemotePairingClaimCodeError;
-pub use async_pool::AsyncDaemonDb;
 #[allow(unused_imports)]
 use conversation::{
     DaemonDbConversation, clear_session_conversation_events,
@@ -221,14 +212,15 @@ use conversation::{
 };
 #[allow(unused_imports)]
 use diagnostics::import_daemon_events;
+pub use harness_daemon_db_core::AsyncDaemonDb;
+pub(crate) use harness_daemon_db_core::SchemaRepairHooks;
+#[cfg(test)]
+pub(crate) use harness_daemon_db_core::set_schema_init_hook;
+pub(crate) use harness_daemon_db_core::trace_async_db_operation;
 pub(crate) use harness_policy_graph_store::NewApprovalGrant;
 pub(crate) use runtime::ensure_shared_db;
-pub(crate) use schema::SchemaRepairHooks;
-#[cfg(test)]
-pub(crate) use schema::set_schema_init_hook;
 #[allow(unused_imports)]
 use signals::derive_effective_signal_status;
-pub(crate) use telemetry::{trace_async_db_operation, trace_sync_db_operation};
 #[allow(unused_imports)]
 use timeline::{stored_timeline_entry, stored_timeline_entry_from_row};
 #[allow(unused_imports)]

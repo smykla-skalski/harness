@@ -8,7 +8,6 @@
 //! The terminal transport has no such column and is covered by
 //! `agent_tui::tests::started_prompt`.
 
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::CodexRunStatus;
 use crate::task_board::AgentMode;
 use crate::task_board::render_triage_escalation_prompt;
@@ -17,10 +16,16 @@ use super::super::test_support::{applied_task, codex_snapshot, seed_session, tes
 use super::super::{codex_worker_request, managed_worker_id};
 use super::{review_launch, write_launch};
 use crate::daemon::db::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 /// Persist a run the way the controller does -- prompt carried from the
 /// request, result carried in the final message -- and read it back.
-async fn round_trip(db: &AsyncDaemonDb, run_id: &str, session_id: &str, prompt: &str) -> String {
+async fn round_trip(
+    db: &AsyncDaemonDbHandle,
+    run_id: &str,
+    session_id: &str,
+    prompt: &str,
+) -> String {
     let mut snapshot = codex_snapshot(CodexRunStatus::Completed, session_id);
     snapshot.run_id = run_id.to_string();
     snapshot.prompt = prompt.to_string();

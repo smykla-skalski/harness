@@ -2,7 +2,6 @@ use std::future::Future;
 
 use tokio::task::JoinSet;
 
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{TaskBoardSyncRequest, TaskBoardSyncResponse};
 use crate::github_api::refresh_read_generation;
 use crate::task_board::external::{
@@ -21,6 +20,9 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 use super::TaskBoardSyncRunContext;
 use super::provider_sync_context_store::ProviderSyncRunStore;
 use super::sync_audit::{SyncExecutionMetrics, TaskBoardSyncAuditTrigger};
+#[cfg(test)]
+use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 /// How an assembly step gives up. The two kinds must stay apart: `Failed` is
 /// the sync erroring out, while `Blocked` carries a terminal batch the caller
@@ -31,7 +33,7 @@ enum SyncAbort {
 }
 
 pub(super) async fn execute_isolated(
-    db: AsyncDaemonDb,
+    db: AsyncDaemonDbHandle,
     request: TaskBoardSyncRequest,
     context: TaskBoardSyncRunContext,
 ) -> (
@@ -75,7 +77,7 @@ impl SyncAbort {
     reason = "sequential sync assembly whose every step aborts either hard or as a terminal batch"
 )]
 pub(super) async fn execute(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &TaskBoardSyncRequest,
     context: &TaskBoardSyncRunContext,
     metrics: &mut SyncExecutionMetrics,
@@ -180,7 +182,7 @@ pub(super) async fn execute(
 
 /// Pending provider create follow-ups block a sync before any provider I/O.
 async fn guard_pending_follow_ups(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &TaskBoardSyncRequest,
     options: ExternalSyncOptions,
 ) -> Result<(), SyncAbort> {
@@ -428,11 +430,13 @@ mod tests {
         );
     }
 
-    async fn config_failure_fixture() -> (tempfile::TempDir, AsyncDaemonDb, TaskBoardSyncRequest) {
+    async fn config_failure_fixture()
+    -> (tempfile::TempDir, AsyncDaemonDbHandle, TaskBoardSyncRequest) {
         let dir = tempdir().expect("tempdir");
         let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
             .await
             .expect("database");
+        let db = AsyncDaemonDbHandle(db);
         let mut item = TaskBoardItem::new(
             "task-config-recovery".into(),
             "Create title".into(),
@@ -489,7 +493,7 @@ mod tests {
     }
 
     async fn follow_up_events(
-        db: &AsyncDaemonDb,
+        db: &AsyncDaemonDbHandle,
     ) -> Vec<crate::daemon::protocol::HarnessMonitorAuditEvent> {
         db.load_audit_events(&HarnessMonitorAuditEventsRequest {
             action_keys: vec!["task_board.external_create_follow_up".into()],

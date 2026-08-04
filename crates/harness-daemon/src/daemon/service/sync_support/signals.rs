@@ -1,8 +1,6 @@
-use crate::daemon::db::DaemonDb;
-
-use super::context::session_not_found;
-use super::{AckResult, CliError, Path, snapshot};
+use super::{AckResult, CliError, Path, session_not_found, snapshot};
 use crate::daemon::db::prelude::*;
+use crate::daemon::db_handle::DaemonDbOwnedHandle;
 
 pub(crate) fn record_signal_ack(
     session_id: &str,
@@ -10,7 +8,7 @@ pub(crate) fn record_signal_ack(
     signal_id: &str,
     result: AckResult,
     project_dir: &Path,
-    db: Option<&DaemonDb>,
+    db: Option<&DaemonDbOwnedHandle>,
 ) -> Result<(), CliError> {
     harness_daemon_session_service::record_signal_ack(
         session_id,
@@ -24,12 +22,15 @@ pub(crate) fn record_signal_ack(
 
 pub(crate) fn reconcile_expired_pending_signals_for_db(
     session_id: &str,
-    db: &DaemonDb,
+    db: &DaemonDbOwnedHandle,
 ) -> Result<(), CliError> {
     harness_daemon_session_service::reconcile_expired_pending_signals(session_id, db)
 }
 
-pub(crate) fn refresh_signal_index_for_db(db: &DaemonDb, session_id: &str) -> Result<(), CliError> {
+pub(crate) fn refresh_signal_index_for_db(
+    db: &DaemonDbOwnedHandle,
+    session_id: &str,
+) -> Result<(), CliError> {
     let resolved = db
         .resolve_session(session_id)?
         .ok_or_else(|| session_not_found(session_id))?;

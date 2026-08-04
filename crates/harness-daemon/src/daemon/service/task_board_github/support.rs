@@ -2,8 +2,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use uuid::Uuid;
 
-use crate::daemon::db::AsyncDaemonDb;
-use crate::daemon::service::session_detail_core_async;
+use super::super::session_detail_core_async;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::task_board::github::{
     GitHubAutomation, GitHubAutomationClient, GitHubAutomationSettings, GitHubCreatePullRequest,
     GitHubProjectConfig, GitHubPullRequestHandle,
@@ -126,7 +126,7 @@ pub(super) fn update_pull_request_metadata(
 
 pub(super) async fn load_session_worktrees_async(
     items: &[TaskBoardItem],
-    async_db: &AsyncDaemonDb,
+    async_db: &AsyncDaemonDbHandle,
 ) -> Result<BTreeMap<String, String>, CliError> {
     let mut worktrees = BTreeMap::new();
     for session_id in items.iter().filter_map(|item| item.session_id.as_deref()) {

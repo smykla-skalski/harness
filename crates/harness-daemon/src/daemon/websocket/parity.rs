@@ -6,7 +6,8 @@ use serde_json::json;
 
 use crate::daemon::agent_acp::{AcpAgentStartRequest, AcpPermissionDecision};
 use crate::daemon::bridge::reconfigure_bridge_async;
-use crate::daemon::db::{DaemonDb, ensure_shared_db};
+use crate::daemon::db::ensure_shared_db;
+use crate::daemon::db_handle::DaemonDbOwnedHandle;
 use crate::daemon::http::{
     DaemonHttpState, adopt_session, adoption_error_status_and_body, ensure_acp_agent,
     ensure_codex_agent, record_adopt_in_db, run_acp_agent_blocking,
@@ -478,19 +479,23 @@ async fn broadcast_session_snapshot(
     Ok(())
 }
 
-fn lock_db(db: &Arc<Mutex<DaemonDb>>) -> Result<MutexGuard<'_, DaemonDb>, CliError> {
+fn lock_db(
+    db: &Arc<Mutex<DaemonDbOwnedHandle>>,
+) -> Result<MutexGuard<'_, DaemonDbOwnedHandle>, CliError> {
     db.lock().map_err(|error| {
         CliErrorKind::workflow_io(format!("daemon database lock poisoned: {error}")).into()
     })
 }
 
-fn sync_db_guard(state: &DaemonHttpState) -> Result<Option<MutexGuard<'_, DaemonDb>>, CliError> {
+fn sync_db_guard(
+    state: &DaemonHttpState,
+) -> Result<Option<MutexGuard<'_, DaemonDbOwnedHandle>>, CliError> {
     state.db.get().map(lock_db).transpose()
 }
 
 fn with_shared_db<T>(
     state: &DaemonHttpState,
-    action: impl FnOnce(&DaemonDb) -> Result<T, CliError>,
+    action: impl FnOnce(&DaemonDbOwnedHandle) -> Result<T, CliError>,
 ) -> Result<T, CliError> {
     let db = ensure_shared_db(&state.db)?;
     let db_guard = lock_db(&db)?;

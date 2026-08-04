@@ -12,7 +12,7 @@ use tokio::task::spawn_blocking;
 
 use super::source_bundle::{cleanup_repository_snapshot_import, materialize_repository_snapshot};
 use super::{RemoteWorkerIdentity, concurrent, invalid_transition};
-use crate::daemon::db::{AsyncDaemonDb, TaskBoardRemoteAssignmentRecord, db_error};
+use crate::daemon::db::{TaskBoardRemoteAssignmentRecord, db_error};
 use crate::daemon::protocol::SessionStartRequest;
 use crate::daemon::service::start_session_direct_async;
 use crate::git::GitError;
@@ -26,9 +26,10 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::source_bundle::apply_prior_phase_bundle;
 use crate::daemon::db::AsyncSessionSummaryQueries;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 pub(super) async fn prepare_remote_workspace(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     record: &TaskBoardRemoteAssignmentRecord,
     offer: &RemoteOfferRequest,
     identity: &RemoteWorkerIdentity,
@@ -68,7 +69,7 @@ pub(super) async fn prepare_remote_workspace(
     reason = "three-way session resolve whose branches share the snapshot-import cleanup contract"
 )]
 pub(super) async fn ensure_remote_session(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     record: &TaskBoardRemoteAssignmentRecord,
     identity: &RemoteWorkerIdentity,
     revision: &str,
@@ -115,7 +116,7 @@ pub(super) async fn ensure_remote_session(
 /// cleaning up the snapshot import, exactly as the inline path did: the caller
 /// only reclaims it once a session exists to own the checkout.
 async fn provision_remote_session(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     record: &TaskBoardRemoteAssignmentRecord,
     identity: &RemoteWorkerIdentity,
     origin: &Path,
@@ -208,7 +209,7 @@ fn session_creation_barriers() -> &'static Mutex<HashMap<String, Arc<RemoteSessi
 }
 
 pub(super) async fn executor_settings_match(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     record: &TaskBoardRemoteAssignmentRecord,
     offer: &RemoteOfferRequest,
 ) -> Result<bool, CliError> {

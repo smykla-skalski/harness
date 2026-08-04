@@ -1,7 +1,7 @@
 use std::future::Future;
 
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::task_board::TaskBoardResolvedReviewer;
 use crate::task_board::{
     AgentMode, DispatchAppliedTask, PlanApprovalGate, TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION,
@@ -22,7 +22,7 @@ use tokio::task::{spawn, spawn_blocking};
 const SUPPORTED_WRITE_RUNTIMES: [&str; 1] = ["codex"];
 
 pub(super) async fn prepare_write_workflow_launch(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     item_id: &str,
     session_id: &str,
     task_id: &str,
@@ -140,7 +140,7 @@ where
 }
 
 pub(crate) async fn validate_write_workflow_launch(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     applied: &DispatchAppliedTask,
 ) -> Result<(), CliError> {
     let Some(launch) = applied.write_workflow.as_ref() else {

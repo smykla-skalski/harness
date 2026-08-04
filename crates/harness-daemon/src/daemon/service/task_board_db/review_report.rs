@@ -1,4 +1,3 @@
-use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::{
     TaskBoardAiReviewReportResponse, TaskBoardAiReviewUnavailableExecution, TaskBoardAttemptState,
     TaskBoardExecutionAttemptRecord, TaskBoardExecutionState, TaskBoardWorkflowExecutionRecord,
@@ -10,9 +9,10 @@ use harness_task_board_codex_requests::attempt_profile;
 use super::TaskBoardGetItemRequest;
 use crate::daemon::db::prelude::*;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 pub(crate) async fn get_task_board_ai_review_report_db(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &TaskBoardGetItemRequest,
 ) -> Result<TaskBoardAiReviewReportResponse, CliError> {
     let item = db.task_board_item(&request.id).await?;
@@ -52,7 +52,7 @@ pub(crate) async fn get_task_board_ai_review_report_db(
 }
 
 async fn running_review_response(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
 ) -> Result<TaskBoardAiReviewReportResponse, CliError> {
@@ -69,7 +69,7 @@ async fn running_review_response(
 }
 
 async fn terminal_review_response(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
 ) -> Result<TaskBoardAiReviewReportResponse, CliError> {
     let provenance = review_runtime_provenance(db, execution).await?;
@@ -101,7 +101,7 @@ struct ReviewRuntimeProvenance {
 }
 
 async fn review_runtime_provenance(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
 ) -> Result<ReviewRuntimeProvenance, CliError> {
     let attempt = latest_review_attempt(execution)?;

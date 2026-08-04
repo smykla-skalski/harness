@@ -1,4 +1,3 @@
-use crate::daemon::db::AsyncDaemonDb;
 #[cfg(test)]
 use crate::daemon::protocol::ManagedAgentSnapshot;
 use crate::daemon::protocol::{
@@ -21,6 +20,7 @@ use tokio::task::spawn_blocking;
 
 use super::{DaemonHttpState, require_async_db};
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 mod automation_run;
 mod item_ops;
@@ -158,7 +158,7 @@ pub(crate) async fn run_once_with_trigger(
 async fn handle_dispatch_result(
     state: &DaemonHttpState,
     result: Result<TaskBoardDispatchResponse, CliError>,
-    async_db: &AsyncDaemonDb,
+    async_db: &AsyncDaemonDbHandle,
 ) -> Result<TaskBoardDispatchResponse, CliError> {
     let mut response = result?;
     if !response.applied.is_empty() {
@@ -178,7 +178,7 @@ async fn handle_dispatch_result(
 async fn handle_run_once_result(
     state: &DaemonHttpState,
     result: Result<TaskBoardOrchestratorRunOnceResponse, CliError>,
-    async_db: &AsyncDaemonDb,
+    async_db: &AsyncDaemonDbHandle,
 ) -> Result<TaskBoardOrchestratorRunOnceResponse, CliError> {
     let mut status = result?;
     if status.last_run_applied_count() > 0 {
@@ -245,7 +245,10 @@ fn classify_worker_outcomes(
     (kept, failures)
 }
 
-async fn broadcast_sessions_updated(state: &DaemonHttpState, async_db: Option<&AsyncDaemonDb>) {
+async fn broadcast_sessions_updated(
+    state: &DaemonHttpState,
+    async_db: Option<&AsyncDaemonDbHandle>,
+) {
     if let Some(async_db) = async_db {
         service::broadcast_sessions_updated_async(&state.sender, Some(async_db)).await;
         return;

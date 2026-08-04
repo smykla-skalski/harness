@@ -12,9 +12,8 @@ use super::controller::{
     lifecycle_response_may_be_lost, renewal_response_may_be_lost, require_io_authority,
 };
 use crate::daemon::db::task_board::prelude::*;
-use crate::daemon::db::{
-    AsyncDaemonDb, TaskBoardRemoteMutationOutcome, TaskBoardRemoteOperationKind,
-};
+use crate::daemon::db::{TaskBoardRemoteMutationOutcome, TaskBoardRemoteOperationKind};
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::task_board::TaskBoardRemoteAssignmentState;
 use crate::task_board::remote_wire::wire::{
     RemoteCancelRequest, RemoteCancelResponse, RemoteLeaseRenewRequest, RemoteLeaseRenewResponse,
@@ -26,7 +25,7 @@ impl RemoteExecutionControllerClient {
     /// offer has not reached the executor yet.
     pub(super) async fn replay_existing_offer(
         &self,
-        db: &AsyncDaemonDb,
+        db: &AsyncDaemonDbHandle,
         request: &RemoteOfferRequest,
     ) -> Result<
         Option<(RemoteOfferResponse, TaskBoardRemoteMutationOutcome)>,
@@ -47,7 +46,7 @@ impl RemoteExecutionControllerClient {
 
     pub(super) async fn authorize_offer(
         &self,
-        db: &AsyncDaemonDb,
+        db: &AsyncDaemonDbHandle,
         request: &RemoteOfferRequest,
     ) -> Result<(), RemoteExecutionControllerError> {
         let trust = self
@@ -74,7 +73,7 @@ impl RemoteExecutionControllerClient {
     /// in a state that accepts lease traffic.
     pub(super) async fn preflight_active_lease(
         &self,
-        db: &AsyncDaemonDb,
+        db: &AsyncDaemonDbHandle,
         request: &RemoteLeaseRenewRequest,
         inactive_message: &'static str,
     ) -> Result<(), RemoteExecutionControllerError> {
@@ -101,7 +100,7 @@ impl RemoteExecutionControllerClient {
 
     pub(super) async fn authorize_renew(
         &self,
-        db: &AsyncDaemonDb,
+        db: &AsyncDaemonDbHandle,
         request: &RemoteLeaseRenewRequest,
     ) -> Result<(), RemoteExecutionControllerError> {
         let trust = self
@@ -126,7 +125,7 @@ impl RemoteExecutionControllerClient {
 
     pub(super) async fn authorize_cancel(
         &self,
-        db: &AsyncDaemonDb,
+        db: &AsyncDaemonDbHandle,
         request: &RemoteCancelRequest,
     ) -> Result<(), RemoteExecutionControllerError> {
         let trust = self

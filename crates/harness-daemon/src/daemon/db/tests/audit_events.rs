@@ -204,12 +204,17 @@ async fn legacy_daemon_events_diagnostics_still_work_after_audit_schema() {
     assert_eq!(legacy_events[0].message, "legacy warning");
 }
 
-async fn open_async_db() -> (tempfile::TempDir, AsyncDaemonDb) {
+async fn open_async_db() -> (
+    tempfile::TempDir,
+    crate::daemon::db_handle::AsyncDaemonDbHandle,
+) {
     let tmp = tempdir().expect("tempdir");
     let db_path = tmp.path().join("harness.db");
-    let db = AsyncDaemonDb::connect(&db_path)
-        .await
-        .expect("open async daemon db");
+    let db = crate::daemon::db_handle::AsyncDaemonDbHandle(
+        AsyncDaemonDb::connect(&db_path)
+            .await
+            .expect("open async daemon db"),
+    );
     (tmp, db)
 }
 

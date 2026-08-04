@@ -7,12 +7,15 @@ use tokio::sync::watch;
 use tokio::task::JoinHandle;
 use tokio::time::{MissedTickBehavior, interval};
 
-use crate::daemon::db::{AsyncDaemonDb, TaskBoardAutomationRunFence, TaskBoardAutomationRunLease};
+use crate::daemon::db::{TaskBoardAutomationRunFence, TaskBoardAutomationRunLease};
 use crate::task_board::TaskBoardAutomationRunOutcome;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::task_board_db::{TaskBoardSyncCoordinatorFence, TaskBoardSyncCoordinatorFenceDecision};
+#[cfg(test)]
+use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(10);
 
@@ -24,7 +27,7 @@ enum LeaseHealth {
 }
 
 pub(crate) struct TaskBoardOrchestratorRunGuard {
-    db: AsyncDaemonDb,
+    db: AsyncDaemonDbHandle,
     lease: TaskBoardAutomationRunLease,
     shutdown_tx: watch::Sender<bool>,
     health_rx: watch::Receiver<LeaseHealth>,
@@ -32,12 +35,12 @@ pub(crate) struct TaskBoardOrchestratorRunGuard {
 }
 
 impl TaskBoardOrchestratorRunGuard {
-    pub(crate) fn start(db: &AsyncDaemonDb, lease: TaskBoardAutomationRunLease) -> Self {
+    pub(crate) fn start(db: &AsyncDaemonDbHandle, lease: TaskBoardAutomationRunLease) -> Self {
         Self::start_with_heartbeat_interval(db, lease, HEARTBEAT_INTERVAL)
     }
 
     fn start_with_heartbeat_interval(
-        db: &AsyncDaemonDb,
+        db: &AsyncDaemonDbHandle,
         lease: TaskBoardAutomationRunLease,
         heartbeat_interval: Duration,
     ) -> Self {
@@ -131,7 +134,7 @@ impl Drop for TaskBoardOrchestratorRunGuard {
 }
 
 struct TaskBoardRunFenceAdapter {
-    db: AsyncDaemonDb,
+    db: AsyncDaemonDbHandle,
     lease: TaskBoardAutomationRunLease,
     health_rx: watch::Receiver<LeaseHealth>,
 }
@@ -144,7 +147,7 @@ impl TaskBoardSyncCoordinatorFence for TaskBoardRunFenceAdapter {
 }
 
 async fn check_fence(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     lease: &TaskBoardAutomationRunLease,
     health_rx: &watch::Receiver<LeaseHealth>,
 ) -> Result<TaskBoardSyncCoordinatorFenceDecision, CliError> {
@@ -167,7 +170,7 @@ async fn check_fence(
     reason = "tokio::select! shutdown/tick loop is clearer as its two explicit branches"
 )]
 async fn run_heartbeat(
-    db: AsyncDaemonDb,
+    db: AsyncDaemonDbHandle,
     lease: TaskBoardAutomationRunLease,
     mut shutdown_rx: watch::Receiver<bool>,
     health_tx: watch::Sender<LeaseHealth>,
@@ -223,13 +226,13 @@ mod tests {
         TaskBoardAutomationDesiredMode, TaskBoardAutomationRunTrigger, TaskBoardAutomationScope,
     };
 
-    async fn database() -> AsyncDaemonDb {
+    async fn database() -> AsyncDaemonDbHandle {
         let temp = tempfile::tempdir().expect("temp dir");
         let path = temp.keep().join("harness.db");
-        AsyncDaemonDb::connect(&path).await.expect("open database")
+        AsyncDaemonDbHandle(AsyncDaemonDb::connect(&path).await.expect("open database"))
     }
 
-    async fn wait_for_lease_renewal(db: &AsyncDaemonDb, shortened_expiry: DateTime<Utc>) {
+    async fn wait_for_lease_renewal(db: &AsyncDaemonDbHandle, shortened_expiry: DateTime<Utc>) {
         tokio::time::timeout(Duration::from_secs(1), async {
             loop {
                 let row = query_as::<_, (String,)>(

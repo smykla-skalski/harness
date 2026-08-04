@@ -9,8 +9,8 @@ use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::protocol::{http_paths, ws_methods};
 use crate::task_board::planning::{approve_plan, submit_plan};
 use crate::task_board::{TaskBoardItem, TaskBoardStatus};
@@ -356,7 +356,7 @@ pub(super) async fn save_simulate_and_promote_ws(
     .await
 }
 
-pub(super) async fn reset_policy_workspace(db: &AsyncDaemonDb) {
+pub(super) async fn reset_policy_workspace(db: &AsyncDaemonDbHandle) {
     query("DELETE FROM policy_workspace")
         .execute(db.pool())
         .await

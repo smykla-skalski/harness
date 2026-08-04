@@ -6,10 +6,9 @@ use std::time::Duration;
 use tokio::runtime::Handle;
 use tokio::sync::broadcast;
 
-use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
-use crate::daemon::protocol::StreamEvent;
-
 use super::process::{AgentTuiInputWorker, AgentTuiProcess};
+use crate::daemon::db_handle::{AsyncDaemonDbHandle, DaemonDbOwnedHandle};
+use crate::daemon::protocol::StreamEvent;
 
 #[derive(Clone)]
 pub(crate) struct ActiveAgentTui {
@@ -43,8 +42,8 @@ pub struct AgentTuiManagerHandle {
 
 pub(crate) struct AgentTuiManagerState {
     pub(crate) sender: broadcast::Sender<StreamEvent>,
-    pub(crate) db: Arc<OnceLock<Arc<Mutex<DaemonDb>>>>,
-    pub(crate) async_db: Arc<OnceLock<Arc<AsyncDaemonDb>>>,
+    pub(crate) db: Arc<OnceLock<Arc<Mutex<DaemonDbOwnedHandle>>>>,
+    pub(crate) async_db: Arc<OnceLock<Arc<AsyncDaemonDbHandle>>>,
     pub(crate) runtime: Option<Handle>,
     pub(crate) active: Mutex<BTreeMap<String, ActiveAgentTui>>,
     pub(crate) sandboxed: bool,
@@ -60,7 +59,7 @@ impl AgentTuiManagerHandle {
     #[must_use]
     pub fn new(
         sender: broadcast::Sender<StreamEvent>,
-        db: Arc<OnceLock<Arc<Mutex<DaemonDb>>>>,
+        db: Arc<OnceLock<Arc<Mutex<DaemonDbOwnedHandle>>>>,
         sandboxed: bool,
     ) -> Self {
         Self::new_with_async_db(sender, db, Arc::new(OnceLock::new()), sandboxed)
@@ -69,8 +68,8 @@ impl AgentTuiManagerHandle {
     #[must_use]
     pub(crate) fn new_with_async_db(
         sender: broadcast::Sender<StreamEvent>,
-        db: Arc<OnceLock<Arc<Mutex<DaemonDb>>>>,
-        async_db: Arc<OnceLock<Arc<AsyncDaemonDb>>>,
+        db: Arc<OnceLock<Arc<Mutex<DaemonDbOwnedHandle>>>>,
+        async_db: Arc<OnceLock<Arc<AsyncDaemonDbHandle>>>,
         sandboxed: bool,
     ) -> Self {
         Self {

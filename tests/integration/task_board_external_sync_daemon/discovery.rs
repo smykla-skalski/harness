@@ -8,6 +8,7 @@ use tempfile::tempdir;
 use std::collections::BTreeSet;
 
 use harness::daemon::db::{AsyncDaemonDb, AsyncDaemonDbConnect};
+use harness::daemon::db_handle::AsyncDaemonDbHandle;
 use harness::task_board::external::{
     ExternalSyncClient, ExternalSyncOptions, TaskBoardSyncStore, sync_external_tasks,
 };
@@ -34,7 +35,7 @@ fn imported_item_ids(operations: &[ExternalSyncOperation]) -> Vec<String> {
 }
 
 async fn imported_items(
-    board: &AsyncDaemonDb,
+    board: &AsyncDaemonDbHandle,
     operations: &[ExternalSyncOperation],
 ) -> Vec<TaskBoardItem> {
     let mut items = Vec::new();
@@ -82,6 +83,7 @@ async fn dependency_and_review_pull_requests_import_once_with_identity() {
     let board = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
         .await
         .expect("database");
+    let board = AsyncDaemonDbHandle(board);
     let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(FakeSyncClient::new(
         ExternalProvider::GitHub,
         vec![
@@ -143,6 +145,7 @@ async fn combined_intent_folds_dependency_and_review_into_one_ticket() {
     let board = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
         .await
         .expect("database");
+    let board = AsyncDaemonDbHandle(board);
     // A ticket already discovered as a dependency update becomes a review
     // request too. The pull must reconcile onto the one ticket, union the
     // intents, and refresh its live provider head without replacing the
@@ -196,6 +199,7 @@ async fn authoritative_complete_pull_closes_an_omitted_review_ticket() {
     let board = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
         .await
         .expect("database");
+    let board = AsyncDaemonDbHandle(board);
     board
         .create_item(github_review_request_item(
             "task-review-30",
@@ -232,6 +236,7 @@ async fn non_authoritative_pull_preserves_an_omitted_open_review_ticket() {
     let board = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
         .await
         .expect("database");
+    let board = AsyncDaemonDbHandle(board);
     board
         .create_item(github_review_request_item(
             "task-review-31",

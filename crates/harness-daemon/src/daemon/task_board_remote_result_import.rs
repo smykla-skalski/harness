@@ -11,9 +11,10 @@ use tokio::task::spawn_blocking;
 
 use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{
-    AsyncDaemonDb, TaskBoardRemoteResultImportRecord, TaskBoardRemoteResultImportRequest,
+    TaskBoardRemoteResultImportRecord, TaskBoardRemoteResultImportRequest,
     TaskBoardRemoteResultImportState, db_error,
 };
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::git::bundle::{GitBundleImportEvidence, GitBundleImportPlan, GitBundleWorktreeState};
 use crate::git::{GitError, GitResult};
 use crate::task_board::TaskBoardWorkflowExecutionCas;
@@ -29,7 +30,7 @@ pub(crate) use orchestration::import_and_adopt_task_board_remote_implementation_
     reason = "flat guard chain over prior-record and import state; each guard has one recovery"
 )]
 pub(crate) async fn import_task_board_remote_implementation_result(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     expected: &TaskBoardWorkflowExecutionCas,
     request: &TaskBoardRemoteResultImportRequest,
 ) -> Result<TaskBoardRemoteResultImportRecord, CliError> {
@@ -112,7 +113,7 @@ pub(crate) async fn import_task_board_remote_implementation_result(
 }
 
 pub(crate) async fn cleanup_task_board_remote_result_import(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     assignment_id: &str,
     fencing_epoch: u64,
 ) -> Result<(), CliError> {
@@ -153,7 +154,7 @@ fn apply_bundle(plan: &GitBundleImportPlan, bundle: &[u8]) -> GitResult<GitBundl
 }
 
 async fn verify_applied_import(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &TaskBoardRemoteResultImportRequest,
     record: &TaskBoardRemoteResultImportRecord,
     plan: GitBundleImportPlan,
@@ -182,7 +183,7 @@ async fn verify_applied_import(
 }
 
 async fn settle_git_failure(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &TaskBoardRemoteResultImportRequest,
     record: &TaskBoardRemoteResultImportRecord,
     plan: GitBundleImportPlan,
@@ -224,7 +225,7 @@ async fn settle_git_failure(
 /// the same plain git error when it does not hold, which is why no caller needs
 /// to screen for it first.
 async fn recover_plan_error(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &TaskBoardRemoteResultImportRequest,
     existing: Option<&TaskBoardRemoteResultImportRecord>,
     error: GitError,
@@ -236,7 +237,7 @@ async fn recover_plan_error(
 }
 
 async fn mark_or_retry(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &TaskBoardRemoteResultImportRequest,
     record: &TaskBoardRemoteResultImportRecord,
     error: GitError,
@@ -260,7 +261,7 @@ async fn mark_or_retry(
 }
 
 async fn mark_verification_failure(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &TaskBoardRemoteResultImportRequest,
     record: &TaskBoardRemoteResultImportRecord,
     error: CliError,

@@ -7,6 +7,7 @@ use crate::daemon::protocol::{
 };
 
 use super::{AsyncDaemonDb, CliError, db_error};
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 #[allow(dead_code)]
 pub(in crate::daemon::db) const UPSERT_AUDIT_EVENT_SQL: &str = "
@@ -85,9 +86,9 @@ async fn write_audit_event(
 // The only place `AsyncDaemonDb` is named as the recorder's storage
 // contract - keeping it here, next to the concrete type, means the
 // recorder itself never has to import `db`.
-impl AuditEventStore for AsyncDaemonDb {
+impl AuditEventStore for AsyncDaemonDbHandle {
     async fn upsert_audit_event(&self, event: &HarnessMonitorAuditEvent) -> Result<(), CliError> {
-        write_audit_event(self, UPSERT_AUDIT_EVENT_SQL, event, "upsert")
+        write_audit_event(&self.0, UPSERT_AUDIT_EVENT_SQL, event, "upsert")
             .await
             .map(|_| ())
     }
@@ -96,7 +97,7 @@ impl AuditEventStore for AsyncDaemonDb {
         &self,
         event: &HarnessMonitorAuditEvent,
     ) -> Result<bool, CliError> {
-        write_audit_event(self, INSERT_AUDIT_EVENT_IF_ABSENT_SQL, event, "insert")
+        write_audit_event(&self.0, INSERT_AUDIT_EVENT_IF_ABSENT_SQL, event, "insert")
             .await
             .map(|rows| rows == 1)
     }

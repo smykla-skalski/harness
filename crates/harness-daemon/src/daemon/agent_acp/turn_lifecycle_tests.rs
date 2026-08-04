@@ -16,6 +16,7 @@ use crate::session::types::AgentStatus;
 use harness_kernel::errors::CliError;
 
 use super::{OpenRouterAgentTurnRuntime, OpenRouterTurnManager};
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 pub(super) const HEAD: &str = "0123456789abcdef0123456789abcdef01234567";
@@ -352,11 +353,12 @@ async fn unknown_turn_fails_without_reaching_the_manager() {
     assert_eq!(error.code(), "KSRCLI090");
 }
 
-pub(super) async fn open_store() -> (tempfile::TempDir, Arc<AsyncDaemonDb>) {
+pub(super) async fn open_store() -> (tempfile::TempDir, Arc<AsyncDaemonDbHandle>) {
     let dir = tempfile::tempdir().expect("tempdir");
     let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
         .await
         .expect("open async db");
+    let db = AsyncDaemonDbHandle(db);
     (dir, Arc::new(db))
 }
 

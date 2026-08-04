@@ -1,6 +1,7 @@
 use clap::Parser;
 
 use harness_daemon::daemon::db::{DaemonDb, DaemonDbOpen};
+use harness_daemon::daemon::db_handle::DaemonDbOwnedHandle;
 use harness_remote_trust::remote_pairing::RemotePairingCode;
 
 use super::super::{DaemonRemoteCommand, DaemonRemotePairCommand};
@@ -13,7 +14,7 @@ struct DaemonRemoteCommandTestHarness {
 
 #[test]
 fn daemon_remote_pair_create_fails_closed_without_remote_tls_identity() {
-    let db = DaemonDb::open_in_memory().expect("open db");
+    let db = DaemonDbOwnedHandle(DaemonDb::open_in_memory().expect("open db"));
     let parsed = DaemonRemoteCommandTestHarness::try_parse_from(["test", "pair", "create"])
         .unwrap()
         .command;

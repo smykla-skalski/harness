@@ -3,7 +3,7 @@ use rusqlite::Connection;
 use super::CliError;
 
 const PAIR_MANAGE_BACKFILL_SQL: &str = include_str!(
-    "../../harness-daemon/src/daemon/db/migrations/0054_daemon_v55_pair_manage_backfill.sql"
+    "../../harness-daemon-db-core/src/migrations/0054_daemon_v55_pair_manage_backfill.sql"
 );
 
 /// # Errors

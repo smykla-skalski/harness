@@ -3,8 +3,9 @@ use super::{
     DaemonManifest, DaemonStatusReport, HealthResponse, LogLevelResponse, SHUTDOWN_SIGNAL,
     SetLogLevelRequest, StreamEvent, bridge, broadcast, index, launchd, state, utc_now,
 };
+use crate::daemon::db::DaemonDbDiagnostics;
 use crate::daemon::db::prelude::*;
-use crate::daemon::db::{DaemonDb, DaemonDbDiagnostics};
+use crate::daemon::db_handle::DaemonDbOwnedHandle;
 use crate::daemon::launchd::LaunchAgentStatus;
 use crate::daemon::protocol::GitHubApiDiagnostics;
 use crate::github_api::GitHubProtectedClient;
@@ -20,6 +21,7 @@ use tokio::task::{JoinError, spawn_blocking};
 pub fn status_report() -> Result<DaemonStatusReport, CliError> {
     let db_path = state::daemon_root().join("harness.db");
     let db = super::db::DaemonDb::open(&db_path)?;
+    let db = DaemonDbOwnedHandle(db);
     let (project_count, worktree_count, session_count) = db.health_counts()?;
 
     Ok(DaemonStatusReport {
@@ -38,7 +40,7 @@ pub fn status_report() -> Result<DaemonStatusReport, CliError> {
 /// Returns [`CliError`] on discovery failures.
 pub fn health_response(
     manifest: &DaemonManifest,
-    db: Option<&super::db::DaemonDb>,
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
 ) -> Result<HealthResponse, CliError> {
     let (project_count, worktree_count, session_count) = if let Some(db) = db {
         db.health_counts()?
@@ -77,7 +79,7 @@ fn reported_identity_fields(identity: Option<state::DaemonIdentity>) -> (String,
 /// Returns [`CliError`] on database failures.
 pub(crate) async fn health_response_async(
     manifest: &DaemonManifest,
-    async_db: Option<&super::db::AsyncDaemonDb>,
+    async_db: Option<&crate::daemon::db_handle::AsyncDaemonDbHandle>,
 ) -> Result<HealthResponse, CliError> {
     let async_db = async_db.ok_or_else(|| {
         CliError::new(CliErrorKind::usage_error(
@@ -170,7 +172,7 @@ fn log_ignored_diagnostics_manifest_error(error: &CliError) {
 /// # Errors
 /// Returns `CliError` when daemon state cannot be loaded.
 pub fn diagnostics_report(
-    db: Option<&super::db::DaemonDb>,
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
 ) -> Result<DaemonDiagnosticsReport, CliError> {
     let manifest = diagnostics_manifest()?;
     let health = manifest
@@ -199,7 +201,7 @@ pub fn diagnostics_report(
 /// # Errors
 /// Returns `CliError` when daemon state cannot be loaded.
 pub(crate) async fn diagnostics_report_async(
-    async_db: Option<&super::db::AsyncDaemonDb>,
+    async_db: Option<&crate::daemon::db_handle::AsyncDaemonDbHandle>,
 ) -> Result<DaemonDiagnosticsReport, CliError> {
     let async_db = async_db.ok_or_else(|| {
         CliError::new(CliErrorKind::usage_error(
@@ -217,7 +219,7 @@ pub(crate) async fn diagnostics_report_async(
 }
 
 pub(crate) fn diagnostics_from_db(
-    db: &super::db::DaemonDb,
+    db: &crate::daemon::db_handle::DaemonDbOwnedHandle,
     manifest: Option<DaemonManifest>,
     health: Option<HealthResponse>,
 ) -> Result<DaemonDiagnosticsReport, CliError> {
@@ -246,7 +248,7 @@ pub(crate) fn diagnostics_from_db(
     reason = "cached diagnostics keep explicit fallback branches per source"
 )]
 async fn diagnostics_from_async_db(
-    async_db: &super::db::AsyncDaemonDb,
+    async_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
     manifest: Option<DaemonManifest>,
     health: Option<HealthResponse>,
 ) -> Result<DaemonDiagnosticsReport, CliError> {
@@ -351,7 +353,7 @@ pub fn get_log_level() -> Result<LogLevelResponse, CliError> {
 /// be persisted.
 pub fn record_telemetry(
     request: &DaemonTelemetryRequest,
-    db: Option<&DaemonDb>,
+    db: Option<&DaemonDbOwnedHandle>,
 ) -> Result<DaemonTelemetryResponse, CliError> {
     let source = request.source.trim();
     if source.is_empty() {

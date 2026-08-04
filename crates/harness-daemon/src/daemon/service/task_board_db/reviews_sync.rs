@@ -8,8 +8,8 @@ use chrono::SecondsFormat;
 use tokio::sync::{Mutex as AsyncMutex, OwnedMutexGuard};
 use tokio::task::spawn;
 
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::protocol::TaskBoardSyncRequest;
 use crate::github_api::stable_data_revision_guard;
 use crate::reviews::{ReviewItem, ReviewPullRequestState, ReviewsQueryRequest};
@@ -127,7 +127,7 @@ impl SharedReviewRequestClient {
 }
 
 pub(super) async fn shared_review_request_clients(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &TaskBoardSyncRequest,
 ) -> Result<Vec<SharedReviewRequestClient>, CliError> {
     if !matches!(
@@ -150,7 +150,7 @@ pub(super) async fn shared_review_request_clients(
 }
 
 pub(crate) async fn reconcile_shared_review_items_db(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     items: &[ReviewItem],
 ) -> Result<(HashSet<String>, Vec<ExternalSyncOperation>), CliError> {
     let settings = db.task_board_orchestrator_settings().await?;

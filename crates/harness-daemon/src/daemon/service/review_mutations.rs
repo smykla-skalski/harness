@@ -24,7 +24,7 @@ use super::{effective_project_dir, index, project_dir_for_db_session, session_de
 use crate::daemon::db::prelude::*;
 
 fn project_dir_from_db_or_index(
-    db: Option<&super::db::DaemonDb>,
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
     session_id: &str,
 ) -> Result<PathBuf, CliError> {
     if let Some(db) = db {
@@ -34,7 +34,10 @@ fn project_dir_from_db_or_index(
     Ok(effective_project_dir(&resolved).to_path_buf())
 }
 
-fn bump_and_refresh(db: Option<&super::db::DaemonDb>, session_id: &str) -> Result<(), CliError> {
+fn bump_and_refresh(
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
+    session_id: &str,
+) -> Result<(), CliError> {
     if let Some(db) = db {
         db.load_session_state_for_mutation(session_id)?;
         db.bump_change(session_id)?;
@@ -51,7 +54,7 @@ pub fn submit_for_review(
     session_id: &str,
     task_id: &str,
     request: &TaskSubmitForReviewRequest,
-    db: Option<&super::db::DaemonDb>,
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
 ) -> Result<SessionDetail, CliError> {
     let project_dir = project_dir_from_db_or_index(db, session_id)?;
     svc_submit_for_review_with_persona(
@@ -74,7 +77,7 @@ pub fn claim_review(
     session_id: &str,
     task_id: &str,
     request: &TaskClaimReviewRequest,
-    db: Option<&super::db::DaemonDb>,
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
 ) -> Result<SessionDetail, CliError> {
     let project_dir = project_dir_from_db_or_index(db, session_id)?;
     svc_claim_review(session_id, task_id, &request.actor, &project_dir)?;
@@ -90,7 +93,7 @@ pub fn submit_review(
     session_id: &str,
     task_id: &str,
     request: &TaskSubmitReviewRequest,
-    db: Option<&super::db::DaemonDb>,
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
 ) -> Result<SessionDetail, CliError> {
     let project_dir = project_dir_from_db_or_index(db, session_id)?;
     let review = svc_submit_review(
@@ -117,7 +120,7 @@ pub fn respond_review(
     session_id: &str,
     task_id: &str,
     request: &TaskRespondReviewRequest,
-    db: Option<&super::db::DaemonDb>,
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
 ) -> Result<SessionDetail, CliError> {
     let project_dir = project_dir_from_db_or_index(db, session_id)?;
     svc_respond_review(
@@ -141,7 +144,7 @@ pub fn arbitrate(
     session_id: &str,
     task_id: &str,
     request: &TaskArbitrateRequest,
-    db: Option<&super::db::DaemonDb>,
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
 ) -> Result<SessionDetail, CliError> {
     let project_dir = project_dir_from_db_or_index(db, session_id)?;
     svc_arbitrate(

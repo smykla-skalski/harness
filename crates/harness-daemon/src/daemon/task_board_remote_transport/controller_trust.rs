@@ -8,9 +8,9 @@ use super::controller_clock::ControllerClock;
 use crate::daemon::db::TaskBoardRemoteOperationKind;
 use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{
-    AsyncDaemonDb, TaskBoardRemoteHostSelection, TaskBoardRemoteHostTrustFence,
-    TaskBoardRemoteOperationTrustFence,
+    TaskBoardRemoteHostSelection, TaskBoardRemoteHostTrustFence, TaskBoardRemoteOperationTrustFence,
 };
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::task_board::TaskBoardExecutionHostConfig;
 use crate::task_board::remote_wire::wire_conversion::domain_host_advertisement;
 
@@ -68,7 +68,7 @@ impl RemoteExecutionControllerClient {
 
     pub(crate) async fn refresh_observation(
         &self,
-        db: &AsyncDaemonDb,
+        db: &AsyncDaemonDbHandle,
     ) -> Result<TaskBoardRemoteHostSelection, RemoteExecutionControllerError> {
         let expected = db.task_board_remote_host_trust_fence(&self.host_id).await?;
         self.require_client_trust(&expected, true)?;
@@ -89,21 +89,21 @@ impl RemoteExecutionControllerClient {
 
     pub(super) async fn current_operation_trust(
         &self,
-        db: &AsyncDaemonDb,
+        db: &AsyncDaemonDbHandle,
     ) -> Result<TaskBoardRemoteOperationTrustFence, RemoteExecutionControllerError> {
         self.current_operation_trust_with_enabled(db, true).await
     }
 
     pub(super) async fn current_source_recovery_trust(
         &self,
-        db: &AsyncDaemonDb,
+        db: &AsyncDaemonDbHandle,
     ) -> Result<TaskBoardRemoteOperationTrustFence, RemoteExecutionControllerError> {
         self.current_operation_trust_with_enabled(db, false).await
     }
 
     pub(super) async fn current_operation_trust_for(
         &self,
-        db: &AsyncDaemonDb,
+        db: &AsyncDaemonDbHandle,
         kind: TaskBoardRemoteOperationKind,
         assignment_id: &str,
     ) -> Result<TaskBoardRemoteOperationTrustFence, RemoteExecutionControllerError> {
@@ -119,7 +119,7 @@ impl RemoteExecutionControllerClient {
 
     pub(super) async fn current_configured_host_trust_for_lifecycle(
         &self,
-        db: &AsyncDaemonDb,
+        db: &AsyncDaemonDbHandle,
     ) -> Result<TaskBoardRemoteHostTrustFence, RemoteExecutionControllerError> {
         let current = db.task_board_remote_host_trust_fence(&self.host_id).await?;
         self.require_client_trust(&current, false)?;
@@ -128,7 +128,7 @@ impl RemoteExecutionControllerClient {
 
     pub(super) async fn current_stable_host_trust_for_replay(
         &self,
-        db: &AsyncDaemonDb,
+        db: &AsyncDaemonDbHandle,
     ) -> Result<TaskBoardRemoteHostTrustFence, RemoteExecutionControllerError> {
         let current = db.task_board_remote_host_trust_fence(&self.host_id).await?;
         if let Some(retained) = self.retained_trust.as_ref() {
@@ -150,7 +150,7 @@ impl RemoteExecutionControllerClient {
 
     async fn current_operation_trust_with_enabled(
         &self,
-        db: &AsyncDaemonDb,
+        db: &AsyncDaemonDbHandle,
         require_enabled: bool,
     ) -> Result<TaskBoardRemoteOperationTrustFence, RemoteExecutionControllerError> {
         let current = db

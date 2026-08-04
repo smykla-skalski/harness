@@ -7,18 +7,19 @@ use super::super::db::AsyncDaemonDb;
 use super::super::db::prelude::*;
 use super::super::protocol::{SessionDetail, SignalAckRequest, SignalCancelRequest};
 use super::{sessions, sync_file_state_from_async_db};
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
-impl AsyncSignalStorage for AsyncDaemonDb {
+impl AsyncSignalStorage for AsyncDaemonDbHandle {
     async fn load_session_state(&self, session_id: &str) -> Result<Option<SessionState>, CliError> {
-        <Self as AsyncSessionStateQueries>::load_session_state(self, session_id).await
+        <AsyncDaemonDb as AsyncSessionStateQueries>::load_session_state(&self.0, session_id).await
     }
 
     async fn resolve_session(&self, session_id: &str) -> Result<Option<ResolvedSession>, CliError> {
-        <Self as AsyncSessionSummaryQueries>::resolve_session(self, session_id).await
+        <AsyncDaemonDb as AsyncSessionSummaryQueries>::resolve_session(&self.0, session_id).await
     }
 
     async fn bump_change(&self, scope: &str) -> Result<(), CliError> {
-        <Self as AsyncSessionWriteQueries>::bump_change(self, scope).await
+        <AsyncDaemonDb as AsyncSessionWriteQueries>::bump_change(&self.0, scope).await
     }
 
     async fn sync_signal_index(
@@ -26,11 +27,12 @@ impl AsyncSignalStorage for AsyncDaemonDb {
         session_id: &str,
         records: &[SessionSignalRecord],
     ) -> Result<(), CliError> {
-        <Self as AsyncSignalIndexQueries>::sync_signal_index(self, session_id, records).await
+        <AsyncDaemonDb as AsyncSignalIndexQueries>::sync_signal_index(&self.0, session_id, records)
+            .await
     }
 
     async fn load_signals(&self, session_id: &str) -> Result<Vec<SessionSignalRecord>, CliError> {
-        <Self as AsyncSignalReadQueries>::load_signals(self, session_id).await
+        <AsyncDaemonDb as AsyncSignalReadQueries>::load_signals(&self.0, session_id).await
     }
 
     async fn update_session_state_immediate<F, T>(
@@ -42,12 +44,14 @@ impl AsyncSignalStorage for AsyncDaemonDb {
         F: FnOnce(&mut SessionState) -> Result<T, CliError> + Send,
         T: Send,
     {
-        <Self as AsyncSessionStateQueries>::update_session_state_immediate(self, session_id, update)
-            .await
+        <AsyncDaemonDb as AsyncSessionStateQueries>::update_session_state_immediate(
+            &self.0, session_id, update,
+        )
+        .await
     }
 
     async fn append_log_entry(&self, entry: &SessionLogEntry) -> Result<(), CliError> {
-        <Self as AsyncSessionWriteQueries>::append_log_entry(self, entry).await
+        <AsyncDaemonDb as AsyncSessionWriteQueries>::append_log_entry(&self.0, entry).await
     }
 
     async fn save_session_state(
@@ -55,7 +59,8 @@ impl AsyncSignalStorage for AsyncDaemonDb {
         project_id: &str,
         state: &SessionState,
     ) -> Result<(), CliError> {
-        <Self as AsyncSessionWriteQueries>::save_session_state(self, project_id, state).await
+        <AsyncDaemonDb as AsyncSessionWriteQueries>::save_session_state(&self.0, project_id, state)
+            .await
     }
 
     async fn merge_signal_records(
@@ -63,7 +68,10 @@ impl AsyncSignalStorage for AsyncDaemonDb {
         session_id: &str,
         records: &[SessionSignalRecord],
     ) -> Result<(), CliError> {
-        <Self as AsyncSignalIndexQueries>::merge_signal_records(self, session_id, records).await
+        <AsyncDaemonDb as AsyncSignalIndexQueries>::merge_signal_records(
+            &self.0, session_id, records,
+        )
+        .await
     }
 
     async fn session_detail(&self, session_id: &str) -> Result<SessionDetail, CliError> {
@@ -79,19 +87,20 @@ impl AsyncSignalStorage for AsyncDaemonDb {
         session_id: &str,
     ) -> Result<Vec<harness_daemon_session_service::ExpiredPendingSignalIndexRecord>, CliError>
     {
-        <Self as AsyncSignalReadQueries>::load_expired_pending_signals(self, session_id).await
+        <AsyncDaemonDb as AsyncSignalReadQueries>::load_expired_pending_signals(&self.0, session_id)
+            .await
     }
 
     async fn list_project_summaries(
         &self,
     ) -> Result<Vec<harness_session::wire::ProjectSummary>, CliError> {
-        AsyncDaemonDb::list_project_summaries(self).await
+        AsyncDaemonDb::list_project_summaries(&self.0).await
     }
 
     async fn list_session_summaries(
         &self,
     ) -> Result<Vec<harness_session::wire::SessionSummary>, CliError> {
-        <Self as AsyncSessionSummaryQueries>::list_session_summaries(self).await
+        <AsyncDaemonDb as AsyncSessionSummaryQueries>::list_session_summaries(&self.0).await
     }
 
     async fn resolve_runtime_session_agents(
@@ -99,8 +108,8 @@ impl AsyncSignalStorage for AsyncDaemonDb {
         runtime_name: &str,
         runtime_session_id: &str,
     ) -> Result<Vec<(String, String)>, CliError> {
-        <Self as AsyncAgentResolutionQueries>::resolve_runtime_session_agents(
-            self,
+        <AsyncDaemonDb as AsyncAgentResolutionQueries>::resolve_runtime_session_agents(
+            &self.0,
             runtime_name,
             runtime_session_id,
         )
@@ -111,7 +120,7 @@ impl AsyncSignalStorage for AsyncDaemonDb {
         &self,
         session_id: &str,
     ) -> Result<Vec<harness_session::wire::AgentToolActivitySummary>, CliError> {
-        <Self as AsyncSignalReadQueries>::load_agent_activity(self, session_id).await
+        <AsyncDaemonDb as AsyncSignalReadQueries>::load_agent_activity(&self.0, session_id).await
     }
 
     async fn load_session_timeline_window(
@@ -119,8 +128,8 @@ impl AsyncSignalStorage for AsyncDaemonDb {
         session_id: &str,
         request: &harness_protocol::timeline::TimelineWindowRequest,
     ) -> Result<Option<harness_protocol::timeline::TimelineWindowResponse>, CliError> {
-        <Self as AsyncTimelineWindowQueries>::load_session_timeline_window(
-            self, session_id, request,
+        <AsyncDaemonDb as AsyncTimelineWindowQueries>::load_session_timeline_window(
+            &self.0, session_id, request,
         )
         .await
     }
@@ -129,19 +138,21 @@ impl AsyncSignalStorage for AsyncDaemonDb {
         &self,
         session_id: &str,
     ) -> Result<Vec<harness_protocol::timeline::TimelineEntry>, CliError> {
-        <Self as AsyncTimelineWindowQueries>::load_session_acp_transcript_entries(self, session_id)
-            .await
+        <AsyncDaemonDb as AsyncTimelineWindowQueries>::load_session_acp_transcript_entries(
+            &self.0, session_id,
+        )
+        .await
     }
 
     async fn list_liveness_candidate_ids(&self) -> Result<Vec<String>, CliError> {
-        AsyncDaemonDb::list_liveness_candidate_ids(self).await
+        AsyncDaemonDb::list_liveness_candidate_ids(&self.0).await
     }
 
     async fn sync_project(
         &self,
         project: &harness_session::index::DiscoveredProject,
     ) -> Result<(), CliError> {
-        <Self as AsyncSessionWriteQueries>::sync_project(self, project).await
+        <AsyncDaemonDb as AsyncSessionWriteQueries>::sync_project(&self.0, project).await
     }
 
     async fn create_session_record(
@@ -149,18 +160,21 @@ impl AsyncSignalStorage for AsyncDaemonDb {
         project_id: &str,
         state: &SessionState,
     ) -> Result<(), CliError> {
-        <Self as AsyncSessionWriteQueries>::create_session_record(self, project_id, state).await
+        <AsyncDaemonDb as AsyncSessionWriteQueries>::create_session_record(
+            &self.0, project_id, state,
+        )
+        .await
     }
 
     async fn delete_session_row(&self, session_id: &str) -> Result<bool, CliError> {
-        <Self as AsyncSessionWriteQueries>::delete_session_row(self, session_id).await
+        <AsyncDaemonDb as AsyncSessionWriteQueries>::delete_session_row(&self.0, session_id).await
     }
 }
 
 pub(crate) async fn cancel_signal_async(
     session_id: &str,
     request: &SignalCancelRequest,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
 ) -> Result<SessionDetail, CliError> {
     harness_daemon_session_service::cancel_signal_async(session_id, request, db).await
 }
@@ -168,7 +182,7 @@ pub(crate) async fn cancel_signal_async(
 pub(crate) async fn record_signal_ack_direct_async(
     session_id: &str,
     request: &SignalAckRequest,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
 ) -> Result<(), CliError> {
     harness_daemon_session_service::record_signal_ack_direct_async(session_id, request, db).await
 }

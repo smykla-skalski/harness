@@ -7,6 +7,7 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_task_board_provider_sync::open_task_board_sync_conflicts;
 
 use harness::daemon::db::{AsyncDaemonDb, AsyncDaemonDbConnect};
+use harness::daemon::db_handle::AsyncDaemonDbHandle;
 use harness::task_board::external::{
     ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision, ExternalProviderScopeState,
     ExternalSyncClient, ExternalSyncOptions, TaskBoardExternalCreateStore,
@@ -27,6 +28,7 @@ async fn push_precondition_failure_persists_three_way_conflict() {
     let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
         .await
         .expect("database");
+    let db = AsyncDaemonDbHandle(db);
     let item = linked_item(
         "task-precondition",
         "Local edit",
@@ -76,6 +78,7 @@ async fn prefer_remote_supersedes_existing_open_conflict() {
     let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
         .await
         .expect("database");
+    let db = AsyncDaemonDbHandle(db);
     let item = linked_item(
         "task-prefer-remote",
         "Local edit",
@@ -126,6 +129,7 @@ async fn pull_report_supersedes_only_converged_known_conflict_fields() {
     let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
         .await
         .expect("database");
+    let db = AsyncDaemonDbHandle(db);
     let item = linked_item(
         "task-pull-report",
         "Local edit",
@@ -171,6 +175,7 @@ async fn prefer_local_supersedes_conflict_after_remote_and_local_state_converge(
     let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
         .await
         .expect("database");
+    let db = AsyncDaemonDbHandle(db);
     let item = linked_item(
         "task-prefer-local",
         "Local edit",
@@ -269,6 +274,7 @@ async fn prefer_local_still_records_a_hierarchy_only_applied_change_despite_a_co
     let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
         .await
         .expect("database");
+    let db = AsyncDaemonDbHandle(db);
     let item = linked_item(
         "task-hierarchy-only",
         "Local edit",
@@ -354,15 +360,15 @@ fn pull_report_options() -> ExternalSyncOptions {
     }
 }
 
-async fn record_open_title_conflict(db: &AsyncDaemonDb, item_id: &str) {
+async fn record_open_title_conflict(db: &AsyncDaemonDbHandle, item_id: &str) {
     record_open_conflicts(db, item_id, &["title"]).await;
 }
 
-async fn record_open_title_and_future_conflicts(db: &AsyncDaemonDb, item_id: &str) {
+async fn record_open_title_and_future_conflicts(db: &AsyncDaemonDbHandle, item_id: &str) {
     record_open_conflicts(db, item_id, &["title", "future_field"]).await;
 }
 
-async fn record_open_conflicts(db: &AsyncDaemonDb, item_id: &str, fields: &[&str]) {
+async fn record_open_conflicts(db: &AsyncDaemonDbHandle, item_id: &str, fields: &[&str]) {
     let revision = db
         .item_snapshot(item_id)
         .await

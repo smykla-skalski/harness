@@ -3,8 +3,7 @@ use std::sync::{Arc, Mutex};
 use axum::extract::ws::Message;
 use tokio::sync::{broadcast, mpsc};
 
-use crate::daemon::db::AsyncDaemonDb;
-use crate::daemon::http::{DaemonHttpState, require_async_db};
+use super::super::http::{DaemonHttpState, require_async_db};
 use crate::daemon::protocol::StreamEvent;
 use crate::daemon::service;
 use harness_kernel::errors::CliError;
@@ -13,6 +12,7 @@ use super::broadcast::{PreparedBroadcast, ReplayBuffer, build_prepared};
 use super::connection::ConnectionState;
 use super::dispatch::ws_activity_log_level;
 use crate::daemon::db::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 pub(crate) async fn relay_broadcast(
     mut broadcast_rx: broadcast::Receiver<Arc<PreparedBroadcast>>,
@@ -159,7 +159,7 @@ fn recovery_events_on_error(error: &CliError) -> Vec<StreamEvent> {
 async fn build_recovery_events_async(
     plan: &RelayRecoveryPlan,
     state: &DaemonHttpState,
-    async_db: &AsyncDaemonDb,
+    async_db: &AsyncDaemonDbHandle,
 ) -> Vec<StreamEvent> {
     let mut events = Vec::new();
     if plan.include_sessions_updated {
@@ -194,7 +194,7 @@ async fn build_recovery_events_async(
 /// never pin a stale snapshot under key zero.
 async fn cached_sessions_updated_event(
     state: &DaemonHttpState,
-    async_db: &AsyncDaemonDb,
+    async_db: &AsyncDaemonDbHandle,
 ) -> Result<StreamEvent, CliError> {
     let Ok(current) = async_db.current_change_sequence().await else {
         return service::sessions_updated_event_async(Some(async_db)).await;

@@ -2,15 +2,18 @@ use harness_testkit::with_isolated_harness_env;
 use tempfile::tempdir;
 
 use super::*;
+use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::daemon::service::sync_task_board_github_tokens;
 use crate::task_board::TaskBoardGitHubTokensSyncRequest;
 use crate::task_board::github::GitHubAutomation;
 
-async fn database(root: &std::path::Path) -> AsyncDaemonDb {
-    AsyncDaemonDb::connect(&root.join("harness.db"))
-        .await
-        .expect("database")
+async fn database(root: &std::path::Path) -> crate::daemon::db_handle::AsyncDaemonDbHandle {
+    crate::daemon::db_handle::AsyncDaemonDbHandle(
+        AsyncDaemonDb::connect(&root.join("harness.db"))
+            .await
+            .expect("database"),
+    )
 }
 
 fn seed_tokens(repositories: &[&str]) {

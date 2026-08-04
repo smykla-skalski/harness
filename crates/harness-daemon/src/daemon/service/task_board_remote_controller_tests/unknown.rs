@@ -251,7 +251,7 @@ fn unknown_status(
 }
 
 async fn record_settlement(
-    db: &crate::daemon::db::AsyncDaemonDb,
+    db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
     request: &RemoteSettledRequest,
 ) -> Result<(), CliError> {
     assert!(
@@ -272,7 +272,7 @@ async fn record_settlement(
 }
 
 async fn record_cleanup(
-    db: &crate::daemon::db::AsyncDaemonDb,
+    db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
     request: &RemoteCleanupObservationRequest,
 ) -> Result<(), CliError> {
     let trust = db.task_board_remote_host_trust_fence(HOST).await?;

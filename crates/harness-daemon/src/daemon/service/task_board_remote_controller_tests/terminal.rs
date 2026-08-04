@@ -279,7 +279,7 @@ fn counted_cleanup_operation(
 }
 
 async fn load_assignment(
-    db: &crate::daemon::db::AsyncDaemonDb,
+    db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
     assignment: &TaskBoardRemoteAssignmentRecord,
 ) -> TaskBoardRemoteAssignmentRecord {
     db.task_board_remote_assignment(&assignment.assignment_id)

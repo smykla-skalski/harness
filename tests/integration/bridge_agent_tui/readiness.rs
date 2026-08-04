@@ -53,6 +53,7 @@ fn with_sandboxed_bridge_manager(
         ],
         || {
             let db = DaemonDb::open(&tmp.path().join("daemon.sqlite3")).expect("open daemon db");
+            let db = DaemonDbOwnedHandle(db);
             let session_state = daemon_service::start_session_direct(
                 &SessionStartRequest {
                     title: label.into(),
@@ -218,6 +219,7 @@ fn readiness_callback_triggers_agent_tui_ready_event() {
     init_git_repo_with_seed(&project_dir);
 
     let db = DaemonDb::open(&db_path).expect("open db");
+    let db = DaemonDbOwnedHandle(db);
     let project = harness::daemon::index::discovered_project_for_checkout(&project_dir);
     db.sync_project(&project).expect("sync project");
     let session_id = session_uuid("sess-readiness-cb");

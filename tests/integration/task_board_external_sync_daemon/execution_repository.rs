@@ -4,6 +4,7 @@ use tempfile::tempdir;
 use harness_kernel::errors::CliError;
 
 use harness::daemon::db::{AsyncDaemonDb, AsyncDaemonDbConnect};
+use harness::daemon::db_handle::AsyncDaemonDbHandle;
 use harness::task_board::external::{
     ExternalCreateLease, ExternalCreateProbe, ExternalCreateRecoveryClient, ExternalCreateRequest,
     ExternalSyncClient, ExternalSyncOptions, TaskBoardSyncStore, sync_external_tasks,
@@ -21,6 +22,7 @@ async fn github_create_persists_repository_without_replacing_project_identity() 
     let board = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
         .await
         .expect("database");
+    let board = AsyncDaemonDbHandle(board);
     let mut item = TaskBoardItem::new(
         "local-1".to_owned(),
         "Local issue".to_owned(),

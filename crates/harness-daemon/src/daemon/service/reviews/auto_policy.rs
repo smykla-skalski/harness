@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use crate::daemon::db::AsyncDaemonDb;
 use crate::reviews::{
     ReviewActionKind, ReviewActionOutcome, ReviewActionPreviewTarget, ReviewActionResult,
     ReviewTarget, ReviewsActionPreviewRequest, ReviewsActionPreviewResponse, ReviewsActionResponse,
@@ -10,6 +9,7 @@ use crate::reviews::{
 use harness_kernel::errors::CliError;
 
 use super::policy::preview_reviews_policy_with_audit_db;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 pub(super) fn action_response(
     summary_prefix: &str,
@@ -35,7 +35,7 @@ pub(super) fn action_response(
 
 pub(super) async fn preview_auto_review_action(
     request: &ReviewsActionPreviewRequest,
-    database: Option<Arc<AsyncDaemonDb>>,
+    database: Option<Arc<AsyncDaemonDbHandle>>,
 ) -> Result<ReviewsActionPreviewResponse, CliError> {
     let mut warnings = Vec::new();
     let mut targets = Vec::with_capacity(request.targets.len());

@@ -4,9 +4,11 @@ use async_trait::async_trait;
 use serde_json::json;
 
 use crate::daemon::audit_events::{AuditEventDraft, record_audit_result};
+#[cfg(test)]
 use crate::daemon::db::AsyncDaemonDb;
 #[cfg(test)]
 use crate::daemon::db::task_board::prelude::PolicyRuntimeQueries;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::service::reviews::token::{github_token, missing_token_error};
 use crate::reviews::policy::ReviewsPolicyActionExecutor;
 use crate::reviews::{ReviewTarget, ReviewsGitHubClient};
@@ -26,7 +28,7 @@ pub(crate) use providers::build_policy_provider_registry;
 
 pub(crate) struct DaemonReviewsPolicyExecutor {
     client: ReviewsGitHubClient,
-    audit_db: Option<Arc<AsyncDaemonDb>>,
+    audit_db: Option<Arc<AsyncDaemonDbHandle>>,
 }
 
 #[async_trait]
@@ -85,7 +87,7 @@ impl DaemonReviewsPolicyExecutor {
         if target.head_sha.trim().is_empty() {
             return self.client.policy_merge(target, method).await;
         }
-        let Some(store) = self.audit_db.clone() else {
+        let Some(store) = self.audit_db.as_deref() else {
             return self.client.policy_merge(target, method).await;
         };
         let source = GitHubPullRequestEvidenceSource::new(self.client.protected());
@@ -100,7 +102,7 @@ impl DaemonReviewsPolicyExecutor {
             head_revision: target.head_sha.clone(),
         };
         let outcome = merge_with_ledger(
-            store.as_ref(),
+            store,
             &source,
             action,
             ActionGateRequirement::for_merge(),
@@ -126,7 +128,7 @@ impl DaemonReviewsPolicyExecutor {
 
 pub(crate) fn daemon_policy_executor_with_audit(
     repository: &str,
-    audit_db: Option<Arc<AsyncDaemonDb>>,
+    audit_db: Option<Arc<AsyncDaemonDbHandle>>,
 ) -> Result<DaemonReviewsPolicyExecutor, CliError> {
     let token = github_token(Some(repository))
         .or_else(|| github_token(None))
@@ -138,7 +140,7 @@ pub(crate) fn daemon_policy_executor_with_audit(
 }
 
 async fn record_reviews_policy_action_audit_result<T>(
-    audit_db: Option<&Arc<AsyncDaemonDb>>,
+    audit_db: Option<&Arc<AsyncDaemonDbHandle>>,
     action_key: &'static str,
     title: &'static str,
     target: &ReviewTarget,
@@ -296,11 +298,11 @@ mod tests {
     #[tokio::test]
     async fn database_registry_persists_all_orchestration_side_effects() {
         let dir = tempdir().expect("tempdir");
-        let database = Arc::new(
+        let database = Arc::new(AsyncDaemonDbHandle(
             AsyncDaemonDb::connect(&dir.path().join("harness.db"))
                 .await
                 .expect("open async daemon db"),
-        );
+        ));
         let registry = build_database_policy_provider_registry(NoopExecutor, Arc::clone(&database));
         let actions = [
             PolicyActionDescriptor {
@@ -364,11 +366,11 @@ mod tests {
     #[tokio::test]
     async fn database_registry_refuses_actions_when_app_kill_switch_is_engaged() {
         let dir = tempdir().expect("tempdir");
-        let database = Arc::new(
+        let database = Arc::new(AsyncDaemonDbHandle(
             AsyncDaemonDb::connect(&dir.path().join("harness.db"))
                 .await
                 .expect("open async daemon db"),
-        );
+        ));
         let mut workspace = PolicyCanvasWorkspace::seeded();
         workspace.spawn_kill_switch = true;
         database
@@ -393,11 +395,11 @@ mod tests {
     #[tokio::test]
     async fn database_registry_refuses_actions_when_policy_automation_is_disabled() {
         let dir = tempdir().expect("tempdir");
-        let database = Arc::new(
+        let database = Arc::new(AsyncDaemonDbHandle(
             AsyncDaemonDb::connect(&dir.path().join("harness.db"))
                 .await
                 .expect("open async daemon db"),
-        );
+        ));
         let mut workspace = PolicyCanvasWorkspace::seeded();
         workspace.global_policy_enforcement_enabled = false;
         database
@@ -422,11 +424,11 @@ mod tests {
     #[tokio::test]
     async fn reviews_policy_action_audit_records_success_and_failure_events() {
         let dir = tempdir().expect("tempdir");
-        let audit_db = Arc::new(
+        let audit_db = Arc::new(AsyncDaemonDbHandle(
             AsyncDaemonDb::connect(&dir.path().join("harness.db"))
                 .await
                 .expect("open async daemon db"),
-        );
+        ));
         let target = sample_review_target();
 
         let success: Result<(), CliError> = Ok(());

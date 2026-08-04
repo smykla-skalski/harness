@@ -13,6 +13,7 @@ use tempfile::tempdir;
 
 use super::{update_task_board_git_runtime_config, validate_repository_tokens};
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 #[test]
@@ -290,6 +291,7 @@ fn secret_handoff_keeps_legacy_payload_until_ack_and_is_idempotent() {
                 let db = AsyncDaemonDb::connect(&tmp.path().join("harness.db"))
                     .await
                     .expect("open db");
+                let db = AsyncDaemonDbHandle(db);
                 db.initialize_empty_task_board(
                     &runtime_config.without_secret_metadata(),
                     Some(&digest),
@@ -378,6 +380,7 @@ fn secret_handoff_ack_recovers_after_legacy_envelope_was_removed() {
                 let db = AsyncDaemonDb::connect(&tmp.path().join("harness.db"))
                     .await
                     .expect("open db");
+                let db = AsyncDaemonDbHandle(db);
                 db.initialize_empty_task_board(
                     &runtime_config.without_secret_metadata(),
                     Some(&digest),

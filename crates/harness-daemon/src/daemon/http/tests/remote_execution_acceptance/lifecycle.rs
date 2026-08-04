@@ -137,7 +137,7 @@ struct ExecutorResult {
 }
 
 pub(super) async fn offer_and_claim(
-    controller_db: &crate::daemon::db::AsyncDaemonDb,
+    controller_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
     execution_id: &str,
 ) -> crate::daemon::db::TaskBoardRemoteAssignmentRecord {
     drive(controller_db, "offer candidate").await;
@@ -164,7 +164,7 @@ pub(super) async fn offer_and_claim(
 
 async fn execute_implementation(
     executor: &crate::daemon::http::DaemonHttpState,
-    executor_db: &crate::daemon::db::AsyncDaemonDb,
+    executor_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
     claimed: &crate::daemon::db::TaskBoardRemoteAssignmentRecord,
     seeded: &super::fixture::SeededExecution,
 ) -> ExecutorResult {
@@ -211,7 +211,7 @@ async fn execute_implementation(
 }
 
 async fn assert_initial_start_boundary(
-    db: &crate::daemon::db::AsyncDaemonDb,
+    db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
     record: &crate::daemon::db::TaskBoardRemoteAssignmentRecord,
     identity: &crate::daemon::db::TaskBoardRemoteExecutorIdentity,
 ) {
@@ -234,7 +234,7 @@ async fn assert_initial_start_boundary(
 }
 
 async fn assert_active_start_boundary(
-    db: &crate::daemon::db::AsyncDaemonDb,
+    db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
     record: &crate::daemon::db::TaskBoardRemoteAssignmentRecord,
     identity: &crate::daemon::db::TaskBoardRemoteExecutorIdentity,
 ) {
@@ -262,7 +262,7 @@ async fn assert_active_start_boundary(
 }
 
 pub(super) async fn assert_executor_runtime_presence(
-    db: &crate::daemon::db::AsyncDaemonDb,
+    db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
     identity: &crate::daemon::db::TaskBoardRemoteExecutorIdentity,
     expected: bool,
 ) {
@@ -274,7 +274,7 @@ pub(super) async fn assert_executor_runtime_presence(
 }
 
 async fn settle_and_clean_up(
-    controller_db: &crate::daemon::db::AsyncDaemonDb,
+    controller_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
     executor: &crate::daemon::http::DaemonHttpState,
     execution_id: &str,
 ) {
@@ -286,7 +286,10 @@ async fn settle_and_clean_up(
     drive(controller_db, "observe executor cleanup").await;
 }
 
-async fn assert_import_target_ready(db: &crate::daemon::db::AsyncDaemonDb, execution_id: &str) {
+async fn assert_import_target_ready(
+    db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
+    execution_id: &str,
+) {
     let assignment = assignment(db, execution_id).await;
     let parent = db
         .task_board_workflow_execution(&assignment.execution_id)
@@ -325,8 +328,8 @@ async fn assert_import_target_ready(db: &crate::daemon::db::AsyncDaemonDb, execu
 }
 
 async fn assert_completion(
-    controller_db: &crate::daemon::db::AsyncDaemonDb,
-    executor_db: &crate::daemon::db::AsyncDaemonDb,
+    controller_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
+    executor_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
     fixture: &AcceptanceFixture,
     seeded: &super::fixture::SeededExecution,
     assignment_id: &str,
@@ -379,7 +382,7 @@ async fn assert_completion(
     );
 }
 
-pub(super) async fn drive(db: &crate::daemon::db::AsyncDaemonDb, phase: &str) {
+pub(super) async fn drive(db: &crate::daemon::db_handle::AsyncDaemonDbHandle, phase: &str) {
     let report = Box::pin(drive_task_board_remote_controller(db))
         .await
         .unwrap_or_else(|error| panic!("controller {phase}: {error}"));
@@ -400,7 +403,7 @@ pub(super) async fn reconcile_executor_tick(
 }
 
 pub(super) async fn executor_assignment(
-    db: &crate::daemon::db::AsyncDaemonDb,
+    db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
     assignment_id: &str,
 ) -> crate::daemon::db::TaskBoardRemoteAssignmentRecord {
     db.task_board_remote_assignment(assignment_id)

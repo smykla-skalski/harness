@@ -3,7 +3,7 @@ use rusqlite::{OptionalExtension, Transaction, TransactionBehavior};
 use super::{CliError, Connection, db_error, schema_repairs_remote_execution_objects as objects};
 
 const MIGRATION_SQL: &str = include_str!(
-    "../../harness-daemon/src/daemon/db/migrations/0039_daemon_v45_task_board_remote_execution_integrity.sql"
+    "../../harness-daemon-db-core/src/migrations/0039_daemon_v45_task_board_remote_execution_integrity.sql"
 );
 const CONTROLLER_SCAN_INDEX: &str = "task_board_remote_assignments_controller_scan";
 const SETTLEMENT_RECEIPT_DELETE_GUARD: &str =

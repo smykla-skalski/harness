@@ -1,6 +1,5 @@
-use super::super::{
-    CliError, LeaderTransferRequest, SessionDetail, SessionEndRequest, db::AsyncDaemonDb,
-};
+use super::super::{CliError, LeaderTransferRequest, SessionDetail, SessionEndRequest};
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::protocol::{SessionArchiveRequest, SessionArchiveResponse};
 
 /// Transfer session leadership through the canonical async daemon DB.
@@ -10,7 +9,7 @@ use crate::daemon::protocol::{SessionArchiveRequest, SessionArchiveResponse};
 pub(crate) async fn transfer_leader_async(
     session_id: &str,
     request: &LeaderTransferRequest,
-    async_db: &AsyncDaemonDb,
+    async_db: &AsyncDaemonDbHandle,
 ) -> Result<SessionDetail, CliError> {
     harness_daemon_session_service::transfer_leader_async(session_id, request, async_db).await
 }
@@ -22,7 +21,7 @@ pub(crate) async fn transfer_leader_async(
 pub(crate) async fn end_session_async(
     session_id: &str,
     request: &SessionEndRequest,
-    async_db: &AsyncDaemonDb,
+    async_db: &AsyncDaemonDbHandle,
 ) -> Result<SessionDetail, CliError> {
     harness_daemon_session_service::end_session_async(session_id, request, async_db).await
 }
@@ -34,7 +33,7 @@ pub(crate) async fn end_session_async(
 pub(crate) async fn archive_session_async(
     session_id: &str,
     request: &SessionArchiveRequest,
-    async_db: &AsyncDaemonDb,
+    async_db: &AsyncDaemonDbHandle,
 ) -> Result<SessionArchiveResponse, CliError> {
     harness_daemon_session_service::archive_session_async(session_id, request, async_db).await
 }

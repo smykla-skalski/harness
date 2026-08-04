@@ -1,9 +1,8 @@
 use std::path::Path;
 
-use crate::daemon::db::AsyncDaemonDb;
-
 use super::*;
 use crate::daemon::db::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 const TASK_LIFECYCLE_SESSION_ID: &str = "52c91a38-b0d5-58ec-9c6b-fe52dae2cbf1";
@@ -27,7 +26,7 @@ fn drop_queue_policy_and_status_async_refresh_session_state() {
 }
 
 struct TaskLifecycleFixture {
-    async_db: AsyncDaemonDb,
+    async_db: AsyncDaemonDbHandle,
     leader_id: String,
     worker_id: String,
     first_task: String,
@@ -42,6 +41,7 @@ async fn task_lifecycle_setup(project: &Path) -> TaskLifecycleFixture {
     let async_db = crate::daemon::db::AsyncDaemonDb::connect(&db_path)
         .await
         .expect("open async daemon db");
+    let async_db = AsyncDaemonDbHandle(async_db);
 
     let state = start_direct_session_async(
         &async_db,

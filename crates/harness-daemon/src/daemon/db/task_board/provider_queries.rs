@@ -21,6 +21,7 @@
 
 use super::items::TaskBoardMutation;
 use crate::daemon::db::{AsyncDaemonDb, CliError};
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::protocol::HarnessMonitorAuditEvent;
 use crate::task_board::external::{
     ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision, ExternalProviderScopeState,
@@ -248,7 +249,7 @@ impl ProviderQueries for AsyncDaemonDb {
         provider_target: &str,
     ) -> Result<TaskBoardExternalCreateBegin, CliError> {
         harness_task_board_provider_sync::begin_task_board_external_create_intent(
-            self,
+            &AsyncDaemonDbHandle(self.clone()),
             item_id,
             provider,
             scope_id,
@@ -264,7 +265,7 @@ impl ProviderQueries for AsyncDaemonDb {
         provider_baseline: &ExternalRef,
     ) -> Result<TaskBoardExternalCreateIntent, CliError> {
         harness_task_board_provider_sync::record_task_board_external_create_outcome(
-            self,
+            &AsyncDaemonDbHandle(self.clone()),
             intent,
             outcome,
             provider_baseline,
@@ -278,7 +279,9 @@ impl ProviderQueries for AsyncDaemonDb {
         scope_id: &str,
     ) -> Result<Vec<TaskBoardExternalCreateIntent>, CliError> {
         harness_task_board_provider_sync::list_pending_task_board_external_create_intents(
-            self, provider, scope_id,
+            &AsyncDaemonDbHandle(self.clone()),
+            provider,
+            scope_id,
         )
         .await
     }
@@ -286,8 +289,10 @@ impl ProviderQueries for AsyncDaemonDb {
     async fn list_created_task_board_external_create_intents(
         &self,
     ) -> Result<Vec<TaskBoardExternalCreateIntent>, CliError> {
-        harness_task_board_provider_sync::list_created_task_board_external_create_intents(self)
-            .await
+        harness_task_board_provider_sync::list_created_task_board_external_create_intents(
+            &AsyncDaemonDbHandle(self.clone()),
+        )
+        .await
     }
 
     async fn list_in_flight_task_board_external_create_intents(
@@ -295,7 +300,8 @@ impl ProviderQueries for AsyncDaemonDb {
         provider: ExternalProvider,
     ) -> Result<Vec<TaskBoardExternalCreateIntent>, CliError> {
         harness_task_board_provider_sync::list_in_flight_task_board_external_create_intents(
-            self, provider,
+            &AsyncDaemonDbHandle(self.clone()),
+            provider,
         )
         .await
     }
@@ -305,7 +311,8 @@ impl ProviderQueries for AsyncDaemonDb {
         provider: Option<ExternalProvider>,
     ) -> Result<Vec<TaskBoardExternalCreateIntent>, CliError> {
         harness_task_board_provider_sync::list_pending_task_board_external_create_follow_ups(
-            self, provider,
+            &AsyncDaemonDbHandle(self.clone()),
+            provider,
         )
         .await
     }
@@ -316,7 +323,9 @@ impl ProviderQueries for AsyncDaemonDb {
         create_key: &str,
     ) -> Result<Option<TaskBoardExternalCreateIntent>, CliError> {
         harness_task_board_provider_sync::task_board_external_create_intent_by_create_key(
-            self, provider, create_key,
+            &AsyncDaemonDbHandle(self.clone()),
+            provider,
+            create_key,
         )
         .await
     }
@@ -326,8 +335,12 @@ impl ProviderQueries for AsyncDaemonDb {
         item_id: &str,
         provider: ExternalProvider,
     ) -> Result<Option<TaskBoardExternalCreateIntent>, CliError> {
-        harness_task_board_provider_sync::task_board_external_create_intent(self, item_id, provider)
-            .await
+        harness_task_board_provider_sync::task_board_external_create_intent(
+            &AsyncDaemonDbHandle(self.clone()),
+            item_id,
+            provider,
+        )
+        .await
     }
 
     async fn task_board_external_create_receipt(
@@ -336,7 +349,9 @@ impl ProviderQueries for AsyncDaemonDb {
         provider: ExternalProvider,
     ) -> Result<Option<TaskBoardExternalCreateIntent>, CliError> {
         harness_task_board_provider_sync::task_board_external_create_receipt(
-            self, item_id, provider,
+            &AsyncDaemonDbHandle(self.clone()),
+            item_id,
+            provider,
         )
         .await
     }
@@ -345,8 +360,11 @@ impl ProviderQueries for AsyncDaemonDb {
         &self,
         intent: &TaskBoardExternalCreateIntent,
     ) -> Result<TaskBoardExternalCreateFinalizeResult, CliError> {
-        harness_task_board_provider_sync::finalize_task_board_external_create_intent(self, intent)
-            .await
+        harness_task_board_provider_sync::finalize_task_board_external_create_intent(
+            &AsyncDaemonDbHandle(self.clone()),
+            intent,
+        )
+        .await
     }
 
     async fn complete_task_board_external_create_follow_ups(
@@ -354,7 +372,8 @@ impl ProviderQueries for AsyncDaemonDb {
         intents: &[TaskBoardExternalCreateIntent],
     ) -> Result<Vec<HarnessMonitorAuditEvent>, CliError> {
         harness_task_board_provider_sync::complete_task_board_external_create_follow_ups(
-            self, intents,
+            &AsyncDaemonDbHandle(self.clone()),
+            intents,
         )
         .await
     }
@@ -364,8 +383,12 @@ impl ProviderQueries for AsyncDaemonDb {
         provider: ExternalProvider,
         scope_id: &str,
     ) -> Result<ExternalProviderScopeState, CliError> {
-        harness_task_board_provider_sync::task_board_provider_scope_state(self, provider, scope_id)
-            .await
+        harness_task_board_provider_sync::task_board_provider_scope_state(
+            &AsyncDaemonDbHandle(self.clone()),
+            provider,
+            scope_id,
+        )
+        .await
     }
 
     async fn begin_task_board_provider_scope_attempt(
@@ -375,7 +398,10 @@ impl ProviderQueries for AsyncDaemonDb {
         now: &str,
     ) -> Result<ExternalProviderScopeAttemptDecision, CliError> {
         harness_task_board_provider_sync::begin_task_board_provider_scope_attempt(
-            self, provider, scope_id, now,
+            &AsyncDaemonDbHandle(self.clone()),
+            provider,
+            scope_id,
+            now,
         )
         .await
     }
@@ -386,7 +412,9 @@ impl ProviderQueries for AsyncDaemonDb {
         now: &str,
     ) -> Result<(), CliError> {
         harness_task_board_provider_sync::renew_task_board_provider_scope_attempt(
-            self, attempt, now,
+            &AsyncDaemonDbHandle(self.clone()),
+            attempt,
+            now,
         )
         .await
     }
@@ -397,7 +425,7 @@ impl ProviderQueries for AsyncDaemonDb {
         released_at: &str,
     ) -> Result<(), CliError> {
         harness_task_board_provider_sync::release_task_board_provider_scope_attempt(
-            self,
+            &AsyncDaemonDbHandle(self.clone()),
             attempt,
             released_at,
         )
@@ -411,7 +439,7 @@ impl ProviderQueries for AsyncDaemonDb {
         completed_at: &str,
     ) -> Result<(), CliError> {
         harness_task_board_provider_sync::complete_task_board_provider_scope_success(
-            self,
+            &AsyncDaemonDbHandle(self.clone()),
             attempt,
             base_revision,
             completed_at,
@@ -425,7 +453,7 @@ impl ProviderQueries for AsyncDaemonDb {
         completed_at: &str,
     ) -> Result<ExternalProviderScopeState, CliError> {
         harness_task_board_provider_sync::complete_task_board_provider_scope_failure(
-            self,
+            &AsyncDaemonDbHandle(self.clone()),
             attempt,
             completed_at,
         )
@@ -441,7 +469,7 @@ impl ProviderQueries for AsyncDaemonDb {
         conflicts: &[TaskBoardSyncConflict],
     ) -> Result<(), CliError> {
         harness_task_board_provider_sync::replace_open_task_board_sync_conflicts(
-            self,
+            &AsyncDaemonDbHandle(self.clone()),
             item_id,
             provider,
             external_ref,
@@ -460,7 +488,7 @@ impl ProviderQueries for AsyncDaemonDb {
         resolved_fields: &[ExternalSyncField],
     ) -> Result<(), CliError> {
         harness_task_board_provider_sync::supersede_open_task_board_sync_conflicts(
-            self,
+            &AsyncDaemonDbHandle(self.clone()),
             item_id,
             provider,
             external_ref,
@@ -472,6 +500,9 @@ impl ProviderQueries for AsyncDaemonDb {
 
     #[cfg(any(test, feature = "daemon-runtime"))]
     async fn open_task_board_sync_conflicts(&self) -> Result<Vec<TaskBoardSyncConflict>, CliError> {
-        harness_task_board_provider_sync::open_task_board_sync_conflicts(self).await
+        harness_task_board_provider_sync::open_task_board_sync_conflicts(&AsyncDaemonDbHandle(
+            self.clone(),
+        ))
+        .await
     }
 }

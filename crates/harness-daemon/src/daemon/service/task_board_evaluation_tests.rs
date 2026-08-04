@@ -60,7 +60,7 @@ fn work_item(status: TaskStatus) -> WorkItem {
     }
 }
 
-async fn seed_active_dispatch_reservation(db: &AsyncDaemonDb, item_id: &str) {
+async fn seed_active_dispatch_reservation(db: &AsyncDaemonDbHandle, item_id: &str) {
     sqlx::query(
         "INSERT INTO task_board_dispatch_intents (
              intent_id, item_id, session_id, work_item_id, workflow_execution_id,
@@ -82,6 +82,7 @@ async fn async_evaluation_preserves_an_item_until_its_dispatch_claims() {
     let db = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
         .await
         .expect("open database");
+    let db = AsyncDaemonDbHandle(db);
     let mut item = TaskBoardItem::new(
         "board-reserved".to_string(),
         "Board item".to_string(),

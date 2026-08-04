@@ -1,6 +1,7 @@
 use tempfile::tempdir;
 
 use super::*;
+use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::task_board::store::OptionalFieldPatch;
 
@@ -10,6 +11,7 @@ async fn provider_update_isolates_an_invalid_parent_and_applies_other_fields() {
     let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
         .await
         .expect("open database");
+    let db = AsyncDaemonDbHandle(db);
     let created = db
         .create_task_board_item(TaskBoardItem::new(
             "provider-parent".into(),
@@ -21,7 +23,7 @@ async fn provider_update_isolates_an_invalid_parent_and_applies_other_fields() {
         .expect("create item")
         .item;
 
-    let updated = <AsyncDaemonDb as TaskBoardSyncStore>::update_item(
+    let updated = <AsyncDaemonDbHandle as TaskBoardSyncStore>::update_item(
         &db,
         &created,
         TaskBoardItemPatch {
@@ -44,6 +46,7 @@ async fn provider_update_with_only_an_invalid_parent_is_a_true_no_op() {
     let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
         .await
         .expect("open database");
+    let db = AsyncDaemonDbHandle(db);
     let created = db
         .create_task_board_item(TaskBoardItem::new(
             "provider-parent-noop".into(),
@@ -59,7 +62,7 @@ async fn provider_update_with_only_an_invalid_parent_is_a_true_no_op() {
         .await
         .expect("snapshot before");
 
-    let updated = <AsyncDaemonDb as TaskBoardSyncStore>::update_item(
+    let updated = <AsyncDaemonDbHandle as TaskBoardSyncStore>::update_item(
         &db,
         &created,
         TaskBoardItemPatch {

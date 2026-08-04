@@ -9,6 +9,7 @@ use crate::daemon::agent_tui::AgentTuiManagerHandle;
 use crate::daemon::codex_controller::CodexControllerHandle;
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::daemon::http::{AsyncDaemonDbSlot, DaemonHttpState, ManagedAgentMutationLocks};
 use crate::daemon::state::{DaemonManifest, HostBridgeManifest};
@@ -32,6 +33,7 @@ async fn scratch_dir_is_created_empty_under_the_daemon_data_home() {
     let directory = tempdir().expect("tempdir");
     let path = directory.path().join("harness.db");
     let db = AsyncDaemonDb::connect(&path).await.expect("connect db");
+    let db = AsyncDaemonDbHandle(db);
 
     let scratch = ensure_escalation_scratch_dir(&db, "triage-escalation-abc").expect("scratch dir");
 
@@ -52,6 +54,7 @@ async fn ensuring_the_same_scratch_dir_twice_is_idempotent() {
     let directory = tempdir().expect("tempdir");
     let path = directory.path().join("harness.db");
     let db = AsyncDaemonDb::connect(&path).await.expect("connect db");
+    let db = AsyncDaemonDbHandle(db);
 
     let first = ensure_escalation_scratch_dir(&db, "triage-escalation-abc").expect("first ensure");
     let second =
@@ -61,17 +64,17 @@ async fn ensuring_the_same_scratch_dir_twice_is_idempotent() {
 }
 
 /// A minimal, fully-wired `DaemonHttpState` sharing the returned
-/// `Arc<AsyncDaemonDb>` with the state's own `async_db` slot, so a test can
+/// `Arc<AsyncDaemonDbHandle>` with the state's own `async_db` slot, so a test can
 /// seed/inspect data through the same handle `drain_tick` will see.
-async fn test_state(db_path: &std::path::Path) -> (DaemonHttpState, Arc<AsyncDaemonDb>) {
+async fn test_state(db_path: &std::path::Path) -> (DaemonHttpState, Arc<AsyncDaemonDbHandle>) {
     let (sender, _) = broadcast::channel(8);
     let db_slot = Arc::new(OnceLock::new());
     let async_db_slot = Arc::new(OnceLock::new());
-    let async_db = Arc::new(
+    let async_db = Arc::new(AsyncDaemonDbHandle(
         AsyncDaemonDb::connect(db_path)
             .await
             .expect("connect async db"),
-    );
+    ));
     async_db_slot
         .set(async_db.clone())
         .expect("install async db");

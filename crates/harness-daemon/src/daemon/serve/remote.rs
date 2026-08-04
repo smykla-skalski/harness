@@ -8,7 +8,7 @@ use crate::daemon::agent_acp::AcpAgentManagerHandle;
 use crate::daemon::agent_tui::AgentTuiManagerHandle;
 use crate::daemon::bridge::install_acp_probe_bridge_refresh;
 use crate::daemon::codex_controller::CodexControllerHandle;
-use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
+use crate::daemon::db_handle::{AsyncDaemonDbHandle, DaemonDbOwnedHandle};
 use crate::daemon::http::{
     self, AsyncDaemonDbSlot, CompanionRouteConfig, CompanionRouter, DaemonHttpAuthMode,
     DaemonHttpState,
@@ -57,8 +57,8 @@ pub async fn serve_remote_https(
     let (endpoint, manifest) = prepare_remote_daemon_manifest(&acme_plan, config.sandboxed)?;
 
     let (sender, _) = broadcast::channel(256);
-    let db: Arc<OnceLock<Arc<Mutex<DaemonDb>>>> = Arc::new(OnceLock::new());
-    let async_db: Arc<OnceLock<Arc<AsyncDaemonDb>>> = Arc::new(OnceLock::new());
+    let db: Arc<OnceLock<Arc<Mutex<DaemonDbOwnedHandle>>>> = Arc::new(OnceLock::new());
+    let async_db: Arc<OnceLock<Arc<AsyncDaemonDbHandle>>> = Arc::new(OnceLock::new());
     service::install_observe_runtime(
         sender.clone(),
         config.observe_interval,
@@ -253,7 +253,7 @@ async fn bind_remote_tls_listener(
 }
 
 fn start_remote_acme_renewal(
-    db: &Arc<OnceLock<Arc<Mutex<DaemonDb>>>>,
+    db: &Arc<OnceLock<Arc<Mutex<DaemonDbOwnedHandle>>>>,
     tls: RemoteTlsConfigHandle,
     shutdown_rx: tokio_watch::Receiver<bool>,
 ) -> Result<JoinHandle<()>, CliError> {

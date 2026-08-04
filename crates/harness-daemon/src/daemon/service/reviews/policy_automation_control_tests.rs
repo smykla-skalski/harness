@@ -1,12 +1,13 @@
 use super::*;
+use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::daemon::reviews_store::PolicyGraphQueries;
 use crate::task_board::policy_graph::PolicyCanvasWorkspace;
 
-async fn database() -> AsyncDaemonDb {
+async fn database() -> AsyncDaemonDbHandle {
     let temp = tempfile::tempdir().expect("temp dir");
     let path = temp.keep().join("harness.db");
-    AsyncDaemonDb::connect(&path).await.expect("open database")
+    AsyncDaemonDbHandle(AsyncDaemonDb::connect(&path).await.expect("open database"))
 }
 
 #[tokio::test]

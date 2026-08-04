@@ -1,4 +1,3 @@
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{
     TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorRunOnceResponse,
 };
@@ -11,11 +10,14 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::super::DaemonHttpState;
 use super::handle_run_once_result;
+#[cfg(test)]
+use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 pub(super) async fn run_once_durable(
     state: &DaemonHttpState,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: TaskBoardOrchestratorRunOnceRequest,
     trigger: TaskBoardAutomationRunTrigger,
 ) -> Result<TaskBoardOrchestratorRunOnceResponse, CliError> {
@@ -54,7 +56,7 @@ fn admitted_session(
 
 async fn execute_durable_run(
     state: &DaemonHttpState,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &TaskBoardOrchestratorRunOnceRequest,
     session: &service::TaskBoardAutomationRunSession,
 ) -> Result<TaskBoardOrchestratorRunOnceResponse, CliError> {
@@ -80,7 +82,7 @@ async fn execute_durable_run(
 }
 
 async fn finish_durable_run(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     session: service::TaskBoardAutomationRunSession,
     result: Result<TaskBoardOrchestratorRunOnceResponse, CliError>,
 ) -> Result<TaskBoardOrchestratorRunOnceResponse, CliError> {
@@ -214,6 +216,7 @@ mod tests {
         let db = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
             .await
             .expect("open database");
+        let db = AsyncDaemonDbHandle(db);
         db.start_task_board_automation(
             TaskBoardAutomationDesiredMode::Continuous,
             chrono::Utc::now(),

@@ -27,6 +27,7 @@ use crate::workspace::utc_now;
 
 use self::support::{WAIT_TIMEOUT, wait_until, with_agent_tui_home};
 use crate::daemon::db::prelude::*;
+use crate::daemon::db_handle::DaemonDbOwnedHandle;
 
 #[test]
 fn manager_starts_registers_steers_and_stops_tui() {
@@ -36,6 +37,7 @@ fn manager_starts_registers_steers_and_stops_tui() {
         let context_root = tmp.path().join("context-root");
         fs_err::create_dir_all(&project_dir).expect("project dir");
         let db = DaemonDb::open_in_memory().expect("open db");
+        let db = DaemonDbOwnedHandle(db);
         let project = crate::daemon::index::DiscoveredProject {
             project_id: "project-tui-manager".into(),
             name: "project".into(),

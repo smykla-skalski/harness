@@ -1,10 +1,9 @@
-use crate::daemon::db::DaemonDb;
-
 use super::{CliError, SessionLogEntry, SessionTransition, session_service, utc_now};
 use crate::daemon::db::prelude::*;
+use crate::daemon::db_handle::DaemonDbOwnedHandle;
 
 pub(crate) fn append_leave_signal_logs_to_db(
-    db: &DaemonDb,
+    db: &DaemonDbOwnedHandle,
     session_id: &str,
     actor_id: &str,
     signals: &[session_service::LeaveSignalRecord],
@@ -25,7 +24,7 @@ pub(crate) fn append_leave_signal_logs_to_db(
 }
 
 pub(crate) fn append_task_drop_effect_logs(
-    db: &DaemonDb,
+    db: &DaemonDbOwnedHandle,
     session_id: &str,
     actor_id: &str,
     effects: &[session_service::TaskDropEffect],

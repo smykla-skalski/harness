@@ -8,7 +8,7 @@ use super::{CliError, db_error};
 /// through [`super::DaemonDb`]. The statements are `IF NOT EXISTS` so a database
 /// already advanced by the async migrator stays untouched.
 const POLICY_GRAPH_DDL: &str =
-    include_str!("../../harness-daemon/src/daemon/db/migrations/0008_daemon_v14_policy_graph.sql");
+    include_str!("../../harness-daemon-db-core/src/migrations/0008_daemon_v14_policy_graph.sql");
 
 /// # Errors
 /// Returns [`CliError`] on SQL failures.

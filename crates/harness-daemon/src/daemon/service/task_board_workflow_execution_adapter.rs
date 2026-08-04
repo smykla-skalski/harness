@@ -2,8 +2,8 @@
 use std::collections::BTreeMap;
 use std::future::Future;
 
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::task_board::{
     TaskBoardExecutionAttemptCas, TaskBoardExecutionAttemptCasOutcome,
     TaskBoardExecutionAttemptCreateOutcome, TaskBoardExecutionAttemptRecord,
@@ -22,7 +22,7 @@ use harness_kernel::errors::CliError;
 use harness_kernel::errors::CliErrorKind;
 use harness_task_board_workflow_execution::WorkflowExecutionStore;
 
-struct WorkflowExecutionDb<'a>(&'a AsyncDaemonDb);
+struct WorkflowExecutionDb<'a>(&'a AsyncDaemonDbHandle);
 
 impl WorkflowExecutionStore for WorkflowExecutionDb<'_> {
     fn workflow_execution(
@@ -75,7 +75,7 @@ pub(crate) struct TaskBoardWorkflowExecutionCreateRequest {
 
 #[cfg(test)]
 pub(crate) async fn create_or_load_workflow_execution(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &TaskBoardWorkflowExecutionCreateRequest,
 ) -> Result<TaskBoardWorkflowExecutionCreateOutcome, CliError> {
     let created_at = canonical_time(&request.created_at)?;
@@ -133,7 +133,7 @@ fn invalid_transition(detail: impl Into<String>) -> CliError {
 }
 
 pub(crate) async fn advance_workflow_execution(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     expected: &TaskBoardWorkflowExecutionCas,
     current_revisions: &TaskBoardWorkflowRevisionGuard,
     observed_pull_request: Option<&TaskBoardPullRequestIdentity>,
@@ -152,7 +152,7 @@ pub(crate) async fn advance_workflow_execution(
 }
 
 pub(crate) async fn schedule_workflow_retry(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     expected: &TaskBoardWorkflowExecutionCas,
     retry: TaskBoardRetrySchedule,
     diagnostic: TaskBoardExecutionDiagnostic,
@@ -169,7 +169,7 @@ pub(crate) async fn schedule_workflow_retry(
 }
 
 pub(crate) async fn resume_workflow_retry(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     expected: &TaskBoardWorkflowExecutionCas,
     resumed_at: &str,
 ) -> Result<TaskBoardWorkflowExecutionCasOutcome, CliError> {
@@ -182,7 +182,7 @@ pub(crate) async fn resume_workflow_retry(
 }
 
 pub(crate) async fn create_workflow_execution_attempt(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     attempt: &TaskBoardExecutionAttemptRecord,
 ) -> Result<TaskBoardExecutionAttemptCreateOutcome, CliError> {
     harness_task_board_workflow_execution::create_workflow_execution_attempt(
@@ -193,7 +193,7 @@ pub(crate) async fn create_workflow_execution_attempt(
 }
 
 pub(crate) async fn record_workflow_execution_attempt(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     expected: &TaskBoardExecutionAttemptCas,
     updated: &TaskBoardExecutionAttemptRecord,
 ) -> Result<TaskBoardExecutionAttemptCasOutcome, CliError> {
@@ -206,7 +206,7 @@ pub(crate) async fn record_workflow_execution_attempt(
 }
 
 pub(crate) async fn guarded_execution(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     expected: &TaskBoardWorkflowExecutionCas,
 ) -> Result<Option<TaskBoardWorkflowExecutionRecord>, CliError> {
     harness_task_board_workflow_execution::guarded_execution(&WorkflowExecutionDb(db), expected)
@@ -214,7 +214,7 @@ pub(crate) async fn guarded_execution(
 }
 
 pub(crate) async fn stale_outcome(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     expected: &TaskBoardWorkflowExecutionCas,
 ) -> Result<TaskBoardWorkflowExecutionCasOutcome, CliError> {
     harness_task_board_workflow_execution::stale_outcome(&WorkflowExecutionDb(db), expected).await

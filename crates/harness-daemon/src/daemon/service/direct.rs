@@ -8,7 +8,7 @@ use super::{CliError, Path, SessionState, agents_service};
 /// Returns `CliError` when the worktree cannot be created or DB operations fail.
 pub fn start_session_direct(
     request: &super::protocol::SessionStartRequest,
-    db: Option<&super::db::DaemonDb>,
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
 ) -> Result<SessionState, CliError> {
     harness_daemon_session_service::start_session(request, db)
 }
@@ -20,7 +20,7 @@ pub fn start_session_direct(
 /// Returns `CliError` when the worktree cannot be created or async DB operations fail.
 pub(crate) async fn start_session_direct_async(
     request: &super::protocol::SessionStartRequest,
-    async_db: &super::db::AsyncDaemonDb,
+    async_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
 ) -> Result<SessionState, CliError> {
     harness_daemon_session_service::start_session_async(request, async_db).await
 }
@@ -32,7 +32,7 @@ pub(crate) async fn start_session_direct_async(
 pub fn join_session_direct(
     session_id: &str,
     request: &super::protocol::SessionJoinRequest,
-    db: Option<&super::db::DaemonDb>,
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
 ) -> Result<SessionState, CliError> {
     let agent_session_id = resolve_agent_session_id(request);
     harness_daemon_session_service::join_session(
@@ -51,7 +51,7 @@ pub fn join_session_direct(
 pub(crate) async fn join_session_direct_async(
     session_id: &str,
     request: &super::protocol::SessionJoinRequest,
-    async_db: &super::db::AsyncDaemonDb,
+    async_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
 ) -> Result<SessionState, CliError> {
     let agent_session_id = resolve_agent_session_id(request);
     harness_daemon_session_service::join_session_async(
@@ -77,7 +77,7 @@ fn resolve_agent_session_id(request: &super::protocol::SessionJoinRequest) -> Op
 pub fn register_agent_runtime_session_direct(
     session_id: &str,
     request: &super::protocol::AgentRuntimeSessionRegistrationRequest,
-    db: Option<&super::db::DaemonDb>,
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
 ) -> Result<bool, CliError> {
     harness_daemon_session_service::register_agent_runtime_session(session_id, request, db)
 }
@@ -85,7 +85,7 @@ pub fn register_agent_runtime_session_direct(
 pub(crate) async fn register_agent_runtime_session_direct_async(
     session_id: &str,
     request: &super::protocol::AgentRuntimeSessionRegistrationRequest,
-    async_db: &super::db::AsyncDaemonDb,
+    async_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
 ) -> Result<bool, CliError> {
     harness_daemon_session_service::register_agent_runtime_session_async(
         session_id, request, async_db,
@@ -100,7 +100,7 @@ pub(crate) async fn register_agent_runtime_session_direct_async(
 pub fn update_session_title_direct(
     session_id: &str,
     request: &super::protocol::SessionTitleRequest,
-    db: &super::db::DaemonDb,
+    db: &crate::daemon::db_handle::DaemonDbOwnedHandle,
 ) -> Result<SessionState, CliError> {
     harness_daemon_session_service::update_session_title(session_id, request, db)
 }
@@ -112,7 +112,7 @@ pub fn update_session_title_direct(
 pub(crate) async fn update_session_title_direct_async(
     session_id: &str,
     request: &super::protocol::SessionTitleRequest,
-    async_db: &super::db::AsyncDaemonDb,
+    async_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
 ) -> Result<SessionState, CliError> {
     harness_daemon_session_service::update_session_title_async(session_id, request, async_db).await
 }
@@ -128,7 +128,7 @@ pub fn disconnect_agent_direct(
     session_id: &str,
     agent_id: &str,
     reason: &str,
-    db: Option<&super::db::DaemonDb>,
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
 ) -> Result<bool, CliError> {
     harness_daemon_session_service::disconnect_agent(session_id, agent_id, reason, db)
 }
@@ -142,7 +142,7 @@ pub(crate) async fn disconnect_agent_direct_async(
     session_id: &str,
     agent_id: &str,
     reason: &str,
-    async_db: &super::db::AsyncDaemonDb,
+    async_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
 ) -> Result<bool, CliError> {
     harness_daemon_session_service::disconnect_agent_async(session_id, agent_id, reason, async_db)
         .await
@@ -155,7 +155,7 @@ pub(crate) async fn disconnect_agent_direct_async(
 pub fn record_signal_ack_direct(
     session_id: &str,
     request: &super::protocol::SignalAckRequest,
-    db: Option<&super::db::DaemonDb>,
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
 ) -> Result<(), CliError> {
     let project_dir = Path::new(&request.project_dir);
     super::record_signal_ack(
@@ -176,7 +176,7 @@ pub fn record_signal_ack_direct(
 /// DELETE has no file-based fallback path.
 pub fn delete_session_direct(
     session_id: &str,
-    db: Option<&super::db::DaemonDb>,
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
 ) -> Result<bool, CliError> {
     harness_daemon_session_service::delete_session(session_id, db)
 }
@@ -187,7 +187,7 @@ pub fn delete_session_direct(
 /// Returns [`CliError`] on DB failures.
 pub(crate) async fn delete_session_direct_async(
     session_id: &str,
-    async_db: &super::db::AsyncDaemonDb,
+    async_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
 ) -> Result<bool, CliError> {
     harness_daemon_session_service::delete_session_async(session_id, async_db).await
 }

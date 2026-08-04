@@ -170,7 +170,7 @@ async fn feature_off_force_cancel_leaves_workflow_change_and_audit_untouched() {
 }
 
 async fn force_cancel_events(
-    db: &crate::daemon::db::AsyncDaemonDb,
+    db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
 ) -> Vec<crate::daemon::protocol::HarnessMonitorAuditEvent> {
     db.load_audit_events(&HarnessMonitorAuditEventsRequest {
         action_keys: vec!["task_board.automation.execution.force_cancel".into()],
@@ -181,7 +181,7 @@ async fn force_cancel_events(
     .events
 }
 
-async fn initialize_automation_control(db: &crate::daemon::db::AsyncDaemonDb) {
+async fn initialize_automation_control(db: &crate::daemon::db_handle::AsyncDaemonDbHandle) {
     db.initialize_task_board_automation_control_from_legacy_intent(
         TaskBoardAutomationDesiredMode::Off,
         chrono::Utc::now(),

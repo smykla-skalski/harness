@@ -1,6 +1,5 @@
 use std::path::Path;
 
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{
     TaskAssignRequest, TaskClaimReviewRequest, TaskCreateRequest, TaskSubmitForReviewRequest,
     TaskSubmitReviewRequest, TaskUpdateRequest,
@@ -9,6 +8,7 @@ use crate::session::types::{ReviewVerdict, SessionRole, TaskStatus};
 
 use super::*;
 use crate::daemon::db::AsyncSessionSummaryQueries;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 #[test]
@@ -23,7 +23,7 @@ fn submit_review_async_concurrent_reviewers_close_quorum_without_lost_state() {
 }
 
 struct ReviewQuorumFixture {
-    async_db: AsyncDaemonDb,
+    async_db: AsyncDaemonDbHandle,
     session_id: String,
     task_id: String,
     reviewer_gemini: String,
@@ -34,7 +34,7 @@ struct ReviewQuorumFixture {
 // agent_id; `role`/`runtime` double as the lookup key since each runtime
 // only ever joins once per fixture.
 async fn review_quorum_join_agent(
-    async_db: &AsyncDaemonDb,
+    async_db: &AsyncDaemonDbHandle,
     project: &Path,
     session_id: &str,
     env_var: &'static str,
@@ -71,7 +71,7 @@ async fn review_quorum_join_agent(
 
 // Session plus its three joined agents, before any task exists yet.
 struct ReviewQuorumSession {
-    async_db: AsyncDaemonDb,
+    async_db: AsyncDaemonDbHandle,
     session_id: String,
     leader_id: String,
     worker_id: String,
@@ -87,6 +87,7 @@ async fn review_quorum_start_session(project: &Path) -> ReviewQuorumSession {
     let async_db = crate::daemon::db::AsyncDaemonDb::connect(&db_path)
         .await
         .expect("open async daemon db");
+    let async_db = AsyncDaemonDbHandle(async_db);
 
     let state = start_direct_session_async(
         &async_db,

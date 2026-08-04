@@ -11,6 +11,8 @@ use crate::daemon::agent_tui::AgentTuiManagerHandle;
 use crate::daemon::codex_controller::CodexControllerHandle;
 use crate::daemon::db::prelude::*;
 use crate::daemon::db::{AgentTurnRunSnapshot, AgentTurnRunStatus, AsyncDaemonDb, DaemonDb};
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
+use crate::daemon::db_handle::DaemonDbOwnedHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::daemon::http::{
     AsyncDaemonDbSlot, DaemonHttpAuthMode, DaemonHttpState, ManagedAgentMutationLocks,
@@ -24,11 +26,11 @@ use crate::session::types::{CURRENT_VERSION, SessionMetrics, SessionState, Sessi
 async fn production_load_reconciles_unattached_active_report_after_restart() {
     let directory = tempdir().expect("tempdir");
     let db_path = directory.path().join("harness.db");
-    let db = Arc::new(
+    let db = Arc::new(AsyncDaemonDbHandle(
         AsyncDaemonDb::connect(&db_path)
             .await
             .expect("open async database"),
-    );
+    ));
     let run = active_report_run();
     seed_session(db.as_ref(), &run.session_id).await;
     db.save_codex_run(&run).await.expect("save active run");
@@ -60,11 +62,11 @@ async fn production_load_reconciles_unattached_active_report_after_restart() {
 async fn production_load_settles_evicted_agent_turn_and_releases_admission() {
     let directory = tempdir().expect("tempdir");
     let db_path = directory.path().join("harness.db");
-    let db = Arc::new(
+    let db = Arc::new(AsyncDaemonDbHandle(
         AsyncDaemonDb::connect(&db_path)
             .await
             .expect("open async database"),
-    );
+    ));
     let run = active_agent_turn_report_run();
     seed_session(db.as_ref(), run.session_id.as_deref().expect("session id")).await;
     insert_committed_admission(db.as_ref(), "ledger-evicted", &run.run_id).await;
@@ -95,7 +97,11 @@ async fn production_load_settles_evicted_agent_turn_and_releases_admission() {
     );
 }
 
-async fn insert_committed_admission(db: &AsyncDaemonDb, ledger_id: &str, managed_worker_id: &str) {
+async fn insert_committed_admission(
+    db: &AsyncDaemonDbHandle,
+    ledger_id: &str,
+    managed_worker_id: &str,
+) {
     let mut conn = db.pool().acquire().await.expect("acquire connection");
     sqlx::query("PRAGMA foreign_keys = OFF")
         .execute(&mut *conn)
@@ -120,7 +126,7 @@ async fn insert_committed_admission(db: &AsyncDaemonDb, ledger_id: &str, managed
     inserted.expect("insert committed admission");
 }
 
-async fn admission_state(db: &AsyncDaemonDb, ledger_id: &str) -> String {
+async fn admission_state(db: &AsyncDaemonDbHandle, ledger_id: &str) -> String {
     sqlx::query_scalar(
         "SELECT state FROM task_board_dispatch_admission_ledger WHERE ledger_id = ?1",
     )
@@ -130,7 +136,7 @@ async fn admission_state(db: &AsyncDaemonDb, ledger_id: &str) -> String {
     .expect("read admission state")
 }
 
-pub(super) async fn seed_session(db: &AsyncDaemonDb, session_id: &str) {
+pub(super) async fn seed_session(db: &AsyncDaemonDbHandle, session_id: &str) {
     let state = SessionState {
         schema_version: CURRENT_VERSION,
         state_version: 1,
@@ -185,13 +191,13 @@ pub(super) async fn seed_session(db: &AsyncDaemonDb, session_id: &str) {
 
 pub(super) fn restarted_state(
     db_path: &std::path::Path,
-    async_db: Arc<AsyncDaemonDb>,
+    async_db: Arc<AsyncDaemonDbHandle>,
 ) -> DaemonHttpState {
     let (sender, _) = broadcast::channel::<StreamEvent>(8);
     let db = Arc::new(OnceLock::new());
-    db.set(Arc::new(Mutex::new(
+    db.set(Arc::new(Mutex::new(DaemonDbOwnedHandle(
         DaemonDb::open(db_path).expect("open synchronous database"),
-    )))
+    ))))
     .expect("install synchronous database");
     let async_db_slot = Arc::new(OnceLock::new());
     async_db_slot.set(async_db).expect("install async database");

@@ -16,12 +16,12 @@ use harness_task_board::{
     validate_task_board_dependency_fix_audit,
 };
 
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::protocol::{CodexRunMode, CodexRunRequest, CodexRunStatus};
 use crate::session::types::{CONTROL_PLANE_ACTOR_ID, SessionRole};
 
 use super::CodexControllerHandle;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 #[derive(Clone)]
 pub struct CodexDependencyFixLauncher {
@@ -113,7 +113,7 @@ impl CodexControllerHandle {
         .await
     }
 
-    fn dependency_fix_audit_sink(&self) -> Result<std::sync::Arc<AsyncDaemonDb>, CliError> {
+    fn dependency_fix_audit_sink(&self) -> Result<std::sync::Arc<AsyncDaemonDbHandle>, CliError> {
         self.state.async_db.get().cloned().ok_or_else(|| {
             CliErrorKind::workflow_io(
                 "dependency fixer ticket audit requires the async daemon database",
@@ -127,42 +127,46 @@ const DEPENDENCY_FIX_AUDIT_START: &str = "<!-- harness:dependency-fix-audit:star
 const DEPENDENCY_FIX_AUDIT_CLOSE: &str = "\n```\n<!-- harness:dependency-fix-audit:end -->";
 
 #[async_trait]
-impl TaskBoardDependencyFixAuditSink for AsyncDaemonDb {
+impl TaskBoardDependencyFixAuditSink for AsyncDaemonDbHandle {
     async fn record(&self, audit: &TaskBoardDependencyFixAuditTrail) -> Result<(), CliError> {
         validate_task_board_dependency_fix_audit(audit)?;
         let audit = audit.clone();
         let item_id = audit.board_item_id.clone();
-        self.update_task_board_item(&item_id, move |item| {
-            if item.workflow.execution_id.as_deref() != Some(audit.workflow_execution_id.as_str()) {
-                return Err(CliErrorKind::workflow_parse(
-                    "dependency fixer audit does not match the ticket workflow execution",
-                )
-                .into());
-            }
-            if let Some(existing) = dependency_fix_audit_from_body(&item.body)? {
-                if existing == audit {
-                    return Ok(false);
+        self.0
+            .update_task_board_item(&item_id, move |item| {
+                if item.workflow.execution_id.as_deref()
+                    != Some(audit.workflow_execution_id.as_str())
+                {
+                    return Err(CliErrorKind::workflow_parse(
+                        "dependency fixer audit does not match the ticket workflow execution",
+                    )
+                    .into());
                 }
-                validate_dependency_fix_audit_advance(&existing, &audit)?;
-            }
-            item.body = render_dependency_fix_audit_body(&item.body, &audit)?;
-            item.workflow.attempts = audit.current_attempt;
-            item.workflow.last_error = Some(audit.failure_reason.clone());
-            match audit.status {
-                TaskBoardDependencyFixAutomationStatus::RetryScheduled => {
-                    item.status = TaskBoardStatus::InProgress;
-                    item.workflow.status = TaskBoardWorkflowStatus::Running;
-                    item.workflow.current_step_id = Some("dependency_fix_retry".into());
+                if let Some(existing) = dependency_fix_audit_from_body(&item.body)? {
+                    if existing == audit {
+                        return Ok(false);
+                    }
+                    validate_dependency_fix_audit_advance(&existing, &audit)?;
                 }
-                TaskBoardDependencyFixAutomationStatus::HumanRequired => {
-                    item.status = TaskBoardStatus::HumanRequired;
-                    item.workflow.status = TaskBoardWorkflowStatus::Paused;
-                    item.workflow.current_step_id = Some("dependency_fix_human_required".into());
+                item.body = render_dependency_fix_audit_body(&item.body, &audit)?;
+                item.workflow.attempts = audit.current_attempt;
+                item.workflow.last_error = Some(audit.failure_reason.clone());
+                match audit.status {
+                    TaskBoardDependencyFixAutomationStatus::RetryScheduled => {
+                        item.status = TaskBoardStatus::InProgress;
+                        item.workflow.status = TaskBoardWorkflowStatus::Running;
+                        item.workflow.current_step_id = Some("dependency_fix_retry".into());
+                    }
+                    TaskBoardDependencyFixAutomationStatus::HumanRequired => {
+                        item.status = TaskBoardStatus::HumanRequired;
+                        item.workflow.status = TaskBoardWorkflowStatus::Paused;
+                        item.workflow.current_step_id =
+                            Some("dependency_fix_human_required".into());
+                    }
                 }
-            }
-            Ok(true)
-        })
-        .await?;
+                Ok(true)
+            })
+            .await?;
         Ok(())
     }
 }

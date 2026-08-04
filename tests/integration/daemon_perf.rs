@@ -9,6 +9,7 @@ use tokio::sync::{broadcast, watch};
 use harness::daemon::agent_acp::AcpAgentManagerHandle;
 use harness::daemon::codex_controller::CodexControllerHandle;
 use harness::daemon::db::{DaemonDb, DaemonDbDiagnostics, DaemonDbImports, DaemonDbOpen};
+use harness::daemon::db_handle::DaemonDbOwnedHandle;
 use harness::daemon::http::{
     DaemonHttpState, default_remote_pairing_limiter, default_remote_pairing_status_limiter,
     serve_tcp,
@@ -61,7 +62,7 @@ struct TestDaemon {
     _shutdown_tx: watch::Sender<bool>,
 }
 
-async fn start_test_daemon(db: Option<DaemonDb>) -> TestDaemon {
+async fn start_test_daemon(db: Option<DaemonDbOwnedHandle>) -> TestDaemon {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
         .await
         .expect("bind");
@@ -241,6 +242,7 @@ async fn daemon_http_endpoint_performance_budgets() {
 
     let db_path = tmp.path().join("harness/daemon/managed/harness.db");
     let db = DaemonDb::open(&db_path).expect("open db");
+    let db = DaemonDbOwnedHandle(db);
     with_isolated_harness_env(tmp.path(), || db.import_from_files()).expect("import");
 
     let daemon = start_test_daemon(Some(db)).await;
@@ -316,6 +318,7 @@ fn daemon_status_report_within_budget() {
     // Import into DB so status_report uses SQLite path.
     let db_path = tmp.path().join("harness/daemon/managed/harness.db");
     let db = DaemonDb::open(&db_path).expect("open db");
+    let db = DaemonDbOwnedHandle(db);
     with_isolated_harness_env(tmp.path(), || db.import_from_files()).expect("import");
     drop(db);
 

@@ -2,7 +2,6 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::service::observe_async_db;
 use crate::daemon::service::reviews::policy_mapping::map_run_response;
 use crate::reviews::{
@@ -19,6 +18,7 @@ use harness_kernel::errors::CliError;
 
 use super::policy::require_policy_runtime_db;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 /// How many runs the history response carries. Bounds the payload so a busy
 /// subject cannot flood the observability surface with every retained run.
@@ -39,7 +39,7 @@ pub async fn reviews_policy_history(
 
 pub(crate) async fn reviews_policy_history_with_audit_db(
     request: &ReviewsPolicyHistoryRequest,
-    database: Option<Arc<AsyncDaemonDb>>,
+    database: Option<Arc<AsyncDaemonDbHandle>>,
 ) -> Result<ReviewsPolicyHistoryResponse, CliError> {
     request.validate()?;
     let database = require_policy_runtime_db(database)?;

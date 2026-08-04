@@ -16,6 +16,7 @@ use crate::task_board::{
 
 use super::super::{DatabaseAutomationRequest, automate_item_with_database_policy};
 use super::{FakeGitHubClient, TEST_HOST_ID, init_repo, managed_branch_name, run_git};
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 #[tokio::test]
@@ -37,6 +38,7 @@ async fn stop_after_fresh_evidence_prevents_merge() {
     let db = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
         .await
         .expect("open database");
+    let db = AsyncDaemonDbHandle(db);
     db.start_task_board_automation(
         TaskBoardAutomationDesiredMode::Continuous,
         chrono::Utc::now(),

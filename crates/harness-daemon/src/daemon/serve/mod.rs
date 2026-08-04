@@ -86,8 +86,10 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
 
     let (sender, _) = broadcast::channel(256);
     let (shutdown_tx, shutdown_rx) = tokio_watch::channel(false);
-    let db: Arc<OnceLock<Arc<Mutex<super::db::DaemonDb>>>> = Arc::new(OnceLock::new());
-    let async_db: Arc<OnceLock<Arc<super::db::AsyncDaemonDb>>> = Arc::new(OnceLock::new());
+    let db: Arc<OnceLock<Arc<Mutex<crate::daemon::db_handle::DaemonDbOwnedHandle>>>> =
+        Arc::new(OnceLock::new());
+    let async_db: Arc<OnceLock<Arc<crate::daemon::db_handle::AsyncDaemonDbHandle>>> =
+        Arc::new(OnceLock::new());
     service::install_observe_runtime(
         sender.clone(),
         config.observe_interval,
@@ -207,19 +209,21 @@ async fn run_startup_recovery(app_state: &DaemonHttpState) -> Result<(), CliErro
     reason = "tracing macro expansion; tokio-rs/tracing#553"
 )]
 pub(crate) fn open_and_publish_db(
-    db_slot: &Arc<OnceLock<Arc<Mutex<super::db::DaemonDb>>>>,
-) -> Result<Arc<Mutex<super::db::DaemonDb>>, CliError> {
+    db_slot: &Arc<OnceLock<Arc<Mutex<crate::daemon::db_handle::DaemonDbOwnedHandle>>>>,
+) -> Result<Arc<Mutex<crate::daemon::db_handle::DaemonDbOwnedHandle>>, CliError> {
     let db_path = state::daemon_root().join("harness.db");
     let db = open_daemon_db(&db_path)?;
-    let db = Arc::new(Mutex::new(db));
+    let db = Arc::new(Mutex::new(crate::daemon::db_handle::DaemonDbOwnedHandle(
+        db,
+    )));
     let _ = db_slot.set(Arc::clone(&db));
     tracing::info!("database ready");
     Ok(db)
 }
 
 pub(crate) async fn initialize_startup_state(
-    db_slot: &Arc<OnceLock<Arc<Mutex<super::db::DaemonDb>>>>,
-    async_db_slot: &Arc<OnceLock<Arc<super::db::AsyncDaemonDb>>>,
+    db_slot: &Arc<OnceLock<Arc<Mutex<crate::daemon::db_handle::DaemonDbOwnedHandle>>>>,
+    async_db_slot: &Arc<OnceLock<Arc<crate::daemon::db_handle::AsyncDaemonDbHandle>>>,
     sender: broadcast::Sender<super::protocol::StreamEvent>,
     config: &DaemonServeConfig,
 ) -> Result<(), CliError> {
@@ -270,7 +274,7 @@ pub(crate) async fn initialize_startup_state(
     clippy::cognitive_complexity,
     reason = "reports the outcome of reattributing unattributed task-board items; two of its three arms log, a count when some were attributed and the error on failure, while the zero case stays silent, so two macro expansions cost 14 of this 7-line function's 17 points, leaving structural 3"
 )]
-async fn reattribute_task_board_items(db: &super::db::AsyncDaemonDb) {
+async fn reattribute_task_board_items(db: &crate::daemon::db_handle::AsyncDaemonDbHandle) {
     match db.reattribute_unattributed_task_board_items().await {
         Ok(0) => {}
         Ok(count) => tracing::info!(count, "attributed task board items to their projects"),
@@ -279,8 +283,8 @@ async fn reattribute_task_board_items(db: &super::db::AsyncDaemonDb) {
 }
 
 fn spawn_startup_background_tasks(
-    db: Arc<Mutex<super::db::DaemonDb>>,
-    async_db_slot: Arc<OnceLock<Arc<super::db::AsyncDaemonDb>>>,
+    db: Arc<Mutex<crate::daemon::db_handle::DaemonDbOwnedHandle>>,
+    async_db_slot: Arc<OnceLock<Arc<crate::daemon::db_handle::AsyncDaemonDbHandle>>>,
     sender: broadcast::Sender<super::protocol::StreamEvent>,
     poll_interval: Duration,
 ) {
@@ -296,7 +300,7 @@ fn spawn_startup_background_tasks(
 }
 
 pub(crate) async fn initialize_async_db(
-    async_db_slot: &Arc<OnceLock<Arc<super::db::AsyncDaemonDb>>>,
+    async_db_slot: &Arc<OnceLock<Arc<crate::daemon::db_handle::AsyncDaemonDbHandle>>>,
 ) -> Result<(), CliError> {
     let db = open_and_publish_async_db(async_db_slot).await?;
     db.cache_startup_diagnostics().await?;
@@ -323,10 +327,12 @@ fn startup_span() -> tracing::Span {
     reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
 )]
 pub(crate) async fn open_and_publish_async_db(
-    async_db_slot: &Arc<OnceLock<Arc<super::db::AsyncDaemonDb>>>,
-) -> Result<Arc<super::db::AsyncDaemonDb>, CliError> {
+    async_db_slot: &Arc<OnceLock<Arc<crate::daemon::db_handle::AsyncDaemonDbHandle>>>,
+) -> Result<Arc<crate::daemon::db_handle::AsyncDaemonDbHandle>, CliError> {
     let db_path = state::daemon_root().join("harness.db");
-    let db = Arc::new(open_daemon_async_db(&db_path).await?);
+    let db = Arc::new(crate::daemon::db_handle::AsyncDaemonDbHandle(
+        open_daemon_async_db(&db_path).await?,
+    ));
     let _ = async_db_slot.set(Arc::clone(&db));
     tracing::info!("async database pool ready");
     Ok(db)

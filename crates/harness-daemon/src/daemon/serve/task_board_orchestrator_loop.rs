@@ -6,8 +6,10 @@ use tokio::sync::watch as tokio_watch;
 use tokio::task::JoinHandle;
 use tokio::time::{MissedTickBehavior, interval};
 
+#[cfg(test)]
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::http::{DaemonHttpState, task_board_route_executor};
 use crate::feature_flags::task_board_automation_v2_enabled_from_env;
 use crate::task_board::TaskBoardOrchestratorRunOnceRequest;
@@ -23,7 +25,7 @@ struct AutonomousOrchestratorIntent {
 
 pub(super) fn spawn_task_board_orchestrator_loop(
     state: DaemonHttpState,
-    db: Arc<AsyncDaemonDb>,
+    db: Arc<AsyncDaemonDbHandle>,
     tick_interval: Duration,
     shutdown_rx: tokio_watch::Receiver<bool>,
 ) -> JoinHandle<()> {
@@ -45,7 +47,7 @@ pub(super) fn spawn_task_board_orchestrator_loop(
 
 async fn run_task_board_orchestrator_loop(
     state: DaemonHttpState,
-    db: Arc<AsyncDaemonDb>,
+    db: Arc<AsyncDaemonDbHandle>,
     tick_interval: Duration,
     mut shutdown_rx: tokio_watch::Receiver<bool>,
 ) {
@@ -70,7 +72,7 @@ async fn wait_for_shutdown(shutdown_rx: &mut tokio_watch::Receiver<bool>) {
     }
 }
 
-async fn run_logged_tick(state: &DaemonHttpState, db: &AsyncDaemonDb) {
+async fn run_logged_tick(state: &DaemonHttpState, db: &AsyncDaemonDbHandle) {
     let request = TaskBoardOrchestratorRunOnceRequest::default();
     let result = drive_task_board_orchestrator_once(
         || orchestrator_state(db),
@@ -80,7 +82,9 @@ async fn run_logged_tick(state: &DaemonHttpState, db: &AsyncDaemonDb) {
     log_tick_result(result);
 }
 
-async fn orchestrator_state(db: &AsyncDaemonDb) -> Result<AutonomousOrchestratorIntent, CliError> {
+async fn orchestrator_state(
+    db: &AsyncDaemonDbHandle,
+) -> Result<AutonomousOrchestratorIntent, CliError> {
     let state = db.task_board_orchestrator_state().await?;
     let settings = db.task_board_orchestrator_settings().await?;
     Ok(AutonomousOrchestratorIntent {
@@ -182,6 +186,7 @@ mod tests {
             let db = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
                 .await
                 .expect("open database");
+            let db = AsyncDaemonDbHandle(db);
             db.replace_task_board_orchestrator_state(&state(false, false))
                 .await
                 .expect("save database state");

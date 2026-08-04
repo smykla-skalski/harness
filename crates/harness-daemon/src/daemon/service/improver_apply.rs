@@ -31,7 +31,7 @@ use crate::daemon::db::prelude::*;
 pub fn improver_apply(
     session_id: &str,
     request: &ImproverApplyRequest,
-    db: Option<&super::db::DaemonDb>,
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
 ) -> Result<ImproverApplyOutcome, CliError> {
     let resolved = if let Some(db) = db {
         db.resolve_session(session_id)?
@@ -49,7 +49,7 @@ pub fn improver_apply(
 pub(crate) async fn improver_apply_async(
     session_id: &str,
     request: &ImproverApplyRequest,
-    async_db: &super::db::AsyncDaemonDb,
+    async_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
 ) -> Result<ImproverApplyOutcome, CliError> {
     let resolved = async_db
         .resolve_session(session_id)

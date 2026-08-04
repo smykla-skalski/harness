@@ -8,8 +8,8 @@ use uuid::Uuid;
 use crate::daemon::audit_events::{
     AuditEventStore, broadcast_audit_event, persist_audit_event_once_strict,
 };
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::protocol::{
     HarnessMonitorAuditEvent, TaskBoardAutomationForceCancelDisposition,
     TaskBoardAutomationForceCancelRequest, TaskBoardAutomationForceCancelResponse,
@@ -28,7 +28,7 @@ use crate::workspace::utc_now;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 pub(crate) async fn force_cancel_task_board_automation_db(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &TaskBoardAutomationForceCancelRequest,
 ) -> Result<TaskBoardAutomationForceCancelResponse, CliError> {
     if !task_board_automation_v2_enabled_from_env() {
@@ -56,7 +56,7 @@ pub(crate) async fn force_cancel_task_board_automation_db(
 }
 
 async fn force_cancel(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &TaskBoardAutomationForceCancelRequest,
     success_audit: &HarnessMonitorAuditEvent,
 ) -> Result<ForceCancelOutcome, CliError> {
@@ -111,7 +111,7 @@ async fn force_cancel(
 }
 
 pub(super) async fn apply_cancel(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     current: TaskBoardWorkflowExecutionRecord,
     target: &TaskBoardAutomationCancelTarget,
     reason: &str,
@@ -178,7 +178,7 @@ pub(super) async fn apply_cancel(
 }
 
 async fn replay_after_race(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     target: &TaskBoardAutomationCancelTarget,
     reason: &str,
     success_audit: &HarnessMonitorAuditEvent,
@@ -200,7 +200,7 @@ async fn replay_after_race(
 }
 
 async fn replay_outcome(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     success_audit: &HarnessMonitorAuditEvent,
     disposition: TaskBoardAutomationForceCancelDisposition,
 ) -> Result<ForceCancelOutcome, CliError> {

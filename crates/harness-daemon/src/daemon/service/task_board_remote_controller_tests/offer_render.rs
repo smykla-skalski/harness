@@ -75,7 +75,7 @@ async fn one_unrenderable_candidate_does_not_block_the_others() {
 }
 
 async fn execution_target(
-    db: &crate::daemon::db::AsyncDaemonDb,
+    db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
     execution_id: &str,
 ) -> Option<String> {
     db.task_board_workflow_execution(execution_id)

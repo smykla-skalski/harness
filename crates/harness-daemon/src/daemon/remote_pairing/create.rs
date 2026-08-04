@@ -12,7 +12,7 @@ use chrono::{DateTime, Duration as ChronoDuration, Utc};
 
 use super::invitation::build_remote_pairing_invitation;
 use super::{RemotePairingCode, RemotePairingRecord, RemotePairingSubject};
-use crate::daemon::db::DaemonDb;
+use crate::daemon::db_handle::DaemonDbOwnedHandle;
 use crate::daemon::remote::{RemoteAccessScope, RemoteRole};
 use crate::daemon::remote_identity::RemoteAuditEvent;
 use crate::reviews::ReviewsQueryRequest;
@@ -78,7 +78,7 @@ pub struct RemotePairingCreated {
 /// Returns [`CliError`] when scope expansion, subject validation, invitation
 /// assembly, or persistence fails.
 pub fn create_remote_pairing(
-    db: &DaemonDb,
+    db: &DaemonDbOwnedHandle,
     params: &RemotePairingCreateParams<'_>,
 ) -> Result<RemotePairingCreated, CliError> {
     if let Some(subject) = params.minted_for {

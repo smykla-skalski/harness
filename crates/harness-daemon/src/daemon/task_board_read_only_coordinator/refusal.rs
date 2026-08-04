@@ -1,4 +1,3 @@
-use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::{
     TaskBoardDependencyRecoveryDecision, TaskBoardTerminalOutcomeKind,
     TaskBoardWorkflowExecutionRecord, classify_task_board_dependency_workflow_recovery,
@@ -6,12 +5,13 @@ use crate::task_board::{
 use harness_kernel::errors::CliError;
 
 use super::{attempts::require_human, requests};
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 /// Refuses an execution whose immutable inputs cannot be used at all.
 ///
 /// `Ok(true)` means the execution was refused and needs no further reconciling.
 pub(super) async fn refuse_unusable_execution(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     now: &str,
 ) -> Result<bool, CliError> {
@@ -45,7 +45,7 @@ pub(super) async fn refuse_unusable_execution(
 }
 
 pub(crate) async fn recovery_decision_or_refuse(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     now: &str,
 ) -> Result<Option<TaskBoardDependencyRecoveryDecision>, CliError> {

@@ -4,8 +4,8 @@ use std::fs::{File, Metadata, OpenOptions};
 use std::io::{ErrorKind, Write as _};
 use std::path::{Path, PathBuf};
 
+use crate::daemon::db::TaskBoardImportMarker;
 use crate::daemon::db::task_board::prelude::*;
-use crate::daemon::db::{AsyncDaemonDb, TaskBoardImportMarker};
 use crate::daemon::reviews_store::PolicyGraphQueries;
 use crate::daemon::state::{
     self, DaemonManifest, DaemonOwnership, FlockGuard, daemon_ownership_from_env_or_default,
@@ -18,6 +18,7 @@ use fs_err as fs;
 use harness_kernel::errors::{CliError, CliErrorKind, io_for};
 
 mod stages;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use stages::{archive_path, find_single_stage, has_completed_archive, stage_path};
 
 const LEGACY_SOURCE: &str = "legacy_global_board";
@@ -34,7 +35,7 @@ const LEGACY_LOCKS: &[&str] = &[
     "policy-task-creation-outbox-v1.json.lock",
 ];
 
-pub(super) async fn migrate_task_board(db: &AsyncDaemonDb) -> Result<(), CliError> {
+pub(super) async fn migrate_task_board(db: &AsyncDaemonDbHandle) -> Result<(), CliError> {
     let raw_config = state::load_runtime_config_raw()?
         .and_then(|config| config.task_board_git_runtime_config)
         .unwrap_or_default();
@@ -55,7 +56,7 @@ pub(super) async fn migrate_task_board(db: &AsyncDaemonDb) -> Result<(), CliErro
     Ok(())
 }
 
-async fn finish_secret_handoff_cleanup(db: &AsyncDaemonDb) -> Result<(), CliError> {
+async fn finish_secret_handoff_cleanup(db: &AsyncDaemonDbHandle) -> Result<(), CliError> {
     recover_acknowledging_secret_handoff(db).await?;
     let Some(marker) = db.completed_task_board_secret_handoff().await? else {
         return Ok(());
@@ -68,7 +69,7 @@ async fn finish_secret_handoff_cleanup(db: &AsyncDaemonDb) -> Result<(), CliErro
     Ok(())
 }
 
-async fn recover_acknowledging_secret_handoff(db: &AsyncDaemonDb) -> Result<(), CliError> {
+async fn recover_acknowledging_secret_handoff(db: &AsyncDaemonDbHandle) -> Result<(), CliError> {
     let Some(marker) = db.pending_task_board_secret_handoff().await? else {
         return Ok(());
     };
@@ -92,7 +93,7 @@ async fn recover_acknowledging_secret_handoff(db: &AsyncDaemonDb) -> Result<(), 
     reason = "cutover sequencing keeps import, policy, and archive failure boundaries explicit"
 )]
 async fn migrate_managed_board(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     runtime_config: &TaskBoardGitRuntimeConfig,
     secret_digest: Option<&str>,
 ) -> Result<(), CliError> {
@@ -210,7 +211,7 @@ fn stage_empty_source(root: &Path) -> Result<PreparedSource, CliError> {
 }
 
 async fn finalize_existing_import(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     root: &Path,
     marker: &TaskBoardImportMarker,
 ) -> Result<(), CliError> {
@@ -280,7 +281,7 @@ fn verify_snapshot_matches_marker(
 }
 
 async fn import_legacy_policy_workspace(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     snapshot: &LegacyTaskBoardSnapshot,
 ) -> Result<(), CliError> {
     let Some(workspace) = snapshot.policy_workspace.as_ref() else {
@@ -299,7 +300,7 @@ async fn import_legacy_policy_workspace(
 }
 
 async fn archive_stage(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     stage: &Path,
     marker: &TaskBoardImportMarker,
 ) -> Result<(), CliError> {
@@ -325,7 +326,7 @@ async fn archive_stage(
         .await
 }
 
-async fn required_marker(db: &AsyncDaemonDb) -> Result<TaskBoardImportMarker, CliError> {
+async fn required_marker(db: &AsyncDaemonDbHandle) -> Result<TaskBoardImportMarker, CliError> {
     db.task_board_import_marker(LEGACY_SOURCE)
         .await?
         .ok_or_else(|| migration_error("legacy Task Board import marker was not recorded"))

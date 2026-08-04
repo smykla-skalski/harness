@@ -1,12 +1,12 @@
-use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
+use crate::daemon::db_handle::{AsyncDaemonDbHandle, DaemonDbOwnedHandle};
+use crate::daemon::index::ResolvedSession;
 use crate::observe::types::Issue;
-
-use super::{CliError, ResolvedSession};
+use harness_kernel::errors::CliError;
 
 pub(crate) use harness_daemon_session_service::observe_actor_id;
 
 pub(crate) fn apply_issue_tasks_to_db(
-    db: &DaemonDb,
+    db: &DaemonDbOwnedHandle,
     resolved: &mut ResolvedSession,
     actor_id: Option<&str>,
     issues: &[Issue],
@@ -15,7 +15,7 @@ pub(crate) fn apply_issue_tasks_to_db(
 }
 
 pub(crate) async fn apply_issue_tasks_to_async_db(
-    async_db: &AsyncDaemonDb,
+    async_db: &AsyncDaemonDbHandle,
     resolved: &mut ResolvedSession,
     actor_id: Option<&str>,
     issues: &[Issue],
@@ -25,7 +25,7 @@ pub(crate) async fn apply_issue_tasks_to_async_db(
 }
 
 pub(crate) async fn apply_heuristic_gap_tasks_to_async_db(
-    async_db: &AsyncDaemonDb,
+    async_db: &AsyncDaemonDbHandle,
     resolved: &mut ResolvedSession,
     actor_id: Option<&str>,
     issues: &[Issue],

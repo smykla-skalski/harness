@@ -9,6 +9,7 @@ use crate::daemon::codex_controller::CodexControllerHandle;
 use crate::daemon::db::prelude::*;
 use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{AsyncDaemonDb, complete_write_preparation};
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::daemon::protocol::{CodexRunStatus, StreamEvent};
 use crate::task_board::AgentMode;
@@ -47,11 +48,11 @@ async fn startup_reconciliation_releases_orphaned_codex_concurrency() {
         .await
         .expect("load change sequence");
 
-    let reopened = Arc::new(
+    let reopened = Arc::new(AsyncDaemonDbHandle(
         AsyncDaemonDb::connect(&db.directory.path().join("harness.db"))
             .await
             .expect("reopen async db"),
-    );
+    ));
     let (sender, _) = broadcast::channel::<StreamEvent>(8);
     let async_db_slot = Arc::new(OnceLock::new());
     async_db_slot

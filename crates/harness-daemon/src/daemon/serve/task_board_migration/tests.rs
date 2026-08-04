@@ -2,6 +2,7 @@ use harness_testkit::with_isolated_harness_env;
 use tempfile::tempdir;
 
 use super::*;
+use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::daemon::reviews_store::PolicyGraphQueries;
 use crate::task_board::policy_graph::{PolicyCanvasWorkspace, PolicyGraph, PolicyGraphMode};
@@ -38,6 +39,7 @@ async fn managed_cutover_recovers_stage_and_archives_after_database_commit() {
     let db = AsyncDaemonDb::connect(&database.path().join("harness.db"))
         .await
         .expect("open database");
+    let db = AsyncDaemonDbHandle(db);
     db.import_legacy_task_board(
         &snapshot,
         Some(&recovered.source),
@@ -176,6 +178,7 @@ async fn existing_import_recreates_missing_sentinel_before_archival() {
     let db = AsyncDaemonDb::connect(&database.path().join("harness.db"))
         .await
         .expect("open database");
+    let db = AsyncDaemonDbHandle(db);
     db.import_legacy_task_board(
         &snapshot,
         Some(&prepared.source),
@@ -223,6 +226,7 @@ async fn existing_import_rejects_a_stage_changed_after_database_commit() {
     let db = AsyncDaemonDb::connect(&database.path().join("harness.db"))
         .await
         .expect("open database");
+    let db = AsyncDaemonDbHandle(db);
     db.import_legacy_task_board(
         &snapshot,
         Some(&prepared.source),
@@ -283,6 +287,7 @@ async fn direct_legacy_pipeline_upgrade_reaches_policy_database_before_archive()
     let db = AsyncDaemonDb::connect(&database.path().join("harness.db"))
         .await
         .expect("open database");
+    let db = AsyncDaemonDbHandle(db);
     db.import_legacy_task_board(
         &snapshot,
         Some(&prepared.source),
@@ -346,6 +351,7 @@ fn acknowledging_recovery_retains_a_changed_secret_envelope() {
                 let db = AsyncDaemonDb::connect(&root.path().join("handoff.db"))
                     .await
                     .expect("database");
+                let db = AsyncDaemonDbHandle(db);
                 db.initialize_empty_task_board(&original.without_secret_metadata(), Some(&digest))
                     .await
                     .expect("initialize handoff");
@@ -397,6 +403,7 @@ fn acknowledging_recovery_rejects_an_envelope_with_removed_plaintext() {
                 let db = AsyncDaemonDb::connect(&root.path().join("handoff.db"))
                     .await
                     .expect("database");
+                let db = AsyncDaemonDbHandle(db);
                 db.initialize_empty_task_board(&original.without_secret_metadata(), Some(&digest))
                     .await
                     .expect("initialize handoff");
@@ -454,6 +461,7 @@ fn completed_handoff_cleanup_retires_a_matching_residual_envelope() {
                 let db = AsyncDaemonDb::connect(&root.path().join("handoff.db"))
                     .await
                     .expect("database");
+                let db = AsyncDaemonDbHandle(db);
                 db.initialize_empty_task_board(&runtime.without_secret_metadata(), Some(&digest))
                     .await
                     .expect("initialize handoff");

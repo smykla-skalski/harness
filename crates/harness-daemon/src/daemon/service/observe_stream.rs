@@ -25,7 +25,7 @@ use crate::daemon::db::prelude::*;
 pub fn observe_session(
     session_id: &str,
     request: Option<&ObserveSessionRequest>,
-    db: Option<&super::db::DaemonDb>,
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
 ) -> Result<SessionDetail, CliError> {
     let actor_id = observe_actor_id(request);
     if let Some(db) = db {
@@ -42,7 +42,7 @@ pub fn observe_session(
 fn observe_session_from_daemon_db(
     session_id: &str,
     actor_id: Option<&str>,
-    db: &super::db::DaemonDb,
+    db: &crate::daemon::db_handle::DaemonDbOwnedHandle,
 ) -> Result<SessionDetail, CliError> {
     let _ = db.load_session_state_for_mutation(session_id)?;
     let mut resolved = db
@@ -76,7 +76,9 @@ pub fn ready_event(session_id: Option<&str>) -> StreamEvent {
 /// This closes the subscription gap between the monitor's last explicit
 /// refresh and the moment the daemon marks the stream as subscribed.
 #[must_use]
-pub fn global_stream_initial_events(db: Option<&super::db::DaemonDb>) -> Vec<StreamEvent> {
+pub fn global_stream_initial_events(
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
+) -> Vec<StreamEvent> {
     let mut events = vec![ready_event(None)];
     if let Ok(event) = sessions_updated_event(db) {
         events.push(event);
@@ -87,7 +89,7 @@ pub fn global_stream_initial_events(db: Option<&super::db::DaemonDb>) -> Vec<Str
 /// Build the events every global stream subscriber receives immediately from the
 /// canonical async DB.
 pub(crate) async fn global_stream_initial_events_async(
-    async_db: Option<&super::db::AsyncDaemonDb>,
+    async_db: Option<&crate::daemon::db_handle::AsyncDaemonDbHandle>,
 ) -> Vec<StreamEvent> {
     let mut events = vec![ready_event(None)];
     if let Ok(event) = sessions_updated_event_async(async_db).await {
@@ -103,7 +105,7 @@ pub(crate) async fn global_stream_initial_events_async(
 #[must_use]
 pub fn session_stream_initial_events(
     session_id: &str,
-    db: Option<&super::db::DaemonDb>,
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
 ) -> Vec<StreamEvent> {
     let mut events = vec![ready_event(Some(session_id))];
     if let Ok(event) = session_updated_core_event(session_id, db) {
@@ -119,7 +121,7 @@ pub fn session_stream_initial_events(
 /// from the canonical async DB.
 pub(crate) async fn session_stream_initial_events_async(
     session_id: &str,
-    async_db: Option<&super::db::AsyncDaemonDb>,
+    async_db: Option<&crate::daemon::db_handle::AsyncDaemonDbHandle>,
 ) -> Vec<StreamEvent> {
     let mut events = vec![ready_event(Some(session_id))];
     if let Ok(event) = session_updated_core_event_async(session_id, async_db).await {
@@ -135,7 +137,9 @@ pub(crate) async fn session_stream_initial_events_async(
 ///
 /// # Errors
 /// Returns `CliError` when project or session discovery fails.
-pub fn sessions_updated_event(db: Option<&super::db::DaemonDb>) -> Result<StreamEvent, CliError> {
+pub fn sessions_updated_event(
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
+) -> Result<StreamEvent, CliError> {
     let payload = SessionsUpdatedPayload {
         projects: list_projects(db)?,
         sessions: list_sessions(true, db)?,
@@ -148,7 +152,7 @@ pub fn sessions_updated_event(db: Option<&super::db::DaemonDb>) -> Result<Stream
 /// # Errors
 /// Returns `CliError` when project or session reads fail.
 pub(crate) async fn sessions_updated_event_async(
-    async_db: Option<&super::db::AsyncDaemonDb>,
+    async_db: Option<&crate::daemon::db_handle::AsyncDaemonDbHandle>,
 ) -> Result<StreamEvent, CliError> {
     let payload = SessionsUpdatedPayload {
         projects: list_projects_async(async_db).await?,
@@ -163,7 +167,7 @@ pub(crate) async fn sessions_updated_event_async(
 /// Returns `CliError` when the session cannot be resolved or serialized.
 pub fn session_updated_event(
     session_id: &str,
-    db: Option<&super::db::DaemonDb>,
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
 ) -> Result<StreamEvent, CliError> {
     let payload = SessionUpdatedPayload {
         detail: session_detail(session_id, db)?,
@@ -182,7 +186,7 @@ pub fn session_updated_event(
 /// Returns `CliError` when the session cannot be resolved or serialized.
 pub fn session_updated_core_event(
     session_id: &str,
-    db: Option<&super::db::DaemonDb>,
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
 ) -> Result<StreamEvent, CliError> {
     let payload = SessionUpdatedPayload {
         detail: session_detail_core(session_id, db)?,
@@ -199,7 +203,7 @@ pub fn session_updated_core_event(
 /// Returns `CliError` when the session cannot be resolved or serialized.
 pub(crate) async fn session_updated_core_event_async(
     session_id: &str,
-    async_db: Option<&super::db::AsyncDaemonDb>,
+    async_db: Option<&crate::daemon::db_handle::AsyncDaemonDbHandle>,
 ) -> Result<StreamEvent, CliError> {
     let payload = SessionUpdatedPayload {
         detail: session_detail_core_async(session_id, async_db).await?,
@@ -215,7 +219,7 @@ pub(crate) async fn session_updated_core_event_async(
 /// Returns `CliError` when the session cannot be resolved or extensions fail to load.
 pub fn session_extensions_event(
     session_id: &str,
-    db: Option<&super::db::DaemonDb>,
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
 ) -> Result<StreamEvent, CliError> {
     let payload = session_extensions(session_id, db)?;
     stream_event("session_extensions", Some(session_id), payload)
@@ -227,7 +231,7 @@ pub fn session_extensions_event(
 /// Returns `CliError` when the session cannot be resolved or extensions fail to load.
 pub(crate) async fn session_extensions_event_async(
     session_id: &str,
-    async_db: Option<&super::db::AsyncDaemonDb>,
+    async_db: Option<&crate::daemon::db_handle::AsyncDaemonDbHandle>,
 ) -> Result<StreamEvent, CliError> {
     let payload = session_extensions_async(session_id, async_db).await?;
     stream_event("session_extensions", Some(session_id), payload)
@@ -235,14 +239,14 @@ pub(crate) async fn session_extensions_event_async(
 
 pub fn broadcast_sessions_updated(
     sender: &broadcast::Sender<StreamEvent>,
-    db: Option<&super::db::DaemonDb>,
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
 ) {
     broadcast_event(sender, sessions_updated_event(db), "sessions_updated", None);
 }
 
 pub(crate) async fn broadcast_sessions_updated_async(
     sender: &broadcast::Sender<StreamEvent>,
-    async_db: Option<&super::db::AsyncDaemonDb>,
+    async_db: Option<&crate::daemon::db_handle::AsyncDaemonDbHandle>,
 ) {
     broadcast_event(
         sender,
@@ -255,7 +259,7 @@ pub(crate) async fn broadcast_sessions_updated_async(
 pub fn broadcast_session_updated(
     sender: &broadcast::Sender<StreamEvent>,
     session_id: &str,
-    db: Option<&super::db::DaemonDb>,
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
 ) {
     broadcast_event(
         sender,
@@ -272,7 +276,7 @@ pub fn broadcast_session_updated(
 pub fn broadcast_session_updated_core(
     sender: &broadcast::Sender<StreamEvent>,
     session_id: &str,
-    db: Option<&super::db::DaemonDb>,
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
 ) {
     broadcast_event(
         sender,
@@ -285,7 +289,7 @@ pub fn broadcast_session_updated_core(
 pub(crate) async fn broadcast_session_updated_core_async(
     sender: &broadcast::Sender<StreamEvent>,
     session_id: &str,
-    async_db: Option<&super::db::AsyncDaemonDb>,
+    async_db: Option<&crate::daemon::db_handle::AsyncDaemonDbHandle>,
 ) {
     broadcast_event(
         sender,
@@ -299,7 +303,7 @@ pub(crate) async fn broadcast_session_updated_core_async(
 pub fn broadcast_session_extensions(
     sender: &broadcast::Sender<StreamEvent>,
     session_id: &str,
-    db: Option<&super::db::DaemonDb>,
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
 ) {
     broadcast_event(
         sender,
@@ -312,7 +316,7 @@ pub fn broadcast_session_extensions(
 pub(crate) async fn broadcast_session_extensions_async(
     sender: &broadcast::Sender<StreamEvent>,
     session_id: &str,
-    async_db: Option<&super::db::AsyncDaemonDb>,
+    async_db: Option<&crate::daemon::db_handle::AsyncDaemonDbHandle>,
 ) {
     broadcast_event(
         sender,
@@ -325,7 +329,7 @@ pub(crate) async fn broadcast_session_extensions_async(
 pub fn broadcast_session_snapshot(
     sender: &broadcast::Sender<StreamEvent>,
     session_id: &str,
-    db: Option<&super::db::DaemonDb>,
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
 ) {
     if let Some(db) = db {
         match super::resolve_session_for_snapshot(session_id, db) {
@@ -374,7 +378,7 @@ pub fn broadcast_session_snapshot(
 pub(crate) async fn broadcast_session_snapshot_async(
     sender: &broadcast::Sender<StreamEvent>,
     session_id: &str,
-    async_db: Option<&super::db::AsyncDaemonDb>,
+    async_db: Option<&crate::daemon::db_handle::AsyncDaemonDbHandle>,
 ) {
     if let Some(async_db) = async_db
         && broadcast_resolved_session_snapshot_async(sender, session_id, async_db).await
@@ -393,7 +397,7 @@ pub(crate) async fn broadcast_session_snapshot_async(
 async fn broadcast_resolved_session_snapshot_async(
     sender: &broadcast::Sender<StreamEvent>,
     session_id: &str,
-    async_db: &super::db::AsyncDaemonDb,
+    async_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
 ) -> bool {
     match super::resolve_session_for_snapshot_async(session_id, async_db).await {
         Ok(Some(resolved)) => {
@@ -416,7 +420,7 @@ async fn broadcast_resolved_session_snapshot_async(
 async fn broadcast_changed_session_snapshot_async(
     sender: &broadcast::Sender<StreamEvent>,
     session_id: &str,
-    async_db: &super::db::AsyncDaemonDb,
+    async_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
     resolved: &super::ResolvedSession,
 ) {
     broadcast_event(

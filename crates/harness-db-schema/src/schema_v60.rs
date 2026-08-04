@@ -3,7 +3,7 @@ use rusqlite::Connection;
 use super::CliError;
 
 const AGENT_TURN_RUNTIME_ID_SQL: &str = include_str!(
-    "../../harness-daemon/src/daemon/db/migrations/0059_daemon_v60_agent_turn_runtime_id.sql"
+    "../../harness-daemon-db-core/src/migrations/0059_daemon_v60_agent_turn_runtime_id.sql"
 );
 
 /// Add the provider-owned turn identity needed to harvest a correlated report.

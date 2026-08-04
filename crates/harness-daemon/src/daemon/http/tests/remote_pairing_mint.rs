@@ -10,13 +10,13 @@ use axum::http::StatusCode;
 use rcgen::{CertificateParams, DistinguishedName, DnType, KeyPair};
 use serde_json::Value;
 
-use crate::daemon::db::DaemonDb;
 use crate::daemon::http::DaemonHttpState;
 use crate::daemon::protocol::http_paths;
 use crate::daemon::remote::{RemoteAccessScope, RemoteRole};
 use crate::daemon::remote_identity::RemoteClientRegistration;
 
 use super::remote_pairing::{remote_pairing_state, serve_http};
+use crate::daemon::db_handle::DaemonDbOwnedHandle;
 
 const BROKER_CLIENT_ID: &str = "panel-broker";
 const VIEWER_CLIENT_ID: &str = "panel-viewer";
@@ -312,7 +312,7 @@ fn mint_state() -> DaemonHttpState {
 /// The invitation is built from persisted ACME state, and its SPKI pin is
 /// computed by parsing the stored leaf, so the fixture needs a real
 /// certificate rather than placeholder PEM text.
-pub(super) fn seed_remote_tls_identity(db: &DaemonDb) {
+pub(super) fn seed_remote_tls_identity(db: &DaemonDbOwnedHandle) {
     let key = KeyPair::generate().expect("generate fixture key");
     let mut params = CertificateParams::new(vec!["daemon.example.com".to_owned()])
         .expect("fixture certificate params");

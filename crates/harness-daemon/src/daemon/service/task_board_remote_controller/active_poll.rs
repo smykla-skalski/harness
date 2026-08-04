@@ -2,9 +2,8 @@ use std::future::Future;
 
 use super::{canonical_now, controller_database_error, requests};
 use crate::daemon::db::task_board::prelude::*;
-use crate::daemon::db::{
-    AsyncDaemonDb, TaskBoardRemoteAssignmentRecord, TaskBoardRemoteMutationOutcome,
-};
+use crate::daemon::db::{TaskBoardRemoteAssignmentRecord, TaskBoardRemoteMutationOutcome};
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::task_board_remote_transport::controller::RemoteExecutionControllerClient;
 use crate::task_board::TaskBoardRemoteAssignmentState;
 use crate::task_board::remote_wire::wire::RemoteAssignmentWireState;
@@ -15,7 +14,7 @@ use harness_kernel::errors::CliError;
 use harness_kernel::errors::CliErrorKind;
 
 pub(super) async fn poll_active_assignment(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     client: &RemoteExecutionControllerClient,
     assignment: &TaskBoardRemoteAssignmentRecord,
 ) -> Result<bool, CliError> {
@@ -56,7 +55,7 @@ pub(super) async fn poll_active_assignment(
 }
 
 async fn poll_cancel_intent(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     client: &RemoteExecutionControllerClient,
     assignment: &TaskBoardRemoteAssignmentRecord,
     request: &RemoteCancelRequest,

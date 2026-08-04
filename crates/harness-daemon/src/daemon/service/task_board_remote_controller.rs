@@ -11,9 +11,7 @@ use tokio::time::timeout;
 
 use crate::daemon::db::TaskBoardRemotePriorPhaseBundle;
 use crate::daemon::db::task_board::prelude::*;
-use crate::daemon::db::{
-    AsyncDaemonDb, TaskBoardRemoteAssignmentRecord, TaskBoardRemoteHostTrustFence,
-};
+use crate::daemon::db::{TaskBoardRemoteAssignmentRecord, TaskBoardRemoteHostTrustFence};
 use crate::daemon::task_board_remote_transport::controller::{
     RemoteExecutionControllerClient, RemoteExecutionControllerError,
 };
@@ -34,6 +32,7 @@ mod active_poll;
 mod offers;
 #[path = "task_board_remote_controller/requests.rs"]
 mod requests;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 #[cfg(test)]
 use active_poll::poll_active_assignment_with;
 #[path = "task_board_remote_controller/scan.rs"]
@@ -61,7 +60,7 @@ pub(crate) struct TaskBoardRemoteControllerReport {
 }
 
 pub(crate) async fn drive_task_board_remote_controller(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
 ) -> Result<TaskBoardRemoteControllerReport, CliError> {
     let driver = CONTROLLER_DRIVER.lock().await;
     let mut report = TaskBoardRemoteControllerReport::default();
@@ -81,7 +80,7 @@ pub(crate) async fn drive_task_board_remote_controller(
 /// Re-takes the driver lock for the offer step alone. The scan above releases
 /// it first so a blocked scan can still refresh hosts without holding it.
 async fn refresh_hosts_and_offer(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     report: &mut TaskBoardRemoteControllerReport,
 ) -> Result<(), CliError> {
     refresh_hosts(db, report).await?;
@@ -94,7 +93,7 @@ async fn refresh_hosts_and_offer(
     reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
 )]
 pub(crate) async fn drive_task_board_remote_controller_before_local_work(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
 ) -> Result<TaskBoardRemoteControllerReport, CliError> {
     let report = Box::pin(drive_task_board_remote_controller(db)).await?;
     if report.refreshed_hosts > 0
@@ -129,7 +128,7 @@ pub(crate) async fn drive_task_board_remote_controller_before_local_work(
 }
 
 async fn refresh_hosts(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     report: &mut TaskBoardRemoteControllerReport,
 ) -> Result<(), CliError> {
     let settings = db.task_board_orchestrator_settings_snapshot().await?;
@@ -145,7 +144,7 @@ async fn refresh_hosts(
 }
 
 async fn refresh_host_ids(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     report: &mut TaskBoardRemoteControllerReport,
     host_ids: Vec<String>,
 ) {
@@ -170,7 +169,7 @@ async fn refresh_host_ids(
     }
 }
 
-async fn refresh_host(db: &AsyncDaemonDb, host_id: &str) -> Result<(), CliError> {
+async fn refresh_host(db: &AsyncDaemonDbHandle, host_id: &str) -> Result<(), CliError> {
     let trust = db.task_board_remote_host_trust_fence(host_id).await?;
     let client =
         RemoteExecutionControllerClient::connect(&trust).map_err(controller_database_error)?;
@@ -186,7 +185,7 @@ async fn refresh_host(db: &AsyncDaemonDb, host_id: &str) -> Result<(), CliError>
     reason = "remote assignment state dispatch is clearer as one explicit match"
 )]
 async fn progress_assignment(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     assignment: TaskBoardRemoteAssignmentRecord,
 ) -> Result<bool, CliError> {
     let client = controller_for_assignment(db, &assignment).await?;
@@ -234,7 +233,7 @@ async fn progress_assignment(
 }
 
 async fn poll_unknown_assignment(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     client: &RemoteExecutionControllerClient,
     assignment: &TaskBoardRemoteAssignmentRecord,
 ) -> Result<bool, CliError> {
@@ -259,7 +258,7 @@ async fn poll_unknown_assignment(
     reason = "sequential settlement-handoff guards share the same status/finish-terminal closures"
 )]
 async fn poll_unknown_assignment_with<Status, StatusFuture, FinishTerminal, FinishFuture>(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     assignment: &TaskBoardRemoteAssignmentRecord,
     status: Status,
     finish_terminal: FinishTerminal,
@@ -308,7 +307,7 @@ where
 }
 
 async fn offer_remote_candidates(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     report: &mut TaskBoardRemoteControllerReport,
 ) -> Result<(), CliError> {
     let candidates = db
@@ -367,7 +366,7 @@ fn warn_offer_render_refused(execution_id: &str, error: &CliError) {
 }
 
 async fn select_local_target(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
     now: &str,
@@ -382,7 +381,7 @@ async fn select_local_target(
 }
 
 async fn controller_for_assignment(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     assignment: &TaskBoardRemoteAssignmentRecord,
 ) -> Result<RemoteExecutionControllerClient, CliError> {
     let trust: TaskBoardRemoteHostTrustFence = db

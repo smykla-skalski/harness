@@ -9,6 +9,7 @@ use crate::daemon::db::{
     TaskBoardRemoteExecutorIdentity, TaskBoardRemoteMutationOutcome, accept_remote_executor,
     remote_executor_claim_request, remote_executor_fixture, remote_executor_identity,
 };
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::daemon::protocol::{CodexRunSnapshot, CodexRunStatus};
 use crate::task_board::remote_wire::wire::{
@@ -99,6 +100,7 @@ async fn settled_unknown_cleanup_releases_capacity_and_survives_restart() {
             let reopened = crate::daemon::db::AsyncDaemonDb::connect(&database_path)
                 .await
                 .expect("reopen executor database");
+            let reopened = AsyncDaemonDbHandle(reopened);
             let replay = reopened
                 .task_board_remote_assignment(&unknown.assignment_id)
                 .await

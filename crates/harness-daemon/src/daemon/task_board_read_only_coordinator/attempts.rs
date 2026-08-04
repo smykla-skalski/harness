@@ -1,4 +1,3 @@
-use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::{
     TaskBoardAttemptState, TaskBoardDependencyRecoveryClass, TaskBoardExecutionAttemptRecord,
     TaskBoardExecutionPhase, TaskBoardExecutionState, TaskBoardItem, TaskBoardTerminalOutcome,
@@ -15,13 +14,14 @@ use super::{
     revision_validation,
 };
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 #[expect(
     clippy::cognitive_complexity,
     reason = "flat guard chain over execution state; each guard delegates to one helper"
 )]
 pub(super) async fn reconcile_execution<R>(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     runtime: &R,
     execution: TaskBoardWorkflowExecutionRecord,
     now: &str,
@@ -109,7 +109,7 @@ where
 }
 
 async fn current_revisions_or_invalidate(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     now: &str,
 ) -> Result<Option<TaskBoardWorkflowRevisionGuard>, CliError> {
@@ -137,7 +137,7 @@ async fn current_revisions_or_invalidate(
 }
 
 async fn reconcile_active_attempt<R>(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     runtime: &R,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
@@ -172,7 +172,7 @@ where
 }
 
 async fn schedule_next_attempt(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     now: &str,
 ) -> Result<(), CliError> {
@@ -292,7 +292,7 @@ fn one_active_attempt(
 }
 
 pub(super) async fn settlement_is_current(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution_id: &str,
     now: &str,
 ) -> Result<bool, CliError> {
@@ -326,7 +326,7 @@ pub(super) async fn settlement_is_current(
 }
 
 pub(super) async fn set_execution_state(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution_id: &str,
     state: TaskBoardExecutionState,
     now: &str,
@@ -335,7 +335,7 @@ pub(super) async fn set_execution_state(
 }
 
 pub(super) async fn settle_execution_running_in_phase(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution_id: &str,
     expected_phase: TaskBoardExecutionPhase,
     now: &str,
@@ -351,7 +351,7 @@ pub(super) async fn settle_execution_running_in_phase(
 }
 
 async fn set_execution_state_guarded(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution_id: &str,
     state: TaskBoardExecutionState,
     expected_phase: Option<TaskBoardExecutionPhase>,
@@ -420,7 +420,7 @@ const fn active_state_claim_allowed(current: TaskBoardExecutionState) -> bool {
 }
 
 pub(super) async fn require_human(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution_id: &str,
     reason: &str,
     summary: &str,

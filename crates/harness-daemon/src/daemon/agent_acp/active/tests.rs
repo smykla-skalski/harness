@@ -138,7 +138,9 @@ fn disconnected_snapshot(reason: DisconnectReason) -> AcpAgentSnapshot {
 async fn spawn_event_forwarder_persists_live_acp_batches_to_db() {
     let (sender, mut receiver) = broadcast::channel(8);
     let (tx, rx) = mpsc::channel(1);
-    let db = Arc::new(Mutex::new(DaemonDb::open_in_memory().expect("open db")));
+    let db = Arc::new(Mutex::new(crate::daemon::db_handle::DaemonDbOwnedHandle(
+        DaemonDb::open_in_memory().expect("open db"),
+    )));
     {
         let db = db.lock().expect("db lock");
         db.sync_project(&sample_project()).expect("sync project");

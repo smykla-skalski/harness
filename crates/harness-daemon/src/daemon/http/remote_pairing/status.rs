@@ -11,7 +11,6 @@ use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 use uuid::Uuid;
 
-use crate::daemon::db::DaemonDb;
 use crate::daemon::protocol::http_paths;
 use crate::daemon::remote::RemoteAccessScope;
 use crate::daemon::remote_crypto::sha256_storage_value;
@@ -25,6 +24,7 @@ use super::super::response::{extract_request_id, timed_json, timed_response};
 use super::super::{DaemonConnectInfo, DaemonHttpState};
 
 use super::super::openapi::DaemonErrorBody;
+use crate::daemon::db_handle::DaemonDbOwnedHandle;
 
 const ROUTE_REMOTE_PAIR_STATUS: &str = "remote.pair.status";
 const ROUTE_REMOTE_PAIR_STATUS_RATE_LIMIT: &str = "remote.pair.status.rate_limit";
@@ -149,7 +149,7 @@ fn ensure_remote_pairing_configured(
 }
 
 fn record_status_audit(
-    db: &DaemonDb,
+    db: &DaemonDbOwnedHandle,
     status: RemotePairingStatus,
     request_id: &str,
     remote_addr: &str,
