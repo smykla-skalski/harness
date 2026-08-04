@@ -4,7 +4,7 @@ use tempfile::tempdir;
 use super::tests::{legacy_v40_fixture, legacy_v40_fixture_at};
 use super::*;
 use harness_daemon::daemon::db::{
-    AsyncDaemonDb, DaemonDb, DaemonDbOpen, schema_query_test_support,
+    AsyncDaemonDb, AsyncDaemonDbConnect, DaemonDb, DaemonDbOpen, schema_query_test_support,
 };
 use harness_task_board::{TaskBoardExecutionHostConfig, remote_spki_pin};
 

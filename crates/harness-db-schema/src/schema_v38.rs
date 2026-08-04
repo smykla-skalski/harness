@@ -21,7 +21,7 @@ pub fn run(conn: &Connection) -> Result<(), CliError> {
 mod tests {
     use super::*;
     use harness_daemon::daemon::db::{
-        AsyncDaemonDb, DaemonDb, DaemonDbOpen, schema_query_test_support,
+        AsyncDaemonDb, AsyncDaemonDbConnect, DaemonDb, DaemonDbOpen, schema_query_test_support,
     };
     use harness_task_board::TaskBoardItem;
     use tempfile::tempdir;

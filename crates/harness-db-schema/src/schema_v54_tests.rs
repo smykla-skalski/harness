@@ -1,7 +1,7 @@
 use rusqlite::Connection;
 use tempfile::tempdir;
 
-use harness_daemon::daemon::db::{AsyncDaemonDb, DaemonDb, DaemonDbOpen};
+use harness_daemon::daemon::db::{AsyncDaemonDb, AsyncDaemonDbConnect, DaemonDb, DaemonDbOpen};
 
 /// Puts `task_board_projects` back at its v51 shape so a `source = 'todoist'`
 /// row can be seeded at all, then stamps v51 so the next open migrates.

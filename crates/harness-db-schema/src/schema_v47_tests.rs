@@ -3,7 +3,7 @@ use tempfile::tempdir;
 
 use super::super::schema_repairs_triage_override::shape_needs_repair;
 use super::run;
-use harness_daemon::daemon::db::{AsyncDaemonDb, DaemonDb, DaemonDbOpen};
+use harness_daemon::daemon::db::{AsyncDaemonDb, AsyncDaemonDbConnect, DaemonDb, DaemonDbOpen};
 
 const DROP_V47_SQL: &str = "
 ALTER TABLE task_board_items DROP COLUMN triage_override_set_at;
