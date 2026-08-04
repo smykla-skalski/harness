@@ -7,22 +7,11 @@
 //! events folds only the new events, falling back to a full rebuild whenever the
 //! cache cannot be proven to match the stored prefix.
 
-use std::collections::HashMap;
-
+use super::activity_fold_cache::ActivityFoldEntry;
 use super::conversation::DaemonDbConversation;
 use super::{
     CliError, ConversationEvent, DaemonDb, daemon_protocol, daemon_snapshot, db_error, i64_from_u64,
 };
-
-/// Cached running activity fold for one `(session_id, agent_id)` pair.
-pub(super) struct ActivityFoldEntry {
-    /// Highest conversation sequence already folded into `accumulator`.
-    last_sequence: i64,
-    accumulator: daemon_snapshot::AgentActivityAccumulator,
-}
-
-/// In-memory activity folds keyed by `(session_id, agent_id)`.
-pub(super) type ActivityFoldCache = HashMap<(String, String), ActivityFoldEntry>;
 
 pub(crate) trait DaemonDbActivityFold {
     /// Build the activity summary for a just-appended batch.
