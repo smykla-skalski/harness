@@ -1,4 +1,3 @@
-use crate::daemon::remote_identity_queries::RemoteIdentityQueries;
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 
@@ -7,6 +6,7 @@ use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous};
 use sqlx::{Sqlite, SqlitePool, query_as, query_scalar};
 
 use super::async_resolved_session::AsyncResolvedSessionRow;
+use super::remote_identity_async::prune_remote_audit_events;
 use super::summary_rows::AsyncSessionSummaryRow;
 use super::task_board_sync_coordinator::{
     TaskBoardSyncCoordinator, TaskBoardSyncPermit, TaskBoardSyncStatus,
@@ -162,7 +162,7 @@ impl AsyncDaemonDb {
                     "async daemon database schema mismatch: expected {SCHEMA_VERSION}, found {version}"
                 )));
             }
-            db.prune_remote_audit_events().await?;
+            prune_remote_audit_events(&db).await?;
             record_daemon_db_pool_state(
                 "async",
                 u64::from(db.pool.size()),

@@ -1,7 +1,7 @@
+use super::remote_identity::prune_remote_audit_events;
 use super::schema_sql::CREATE_SCHEMA;
 use super::{CliError, Connection, DaemonDb, Path, db_error};
 use crate::daemon::db::timeline::DaemonDbTimeline;
-use crate::daemon::remote_identity_queries::RemoteIdentitySyncQueries;
 use rusqlite::ffi::ErrorCode;
 use rusqlite::{Transaction, TransactionBehavior};
 use std::cell::RefCell;
@@ -48,7 +48,7 @@ impl DaemonDb {
             activity_fold: RefCell::new(super::activity_fold::ActivityFoldCache::new()),
         };
         db.ensure_schema()?;
-        db.prune_remote_audit_events()?;
+        prune_remote_audit_events(&db)?;
         Ok(db)
     }
 
@@ -72,7 +72,7 @@ impl DaemonDb {
             activity_fold: RefCell::new(super::activity_fold::ActivityFoldCache::new()),
         };
         db.ensure_schema()?;
-        db.prune_remote_audit_events()?;
+        prune_remote_audit_events(&db)?;
         Ok(db)
     }
 

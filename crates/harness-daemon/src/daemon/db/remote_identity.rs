@@ -101,6 +101,26 @@ pub(crate) fn prune_remote_audit_events_in_transaction(conn: &Connection) -> Res
     .map_err(|error| db_error(format!("prune retained remote audit events: {error}")))
 }
 
+/// Prune retained remote audit events in their own transaction.
+///
+/// Callers that already hold a transaction (e.g. an audit-event write
+/// wanting retention enforced in the same commit) should call
+/// [`prune_remote_audit_events_in_transaction`] directly instead.
+///
+/// # Errors
+/// Returns [`CliError`] when the retention transaction cannot complete.
+pub(crate) fn prune_remote_audit_events(db: &DaemonDb) -> Result<u64, CliError> {
+    let transaction = db
+        .connection()
+        .unchecked_transaction()
+        .map_err(|error| db_error(format!("begin remote audit prune: {error}")))?;
+    let pruned = prune_remote_audit_events_in_transaction(&transaction)?;
+    transaction
+        .commit()
+        .map_err(|error| db_error(format!("commit remote audit prune: {error}")))?;
+    Ok(pruned)
+}
+
 fn insert_remote_audit_event(conn: &Connection, event: &RemoteAuditEvent) -> Result<(), CliError> {
     conn.execute(
         INSERT_REMOTE_AUDIT_EVENT_SQL,
