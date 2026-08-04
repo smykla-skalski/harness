@@ -6,6 +6,7 @@ use super::{
 use super::{CliErrorKind, session_not_found};
 #[cfg(test)]
 use crate::daemon::db::timeline::DaemonDbTimeline;
+use crate::daemon::db_timeline_source::DaemonDbTimelineHandle;
 use crate::session::service::ResolvedRuntimeSessionAgent;
 use harness_protocol::daemon::summaries::AcpTranscriptResponse;
 #[cfg(test)]
@@ -225,7 +226,7 @@ pub(crate) fn session_timeline_with_scope(
     {
         return timeline::session_timeline_from_resolved_with_db_scope(
             &resolved,
-            db,
+            &DaemonDbTimelineHandle(db),
             payload_scope,
         );
     }
