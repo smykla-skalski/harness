@@ -5,6 +5,7 @@ use super::{
 #[cfg(test)]
 use super::{OptionalExtension, SessionTimelineStateRow, usize_from_i64};
 use crate::daemon::db::prelude::*;
+use crate::daemon::db_timeline_source::DaemonDbTimelineHandle;
 #[cfg(test)]
 use harness_protocol::timeline::{TimelineCursor, TimelineWindowRequest, TimelineWindowResponse};
 
@@ -154,7 +155,7 @@ impl DaemonDbTimeline for DaemonDb {
     ) -> Result<(), CliError> {
         let entries = daemon_timeline::session_timeline_from_resolved_with_db_scope(
             resolved,
-            self,
+            &DaemonDbTimelineHandle(self),
             daemon_timeline::TimelinePayloadScope::Full,
         )?;
         let stored_entries = entries

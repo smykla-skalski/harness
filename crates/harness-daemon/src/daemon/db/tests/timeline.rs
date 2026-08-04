@@ -1,6 +1,7 @@
 use super::*;
 use crate::daemon::db::conversation::DaemonDbConversation;
 use crate::daemon::db::timeline::DaemonDbTimeline;
+use crate::daemon::db_timeline_source::DaemonDbTimelineHandle;
 
 /// Regression coverage for the `TimelineDbSource` seam `harness_timeline`
 /// reads through instead of depending on `DaemonDb` directly: builds a
@@ -49,8 +50,11 @@ fn hybrid_timeline_builder_matches_db_backed_resolution() {
         .expect("resolve session")
         .expect("resolved session present");
 
-    let hybrid_entries = daemon_timeline::session_timeline_from_resolved_with_db(&resolved, &db)
-        .expect("hybrid timeline");
+    let hybrid_entries = daemon_timeline::session_timeline_from_resolved_with_db(
+        &resolved,
+        &DaemonDbTimelineHandle(&db),
+    )
+    .expect("hybrid timeline");
     let ledger_window = db
         .load_session_timeline_window(&state.session_id, &TimelineWindowRequest::default())
         .expect("load timeline window")

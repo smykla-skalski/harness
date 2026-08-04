@@ -31,7 +31,6 @@ pub(crate) use crate::session::types::{
 };
 pub(crate) use crate::workspace::{project_context_dir, project_context_id, utc_now};
 pub(crate) use harness_kernel::errors::{CliError, CliErrorKind};
-pub(crate) use harness_timeline::TimelineDbSource;
 
 pub(crate) use super::{
     index as daemon_index, launchd as daemon_launchd, protocol as daemon_protocol, state,
@@ -276,31 +275,6 @@ pub struct DaemonDb {
     path: Option<PathBuf>,
     /// Per-agent running activity folds for the live conversation append path.
     activity_fold: RefCell<activity_fold::ActivityFoldCache>,
-}
-
-// `harness_timeline`'s hybrid session-timeline builder reads through this
-// trait instead of taking `DaemonDb` directly, so that crate never depends
-// back on `harness-daemon`; this impl is the one place the two sides meet.
-impl TimelineDbSource for DaemonDb {
-    fn load_session_log(&self, session_id: &str) -> Result<Vec<SessionLogEntry>, CliError> {
-        <Self as SessionCoreQueries>::load_session_log(self, session_id)
-    }
-
-    fn load_task_checkpoints(
-        &self,
-        session_id: &str,
-        task_id: &str,
-    ) -> Result<Vec<TaskCheckpoint>, CliError> {
-        <Self as SessionCoreQueries>::load_task_checkpoints(self, session_id, task_id)
-    }
-
-    fn load_conversation_events(
-        &self,
-        session_id: &str,
-        agent_id: &str,
-    ) -> Result<Vec<ConversationEvent>, CliError> {
-        DaemonDbConversation::load_conversation_events(self, session_id, agent_id)
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
