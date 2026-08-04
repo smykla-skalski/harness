@@ -24,9 +24,8 @@ use harness_kernel::errors::CliError;
 
 use crate::daemon::db::db_error;
 use crate::daemon::db::remote_identity::{
-    INSERT_REMOTE_AUDIT_EVENT_SQL, prune_remote_audit_events_in_transaction,
-    record_remote_audit_event_in_transaction, remote_client, remote_client_from_row,
-    scopes_to_json,
+    INSERT_REMOTE_AUDIT_EVENT_SQL, record_remote_audit_event_in_transaction, remote_client,
+    remote_client_from_row, scopes_to_json,
 };
 use crate::daemon::db::remote_identity_async::prune_remote_audit_events_in_transaction as prune_remote_audit_events_async_in_transaction;
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
@@ -56,10 +55,6 @@ pub(crate) trait RemoteIdentityQueries: Send + Sync {
     /// # Errors
     /// Returns [`CliError`] on SQL failure.
     async fn record_remote_audit_event(&self, event: &RemoteAuditEvent) -> Result<(), CliError>;
-
-    /// # Errors
-    /// Returns [`CliError`] when the retention transaction cannot complete.
-    async fn prune_remote_audit_events(&self) -> Result<u64, CliError>;
 
     /// # Errors
     /// Returns [`CliError`] when the row is missing, denied, or cannot be updated.
@@ -225,20 +220,6 @@ impl RemoteIdentityQueries for AsyncDaemonDb {
         Ok(())
     }
 
-    async fn prune_remote_audit_events(&self) -> Result<u64, CliError> {
-        let mut transaction = self
-            .pool()
-            .begin()
-            .await
-            .map_err(|error| db_error(format!("begin remote audit prune: {error}")))?;
-        let pruned = prune_remote_audit_events_async_in_transaction(&mut transaction).await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit remote audit prune: {error}")))?;
-        Ok(pruned)
-    }
-
     async fn mark_remote_audit_event_failed(
         &self,
         event_id: &str,
@@ -391,15 +372,7 @@ impl RemoteIdentitySyncQueries for DaemonDb {
     }
 
     fn prune_remote_audit_events(&self) -> Result<u64, CliError> {
-        let transaction = self
-            .connection()
-            .unchecked_transaction()
-            .map_err(|error| db_error(format!("begin remote audit prune: {error}")))?;
-        let pruned = prune_remote_audit_events_in_transaction(&transaction)?;
-        transaction
-            .commit()
-            .map_err(|error| db_error(format!("commit remote audit prune: {error}")))?;
-        Ok(pruned)
+        crate::daemon::db::remote_identity::prune_remote_audit_events(self)
     }
 
     fn mark_remote_audit_event_failed(
