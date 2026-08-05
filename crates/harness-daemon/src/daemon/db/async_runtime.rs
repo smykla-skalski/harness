@@ -4,7 +4,7 @@ use super::{
     AgentTuiLiveRefreshState, AgentTuiSize, AgentTuiSnapshot, AgentTuiStatus, AsyncDaemonDb,
     AsyncDaemonTransactions, CliError, CodexRunSnapshot, TerminalScreenSnapshot, db_error,
 };
-use crate::daemon::db::runtime::{
+use crate::daemon::db::{
     codex_mode_as_str, codex_mode_from_str, codex_status_as_str, codex_status_from_str,
 };
 

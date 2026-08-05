@@ -1,54 +1,49 @@
-//! `SessionSummaryRow` (the sync path) and its shared helpers live in
-//! `harness-daemon-db-queries` now (see that crate's `summary_rows` module) -
-//! `AsyncSessionSummaryRow` stays here, since its `into_summary_canonicalized`
-//! calls `AsyncSessionWriteQueries::save_session_state` (`async_writes.rs`),
-//! not yet extracted; that crate cannot depend back on `harness-daemon`.
-
 use std::path::PathBuf;
 
-use harness_daemon_db_queries::{
+use harness_daemon_db_core::{AsyncDaemonDb, db_error};
+use harness_kernel::errors::CliError;
+use harness_protocol::session::SessionState;
+use harness_session::index::DiscoveredProject;
+use harness_session::service::canonicalize_persisted_session_state;
+use harness_session::wire::SessionSummary;
+
+use crate::async_writes::AsyncSessionWriteQueries;
+use crate::summary_rows::{
     SessionSummaryScalars, SessionSummaryStateProjection, build_session_summary_fast,
     build_session_summary_from_state, parse_session_status_db_label, session_summary_is_legacy,
 };
 
-use super::{
-    AsyncDaemonDb, AsyncSessionWriteQueries, CliError, DiscoveredProject, SessionState,
-    daemon_protocol, db_error,
-};
-use crate::session::service::canonicalize_persisted_session_state;
-use crate::workspace::utc_now;
-
 #[derive(sqlx::FromRow)]
-pub(super) struct AsyncSessionSummaryRow {
-    pub(super) session_id: String,
-    title: String,
-    context: String,
-    status: String,
-    created_at: String,
-    updated_at: String,
-    last_activity_at: Option<String>,
-    leader_id: Option<String>,
-    observe_id: Option<String>,
-    pending_leader_transfer_json: Option<String>,
-    metrics_json: String,
-    state_json: String,
-    archived_at: Option<String>,
-    project_id: String,
-    project_name: String,
-    project_dir: Option<String>,
-    repository_root: Option<String>,
-    context_root: String,
-    checkout_id: String,
-    checkout_name: String,
-    is_worktree: bool,
-    worktree_name: Option<String>,
+pub struct AsyncSessionSummaryRow {
+    pub session_id: String,
+    pub title: String,
+    pub context: String,
+    pub status: String,
+    pub created_at: String,
+    pub updated_at: String,
+    pub last_activity_at: Option<String>,
+    pub leader_id: Option<String>,
+    pub observe_id: Option<String>,
+    pub pending_leader_transfer_json: Option<String>,
+    pub metrics_json: String,
+    pub state_json: String,
+    pub archived_at: Option<String>,
+    pub project_id: String,
+    pub project_name: String,
+    pub project_dir: Option<String>,
+    pub repository_root: Option<String>,
+    pub context_root: String,
+    pub checkout_id: String,
+    pub checkout_name: String,
+    pub is_worktree: bool,
+    pub worktree_name: Option<String>,
 }
 
 impl AsyncSessionSummaryRow {
-    pub(super) async fn into_summary(
-        self,
-        db: &AsyncDaemonDb,
-    ) -> Result<daemon_protocol::SessionSummary, CliError> {
+    /// # Errors
+    /// Returns [`CliError`] when the stored state cannot be parsed, or when
+    /// canonicalization needs to persist a repaired row and that write fails.
+    pub async fn into_summary(self, db: &AsyncDaemonDb) -> Result<SessionSummary, CliError> {
         let projection = SessionSummaryStateProjection::parse(&self.state_json)?;
         if session_summary_is_legacy(
             parse_session_status_db_label(&self.status),
@@ -65,11 +60,14 @@ impl AsyncSessionSummaryRow {
     async fn into_summary_canonicalized(
         self,
         db: &AsyncDaemonDb,
-    ) -> Result<daemon_protocol::SessionSummary, CliError> {
+    ) -> Result<SessionSummary, CliError> {
         let mut state: SessionState = serde_json::from_str(&self.state_json)
             .map_err(|error| db_error(format!("parse session state: {error}")))?;
         let project = self.discovered_project();
-        if canonicalize_persisted_session_state(&mut state, &utc_now()) {
+        if canonicalize_persisted_session_state(
+            &mut state,
+            &harness_workspace::workspace::utc_now(),
+        ) {
             db.save_session_state(&project.project_id, &state).await?;
         }
         Ok(build_session_summary_from_state(state, &project))

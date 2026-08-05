@@ -18,12 +18,16 @@ mod async_diagnostics;
 mod async_reads;
 mod async_resolved_session;
 mod async_session_state;
+mod async_session_summaries;
 mod async_signal_writes;
+mod async_summary_rows;
 mod async_writes;
 mod change_tracking;
 mod conversation;
 mod diagnostics;
+mod rebuild;
 mod review_writes;
+mod runtime;
 mod signals;
 mod stored_timeline_entry;
 mod summaries;
@@ -43,7 +47,9 @@ pub use async_diagnostics::AsyncDiagnosticsQueries;
 pub use async_reads::AsyncTimelineWindowQueries;
 pub use async_resolved_session::AsyncResolvedSessionRow;
 pub use async_session_state::AsyncSessionStateQueries;
+pub use async_session_summaries::AsyncSessionSummaryQueries;
 pub use async_signal_writes::AsyncSignalIndexQueries;
+pub use async_summary_rows::AsyncSessionSummaryRow;
 pub use async_writes::{
     AsyncDaemonTransactions, AsyncSessionWriteQueries, sync_session_in_transaction,
 };
@@ -54,7 +60,12 @@ pub use conversation::{
     prepare_agent_conversation_imports_and_activity, prepare_runtime_transcript_resync_for_agents,
 };
 pub use diagnostics::{DaemonDbDiagnostics, import_daemon_events};
+pub use rebuild::TaskReviewRebuild;
 pub use review_writes::{AsyncTaskReviewWrites, SyncTaskReviewWrites, TaskV10Columns};
+pub use runtime::{
+    AgentTuiLiveRefreshState, RuntimeSnapshotQueries, codex_mode_as_str, codex_mode_from_str,
+    codex_status_as_str, codex_status_from_str,
+};
 pub use signals::{SignalIndexQueries, derive_effective_signal_status};
 pub use stored_timeline_entry::StoredTimelineEntry;
 pub use summaries::SessionSummaryQueries;

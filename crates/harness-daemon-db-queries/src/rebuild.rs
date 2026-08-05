@@ -7,12 +7,12 @@
 //! `SQLite` mirror from the file truth so the daemon starts with a consistent
 //! view.
 
+use harness_daemon_db_core::{DaemonDb, db_error};
+use harness_kernel::errors::CliError;
+use harness_protocol::session::Review;
 use rusqlite::params;
 
-use super::{CliError, DaemonDb, db_error};
-use crate::session::types::Review;
-
-pub(crate) trait TaskReviewRebuild {
+pub trait TaskReviewRebuild {
     /// # Errors
     /// Returns [`CliError`] on SQL failures.
     fn rebuild_task_reviews(
@@ -145,9 +145,20 @@ impl TaskReviewRebuild for DaemonDb {
 
 #[cfg(test)]
 mod tests {
+    use harness_daemon_db_core::SchemaRepairHooks;
+    use harness_protocol::session::{ReviewPoint, ReviewPointState, ReviewVerdict};
+
     use super::*;
-    use crate::daemon::db_open::DaemonDbOpen;
-    use crate::session::types::{ReviewPoint, ReviewPointState, ReviewVerdict};
+
+    /// No legacy-shaped rows are ever seeded in these tests, so the repair
+    /// hooks `open_in_memory_with_hooks` runs on every open never fire.
+    fn open_test_db() -> DaemonDb {
+        DaemonDb::open_in_memory_with_hooks(&SchemaRepairHooks {
+            sync_session: |_, _, _| Ok(()),
+            backfill_legacy_timelines: |_| Ok(()),
+        })
+        .expect("open db")
+    }
 
     fn seed_session(db: &DaemonDb) {
         db.connection()
@@ -192,7 +203,7 @@ mod tests {
 
     #[test]
     fn rebuild_replaces_existing_rows_with_file_contents() {
-        let db = DaemonDb::open_in_memory().expect("open db");
+        let db = open_test_db();
         // Seed a session so the foreign key resolves.
         seed_session(&db);
 
@@ -225,7 +236,7 @@ mod tests {
 
     #[test]
     fn rebuild_with_empty_slice_clears_existing_rows() {
-        let db = DaemonDb::open_in_memory().expect("open db");
+        let db = open_test_db();
         seed_session(&db);
         db.rebuild_task_reviews(
             "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
@@ -249,7 +260,7 @@ mod tests {
 
     #[test]
     fn rebuild_only_affects_the_target_task() {
-        let db = DaemonDb::open_in_memory().expect("open db");
+        let db = open_test_db();
         seed_session(&db);
         db.rebuild_task_reviews(
             "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
