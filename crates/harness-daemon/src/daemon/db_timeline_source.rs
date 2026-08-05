@@ -9,7 +9,7 @@
 //! must stay in this crate.
 
 use crate::agents::runtime::event::ConversationEvent;
-use crate::daemon::db::conversation::DaemonDbConversation;
+use crate::daemon::db::DaemonDbConversation;
 use crate::daemon::db::{DaemonDb, SessionCoreQueries};
 use crate::session::types::{SessionLogEntry, TaskCheckpoint};
 use harness_kernel::errors::CliError;

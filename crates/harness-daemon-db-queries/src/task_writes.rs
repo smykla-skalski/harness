@@ -1,8 +1,15 @@
 use std::collections::BTreeMap;
 
-use super::{CliError, Connection, WorkItem, db_error};
+use harness_daemon_db_core::db_error;
+use harness_kernel::errors::CliError;
+use harness_protocol::session::WorkItem;
+use rusqlite::Connection;
 
-pub(super) fn replace_tasks(
+use crate::task_row::TaskRowBindings;
+
+/// # Errors
+/// Returns [`CliError`] on SQL failures.
+pub fn replace_tasks(
     transaction: &Connection,
     session_id: &str,
     tasks: &BTreeMap<String, WorkItem>,
@@ -27,7 +34,7 @@ pub(super) fn replace_tasks(
         .map_err(|error| db_error(format!("prepare task insert: {error}")))?;
 
     for (task_id, task) in tasks {
-        let row = super::task_row::TaskRowBindings::from_task(task);
+        let row = TaskRowBindings::from_task(task);
         statement
             .execute(rusqlite::params![
                 task_id,

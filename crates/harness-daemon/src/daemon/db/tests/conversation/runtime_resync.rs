@@ -1,5 +1,5 @@
 use super::*;
-use crate::daemon::db::conversation::DaemonDbConversation;
+use crate::daemon::db::DaemonDbConversation;
 use crate::daemon::db::imports::DaemonDbSessionResync;
 use crate::daemon::db::timeline::DaemonDbTimeline;
 

@@ -5,28 +5,27 @@
 //! such as manifests, auth tokens, lock files, and live signal/transcript
 //! artifacts.
 
-pub(crate) use std::borrow::Cow;
 pub(crate) use std::collections::BTreeMap;
 pub(crate) use std::io::{Error as IoError, ErrorKind};
-pub(crate) use std::path::{Path, PathBuf};
+pub(crate) use std::path::PathBuf;
 pub(crate) use std::sync::{Arc, Mutex, OnceLock};
 
 pub(crate) use rusqlite::{Connection, OptionalExtension, types::Type};
-pub(crate) use sha2::{Digest, Sha256};
 
 pub(crate) use crate::agents::runtime::event::ConversationEvent;
 pub(crate) use crate::daemon::agent_tui::{
     AgentTuiSize, AgentTuiSnapshot, AgentTuiStatus, TerminalScreenSnapshot,
 };
 pub(crate) use crate::daemon::index::DiscoveredProject;
-pub(crate) use crate::daemon::protocol::{
-    CodexRunMode, CodexRunSnapshot, CodexRunStatus, TimelineEntry,
-};
+pub(crate) use crate::daemon::protocol::{CodexRunMode, CodexRunSnapshot, CodexRunStatus};
+#[allow(unused_imports)]
+pub(crate) use crate::session::types::SessionStatus;
 pub(crate) use crate::session::types::{
-    AgentRegistration, SessionLogEntry, SessionSignalRecord, SessionState, SessionStatus,
-    TaskCheckpoint, WorkItem,
+    AgentRegistration, SessionLogEntry, SessionSignalRecord, SessionState, TaskCheckpoint, WorkItem,
 };
-pub(crate) use crate::workspace::{project_context_dir, project_context_id, utc_now};
+#[allow(unused_imports)]
+pub(crate) use crate::workspace::project_context_id;
+pub(crate) use crate::workspace::utc_now;
 pub(crate) use harness_kernel::errors::{CliError, CliErrorKind};
 
 pub(crate) use super::{
@@ -37,15 +36,16 @@ pub(crate) use super::{
 // accumulator); this alias keeps every call site below unchanged.
 pub(crate) use harness_daemon_snapshot as daemon_snapshot;
 
-pub(crate) mod activity_fold;
-pub(crate) use harness_daemon_db_core::activity_fold_cache;
 pub(crate) use harness_daemon_db_core::audit_event_retention;
 pub(crate) use harness_daemon_db_core::audit_event_retention_async;
+#[allow(unused_imports)]
+pub(crate) use harness_daemon_db_core::usize_from_i64;
 pub use harness_daemon_db_core::{DaemonDb, SCHEMA_VERSION};
 pub(crate) use harness_daemon_db_core::{
-    LIVENESS_CANDIDATE_IDS_SQL, canonical_db_unavailable, db_error, i64_from_u64, u64_from_i64,
-    usize_from_i64,
+    canonical_db_unavailable, db_error, i64_from_u64, u64_from_i64,
 };
+#[allow(unused_imports)]
+pub(crate) use harness_daemon_db_queries::DaemonDbActivityFold;
 mod async_agent_turn_runs;
 pub(crate) use async_agent_turn_runs::{
     AgentTurnRunSnapshot, AgentTurnRunStatus, AsyncAgentTurnRunQueries,
@@ -172,16 +172,11 @@ pub(crate) use task_board::{
 mod session_data;
 pub use session_data::SessionCoreQueries;
 mod signals;
+pub use harness_daemon_db_queries::SessionSummaryQueries;
 pub use harness_daemon_db_queries::SignalIndexQueries;
-mod summaries;
-pub use summaries::SessionSummaryQueries;
 mod summary_rows;
-mod task_row;
-mod task_writes;
 pub(crate) mod timeline;
-mod timeline_store;
-mod writes;
-pub use writes::SessionWriteQueries;
+pub use harness_daemon_db_queries::SessionWriteQueries;
 pub(crate) mod prelude;
 
 #[cfg(test)]
@@ -195,54 +190,43 @@ pub use crate::daemon::remote_acme_queries::{
 };
 pub use crate::daemon::remote_identity_queries::RemoteIdentitySyncQueries;
 pub(crate) use crate::daemon::remote_pairing_queries::RemotePairingClaimCodeError;
-#[allow(unused_imports)]
-use conversation::{
-    DaemonDbConversation, clear_session_conversation_events,
-    prepare_agent_conversation_imports_and_activity, prepare_runtime_transcript_resync_for_agents,
-};
 pub use harness_daemon_db_core::AsyncDaemonDb;
 pub(crate) use harness_daemon_db_core::SchemaRepairHooks;
 #[cfg(test)]
 pub(crate) use harness_daemon_db_core::set_schema_init_hook;
 pub(crate) use harness_daemon_db_core::trace_async_db_operation;
+pub(crate) use harness_daemon_db_queries::DaemonDbConversation;
+pub(crate) use harness_daemon_db_queries::TaskRowBindings;
 #[allow(unused_imports)]
 use harness_daemon_db_queries::derive_effective_signal_status;
 #[allow(unused_imports)]
+pub(crate) use harness_daemon_db_queries::extract_conversation_event_kind;
+#[allow(unused_imports)]
+pub(crate) use harness_daemon_db_queries::extract_transition_kind;
+#[allow(unused_imports)]
 use harness_daemon_db_queries::import_daemon_events;
-pub(crate) use harness_policy_graph_store::NewApprovalGrant;
-pub(crate) use runtime::ensure_shared_db;
+pub(crate) use harness_daemon_db_queries::normalize_change_scope;
 #[allow(unused_imports)]
-use timeline::{stored_timeline_entry, stored_timeline_entry_from_row};
+pub(crate) use harness_daemon_db_queries::parse_session_status_db_label;
+pub(crate) use harness_daemon_db_queries::session_status_db_label;
+pub(crate) use harness_daemon_db_queries::{
+    PreparedAgentTranscriptResync, PreparedConversationEventImport,
+};
 #[allow(unused_imports)]
-use timeline_store::{
+use harness_daemon_db_queries::{
     bump_session_timeline_state, replace_all_session_timeline_entries,
     replace_session_timeline_entries_for_prefix, upsert_session_timeline_entry,
     upsert_session_timeline_entry_row,
 };
-
-pub(crate) fn normalize_change_scope(scope: &str) -> Cow<'_, str> {
-    if scope == "global" || scope.starts_with("session:") || scope.starts_with("task_board:") {
-        Cow::Borrowed(scope)
-    } else {
-        Cow::Owned(format!("session:{scope}"))
-    }
-}
-
-pub(crate) fn session_status_db_label(status: SessionStatus) -> Result<String, CliError> {
-    let value = serde_json::to_value(status)
-        .map_err(|error| db_error(format!("serialize session status: {error}")))?;
-    value
-        .as_str()
-        .map(ToOwned::to_owned)
-        .ok_or_else(|| db_error("serialize session status: expected string"))
-}
-
-#[must_use]
-#[allow(dead_code)]
-pub(crate) fn parse_session_status_db_label(status: &str) -> SessionStatus {
-    serde_json::from_value(serde_json::Value::String(status.to_string()))
-        .unwrap_or(SessionStatus::Ended)
-}
+#[allow(unused_imports)]
+use harness_daemon_db_queries::{
+    clear_session_conversation_events, prepare_agent_conversation_imports_and_activity,
+    prepare_runtime_transcript_resync_for_agents,
+};
+#[allow(unused_imports)]
+use harness_daemon_db_queries::{stored_timeline_entry, stored_timeline_entry_from_row};
+pub(crate) use harness_policy_graph_store::NewApprovalGrant;
+pub(crate) use runtime::ensure_shared_db;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[doc(hidden)]
@@ -267,36 +251,9 @@ pub(crate) struct PreparedTaskCheckpointImport {
 }
 
 #[derive(Debug)]
-pub(crate) struct PreparedConversationEventImport {
-    agent_id: String,
-    runtime: String,
-    events: Vec<ConversationEvent>,
-}
-
-#[derive(Debug)]
-pub(crate) struct PreparedAgentTranscriptResync {
-    agent_id: String,
-    runtime: String,
-    activity: daemon_protocol::AgentToolActivitySummary,
-    events: Vec<ConversationEvent>,
-}
-
-#[derive(Debug)]
 pub(crate) struct PreparedRuntimeTranscriptResync {
     session_id: String,
     agents: Vec<PreparedAgentTranscriptResync>,
-}
-
-#[cfg(test)]
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct SessionTimelineStateRow {
-    session_id: String,
-    revision: i64,
-    entry_count: usize,
-    newest_recorded_at: Option<String>,
-    oldest_recorded_at: Option<String>,
-    integrity_hash: String,
-    updated_at: String,
 }
 
 /// Summary of what was imported from file-based storage.
@@ -312,37 +269,6 @@ pub struct ReconcileResult {
     pub projects: usize,
     pub sessions_imported: usize,
     pub sessions_skipped: usize,
-}
-
-/// Extract the serde tag from a serialized `SessionTransition` JSON string.
-/// Returns the variant name (e.g. `SessionStarted`, `AgentJoined`) for indexing.
-pub(crate) fn extract_transition_kind(json: &str) -> String {
-    serde_json::from_str::<serde_json::Value>(json)
-        .ok()
-        .and_then(|value| {
-            value
-                .as_object()
-                .and_then(|object| object.keys().next().cloned())
-                .or_else(|| value.as_str().map(String::from))
-        })
-        .unwrap_or_default()
-}
-
-/// Extract the discriminant from a serialized `ConversationEventKind` JSON
-/// string. Returns the tagged `type` field (for example `assistant_text` or
-/// `permission_asked`) for indexing.
-pub(crate) fn extract_conversation_event_kind(json: &str) -> String {
-    serde_json::from_str::<serde_json::Value>(json)
-        .ok()
-        .and_then(|value| {
-            value
-                .as_object()
-                .and_then(|object| object.get("type"))
-                .and_then(serde_json::Value::as_str)
-                .map(String::from)
-                .or_else(|| value.as_str().map(String::from))
-        })
-        .unwrap_or_default()
 }
 
 #[cfg(test)]

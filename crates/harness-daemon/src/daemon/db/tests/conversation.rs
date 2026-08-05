@@ -1,5 +1,5 @@
 use super::*;
-use crate::daemon::db::conversation::DaemonDbConversation;
+use crate::daemon::db::DaemonDbConversation;
 
 fn seed_conversation_session(db: &DaemonDb) {
     let project = sample_project();

@@ -1,5 +1,5 @@
+use crate::daemon::db::SessionWriteQueries;
 use crate::daemon::db::imports::DaemonDbSessionResync;
-use crate::daemon::db::writes::SessionWriteQueries;
 use std::path::Path;
 
 use crate::daemon::index as daemon_index;

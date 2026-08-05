@@ -1,9 +1,15 @@
-use super::{
-    CliError, Connection, Digest, OptionalExtension, Sha256, StoredTimelineEntry, db_error,
-    stored_timeline_entry_from_row, usize_from_i64, utc_now,
-};
+use harness_daemon_db_core::{db_error, usize_from_i64};
+use harness_kernel::errors::CliError;
+use harness_workspace::workspace::utc_now;
+use rusqlite::{Connection, OptionalExtension};
+use sha2::{Digest, Sha256};
 
-pub(super) fn replace_all_session_timeline_entries(
+use crate::stored_timeline_entry::StoredTimelineEntry;
+use crate::timeline::stored_timeline_entry_from_row;
+
+/// # Errors
+/// Returns [`CliError`] on SQL failures.
+pub fn replace_all_session_timeline_entries(
     conn: &Connection,
     session_id: &str,
     entries: &[StoredTimelineEntry],
@@ -52,7 +58,9 @@ pub(super) fn replace_all_session_timeline_entries(
     Ok(())
 }
 
-pub(super) fn upsert_session_timeline_entry(
+/// # Errors
+/// Returns [`CliError`] on SQL failures.
+pub fn upsert_session_timeline_entry(
     transaction: &Connection,
     entry: &StoredTimelineEntry,
 ) -> Result<(), CliError> {
@@ -67,7 +75,10 @@ pub(super) fn upsert_session_timeline_entry(
 /// Returns `true` when the row was inserted or changed. Batch callers should use
 /// this in a loop and call [`bump_session_timeline_state`] once afterwards, so
 /// the O(entries) state recompute happens per batch instead of per row.
-pub(super) fn upsert_session_timeline_entry_row(
+///
+/// # Errors
+/// Returns [`CliError`] on SQL failures.
+pub fn upsert_session_timeline_entry_row(
     transaction: &Connection,
     entry: &StoredTimelineEntry,
 ) -> Result<bool, CliError> {
@@ -117,7 +128,10 @@ pub(super) fn upsert_session_timeline_entry_row(
 }
 
 /// Bump the session timeline revision and recompute its cached state once.
-pub(super) fn bump_session_timeline_state(
+///
+/// # Errors
+/// Returns [`CliError`] on SQL failures.
+pub fn bump_session_timeline_state(
     transaction: &Connection,
     session_id: &str,
 ) -> Result<(), CliError> {
@@ -125,7 +139,9 @@ pub(super) fn bump_session_timeline_state(
     persist_session_timeline_state(transaction, session_id, current_revision + 1, None)
 }
 
-pub(super) fn replace_session_timeline_entries_for_prefix(
+/// # Errors
+/// Returns [`CliError`] on SQL failures.
+pub fn replace_session_timeline_entries_for_prefix(
     transaction: &Connection,
     session_id: &str,
     source_kind: &str,

@@ -3948,13 +3948,17 @@ dependencies = [
  "harness-daemon-launchd",
  "harness-daemon-root",
  "harness-daemon-session-service",
+ "harness-daemon-snapshot",
  "harness-kernel",
  "harness-protocol",
  "harness-session",
  "harness-timeline",
  "harness-workspace",
+ "hex",
  "rusqlite",
+ "serde",
  "serde_json",
+ "sha2 0.11.0",
  "sqlx",
 ]
 

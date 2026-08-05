@@ -3,17 +3,19 @@
 //! `append_conversation_events` runs on every streamed ACP message. Rebuilding
 //! the activity summary from the full stored transcript each time is quadratic
 //! over the conversation length. This module keeps a per-agent running
-//! [`daemon_snapshot::AgentActivityAccumulator`] so a steady stream of appended
+//! [`harness_daemon_snapshot::AgentActivityAccumulator`] so a steady stream of appended
 //! events folds only the new events, falling back to a full rebuild whenever the
 //! cache cannot be proven to match the stored prefix.
 
-use super::activity_fold_cache::ActivityFoldEntry;
-use super::conversation::DaemonDbConversation;
-use super::{
-    CliError, ConversationEvent, DaemonDb, daemon_protocol, daemon_snapshot, db_error, i64_from_u64,
-};
+use harness_daemon_db_core::activity_fold_cache::ActivityFoldEntry;
+use harness_daemon_db_core::{DaemonDb, db_error, i64_from_u64};
+use harness_kernel::errors::CliError;
+use harness_protocol::agent::ConversationEvent;
+use harness_session::wire::AgentToolActivitySummary;
 
-pub(crate) trait DaemonDbActivityFold {
+use crate::conversation::DaemonDbConversation;
+
+pub trait DaemonDbActivityFold {
     /// Build the activity summary for a just-appended batch.
     ///
     /// When the cached fold reflects exactly the stored prefix (its last folded
@@ -33,14 +35,16 @@ pub(crate) trait DaemonDbActivityFold {
         runtime: &str,
         events: &[ConversationEvent],
         stored_max_before: i64,
-    ) -> Result<daemon_protocol::AgentToolActivitySummary, CliError>;
+    ) -> Result<AgentToolActivitySummary, CliError>;
 
+    /// # Errors
+    /// Returns [`CliError`] when the stored transcript cannot be loaded.
     fn rebuild_activity_fold(
         &self,
         session_id: &str,
         agent_id: &str,
         runtime: &str,
-    ) -> Result<daemon_protocol::AgentToolActivitySummary, CliError>;
+    ) -> Result<AgentToolActivitySummary, CliError>;
 
     /// Drop cached activity fold state when a path replaces or deletes stored
     /// conversation rows for a session (optionally narrowed to a single agent).
@@ -61,8 +65,9 @@ pub(crate) trait DaemonDbActivityFold {
         agent_id: &str,
     ) -> Result<i64, CliError>;
 
-    /// Number of cached activity folds, for tests asserting eviction.
-    #[cfg(test)]
+    /// Number of cached activity folds, for tests asserting eviction. Not
+    /// `#[cfg(test)]` here: that gate only activates for this crate's own
+    /// test build, not `harness-daemon`'s.
     fn activity_fold_entry_count(&self) -> usize;
 }
 
@@ -74,7 +79,7 @@ impl DaemonDbActivityFold for DaemonDb {
         runtime: &str,
         events: &[ConversationEvent],
         stored_max_before: i64,
-    ) -> Result<daemon_protocol::AgentToolActivitySummary, CliError> {
+    ) -> Result<AgentToolActivitySummary, CliError> {
         let min_batch_sequence = events
             .iter()
             .map(|event| i64_from_u64(event.sequence))
@@ -100,10 +105,10 @@ impl DaemonDbActivityFold for DaemonDb {
         session_id: &str,
         agent_id: &str,
         runtime: &str,
-    ) -> Result<daemon_protocol::AgentToolActivitySummary, CliError> {
+    ) -> Result<AgentToolActivitySummary, CliError> {
         let merged = self.load_conversation_events(session_id, agent_id)?;
         let mut accumulator =
-            daemon_snapshot::AgentActivityAccumulator::new(agent_id, runtime, None);
+            harness_daemon_snapshot::AgentActivityAccumulator::new(agent_id, runtime, None);
         let mut last_sequence = -1;
         for event in &merged {
             accumulator.apply(event);
@@ -146,7 +151,6 @@ impl DaemonDbActivityFold for DaemonDb {
             .map_err(|error| db_error(format!("load conversation max sequence: {error}")))
     }
 
-    #[cfg(test)]
     fn activity_fold_entry_count(&self) -> usize {
         self.activity_fold.borrow().len()
     }

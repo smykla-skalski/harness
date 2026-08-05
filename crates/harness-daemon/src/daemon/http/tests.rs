@@ -1,4 +1,4 @@
-use crate::daemon::db::conversation::DaemonDbConversation;
+use crate::daemon::db::DaemonDbConversation;
 use std::io;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
