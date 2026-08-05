@@ -1,54 +1,24 @@
+use harness_daemon_db_queries::{
+    prepare_agent_conversation_imports_and_activity, prepare_runtime_transcript_resync_for_agents,
+    session_state_import_required,
+};
+
 use super::DaemonDbConversation;
 use super::timeline::DaemonDbTimeline;
 use super::{
-    CliError, DaemonDb, DiscoveredProject, ImportResult, PreparedRuntimeTranscriptResync,
-    PreparedSessionResync, PreparedTaskCheckpointImport, ReconcileResult, SessionState,
-    TaskReviewRebuild, clear_session_conversation_events, daemon_index, daemon_snapshot,
-    import_daemon_events, prepare_agent_conversation_imports_and_activity,
-    prepare_runtime_transcript_resync_for_agents,
+    CliError, DaemonDb, PreparedRuntimeTranscriptResync, PreparedSessionResync,
+    PreparedTaskCheckpointImport, TaskReviewRebuild, clear_session_conversation_events,
+    daemon_index, daemon_snapshot,
 };
 use crate::daemon::db::prelude::*;
 
-pub trait DaemonDbImports {
-    /// Import all file-backed sessions and projects into the database.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on discovery or SQL failures.
-    fn import_from_files(&self) -> Result<ImportResult, CliError>;
-
-    /// Reconcile file-discovered sessions into the database, only
-    /// importing sessions that are new or have a higher `state_version`
-    /// than the DB copy. Daemon-first sessions (only in `SQLite`) are
-    /// never touched.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on discovery or SQL failures.
-    fn reconcile_sessions(
-        &self,
-        projects: &[daemon_index::DiscoveredProject],
-        sessions: &[daemon_index::ResolvedSession],
-    ) -> Result<ReconcileResult, CliError>;
-
-    /// Discover projects and sessions from files, then reconcile into
-    /// the database. Only imports sessions that are new or have a higher
-    /// `state_version` than existing DB records. Safe to call while the
-    /// daemon is serving - daemon-first sessions are never overwritten.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on discovery or SQL failures.
-    fn reconcile_from_files(&self) -> Result<ReconcileResult, CliError>;
-
-    /// Re-sync a session from its file-backed state into the database.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] on discovery, I/O, or SQL failures.
-    fn resync_session(&self, session_id: &str) -> Result<(), CliError>;
-}
-
-/// Kept separate from [`DaemonDbImports`] (rather than one trait) because its
-/// prepared-resync argument types stay `pub(crate)`: a `pub` trait exposing a
-/// `pub(crate)` type in its signature is a real privacy mismatch, not just a
-/// lint to silence.
+/// Kept separate from [`harness_daemon_db_queries::DaemonDbImports`] (rather
+/// than folded into it) because its prepared-resync argument types stay
+/// `pub(crate)`: a `pub` trait exposing a `pub(crate)` type in its signature
+/// is a real privacy mismatch, not just a lint to silence. Stays in
+/// `harness-daemon` because `apply_prepared_session_resync` needs
+/// `rebuild_session_timeline_from_resolved` (`DaemonDbTimeline`, not yet
+/// extracted).
 pub(crate) trait DaemonDbSessionResync {
     /// Apply a previously prepared session re-sync to the daemon database.
     ///
@@ -67,93 +37,6 @@ pub(crate) trait DaemonDbSessionResync {
         &self,
         prepared: &PreparedRuntimeTranscriptResync,
     ) -> Result<(), CliError>;
-}
-
-fn session_state_import_required(
-    db: &DaemonDb,
-    session_id: &str,
-    file_state_version: u64,
-) -> Result<bool, CliError> {
-    let db_version = db.session_state_version(session_id)?;
-    let file_version = i64::try_from(file_state_version).unwrap_or(i64::MAX);
-    Ok(db_version.is_none_or(|version| version < file_version))
-}
-
-impl DaemonDbImports for DaemonDb {
-    fn import_from_files(&self) -> Result<ImportResult, CliError> {
-        let projects = daemon_index::discover_projects()?;
-        let sessions = daemon_index::discover_sessions_for(&projects, true)?;
-
-        let mut result = ImportResult::default();
-
-        for project in &projects {
-            self.sync_project(project)?;
-            result.projects += 1;
-        }
-
-        for resolved in &sessions {
-            self.sync_session(&resolved.project.project_id, &resolved.state)?;
-            result.sessions += 1;
-
-            import_session_log(self, &resolved.project, &resolved.state.session_id)?;
-            import_session_checkpoints(self, &resolved.project, &resolved.state)?;
-            import_session_signals(self, resolved)?;
-            import_session_activity_and_conversation_events(self, resolved)?;
-        }
-
-        import_daemon_events(self)?;
-        self.bump_change("global")?;
-
-        Ok(result)
-    }
-
-    fn reconcile_sessions(
-        &self,
-        projects: &[daemon_index::DiscoveredProject],
-        sessions: &[daemon_index::ResolvedSession],
-    ) -> Result<ReconcileResult, CliError> {
-        let mut result = ReconcileResult::default();
-
-        for project in projects {
-            self.sync_project(project)?;
-            result.projects += 1;
-        }
-
-        for resolved in sessions {
-            if !session_state_import_required(
-                self,
-                &resolved.state.session_id,
-                resolved.state.state_version,
-            )? {
-                result.sessions_skipped += 1;
-                continue;
-            }
-
-            self.sync_session(&resolved.project.project_id, &resolved.state)?;
-            import_session_log(self, &resolved.project, &resolved.state.session_id)?;
-            import_session_checkpoints(self, &resolved.project, &resolved.state)?;
-            import_session_signals(self, resolved)?;
-            import_session_activity_and_conversation_events(self, resolved)?;
-            result.sessions_imported += 1;
-        }
-
-        if result.sessions_imported > 0 {
-            self.bump_change("global")?;
-        }
-
-        Ok(result)
-    }
-
-    fn reconcile_from_files(&self) -> Result<ReconcileResult, CliError> {
-        let projects = daemon_index::discover_projects()?;
-        let sessions = daemon_index::discover_sessions_for(&projects, true)?;
-        self.reconcile_sessions(&projects, &sessions)
-    }
-
-    fn resync_session(&self, session_id: &str) -> Result<(), CliError> {
-        let prepared = prepare_session_resync(session_id)?;
-        DaemonDbSessionResync::apply_prepared_session_resync(self, &prepared)
-    }
 }
 
 impl DaemonDbSessionResync for DaemonDb {
@@ -338,66 +221,4 @@ pub(crate) fn prepare_runtime_transcript_resync(
         session_id: resolved.state.session_id,
         agents,
     }))
-}
-
-fn import_session_log(
-    db: &DaemonDb,
-    project: &DiscoveredProject,
-    session_id: &str,
-) -> Result<(), CliError> {
-    let entries = daemon_index::load_log_entries(project, session_id)?;
-    for entry in &entries {
-        db.append_log_entry(entry)?;
-    }
-    Ok(())
-}
-
-fn import_session_checkpoints(
-    db: &DaemonDb,
-    project: &DiscoveredProject,
-    state: &SessionState,
-) -> Result<(), CliError> {
-    for task_id in state.tasks.keys() {
-        let checkpoints = daemon_index::load_task_checkpoints(project, &state.session_id, task_id)?;
-        for checkpoint in &checkpoints {
-            db.append_checkpoint(&state.session_id, checkpoint)?;
-        }
-    }
-    Ok(())
-}
-
-fn import_session_signals(
-    db: &DaemonDb,
-    resolved: &daemon_index::ResolvedSession,
-) -> Result<(), CliError> {
-    let signals = daemon_snapshot::load_signals_for(&resolved.project, &resolved.state)?;
-    db.sync_signal_index(&resolved.state.session_id, &signals)
-}
-
-fn import_session_activity_and_conversation_events(
-    db: &DaemonDb,
-    resolved: &daemon_index::ResolvedSession,
-) -> Result<(), CliError> {
-    let (activities, conversation_events) = prepare_agent_conversation_imports_and_activity(
-        &resolved.state,
-        |agent_id, runtime, session_key| {
-            daemon_index::load_conversation_events(
-                &resolved.project,
-                runtime,
-                session_key,
-                agent_id,
-            )
-        },
-    )?;
-    db.sync_agent_activity(&resolved.state.session_id, &activities)?;
-    clear_session_conversation_events(&db.conn, &resolved.state.session_id)?;
-    for import in &conversation_events {
-        db.sync_conversation_events(
-            &resolved.state.session_id,
-            &import.agent_id,
-            &import.runtime,
-            &import.events,
-        )?;
-    }
-    Ok(())
 }

@@ -25,6 +25,7 @@ mod async_writes;
 mod change_tracking;
 mod conversation;
 mod diagnostics;
+mod imports;
 mod rebuild;
 mod review_writes;
 mod runtime;
@@ -61,6 +62,7 @@ pub use conversation::{
     prepare_agent_conversation_imports_and_activity, prepare_runtime_transcript_resync_for_agents,
 };
 pub use diagnostics::{DaemonDbDiagnostics, import_daemon_events};
+pub use imports::{DaemonDbImports, ImportResult, ReconcileResult, session_state_import_required};
 pub use rebuild::TaskReviewRebuild;
 pub use review_writes::{AsyncTaskReviewWrites, SyncTaskReviewWrites, TaskV10Columns};
 pub use runtime::{
