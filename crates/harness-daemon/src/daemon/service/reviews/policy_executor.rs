@@ -303,6 +303,10 @@ mod tests {
                 .await
                 .expect("open async daemon db"),
         ));
+        database
+            .replace_policy_workspace(&PolicyCanvasWorkspace::seeded())
+            .await
+            .expect("seed policy workspace with automation enabled");
         let registry = build_database_policy_provider_registry(NoopExecutor, Arc::clone(&database));
         let actions = [
             PolicyActionDescriptor {
