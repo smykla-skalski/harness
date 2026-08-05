@@ -1,12 +1,15 @@
+use std::future::Future;
+
+use harness_daemon_db_core::{AsyncDaemonDb, db_error, trace_async_db_operation};
+use harness_kernel::errors::CliError;
+use harness_session::index;
+use harness_session::storage;
+use harness_session::wire::SessionSummary;
+use harness_telemetry::record_daemon_db_pool_state;
 use sqlx::query_as;
 
-use super::summary_rows::AsyncSessionSummaryRow;
-use super::{
-    AsyncDaemonDb, AsyncResolvedSessionRow, CliError, daemon_index, daemon_protocol, db_error,
-    trace_async_db_operation,
-};
-use crate::session::storage;
-use crate::telemetry::record_daemon_db_pool_state;
+use crate::async_resolved_session::AsyncResolvedSessionRow;
+use crate::async_summary_rows::AsyncSessionSummaryRow;
 
 const SESSION_SUMMARIES_SQL: &str = "SELECT
     s.session_id,
@@ -62,29 +65,27 @@ const RESOLVE_SESSION_SQL: &str = "SELECT
    )";
 
 /// Session summary and resolution reads that canonicalize a legacy-shaped
-/// row via [`AsyncSessionWriteQueries::save_session_state`](super::AsyncSessionWriteQueries::save_session_state)
-/// when one turns up, so this stays a `db`-external extension trait rather
-/// than an inherent [`AsyncDaemonDb`] method the way the rest of the pool's
-/// clean read paths do.
-pub(crate) trait AsyncSessionSummaryQueries {
+/// row via [`crate::AsyncSessionWriteQueries::save_session_state`] when one
+/// turns up, so this stays a `db`-external extension trait rather than an
+/// inherent [`AsyncDaemonDb`] method the way the rest of the pool's clean
+/// read paths do.
+pub trait AsyncSessionSummaryQueries {
     /// # Errors
     /// Returns [`CliError`] on SQL failures.
-    async fn list_session_summaries(
+    fn list_session_summaries(
         &self,
-    ) -> Result<Vec<daemon_protocol::SessionSummary>, CliError>;
+    ) -> impl Future<Output = Result<Vec<SessionSummary>, CliError>> + Send;
 
     /// # Errors
     /// Returns [`CliError`] on SQL or parse failures.
-    async fn resolve_session(
+    fn resolve_session(
         &self,
         session_id: &str,
-    ) -> Result<Option<daemon_index::ResolvedSession>, CliError>;
+    ) -> impl Future<Output = Result<Option<index::ResolvedSession>, CliError>> + Send;
 }
 
 impl AsyncSessionSummaryQueries for AsyncDaemonDb {
-    async fn list_session_summaries(
-        &self,
-    ) -> Result<Vec<daemon_protocol::SessionSummary>, CliError> {
+    async fn list_session_summaries(&self) -> Result<Vec<SessionSummary>, CliError> {
         trace_async_db_operation(
             "list_session_summaries",
             "read",
@@ -116,7 +117,7 @@ impl AsyncSessionSummaryQueries for AsyncDaemonDb {
     async fn resolve_session(
         &self,
         session_id: &str,
-    ) -> Result<Option<daemon_index::ResolvedSession>, CliError> {
+    ) -> Result<Option<index::ResolvedSession>, CliError> {
         storage::validate_session_id(session_id)?;
         trace_async_db_operation(
             "resolve_session",

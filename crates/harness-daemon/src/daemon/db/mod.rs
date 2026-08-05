@@ -7,10 +7,9 @@
 
 #[cfg(test)]
 pub(crate) use std::collections::BTreeMap;
-pub(crate) use std::io::{Error as IoError, ErrorKind};
 pub(crate) use std::sync::{Arc, Mutex, OnceLock};
 
-pub(crate) use rusqlite::{Connection, OptionalExtension, types::Type};
+pub(crate) use rusqlite::{Connection, OptionalExtension};
 
 #[cfg(test)]
 pub(crate) use crate::agents::runtime::event::ConversationEvent;
@@ -18,7 +17,9 @@ pub(crate) use crate::daemon::agent_tui::{
     AgentTuiSize, AgentTuiSnapshot, AgentTuiStatus, TerminalScreenSnapshot,
 };
 pub(crate) use crate::daemon::index::DiscoveredProject;
-pub(crate) use crate::daemon::protocol::{CodexRunMode, CodexRunSnapshot, CodexRunStatus};
+pub(crate) use crate::daemon::protocol::CodexRunSnapshot;
+#[cfg(test)]
+pub(crate) use crate::daemon::protocol::{CodexRunMode, CodexRunStatus};
 #[cfg(test)]
 pub(crate) use crate::session::types::AgentRegistration;
 #[allow(unused_imports)]
@@ -59,7 +60,6 @@ pub(crate) use harness_daemon_db_queries::AsyncAgentResolutionQueries;
 pub(crate) use harness_daemon_db_queries::AsyncChangeTrackingQueries;
 pub(crate) use harness_daemon_db_queries::AsyncConversationSyncQueries;
 pub(crate) use harness_daemon_db_queries::AsyncDiagnosticsQueries;
-pub(crate) use harness_daemon_db_queries::AsyncResolvedSessionRow;
 pub(crate) use harness_daemon_db_queries::AsyncSignalReadQueries;
 pub(crate) use harness_daemon_db_queries::AsyncTimelineWindowQueries;
 #[cfg(test)]
@@ -67,8 +67,7 @@ pub(crate) use harness_daemon_db_queries::StoredTimelineEntry;
 mod async_runtime;
 pub(crate) use async_runtime::AsyncRuntimeSnapshotQueries;
 pub(crate) use harness_daemon_db_queries::AsyncSessionStateQueries;
-mod async_session_summaries;
-pub(crate) use async_session_summaries::AsyncSessionSummaryQueries;
+pub(crate) use harness_daemon_db_queries::AsyncSessionSummaryQueries;
 pub(crate) use harness_daemon_db_queries::AsyncSignalIndexQueries;
 pub(crate) use harness_daemon_db_queries::sync_session_in_transaction;
 pub(crate) use harness_daemon_db_queries::{AsyncDaemonTransactions, AsyncSessionWriteQueries};
@@ -86,9 +85,8 @@ pub(crate) use imports::{
 };
 mod policy_graph_connection;
 mod pull_request_actions;
+pub(crate) use harness_daemon_db_queries::TaskReviewRebuild;
 pub(crate) use pull_request_actions::AsyncPullRequestActionQueries;
-mod rebuild;
-pub(crate) use rebuild::TaskReviewRebuild;
 pub(crate) mod remote_acme;
 pub(crate) mod remote_identity;
 pub(crate) mod remote_pairing_revoke;
@@ -97,7 +95,10 @@ pub(crate) use crate::daemon::remote_pairing_queries::RemotePairingRevokeOutcome
 pub(crate) mod remote_pairing;
 pub(crate) use harness_daemon_db_queries::{AsyncTaskReviewWrites, SyncTaskReviewWrites};
 mod runtime;
-pub use runtime::RuntimeSnapshotQueries;
+pub use harness_daemon_db_queries::RuntimeSnapshotQueries;
+pub(crate) use harness_daemon_db_queries::{
+    codex_mode_as_str, codex_mode_from_str, codex_status_as_str, codex_status_from_str,
+};
 #[cfg(feature = "test-support")]
 pub mod schema_query_test_support;
 #[allow(dead_code)]
@@ -178,7 +179,6 @@ pub use session_data::SessionCoreQueries;
 mod signals;
 pub use harness_daemon_db_queries::SessionSummaryQueries;
 pub use harness_daemon_db_queries::SignalIndexQueries;
-mod summary_rows;
 pub(crate) mod timeline;
 pub use harness_daemon_db_queries::SessionWriteQueries;
 pub(crate) mod prelude;
@@ -198,7 +198,7 @@ pub use harness_daemon_db_core::AsyncDaemonDb;
 pub(crate) use harness_daemon_db_core::SchemaRepairHooks;
 #[cfg(test)]
 pub(crate) use harness_daemon_db_core::set_schema_init_hook;
-pub(crate) use harness_daemon_db_core::trace_async_db_operation;
+pub(crate) use harness_daemon_db_queries::AgentTuiLiveRefreshState;
 pub(crate) use harness_daemon_db_queries::DaemonDbConversation;
 #[allow(unused_imports)]
 use harness_daemon_db_queries::derive_effective_signal_status;
@@ -230,13 +230,6 @@ use harness_daemon_db_queries::{
 use harness_daemon_db_queries::{stored_timeline_entry, stored_timeline_entry_from_row};
 pub(crate) use harness_policy_graph_store::NewApprovalGrant;
 pub(crate) use runtime::ensure_shared_db;
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[doc(hidden)]
-pub struct AgentTuiLiveRefreshState {
-    pub(crate) status: AgentTuiStatus,
-    pub(crate) updated_at: String,
-}
 
 #[derive(Debug)]
 pub(crate) struct PreparedSessionResync {
