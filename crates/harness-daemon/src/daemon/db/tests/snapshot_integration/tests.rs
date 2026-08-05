@@ -1,6 +1,7 @@
 use tempfile::tempdir;
 
 use crate::daemon::index::ResolvedSession;
+use crate::session::types::SessionSignalStatus;
 
 use super::*;
 

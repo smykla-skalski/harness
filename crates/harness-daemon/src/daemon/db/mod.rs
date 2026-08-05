@@ -15,7 +15,6 @@ pub(crate) use rusqlite::{Connection, OptionalExtension, types::Type};
 pub(crate) use sha2::{Digest, Sha256};
 
 pub(crate) use crate::agents::runtime::event::ConversationEvent;
-pub(crate) use crate::agents::runtime::signal::Signal;
 pub(crate) use crate::daemon::agent_tui::{
     AgentTuiSize, AgentTuiSnapshot, AgentTuiStatus, TerminalScreenSnapshot,
 };
@@ -24,8 +23,8 @@ pub(crate) use crate::daemon::protocol::{
     CodexRunMode, CodexRunSnapshot, CodexRunStatus, TimelineEntry,
 };
 pub(crate) use crate::session::types::{
-    AgentRegistration, SessionLogEntry, SessionSignalRecord, SessionSignalStatus, SessionState,
-    SessionStatus, TaskCheckpoint, WorkItem,
+    AgentRegistration, SessionLogEntry, SessionSignalRecord, SessionState, SessionStatus,
+    TaskCheckpoint, WorkItem,
 };
 pub(crate) use crate::workspace::{project_context_dir, project_context_id, utc_now};
 pub(crate) use harness_kernel::errors::{CliError, CliErrorKind};
@@ -51,16 +50,14 @@ mod async_agent_turn_runs;
 pub(crate) use async_agent_turn_runs::{
     AgentTurnRunSnapshot, AgentTurnRunStatus, AsyncAgentTurnRunQueries,
 };
-mod async_agents;
-pub(crate) use async_agents::AsyncAgentResolutionQueries;
+pub(crate) use harness_daemon_db_queries::AsyncAgentResolutionQueries;
 pub(crate) use harness_daemon_db_queries::AsyncChangeTrackingQueries;
 mod async_conversation;
 pub(crate) use async_conversation::AsyncConversationSyncQueries;
-mod async_detail;
-pub(crate) use async_detail::AsyncSignalReadQueries;
 pub(crate) use harness_daemon_db_queries::AsyncDiagnosticsQueries;
-mod async_reads;
-pub(crate) use async_reads::AsyncTimelineWindowQueries;
+pub(crate) use harness_daemon_db_queries::AsyncSignalReadQueries;
+pub(crate) use harness_daemon_db_queries::AsyncTimelineWindowQueries;
+pub(crate) use harness_daemon_db_queries::StoredTimelineEntry;
 mod async_resolved_session;
 mod async_runtime;
 pub(crate) use async_runtime::AsyncRuntimeSnapshotQueries;
@@ -94,8 +91,7 @@ pub(crate) mod remote_pairing_revoke;
 pub(crate) use crate::daemon::remote_pairing_queries::RemotePairingOwner;
 pub(crate) use crate::daemon::remote_pairing_queries::RemotePairingRevokeOutcome;
 pub(crate) mod remote_pairing;
-mod review_writes;
-pub(crate) use review_writes::{AsyncTaskReviewWrites, SyncTaskReviewWrites};
+pub(crate) use harness_daemon_db_queries::{AsyncTaskReviewWrites, SyncTaskReviewWrites};
 mod runtime;
 pub use runtime::RuntimeSnapshotQueries;
 #[cfg(feature = "test-support")]
@@ -291,22 +287,6 @@ pub(crate) struct PreparedRuntimeTranscriptResync {
     agents: Vec<PreparedAgentTranscriptResync>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct StoredTimelineEntry {
-    session_id: String,
-    entry_id: String,
-    source_kind: String,
-    source_key: String,
-    recorded_at: String,
-    kind: String,
-    agent_id: Option<String>,
-    task_id: Option<String>,
-    summary: String,
-    payload_json: String,
-    sort_recorded_at: String,
-    sort_tiebreaker: String,
-}
-
 #[cfg(test)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct SessionTimelineStateRow {
@@ -317,31 +297,6 @@ pub(crate) struct SessionTimelineStateRow {
     oldest_recorded_at: Option<String>,
     integrity_hash: String,
     updated_at: String,
-}
-
-impl StoredTimelineEntry {
-    fn into_timeline_entry(
-        self,
-        payload_scope: daemon_timeline::TimelinePayloadScope,
-    ) -> Result<TimelineEntry, CliError> {
-        let payload = if payload_scope == daemon_timeline::TimelinePayloadScope::Summary {
-            serde_json::Value::Object(serde_json::Map::new())
-        } else {
-            serde_json::from_str(&self.payload_json).map_err(|error| {
-                db_error(format!("parse timeline payload {}: {error}", self.entry_id))
-            })?
-        };
-        Ok(TimelineEntry {
-            entry_id: self.entry_id,
-            recorded_at: self.recorded_at,
-            kind: self.kind,
-            session_id: self.session_id,
-            agent_id: self.agent_id,
-            task_id: self.task_id,
-            summary: self.summary,
-            payload,
-        })
-    }
 }
 
 /// Summary of what was imported from file-based storage.

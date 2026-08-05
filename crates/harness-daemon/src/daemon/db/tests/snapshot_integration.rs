@@ -16,8 +16,8 @@ use fs_err as fs;
 use super::*;
 use crate::agents::runtime::RuntimeCapabilities;
 use crate::agents::runtime::signal::{
-    AckResult, DeliveryConfig, SignalAck, SignalPayload, SignalPriority, acknowledge_signal,
-    write_signal_file,
+    AckResult, DeliveryConfig, Signal, SignalAck, SignalPayload, SignalPriority,
+    acknowledge_signal, write_signal_file,
 };
 use crate::observe::types::{
     ActiveWorker, FixSafety, IssueCategory, IssueCode, IssueSeverity, ObserverState, OpenIssue,

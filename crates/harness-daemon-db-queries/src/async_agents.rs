@@ -1,6 +1,8 @@
-use sqlx::query_as;
+use std::future::Future;
 
-use super::{AsyncDaemonDb, CliError, db_error};
+use harness_daemon_db_core::{AsyncDaemonDb, db_error};
+use harness_kernel::errors::CliError;
+use sqlx::query_as;
 
 /// Resolve a runtime-session ID to live agents.
 ///
@@ -19,7 +21,7 @@ const RESOLVE_RUNTIME_SESSION_AGENT_SQL: &str = "SELECT a.session_id, a.agent_id
      ORDER BY a.session_id, a.agent_id";
 
 /// Runtime-session-to-agent resolution through the canonical async daemon DB.
-pub(crate) trait AsyncAgentResolutionQueries: Send + Sync {
+pub trait AsyncAgentResolutionQueries: Send + Sync {
     /// Resolve a runtime-session ID to live (`session_id`, `agent_id`) pairs.
     ///
     /// Returns every match so the caller can detect ambiguity. Uses the
@@ -28,11 +30,11 @@ pub(crate) trait AsyncAgentResolutionQueries: Send + Sync {
     ///
     /// # Errors
     /// Returns [`CliError`] on SQL failures.
-    async fn resolve_runtime_session_agents(
+    fn resolve_runtime_session_agents(
         &self,
         runtime_name: &str,
         runtime_session_id: &str,
-    ) -> Result<Vec<(String, String)>, CliError>;
+    ) -> impl Future<Output = Result<Vec<(String, String)>, CliError>> + Send;
 }
 
 impl AsyncAgentResolutionQueries for AsyncDaemonDb {

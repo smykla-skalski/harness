@@ -1,10 +1,14 @@
+use std::future::Future;
+
+use harness_daemon_db_core::{AsyncDaemonDb, db_error};
 use harness_daemon_session_service::ExpiredPendingSignalIndexRecord;
+use harness_kernel::errors::CliError;
+use harness_protocol::agent::Signal;
+use harness_protocol::session::{SessionSignalRecord, SessionSignalStatus};
+use harness_session::wire::AgentToolActivitySummary;
 use sqlx::{query_as, query_scalar};
 
-use super::{
-    AsyncDaemonDb, CliError, SessionSignalRecord, SessionSignalStatus, Signal, daemon_protocol,
-    db_error,
-};
+use crate::signals::derive_effective_signal_status;
 
 const LOAD_SIGNALS_SQL: &str = "
 SELECT signal_json, ack_json, runtime, agent_id, session_id, status
@@ -24,24 +28,27 @@ ORDER BY created_at DESC";
 
 /// Async mirror of `signals::SignalIndexQueries`'s reads, plus the cached
 /// agent-activity read, through the canonical async daemon DB.
-pub(crate) trait AsyncSignalReadQueries: Send + Sync {
+pub trait AsyncSignalReadQueries: Send + Sync {
     /// # Errors
     /// Returns [`CliError`] on query or JSON parse failure.
-    async fn load_signals(&self, session_id: &str) -> Result<Vec<SessionSignalRecord>, CliError>;
+    fn load_signals(
+        &self,
+        session_id: &str,
+    ) -> impl Future<Output = Result<Vec<SessionSignalRecord>, CliError>> + Send;
 
     /// # Errors
     /// Returns [`CliError`] on query or JSON parse failure.
-    async fn load_agent_activity(
+    fn load_agent_activity(
         &self,
         session_id: &str,
-    ) -> Result<Vec<daemon_protocol::AgentToolActivitySummary>, CliError>;
+    ) -> impl Future<Output = Result<Vec<AgentToolActivitySummary>, CliError>> + Send;
 
     /// # Errors
     /// Returns [`CliError`] on query or JSON parse failure.
-    async fn load_expired_pending_signals(
+    fn load_expired_pending_signals(
         &self,
         session_id: &str,
-    ) -> Result<Vec<ExpiredPendingSignalIndexRecord>, CliError>;
+    ) -> impl Future<Output = Result<Vec<ExpiredPendingSignalIndexRecord>, CliError>> + Send;
 }
 
 impl AsyncSignalReadQueries for AsyncDaemonDb {
@@ -57,7 +64,7 @@ impl AsyncSignalReadQueries for AsyncDaemonDb {
     async fn load_agent_activity(
         &self,
         session_id: &str,
-    ) -> Result<Vec<daemon_protocol::AgentToolActivitySummary>, CliError> {
+    ) -> Result<Vec<AgentToolActivitySummary>, CliError> {
         let rows = query_scalar::<_, String>(LOAD_ACTIVITY_SQL)
             .bind(session_id)
             .fetch_all(self.pool())
@@ -129,7 +136,7 @@ impl AsyncSignalRow {
             runtime: self.runtime,
             agent_id: self.agent_id,
             session_id: self.session_id,
-            status: super::derive_effective_signal_status(stored, &signal),
+            status: derive_effective_signal_status(stored, &signal),
             signal,
             acknowledgment,
         })
@@ -148,7 +155,7 @@ impl AsyncExpiredPendingSignalRow {
         let signal: Signal = serde_json::from_str(&self.signal_json).map_err(|error| {
             db_error(format!("parse async expired pending signal row: {error}"))
         })?;
-        if super::derive_effective_signal_status(SessionSignalStatus::Pending, &signal)
+        if derive_effective_signal_status(SessionSignalStatus::Pending, &signal)
             != SessionSignalStatus::Expired
         {
             return Ok(None);
