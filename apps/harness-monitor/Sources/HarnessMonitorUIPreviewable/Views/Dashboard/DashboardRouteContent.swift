@@ -46,6 +46,7 @@ struct DashboardRouteContent: View, Equatable {
       DashboardTaskBoardRouteView(
         store: store,
         dashboardUI: dashboardUI,
+        history: history,
         sessionCatalog: sessionCatalog,
         isRouteVisible: isTaskBoardVisible,
         operationsInspectorVisible: operationsInspectorVisible,
@@ -69,7 +70,8 @@ struct DashboardRouteContent: View, Equatable {
       DashboardRetainedAuxiliaryRoute(isVisible: isAuditVisible) {
         DashboardAuditRouteView(
           store: store,
-          dashboardUI: dashboardUI
+          dashboardUI: dashboardUI,
+          history: history
         )
       }
       .layoutValue(key: DashboardRetainedRouteKey.self, value: .audit)
@@ -181,6 +183,7 @@ private struct DashboardRetainedRouteKey: LayoutValueKey {
 struct DashboardTaskBoardRouteView: View {
   let store: HarnessMonitorStore
   let dashboardUI: HarnessMonitorStore.ContentDashboardSlice
+  let history: GlobalWindowNavigationHistory
   let sessionCatalog: HarnessMonitorStore.SessionCatalogSlice
   let isRouteVisible: Bool
   let operationsInspectorVisible: Bool
@@ -264,12 +267,14 @@ struct DashboardTaskBoardRouteView: View {
     TaskBoardOverviewHost(
       scope: .dashboard,
       store: store,
+      navigationHistory: history,
       snapshot: taskBoardInboxSnapshot,
       taskBoardItems: dashboardUI.taskBoardItems,
       decisions: store.supervisorOpenDecisions,
       orchestratorStatus: dashboardUI.taskBoardOrchestratorStatus,
       evaluationSummary: dashboardUI.taskBoardEvaluationSummary,
       isActionInFlight: dashboardUI.isTaskBoardBusy || dashboardUI.connectionState != .online,
+      isRouteVisible: isRouteVisible,
       showsOperationsPanel: false,
       isCommandFocusActive: isRouteVisible,
       operationsInspectorFocus: operationsInspectorFocus

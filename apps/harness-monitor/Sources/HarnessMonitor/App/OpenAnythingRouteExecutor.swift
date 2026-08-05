@@ -1,5 +1,6 @@
 import Foundation
 import HarnessMonitorKit
+import HarnessMonitorUIPreviewable
 
 /// Routing step plumbing for the Open Anything palette.
 ///
@@ -14,8 +15,7 @@ import HarnessMonitorKit
 /// purpose: it lets the host modifier wrap a target's effect in multiple
 /// command-flavoured steps (presentation, command, navigation) without
 /// teaching the target enum about every host concern. Some targets fan out
-/// to >1 step (review hits select then navigate, task-board items request a
-/// session route then open the session window). Keep that overlap explicit
+/// to >1 step (review hits select then navigate). Keep that overlap explicit
 /// rather than collapsing it.
 ///
 /// Deep-link steps (`.openExternalURL`, `.revealInFinder`) are not produced by
@@ -23,13 +23,6 @@ import HarnessMonitorKit
 /// palette view: "Open in browser" on review URLs, "Reveal in Finder" on
 /// session worktree paths. The host modifier dispatches them the same way as
 /// any other command step.
-
-enum OpenAnythingSessionRouteTarget: Equatable, Sendable {
-  case agent(sessionID: String, agentID: String)
-  case task(sessionID: String, taskID: String)
-  case decision(sessionID: String, decisionID: String, resetDecisionFilters: Bool)
-  case timeline(sessionID: String, entryID: String)
-}
 
 enum OpenAnythingRoutingStep: Equatable, Sendable {
   case presentNewSessionSheet
@@ -41,10 +34,10 @@ enum OpenAnythingRoutingStep: Equatable, Sendable {
   case copyDiagnostics
   case openWindow(OpenAnythingWindowTarget)
   case openDashboard(OpenAnythingDashboardRoute)
+  case openDashboardAgent(DashboardAgentNavigationTarget)
+  case openDashboardTaskBoard(DashboardTaskBoardNavigationTarget)
+  case openDashboardAudit(DashboardAuditNavigationTarget)
   case openSettings(rawValue: String)
-  case openSessionWindow(sessionID: String)
-  case requestSessionRoute(OpenAnythingSessionRouteTarget)
-  case selectSupervisorDecision(id: String)
   case selectDashboardReview(pullRequestID: String)
   case openExternalURL(URL)
   case revealInFinder(URL)
@@ -69,11 +62,11 @@ enum OpenAnythingRouteExecutor {
     case .settingsSection(let rawValue):
       return [.openSettings(rawValue: rawValue)]
     case .session(let sessionID):
-      return [.openSessionWindow(sessionID: sessionID)]
-    case .taskBoardItem(_, let sessionID, let workItemID):
-      return taskBoardSteps(sessionID: sessionID, workItemID: workItemID)
-    case .decision(let id, let sessionID):
-      return decisionSteps(id: id, sessionID: sessionID)
+      return [.openDashboardAgent(.session(sessionID: sessionID))]
+    case .taskBoardItem(let id, _, _):
+      return [.openDashboardTaskBoard(.item(itemID: id))]
+    case .decision(let id, _):
+      return [.openDashboardAgent(.decision(decisionID: id))]
     case .review(let pullRequestID):
       return [
         .selectDashboardReview(pullRequestID: pullRequestID),
@@ -190,56 +183,18 @@ enum OpenAnythingRouteExecutor {
     }
   }
 
-  private static func taskBoardSteps(
-    sessionID: String?,
-    workItemID: String?
-  ) -> [OpenAnythingRoutingStep] {
-    guard let sessionID, let workItemID else {
-      return [.openDashboard(.taskBoard)]
-    }
-    return [
-      .requestSessionRoute(.task(sessionID: sessionID, taskID: workItemID)),
-      .openSessionWindow(sessionID: sessionID),
-    ]
-  }
-
-  private static func decisionSteps(
-    id: String,
-    sessionID: String?
-  ) -> [OpenAnythingRoutingStep] {
-    guard let sessionID else {
-      return [
-        .selectSupervisorDecision(id: id),
-        .openDashboard(.taskBoard),
-      ]
-    }
-    return [
-      .requestSessionRoute(
-        .decision(sessionID: sessionID, decisionID: id, resetDecisionFilters: true)
-      ),
-      .openSessionWindow(sessionID: sessionID),
-    ]
-  }
-
   private static func loadedSessionSteps(
     _ target: OpenAnythingLoadedSessionTarget
   ) -> [OpenAnythingRoutingStep] {
     switch target {
     case .agent(let sessionID, let agentID):
-      return [
-        .requestSessionRoute(.agent(sessionID: sessionID, agentID: agentID)),
-        .openSessionWindow(sessionID: sessionID),
-      ]
+      return [.openDashboardAgent(.sessionAgent(sessionID: sessionID, agentID: agentID))]
     case .task(let sessionID, let taskID):
       return [
-        .requestSessionRoute(.task(sessionID: sessionID, taskID: taskID)),
-        .openSessionWindow(sessionID: sessionID),
+        .openDashboardTaskBoard(.loadedSessionTask(sessionID: sessionID, taskID: taskID))
       ]
-    case .timeline(let sessionID, let entryID):
-      return [
-        .requestSessionRoute(.timeline(sessionID: sessionID, entryID: entryID)),
-        .openSessionWindow(sessionID: sessionID),
-      ]
+    case .timeline(let target):
+      return [.openDashboardAudit(.sessionTimeline(.init(target)))]
     }
   }
 }

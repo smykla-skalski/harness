@@ -75,7 +75,7 @@ extension OpenAnythingCorpusBuilder {
           id: "loadedSession.timeline.\(snapshot.sessionID).\(entry.entryId)",
           domain: .loadedSession,
           target: .loadedSession(
-            .timeline(sessionID: snapshot.sessionID, entryID: entry.entryId)
+            .timeline(.init(entry: entry))
           ),
           title: entry.summary.isEmpty ? entry.kind : entry.summary,
           subtitle: "Timeline",

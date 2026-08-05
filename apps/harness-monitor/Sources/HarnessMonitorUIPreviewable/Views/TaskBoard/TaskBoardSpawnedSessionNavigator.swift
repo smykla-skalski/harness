@@ -1,36 +1,43 @@
 import HarnessMonitorKit
 import SwiftUI
 
-/// Navigates from a dispatched board item to the live session that hosts its
-/// spawned managed agent. Selects the session, raises its window, and focuses
-/// the linked work item so the operator lands inside the running session
-/// instead of the modal task-actions sheet. When dispatch delivery returns the
-/// managed-agent snapshot, the route focuses that exact run; older call sites
-/// continue to fall back to the linked work item.
+/// Navigates from a dispatched board item to its exact Dashboard destination.
+/// A delivered managed-agent snapshot wins; older dispatches fall back to the
+/// linked board task without opening a legacy Session window.
 @MainActor
 enum TaskBoardSpawnedSessionNavigator {
   static func open(
-    store: HarnessMonitorStore,
+    store _: HarnessMonitorStore,
     openWindow: OpenWindowAction,
     sessionID: String,
     workItemID: String?,
     managedAgent: ManagedAgentSnapshot? = nil
   ) {
     if let managedAgent {
-      switch managedAgent {
-      case .terminal(let snapshot):
-        store.requestSessionRoute(.terminal(sessionID: sessionID, terminalID: snapshot.tuiId))
-      case .codex(let snapshot):
-        store.requestSessionRoute(.codex(sessionID: sessionID, runID: snapshot.runId))
-      case .acp(let snapshot):
-        store.requestSessionRoute(.agent(sessionID: sessionID, agentID: snapshot.acpId))
-      }
+      openWindow.openHarnessDashboardAgent(
+        .managedAgent(
+          sessionID: sessionID,
+          runtimeKind: runtimeKind(for: managedAgent),
+          managedAgentID: managedAgent.managedAgentID
+        )
+      )
     } else if let workItemID, !workItemID.isEmpty {
-      store.requestSessionRoute(.task(sessionID: sessionID, taskID: workItemID))
+      openWindow.openHarnessDashboardTaskBoard(
+        .loadedSessionTask(sessionID: sessionID, taskID: workItemID)
+      )
+    } else {
+      openWindow.openHarnessDashboardAgent(.session(sessionID: sessionID))
     }
-    openWindow.openHarnessSessionWindow(sessionID: sessionID)
-    Task { @MainActor in
-      await store.selectSession(sessionID)
+  }
+
+  private static func runtimeKind(for snapshot: ManagedAgentSnapshot) -> DashboardAgentRuntimeKind {
+    switch snapshot {
+    case .terminal:
+      .terminal
+    case .codex:
+      .codex
+    case .acp:
+      .acp
     }
   }
 }

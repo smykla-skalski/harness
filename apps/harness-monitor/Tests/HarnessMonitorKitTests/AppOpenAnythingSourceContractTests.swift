@@ -226,19 +226,27 @@ struct AppOpenAnythingSourceContractTests {
     #expect(hostSource.contains("if let loadedSessionOverride"))
   }
 
-  @Test("Open Anything timeline hits route and focus the selected entry")
-  func timelineHitsRouteAndFocusEntry() throws {
+  @Test("Open Anything timeline targets the exact Dashboard Audit event")
+  func timelineTargetsExactDashboardAuditEvent() throws {
     let executorSource = try harnessSourceFile(named: "App/OpenAnythingRouteExecutor.swift")
-    let observerSource = try previewableSourceFile(
-      named: "Views/Sessions/SessionWindowView+Observers.swift"
+    let auditSource = try previewableSourceFile(
+      named: "Views/Dashboard/DashboardAuditRouteView.swift"
     )
-    let listSource = try previewableSourceFile(named: "Views/Timeline/SessionTimelineList.swift")
 
-    #expect(executorSource.contains(".requestSessionRoute(.timeline("))
-    #expect(observerSource.contains("stateCache.sectionState.timelineEntryID = entryID"))
-    #expect(observerSource.contains("stateCache.selectRoute(.timeline)"))
-    #expect(listSource.contains("proxy.scrollTo(rowID, anchor: .center)"))
-    #expect(listSource.contains("isFocused: key.rowID == row.id"))
+    #expect(executorSource.contains(".openDashboardAudit(.sessionTimeline(.init(target)))"))
+    #expect(auditSource.contains("pendingDashboardAuditRestoreRequest"))
+    #expect(auditSource.contains("routedTimelineEvent = routedEvent"))
+    #expect(auditSource.contains("selectedEventID = event.id"))
+    #expect(auditSource.contains("The requested activity is unavailable"))
+  }
+
+  @Test("Harness deep links activate their exact Dashboard routes")
+  func deepLinksActivateExactDashboardRoutes() throws {
+    let sceneSource = try harnessSourceFile(named: "App/HarnessMonitorApp+SceneContent.swift")
+
+    #expect(sceneSource.contains("appWindowNavigationHistory.requestDashboardRoute(.reviews)"))
+    #expect(sceneSource.contains("openWindow.openHarnessDashboardTaskBoard(.item(itemID: itemID))"))
+    #expect(!sceneSource.contains("Route switching into reviews/taskBoard is deferred"))
   }
 
   @Test("Open Anything section header exposes collapse and show-all separately")

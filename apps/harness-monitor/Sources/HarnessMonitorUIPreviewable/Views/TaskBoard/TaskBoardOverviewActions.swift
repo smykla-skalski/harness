@@ -117,6 +117,44 @@ public struct TaskBoardOverviewActions: Equatable {
   }
 
   @MainActor
+  func openSessionTask(sessionID: String, taskID: String) {
+    guard let store else { return }
+    switch scope {
+    case .dashboard:
+      Task { @MainActor in
+        await store.selectSession(sessionID)
+        store.presentedSheet = .taskActions(sessionID: sessionID, taskID: taskID)
+      }
+    case .session(let scopedSessionID):
+      guard scopedSessionID == sessionID else { return }
+      store.presentedSheet = .taskActions(sessionID: sessionID, taskID: taskID)
+    }
+  }
+
+  @MainActor
+  func selectVerifiedSessionTask(sessionID: String, taskID: String) async -> Bool {
+    guard let store, !Task.isCancelled else { return false }
+    switch scope {
+    case .dashboard:
+      await store.selectSession(sessionID)
+      guard
+        !Task.isCancelled,
+        store.selectedSession?.session.sessionId == sessionID,
+        store.selectedSession?.tasks.contains(where: { $0.taskId == taskID }) == true
+      else { return false }
+      return true
+    case .session(let scopedSessionID):
+      guard scopedSessionID == sessionID else { return false }
+      return true
+    }
+  }
+
+  @MainActor
+  func presentVerifiedSessionTask(sessionID: String, taskID: String) {
+    store?.presentedSheet = .taskActions(sessionID: sessionID, taskID: taskID)
+  }
+
+  @MainActor
   func openDecision(_ decision: Decision) {
     guard let store else { return }
     store.supervisorSelectedDecisionID = decision.id

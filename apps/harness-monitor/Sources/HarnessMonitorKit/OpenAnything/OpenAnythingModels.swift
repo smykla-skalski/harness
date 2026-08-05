@@ -245,10 +245,36 @@ public enum OpenAnythingDashboardRoute: String, Codable, CaseIterable, Hashable,
   }
 }
 
+public struct OpenAnythingLoadedSessionTimelineTarget: Codable, Hashable, Sendable {
+  public let sessionID: String
+  public let entryID: String
+  public let recordedAt: String
+  public let kind: String
+  public let agentID: String?
+  public let taskID: String?
+  public let summary: String
+  public let payloadJSON: String?
+
+  public init(entry: TimelineEntry) {
+    sessionID = entry.sessionId
+    entryID = entry.entryId
+    recordedAt = entry.recordedAt
+    kind = entry.kind
+    agentID = entry.agentId
+    taskID = entry.taskId
+    summary = entry.summary
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys]
+    payloadJSON = (try? encoder.encode(entry.payload)).flatMap {
+      String(bytes: $0, encoding: .utf8)
+    }
+  }
+}
+
 public enum OpenAnythingLoadedSessionTarget: Codable, Hashable, Sendable {
   case agent(sessionID: String, agentID: String)
   case task(sessionID: String, taskID: String)
-  case timeline(sessionID: String, entryID: String)
+  case timeline(OpenAnythingLoadedSessionTimelineTarget)
 }
 
 public enum OpenAnythingTarget: Codable, Hashable, Sendable {

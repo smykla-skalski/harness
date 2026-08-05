@@ -41,7 +41,7 @@ public struct CodexApprovalRule: PolicyRule {
     snapshotID: String,
     context: PolicyContext
   ) -> SupervisorAction? {
-    let decisionID = "codex-approval:\(sessionID):\(approval.id)"
+    let decisionID = Self.decisionID(sessionID: sessionID, approvalID: approval.id)
     let payload = SupervisorAction.DecisionPayload(
       id: decisionID,
       severity: .needsUser,
@@ -60,6 +60,10 @@ public struct CodexApprovalRule: PolicyRule {
       return nil
     }
     return action
+  }
+
+  public static func decisionID(sessionID: String, approvalID: String) -> String {
+    "codex-approval:\(sessionID):\(approvalID)"
   }
 
   private func makeSuggestedActions(agentID: String, approvalID: String) -> [SuggestedAction] {

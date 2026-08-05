@@ -34,6 +34,8 @@ struct DashboardCodexStatusCard: View {
 }
 
 struct DashboardCodexApprovals: View {
+  let store: HarnessMonitorStore
+  let sessionID: String
   let approvals: [CodexApprovalRequest]
   let isBusy: Bool
   let onResolve: (CodexApprovalRequest, CodexApprovalDecision) -> Void
@@ -65,9 +67,18 @@ struct DashboardCodexApprovals: View {
                 onResolve(approval, decision)
               }
               .disabled(isBusy)
+              .dashboardPrimaryDecisionActionFocus(
+                store: store,
+                decisionID: CodexApprovalRule.decisionID(
+                  sessionID: sessionID,
+                  approvalID: approval.id
+                ),
+                isPrimaryAction: decision == .accept
+              )
             }
           }
         }
+        .id(CodexApprovalRule.decisionID(sessionID: sessionID, approvalID: approval.id))
       }
     }
   }

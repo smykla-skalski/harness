@@ -194,14 +194,14 @@ struct HarnessMonitorOpenAnythingExecutorBinder: ViewModifier {
       openWindowTarget(target, openWindow: openWindow)
     case .openDashboard(let route):
       openDashboard(route, openWindow: openWindow)
+    case .openDashboardAgent(let target):
+      openWindow.openHarnessDashboardAgent(target)
+    case .openDashboardTaskBoard(let target):
+      openWindow.openHarnessDashboardTaskBoard(target)
+    case .openDashboardAudit(let target):
+      openWindow.openHarnessDashboardAudit(target)
     case .openSettings(let rawValue):
       openSettings(rawValue: rawValue, openWindow: openWindow)
-    case .openSessionWindow(let sessionID):
-      openWindow.openHarnessSessionWindow(sessionID: sessionID)
-    case .requestSessionRoute(let target):
-      requestSessionRoute(target)
-    case .selectSupervisorDecision(let id):
-      store.supervisorSelectedDecisionID = id
     case .selectDashboardReview(let pullRequestID):
       reviewRegistry.requestSelection(pullRequestID: pullRequestID)
     case .presentNewSessionSheet, .presentNewTaskSheet, .attachExternalSession, .refresh,
@@ -324,19 +324,4 @@ struct HarnessMonitorOpenAnythingExecutorBinder: ViewModifier {
     openWindow(id: HarnessMonitorWindowID.settings)
   }
 
-  private func requestSessionRoute(_ target: OpenAnythingSessionRouteTarget) {
-    switch target {
-    case .agent(let sessionID, let agentID):
-      store.requestSessionRoute(.agent(sessionID: sessionID, agentID: agentID))
-    case .task(let sessionID, let taskID):
-      store.requestSessionRoute(.task(sessionID: sessionID, taskID: taskID))
-    case .decision(let sessionID, let decisionID, let resetDecisionFilters):
-      store.requestSessionRoute(
-        .decision(sessionID: sessionID, decisionID: decisionID),
-        resetDecisionFilters: resetDecisionFilters
-      )
-    case .timeline(let sessionID, let entryID):
-      store.requestSessionRoute(.timeline(sessionID: sessionID, entryID: entryID))
-    }
-  }
 }

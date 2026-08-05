@@ -215,6 +215,7 @@ enum DashboardSidebarSelection: Hashable {
 
 struct DashboardSidebar: View {
   let store: HarnessMonitorStore
+  let history: GlobalWindowNavigationHistory
   @Binding var selectedRoute: DashboardWindowRoute
   let recentSessions: [SessionSummary]
   let statusModel: SessionStatusSummaryModel
@@ -233,7 +234,7 @@ struct DashboardSidebar: View {
         dashboardSelection = newValue
         switch newValue {
         case .route(let route):
-          selectedRoute = route
+          activateRoute(route)
         case .session(let sessionID):
           guard shouldOpenSessionWindow(for: NSApp.currentEvent) else {
             return
@@ -280,6 +281,11 @@ struct DashboardSidebar: View {
                 systemImage: route.systemImage
               )
               .tag(DashboardSidebarSelection.route(route))
+              .simultaneousGesture(
+                TapGesture().onEnded {
+                  activateRoute(route)
+                }
+              )
               .accessibilityIdentifier(
                 HarnessMonitorAccessibility.dashboardWindowRoute(route.rawValue)
               )
@@ -301,11 +307,16 @@ struct DashboardSidebar: View {
           guard let sessionID else {
             return
           }
-          openWindow.openHarnessSessionWindow(sessionID: sessionID)
+          openWindow.openHarnessDashboardAgent(.session(sessionID: sessionID))
           pendingSessionOpenID = nil
           dashboardSelection = .route(selectedRoute)
         }
       }
     }
+  }
+
+  private func activateRoute(_ route: DashboardWindowRoute) {
+    history.userSelectedDashboardRoute(route)
+    selectedRoute = route
   }
 }

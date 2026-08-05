@@ -37,7 +37,7 @@ struct WindowMenuCommands: Commands {
     case .newSessionSheet:
       store.presentedSheet = .newSession
     case .session(let sessionID):
-      openWindow.openHarnessSessionWindow(sessionID: sessionID)
+      openWindow.openHarnessDashboardAgent(.session(sessionID: sessionID))
     }
   }
 

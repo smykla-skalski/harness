@@ -37,18 +37,21 @@ struct SessionCockpitView: View {
   }
 
   private func openAgent(_ agentID: String) {
-    store.requestSessionRoute(
-      .agent(sessionID: detail.session.sessionId, agentID: agentID)
+    openWindow.openHarnessDashboardAgent(
+      .sessionAgent(sessionID: detail.session.sessionId, agentID: agentID)
     )
-    openWindow.openHarnessSessionWindow(sessionID: detail.session.sessionId)
   }
 
   private func focusObserver() {
-    store.requestSessionRoute(
-      .decisions(sessionID: detail.session.sessionId),
-      resetDecisionFilters: true
+    guard let observer = detail.observer else { return }
+    openWindow.openHarnessDashboardAudit(
+      .observerSummary(
+        DashboardObserverActivityTarget(
+          sessionID: detail.session.sessionId,
+          observer: observer
+        )
+      )
     )
-    openWindow.openHarnessSessionWindow(sessionID: detail.session.sessionId)
   }
 
   var body: some View {

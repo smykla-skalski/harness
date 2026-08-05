@@ -347,15 +347,13 @@ struct SessionAgentDetailSection: View {
       }?.id
 
     if let decisionID = oldestOpenDecisionID ?? pendingDecisionAttention?.oldestDecisionID {
-      store.requestSessionRoute(
-        .decision(sessionID: sessionID, decisionID: decisionID),
-        resetDecisionFilters: true
-      )
       store.supervisorSelectedDecisionID = decisionID
       store.requestPrimaryDecisionActionFocus(decisionID: decisionID)
-      openWindow.openHarnessSessionWindow(sessionID: sessionID)
+      openWindow.openHarnessDashboardDecision(decisionID: decisionID)
     } else {
-      openWindow.openHarnessSessionWindow(sessionID: sessionID)
+      openWindow.openHarnessDashboardAgent(
+        .sessionAgent(sessionID: sessionID, agentID: agent.agentId)
+      )
     }
   }
 

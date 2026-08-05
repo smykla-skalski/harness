@@ -44,13 +44,21 @@ public struct SessionAttentionToolbarButton: View {
   }
 
   private func openSessionWindow(focusesDecisions: Bool) {
-    if focusesDecisions && !SessionRouteDefaults.hasStoredSelection() {
-      store.requestSessionRoute(
-        .decisions(sessionID: store.selectedSessionID),
-        resetDecisionFilters: true
-      )
+    if focusesDecisions,
+      let sessionID = store.selectedSessionID,
+      let decisionID = store.supervisorPresentationItemsBySession[sessionID]?
+        .min(by: { lhs, rhs in
+          lhs.createdAt == rhs.createdAt ? lhs.id < rhs.id : lhs.createdAt < rhs.createdAt
+        })?.id
+    {
+      openWindow.openHarnessDashboardDecision(decisionID: decisionID)
+      return
     }
-    openWindow.openHarnessSessionWindow(sessionID: store.selectedSessionID)
+    guard let sessionID = store.selectedSessionID else {
+      openWindow.openHarnessDashboardWindow()
+      return
+    }
+    openWindow.openHarnessDashboardAgent(.session(sessionID: sessionID))
   }
 
   private func helpText(count: Int) -> String {

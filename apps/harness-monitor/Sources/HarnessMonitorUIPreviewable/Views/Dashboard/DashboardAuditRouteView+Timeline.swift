@@ -147,6 +147,7 @@ struct DashboardAuditTimelinePane: View {
   let hasMoreEvents: Bool
   let loadMoreEvents: () -> Void
   let copyDispatcher: DashboardAuditCopyDispatcher
+  let navigationScrollTarget: DashboardAuditTimelineScrollTarget?
 
   private var rows: [DashboardAuditTimelineRow] {
     DashboardAuditTimelineRow.rows(for: events, configuration: configuration)
@@ -166,28 +167,42 @@ struct DashboardAuditTimelinePane: View {
       .frame(maxWidth: .infinity, maxHeight: .infinity)
       .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardAuditEmptyState)
     } else {
-      ScrollView {
-        LazyVStack(alignment: .leading, spacing: 0) {
-          ForEach(rows) { row in
-            if let dayDividerLabel = row.dayDividerLabel {
-              DashboardAuditDayDivider(label: dayDividerLabel)
+      ScrollViewReader { proxy in
+        ScrollView {
+          LazyVStack(alignment: .leading, spacing: 0) {
+            ForEach(rows) { row in
+              if let dayDividerLabel = row.dayDividerLabel {
+                DashboardAuditDayDivider(label: dayDividerLabel)
+              }
+              DashboardAuditTimelineRowView(
+                row: row,
+                isSelected: row.event.id == selectedEventID,
+                copyDispatcher: copyDispatcher
+              ) {
+                selectedEventID = row.event.id
+              }
+              .id(row.event.id)
             }
-            DashboardAuditTimelineRowView(
-              row: row,
-              isSelected: row.event.id == selectedEventID,
-              copyDispatcher: copyDispatcher
-            ) {
-              selectedEventID = row.event.id
+            if hasMoreEvents {
+              DashboardAuditLoadMoreButton(action: loadMoreEvents)
             }
           }
-          if hasMoreEvents {
-            DashboardAuditLoadMoreButton(action: loadMoreEvents)
-          }
+          .padding(.vertical, 10)
+          .animation(.snappy(duration: 0.18), value: rows.map(\.id))
         }
-        .padding(.vertical, 10)
-        .animation(.snappy(duration: 0.18), value: rows.map(\.id))
+        .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardAuditScrollView)
+        .task(id: navigationScrollTarget) {
+          guard
+            let target = DashboardAuditTimelineScrollTarget.resolve(
+              navigationScrollTarget,
+              availableEventIDs: Set(rows.map(\.id))
+            )
+          else { return }
+          await Task.yield()
+          guard !Task.isCancelled else { return }
+          proxy.scrollTo(target.eventID, anchor: .center)
+        }
       }
-      .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardAuditScrollView)
     }
   }
 }
@@ -385,23 +400,5 @@ private struct DashboardAuditTimelineRowView: View {
 
   private func copyEvent(_ event: HarnessMonitorAuditEvent) {
     copyDispatcher.copy(event: event)
-  }
-}
-
-private struct DashboardAuditOutcomeBadge: View {
-  let event: HarnessMonitorAuditEvent
-
-  var body: some View {
-    Text(event.outcome.auditDisplayLabel)
-      .scaledFont(.caption2)
-      .foregroundStyle(event.outcomeTint)
-      .lineLimit(1)
-      .fixedSize(horizontal: true, vertical: false)
-      .padding(.horizontal, 6)
-      .padding(.vertical, 2)
-      .background(
-        event.outcomeTint.opacity(0.14),
-        in: RoundedRectangle(cornerRadius: 4, style: .continuous)
-      )
   }
 }

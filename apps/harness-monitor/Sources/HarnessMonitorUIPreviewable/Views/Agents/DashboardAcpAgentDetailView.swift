@@ -9,7 +9,7 @@ struct DashboardAcpAgentDetailView: View {
   let loadsAutomatically: Bool
 
   var body: some View {
-    ScrollView {
+    DashboardDecisionScrollView(store: store, decisionIDs: navigationDecisionIDs) {
       VStack(alignment: .leading, spacing: 20) {
         DashboardAgentDetailHeader(agent: agent)
         DashboardAgentDecisionsSection(store: store, items: teamDecisions)
@@ -48,6 +48,14 @@ struct DashboardAcpAgentDetailView: View {
       guard loadsAutomatically else { return }
       requestLoad()
     }
+  }
+
+  private var navigationDecisionIDs: Set<String> {
+    let permissionIDs =
+      state.detail?.pendingPermissions.map {
+        store.acpPermissionDecisionPayload(for: $0).decisionID
+      } ?? []
+    return Set(teamDecisions.map(\.id) + permissionIDs)
   }
 
   @ViewBuilder
