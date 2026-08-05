@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex, PoisonError};
 
 use tokio::sync::{Mutex as AsyncMutex, OwnedMutexGuard};
 
-use crate::daemon::protocol::TaskBoardSyncResponse;
+use harness_task_board::wire::TaskBoardSyncResponse;
 
 #[derive(Debug, Default)]
 pub(super) struct TaskBoardSyncCoordinator {
@@ -21,7 +21,7 @@ struct TaskBoardSyncState {
     pending_generation: Option<u64>,
 }
 
-pub(crate) struct TaskBoardSyncPermit {
+pub struct TaskBoardSyncPermit {
     coordinator: Arc<TaskBoardSyncCoordinator>,
     cancellation: Arc<AtomicBool>,
     generation: Option<u64>,
@@ -29,12 +29,12 @@ pub(crate) struct TaskBoardSyncPermit {
     _guard: OwnedMutexGuard<()>,
 }
 
-pub(crate) struct TaskBoardSyncStatus {
-    pub(crate) active: bool,
-    pub(crate) cancellation_requested: bool,
-    pub(crate) cancelled: bool,
-    pub(crate) error: Option<String>,
-    pub(crate) summary: Option<TaskBoardSyncResponse>,
+pub struct TaskBoardSyncStatus {
+    pub active: bool,
+    pub cancellation_requested: bool,
+    pub cancelled: bool,
+    pub error: Option<String>,
+    pub summary: Option<TaskBoardSyncResponse>,
 }
 
 impl TaskBoardSyncCoordinator {
@@ -126,11 +126,12 @@ impl TaskBoardSyncCoordinator {
 }
 
 impl TaskBoardSyncPermit {
-    pub(crate) fn cancellation(&self) -> Arc<AtomicBool> {
+    #[must_use]
+    pub fn cancellation(&self) -> Arc<AtomicBool> {
         Arc::clone(&self.cancellation)
     }
 
-    pub(crate) fn record_completion(
+    pub fn record_completion(
         &mut self,
         summary: Option<TaskBoardSyncResponse>,
         error: Option<String>,

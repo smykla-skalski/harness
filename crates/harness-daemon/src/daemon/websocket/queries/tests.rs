@@ -9,6 +9,7 @@ use super::*;
 use crate::agents::runtime::event::{ConversationEvent, ConversationEventKind};
 use crate::daemon::db::DaemonDb;
 use crate::daemon::db::prelude::*;
+use crate::daemon::db_handle::DaemonDbOwnedHandle;
 use crate::daemon::http::DaemonHttpState;
 use crate::daemon::protocol::WsRequest;
 
@@ -488,6 +489,7 @@ async fn dispatch_read_query_session_timeline_uses_async_db_when_sync_db_is_unav
 fn seed_sample_acp_transcript(state: &DaemonHttpState) {
     let db_path = state.db_path.as_ref().expect("db path");
     let db = DaemonDb::open(db_path).expect("open file db");
+    let db = DaemonDbOwnedHandle(db);
     let mut session = db
         .load_session_state("f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4")
         .expect("load sample session")

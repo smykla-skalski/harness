@@ -6,10 +6,13 @@ use std::time::Instant;
 use tracing::Instrument as _;
 use tracing::field::{Empty, display};
 
-use crate::telemetry::{apply_current_baggage_to_span, record_daemon_db_operation_metrics};
 use harness_kernel::errors::CliError;
+use harness_telemetry::{apply_current_baggage_to_span, record_daemon_db_operation_metrics};
 
-pub(crate) fn trace_sync_db_operation<T, F>(
+/// # Errors
+/// Returns whatever error `work` returns; the operation is only traced, not
+/// altered.
+pub fn trace_sync_db_operation<T, F>(
     operation: &str,
     access: &str,
     db_path: Option<&Path>,
@@ -28,7 +31,10 @@ where
     result
 }
 
-pub(crate) async fn trace_async_db_operation<T, F, Fut>(
+/// # Errors
+/// Returns whatever error `work` returns; the operation is only traced, not
+/// altered.
+pub async fn trace_async_db_operation<T, F, Fut>(
     operation: &str,
     access: &str,
     db_path: Option<&Path>,

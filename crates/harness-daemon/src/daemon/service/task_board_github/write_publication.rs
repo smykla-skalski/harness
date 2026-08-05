@@ -1,7 +1,6 @@
 use std::path::Path;
 use std::slice;
 
-use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::github::{GitHubAutomationClient, GitHubProjectConfig};
 use crate::task_board::{
     PolicyAction, PolicyGraph, TaskBoardItem, TaskBoardLifecycleOutcome,
@@ -23,6 +22,7 @@ mod evidence;
 #[path = "write_publication/preparation.rs"]
 mod preparation;
 
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use client::{
     PublicationClient, publication_client_for_repository, repository_publication_client,
     resolve_base_branch,
@@ -41,7 +41,7 @@ pub(super) use preparation::{
 const WRITE_PUBLICATION_HOST: &str = "task-board-write-workflow";
 
 pub(crate) async fn validate_write_workflow_launch_publication(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     settings: &TaskBoardOrchestratorSettings,
     workflow_kind: TaskBoardWorkflowKind,
     execution_repository: Option<&str>,
@@ -74,7 +74,7 @@ pub(crate) async fn validate_write_workflow_launch_publication(
 }
 
 pub(crate) async fn publish_task_board_write_execution(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
 ) -> Result<TaskBoardLifecycleOutcome, CliError> {
     let publication = write_publication_client(db, execution).await?;
@@ -104,7 +104,7 @@ pub(crate) async fn publish_task_board_write_execution(
 }
 
 pub(crate) async fn verify_task_board_write_execution_publication(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     known_external_url: Option<&str>,
 ) -> Result<TaskBoardLifecycleOutcome, CliError> {
@@ -119,7 +119,7 @@ pub(crate) async fn verify_task_board_write_execution_publication(
 }
 
 async fn publish_pr_fix(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     publication: &PublicationClient,
     local: &LocalHeadEvidence,
@@ -222,7 +222,7 @@ pub(super) async fn publish_pr_fix_branch(
 }
 
 async fn publish_default_task(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     publication: &PublicationClient,
     local: &LocalHeadEvidence,
@@ -313,7 +313,7 @@ async fn preflight_default_branch(
 }
 
 async fn verify_published(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     publication: &PublicationClient,
     number: u64,
@@ -379,7 +379,7 @@ fn expected_publication_target(
 }
 
 async fn write_publication_client(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
 ) -> Result<PublicationClient, CliError> {
     let settings = db.task_board_orchestrator_settings_snapshot().await?;

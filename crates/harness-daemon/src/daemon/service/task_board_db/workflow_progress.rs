@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use crate::daemon::db::{AgentTurnRunSnapshot, AsyncDaemonDb};
+use crate::daemon::db::AgentTurnRunSnapshot;
 use crate::daemon::protocol::CodexRunSnapshot;
 use crate::task_board::{
     TaskBoardWorkflowAttemptRuntimeEvidence, TaskBoardWorkflowProgressResponse,
@@ -11,9 +11,10 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 use super::TaskBoardGetItemRequest;
 use crate::daemon::db::prelude::*;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 pub(crate) async fn get_task_board_workflow_progress_db(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &TaskBoardGetItemRequest,
 ) -> Result<TaskBoardWorkflowProgressResponse, CliError> {
     let item = db.task_board_item(&request.id).await?;

@@ -25,16 +25,10 @@ const UPDATE_SQLX_MIGRATION_METADATA_SQL: &str =
     "UPDATE _sqlx_migrations SET description = ?2, checksum = ?3 WHERE version = ?1";
 const AGENT_TURN_RUNS_MIGRATION_VERSION: i64 = 58;
 const MODIFIED_AGENT_TURN_RUNS_CHECKSUM: &str = "BB276C3EA875F30B7FE1BE84A078D14AE950E38D3B9F4489E6D8CACEF966056AFA96F74153221DF6070A8B38B561B82F";
-// `sqlx::migrate!` resolves relative to `CARGO_MANIFEST_DIR`, which differs
-// between harness-daemon's own build (`standalone-daemon` on by default) and
-// root's `daemon-runtime`-gated test-only mirror of this file (`standalone-daemon`
-// off, since `full-runtime` does not imply it), so the path still needs a
-// feature-gated pair even though both now point under `crates/harness-daemon`.
-#[cfg(not(feature = "standalone-daemon"))]
-static DAEMON_DB_MIGRATOR: Migrator =
-    sqlx::migrate!("crates/harness-daemon/src/daemon/db/migrations");
-#[cfg(feature = "standalone-daemon")]
-static DAEMON_DB_MIGRATOR: Migrator = sqlx::migrate!("src/daemon/db/migrations");
+// `sqlx::migrate!` resolves relative to this crate's own `CARGO_MANIFEST_DIR`;
+// unlike `harness-daemon`, nothing path-includes this crate's source into a
+// facade with a different manifest directory, so a single path suffices.
+static DAEMON_DB_MIGRATOR: Migrator = sqlx::migrate!("src/migrations");
 
 pub(super) async fn ensure_async_schema(pool: &SqlitePool) -> Result<(), CliError> {
     if !table_exists(pool, "schema_meta").await? {
@@ -51,8 +45,9 @@ pub(super) async fn ensure_async_schema(pool: &SqlitePool) -> Result<(), CliErro
 /// Every migration the binary carries. Tests that assert a fully migrated
 /// database read this instead of a literal range, so adding a migration does
 /// not mean rewriting a number in unrelated tests.
-#[cfg(test)]
-pub(crate) fn all_migration_versions() -> Vec<i64> {
+#[cfg(any(test, feature = "test-support"))]
+#[must_use]
+pub fn all_migration_versions() -> Vec<i64> {
     DAEMON_DB_MIGRATOR
         .iter()
         .map(|migration| migration.version)
@@ -436,7 +431,7 @@ async fn restore_migration_pragmas(conn: &mut sqlx::SqliteConnection) -> Result<
 #[cfg(test)]
 mod pragma_tests {
     use super::{SchemaRepairHooks, query, restore_migration_pragmas};
-    use crate::daemon::db::AsyncDaemonDb;
+    use crate::AsyncDaemonDb;
 
     /// The hooks are unreachable here: `connect_with_hooks` only threads them
     /// through `prepare_legacy_schema`, which is a no-op for a path that does

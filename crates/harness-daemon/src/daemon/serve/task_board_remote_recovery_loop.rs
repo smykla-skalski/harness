@@ -6,7 +6,8 @@ use tokio::task::JoinHandle;
 use tokio::time::{Instant as TokioInstant, sleep_until};
 
 use crate::daemon::db::task_board::prelude::*;
-use crate::daemon::db::{AsyncDaemonDb, TaskBoardRemoteRecoveryBatch, utc_now};
+use crate::daemon::db::{TaskBoardRemoteRecoveryBatch, utc_now};
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::http::DaemonHttpState;
 use crate::daemon::service::task_board_remote_controller::drive_task_board_remote_controller;
 use crate::daemon::service::task_board_remote_controller::drive_task_board_remote_controller_before_local_work;
@@ -82,7 +83,7 @@ async fn run_remote_recovery_loop(
 
 pub(crate) async fn recover_remote_assignments_before_local_work(
     _state: &DaemonHttpState,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
 ) -> Result<(), CliError> {
     for _ in 0..MAXIMUM_FOREGROUND_PAGES {
         let report = Box::pin(drive_task_board_remote_controller_before_local_work(db)).await?;
@@ -97,7 +98,7 @@ pub(crate) async fn recover_remote_assignments_before_local_work(
 }
 
 pub(crate) async fn recover_remote_assignments_before_work(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
 ) -> Result<(), CliError> {
     for _ in 0..MAXIMUM_FOREGROUND_PAGES {
         let batch = Box::pin(db.recover_task_board_remote_assignments(&utc_now())).await?;
@@ -114,7 +115,7 @@ pub(crate) async fn recover_remote_assignments_before_work(
 
 #[cfg(test)]
 pub(crate) async fn recover_remote_assignments_at_startup(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
 ) -> Result<(), CliError> {
     for _ in 0..MAXIMUM_STARTUP_PAGES {
         let now = utc_now();
@@ -139,7 +140,7 @@ pub(crate) async fn recover_remote_assignments_at_startup(
 )]
 pub(crate) async fn recover_remote_assignments_at_startup_with_controller(
     _state: &DaemonHttpState,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
 ) -> Result<(), CliError> {
     for _ in 0..MAXIMUM_STARTUP_PAGES {
         let report = Box::pin(drive_task_board_remote_controller_before_local_work(db)).await?;
@@ -168,7 +169,7 @@ pub(crate) async fn recover_remote_assignments_at_startup_with_controller(
 )]
 async fn maintain_remote_recovery_after_controller(
     _state: &DaemonHttpState,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     schedule: &mut RecoverySchedule,
 ) {
     let coverage = match Box::pin(drive_task_board_remote_controller(db)).await {
@@ -207,7 +208,7 @@ async fn maintain_remote_recovery_after_controller(
 }
 
 async fn maintain_remote_recovery_after_coverage(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     schedule: &mut RecoverySchedule,
     coverage: ControllerCoverage,
 ) {
@@ -225,7 +226,7 @@ async fn maintain_remote_recovery_after_coverage(
     clippy::cognitive_complexity,
     reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
 )]
-async fn maintain_remote_recovery(db: &AsyncDaemonDb, schedule: &mut RecoverySchedule) {
+async fn maintain_remote_recovery(db: &AsyncDaemonDbHandle, schedule: &mut RecoverySchedule) {
     let result = Box::pin(async {
         let now = utc_now();
         let batch = Box::pin(db.recover_task_board_remote_assignments(&now)).await?;
@@ -248,7 +249,7 @@ async fn maintain_remote_recovery(db: &AsyncDaemonDb, schedule: &mut RecoverySch
     clippy::cognitive_complexity,
     reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
 )]
-async fn prune_startup_evidence(db: &AsyncDaemonDb, now: &str) {
+async fn prune_startup_evidence(db: &AsyncDaemonDbHandle, now: &str) {
     if let Err(error) = db.prune_task_board_remote_execution_evidence(now).await {
         tracing::warn!(%error, "task-board remote evidence startup pruning failed");
     }

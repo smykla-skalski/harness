@@ -1,5 +1,3 @@
-use crate::daemon::db::AsyncDaemonDb;
-use crate::daemon::db::DaemonDb;
 use crate::daemon::db::prelude::*;
 use crate::daemon::protocol::CodexRunRequest;
 use crate::daemon::service as daemon_service;
@@ -13,6 +11,7 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::handle::{CodexControllerHandle, lock_db};
 use super::orchestration::rollback_codex_registration;
+use crate::daemon::db_handle::{AsyncDaemonDbHandle, DaemonDbOwnedHandle};
 
 #[derive(Clone, Debug)]
 pub(super) struct RegistrationMutation {
@@ -160,7 +159,7 @@ pub(super) fn register_sync(
 }
 
 fn persist_sync_registration(
-    db: &DaemonDb,
+    db: &DaemonDbOwnedHandle,
     session_id: &str,
     state: &SessionState,
     agent_id: &str,
@@ -188,7 +187,11 @@ fn persist_sync_registration(
     clippy::cognitive_complexity,
     reason = "restores the pre-registration session state and republishes it, logging on either failure; the two tracing::warn! expansions cost 14 of its 17 points, leaving structural 3"
 )]
-fn rollback_sync_registration(db: &DaemonDb, session_id: &str, original_state: &SessionState) {
+fn rollback_sync_registration(
+    db: &DaemonDbOwnedHandle,
+    session_id: &str,
+    original_state: &SessionState,
+) {
     let restore_result = db
         .project_id_for_session(session_id)
         .and_then(|project_id| {
@@ -220,7 +223,7 @@ fn rollback_sync_registration(db: &DaemonDb, session_id: &str, original_state: &
     reason = "persists registration side effects and rolls them back on failure while still returning the original error; the tracing::warn! for a failed rollback costs 7 of its 10 points, leaving structural 3"
 )]
 pub(super) async fn finalize_async_registration(
-    async_db: &AsyncDaemonDb,
+    async_db: &AsyncDaemonDbHandle,
     session_id: &str,
     agent_id: &str,
     joined_role: SessionRole,
@@ -253,7 +256,7 @@ pub(super) async fn finalize_async_registration(
 }
 
 async fn persist_registration_side_effects(
-    async_db: &AsyncDaemonDb,
+    async_db: &AsyncDaemonDbHandle,
     session_id: &str,
     agent_id: &str,
     joined_role: SessionRole,
@@ -276,7 +279,7 @@ async fn persist_registration_side_effects(
 }
 
 async fn rollback_registration(
-    async_db: &AsyncDaemonDb,
+    async_db: &AsyncDaemonDbHandle,
     session_id: &str,
     agent_id: &str,
     managed_agent: &ManagedAgentRef,

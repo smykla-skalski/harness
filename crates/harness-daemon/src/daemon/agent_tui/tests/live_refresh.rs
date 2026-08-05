@@ -12,6 +12,7 @@ use crate::workspace::utc_now;
 
 use super::support::{WAIT_TIMEOUT, sample_snapshot, wait_until, with_agent_tui_home};
 use crate::daemon::db::prelude::*;
+use crate::daemon::db_handle::DaemonDbOwnedHandle;
 
 #[test]
 fn manager_publishes_terminal_output_without_manual_refresh() {
@@ -21,6 +22,7 @@ fn manager_publishes_terminal_output_without_manual_refresh() {
         let context_root = tmp.path().join("context-root");
         fs_err::create_dir_all(&project_dir).expect("project dir");
         let db = DaemonDb::open_in_memory().expect("open db");
+        let db = DaemonDbOwnedHandle(db);
         let project = crate::daemon::index::DiscoveredProject {
             project_id: "project-tui-live-refresh".into(),
             name: "project".into(),
@@ -112,6 +114,7 @@ fn live_refresh_step_skips_persist_when_db_updated_concurrently() {
     let context_root = tmp.path().join("context-root");
     fs_err::create_dir_all(&project_dir).expect("project dir");
     let db = DaemonDb::open_in_memory().expect("open db");
+    let db = DaemonDbOwnedHandle(db);
     let project = crate::daemon::index::DiscoveredProject {
         project_id: "project-live-refresh".into(),
         name: "project".into(),
@@ -193,6 +196,7 @@ fn live_refresh_step_skips_persist_when_db_updated_concurrently() {
 #[test]
 fn manager_list_prioritizes_leader_tui_over_worker_refresh_order() {
     let db = DaemonDb::open_in_memory().expect("open db");
+    let db = DaemonDbOwnedHandle(db);
     let tmp = tempfile::tempdir().expect("tempdir");
     let project_dir = tmp.path().join("project");
     let context_root = tmp.path().join("context-root");

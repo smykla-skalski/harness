@@ -5,6 +5,7 @@ use super::super::task_board_read_only_coordinator::reconcile_task_board_read_on
 use super::super::task_board_read_only_runtime::TaskBoardReadOnlyRuntime;
 use super::fixture::Fixture;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 pub(super) struct HeadlessWorkflowDriver<'a, R> {
@@ -54,26 +55,28 @@ impl<'a, R: TaskBoardReadOnlyRuntime> HeadlessWorkflowDriver<'a, R> {
         execution
     }
 
-    async fn execution(&self, db: &AsyncDaemonDb) -> TaskBoardWorkflowExecutionRecord {
+    async fn execution(&self, db: &AsyncDaemonDbHandle) -> TaskBoardWorkflowExecutionRecord {
         db.task_board_workflow_execution(&self.fixture.execution_id)
             .await
             .expect("load workflow driver execution")
             .expect("workflow driver execution exists")
     }
 
-    async fn restart(&self, now: &str) -> AsyncDaemonDb {
+    async fn restart(&self, now: &str) -> AsyncDaemonDbHandle {
         let db = self.connect().await;
         self.reconcile(&db, now).await;
         db
     }
 
-    async fn connect(&self) -> AsyncDaemonDb {
-        AsyncDaemonDb::connect(&self.fixture.test.path)
-            .await
-            .expect("restart workflow driver database")
+    async fn connect(&self) -> AsyncDaemonDbHandle {
+        AsyncDaemonDbHandle(
+            AsyncDaemonDb::connect(&self.fixture.test.path)
+                .await
+                .expect("restart workflow driver database"),
+        )
     }
 
-    async fn reconcile(&self, db: &AsyncDaemonDb, now: &str) {
+    async fn reconcile(&self, db: &AsyncDaemonDbHandle, now: &str) {
         let report =
             reconcile_task_board_read_only_workflows_with_runtime(db, self.runtime, now, 8)
                 .await

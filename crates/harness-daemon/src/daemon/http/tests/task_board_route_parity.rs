@@ -1,7 +1,6 @@
 use serde_json::json;
 use tempfile::tempdir;
 
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{http_paths, ws_methods};
 use crate::task_board::policy_graph::PolicyCanvasWorkspace;
 
@@ -9,6 +8,7 @@ use super::task_board_route_parity_support::*;
 use super::task_board_support::{
     assert_task_board_capabilities_match, on_large_stack, without_durable_task_board_automation,
 };
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::reviews_store::PolicyGraphQueries;
 
 #[test]
@@ -381,7 +381,7 @@ async fn run_policy_pipeline_parity() {
 async fn assert_policy_canvas_routes_match(
     client: &reqwest::Client,
     base_url: &str,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
 ) {
     reset_policy_workspace(db).await;
     let http_create = post_json(

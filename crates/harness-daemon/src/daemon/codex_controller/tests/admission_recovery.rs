@@ -1,6 +1,5 @@
 use tokio::sync::mpsc;
 
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::CodexRunStatus;
 use crate::daemon::test_liveness::LIVENESS;
 use crate::session::storage as session_storage;
@@ -19,6 +18,7 @@ use super::test_support::{
 };
 use crate::daemon::db::AsyncSessionSummaryQueries;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 const SESSION_ID: &str = "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc";
 const TASK_ID: &str = "task-1";
@@ -247,7 +247,7 @@ fn assert_blocked_task(state: &SessionState) {
 }
 
 async fn seed_committed_admission(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     kinds: &[&str],
 ) -> (String, DispatchAppliedTask) {
     let item = TaskBoardItem::new(
@@ -292,7 +292,7 @@ async fn seed_committed_admission(
     (intent_id, dispatch)
 }
 
-async fn insert_allowed_decision(db: &AsyncDaemonDb, intent_id: &str) {
+async fn insert_allowed_decision(db: &AsyncDaemonDbHandle, intent_id: &str) {
     let item_revision: i64 =
         sqlx::query_scalar("SELECT revision FROM task_board_items WHERE item_id = ?1")
             .bind(ITEM_ID)
@@ -326,7 +326,7 @@ async fn insert_allowed_decision(db: &AsyncDaemonDb, intent_id: &str) {
     .expect("insert allowed recovery decision");
 }
 
-async fn insert_committed_ledger(db: &AsyncDaemonDb, intent_id: &str, kind: &str) {
+async fn insert_committed_ledger(db: &AsyncDaemonDbHandle, intent_id: &str, kind: &str) {
     let (window_start, window_end, limit) = match kind {
         "concurrency" => (None, None, 1_i64),
         "rate" => (
@@ -365,7 +365,11 @@ async fn insert_committed_ledger(db: &AsyncDaemonDb, intent_id: &str, kind: &str
     .expect("insert committed recovery ledger");
 }
 
-async fn ledger_state(db: &AsyncDaemonDb, intent_id: &str, kind: &str) -> (String, Option<String>) {
+async fn ledger_state(
+    db: &AsyncDaemonDbHandle,
+    intent_id: &str,
+    kind: &str,
+) -> (String, Option<String>) {
     sqlx::query_as(
         "SELECT state, released_at FROM task_board_dispatch_admission_ledger
          WHERE intent_id = ?1 AND kind = ?2",

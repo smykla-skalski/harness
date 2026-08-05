@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::task_board::external::{
     ExternalCreateOutcome, ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision,
     ExternalProviderScopeState, TaskBoardSyncItemSnapshot,
@@ -17,7 +17,7 @@ use crate::task_board::{
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 #[async_trait]
-impl TaskBoardExternalCreateStore for AsyncDaemonDb {
+impl TaskBoardExternalCreateStore for AsyncDaemonDbHandle {
     async fn begin_external_create_intent(
         &self,
         item_id: &str,
@@ -25,7 +25,8 @@ impl TaskBoardExternalCreateStore for AsyncDaemonDb {
         scope_id: &str,
         provider_target: &str,
     ) -> Result<TaskBoardExternalCreateBegin, CliError> {
-        self.begin_task_board_external_create_intent(item_id, provider, scope_id, provider_target)
+        self.0
+            .begin_task_board_external_create_intent(item_id, provider, scope_id, provider_target)
             .await
     }
 
@@ -35,7 +36,8 @@ impl TaskBoardExternalCreateStore for AsyncDaemonDb {
         outcome: &ExternalCreateOutcome,
         provider_baseline: &ExternalRef,
     ) -> Result<TaskBoardExternalCreateIntent, CliError> {
-        self.record_task_board_external_create_outcome(intent, outcome, provider_baseline)
+        self.0
+            .record_task_board_external_create_outcome(intent, outcome, provider_baseline)
             .await
     }
 
@@ -43,21 +45,25 @@ impl TaskBoardExternalCreateStore for AsyncDaemonDb {
         &self,
         intent: &TaskBoardExternalCreateIntent,
     ) -> Result<TaskBoardExternalCreateFinalizeResult, CliError> {
-        self.finalize_task_board_external_create_intent(intent)
+        self.0
+            .finalize_task_board_external_create_intent(intent)
             .await
     }
 
     async fn list_created_external_create_intents(
         &self,
     ) -> Result<Vec<TaskBoardExternalCreateIntent>, CliError> {
-        self.list_created_task_board_external_create_intents().await
+        self.0
+            .list_created_task_board_external_create_intents()
+            .await
     }
 
     async fn list_in_flight_external_create_intents(
         &self,
         provider: ExternalProvider,
     ) -> Result<Vec<TaskBoardExternalCreateIntent>, CliError> {
-        self.list_in_flight_task_board_external_create_intents(provider)
+        self.0
+            .list_in_flight_task_board_external_create_intents(provider)
             .await
     }
 
@@ -66,7 +72,8 @@ impl TaskBoardExternalCreateStore for AsyncDaemonDb {
         provider: ExternalProvider,
         create_key: &str,
     ) -> Result<Option<TaskBoardExternalCreateIntent>, CliError> {
-        self.task_board_external_create_intent_by_create_key(provider, create_key)
+        self.0
+            .task_board_external_create_intent_by_create_key(provider, create_key)
             .await
     }
 
@@ -74,28 +81,30 @@ impl TaskBoardExternalCreateStore for AsyncDaemonDb {
         &self,
         provider: Option<ExternalProvider>,
     ) -> Result<Vec<TaskBoardExternalCreateIntent>, CliError> {
-        self.list_pending_task_board_external_create_follow_ups(provider)
+        self.0
+            .list_pending_task_board_external_create_follow_ups(provider)
             .await
     }
 }
 
 #[async_trait]
-impl TaskBoardSyncStore for AsyncDaemonDb {
+impl TaskBoardSyncStore for AsyncDaemonDbHandle {
     async fn list_items(
         &self,
         status: Option<TaskBoardStatus>,
     ) -> Result<Vec<TaskBoardItem>, CliError> {
-        self.list_task_board_items(status).await
+        self.0.list_task_board_items(status).await
     }
 
     async fn list_items_including_deleted(&self) -> Result<Vec<TaskBoardItem>, CliError> {
-        self.list_task_board_items_including_deleted().await
+        self.0.list_task_board_items_including_deleted().await
     }
 
     async fn list_item_snapshots_including_deleted(
         &self,
     ) -> Result<Vec<TaskBoardSyncItemSnapshot>, CliError> {
         Ok(self
+            .0
             .list_task_board_item_snapshots_including_deleted()
             .await?
             .into_iter()
@@ -104,7 +113,7 @@ impl TaskBoardSyncStore for AsyncDaemonDb {
     }
 
     async fn create_item(&self, item: TaskBoardItem) -> Result<TaskBoardItem, CliError> {
-        Box::pin(self.create_task_board_item_with_provider_triage(item))
+        Box::pin(self.0.create_task_board_item_with_provider_triage(item))
             .await
             .map(|mutation| mutation.item)
     }
@@ -116,6 +125,7 @@ impl TaskBoardSyncStore for AsyncDaemonDb {
     ) -> Result<TaskBoardItem, CliError> {
         let item_id = expected_item.id.clone();
         let mutation = self
+            .0
             .update_task_board_item_with_provider_triage(&item_id, |item| {
                 if item != expected_item {
                     return Err(CliErrorKind::concurrent_modification(format!(
@@ -131,7 +141,8 @@ impl TaskBoardSyncStore for AsyncDaemonDb {
     }
 
     async fn item_snapshot(&self, item_id: &str) -> Result<TaskBoardSyncItemSnapshot, CliError> {
-        self.task_board_item_snapshot(item_id)
+        self.0
+            .task_board_item_snapshot(item_id)
             .await
             .map(|snapshot| TaskBoardSyncItemSnapshot::new(snapshot.item, snapshot.item_revision))
     }
@@ -175,7 +186,8 @@ impl TaskBoardSyncStore for AsyncDaemonDb {
         provider: ExternalProvider,
         scope_id: &str,
     ) -> Result<ExternalProviderScopeState, CliError> {
-        self.task_board_provider_scope_state(provider, scope_id)
+        self.0
+            .task_board_provider_scope_state(provider, scope_id)
             .await
     }
 
@@ -185,7 +197,8 @@ impl TaskBoardSyncStore for AsyncDaemonDb {
         scope_id: &str,
         now: &str,
     ) -> Result<ExternalProviderScopeAttemptDecision, CliError> {
-        self.begin_task_board_provider_scope_attempt(provider, scope_id, now)
+        self.0
+            .begin_task_board_provider_scope_attempt(provider, scope_id, now)
             .await
     }
 
@@ -194,7 +207,8 @@ impl TaskBoardSyncStore for AsyncDaemonDb {
         attempt: &ExternalProviderScopeAttempt,
         now: &str,
     ) -> Result<(), CliError> {
-        self.renew_task_board_provider_scope_attempt(attempt, now)
+        self.0
+            .renew_task_board_provider_scope_attempt(attempt, now)
             .await
     }
 
@@ -203,7 +217,8 @@ impl TaskBoardSyncStore for AsyncDaemonDb {
         attempt: &ExternalProviderScopeAttempt,
         released_at: &str,
     ) -> Result<(), CliError> {
-        self.release_task_board_provider_scope_attempt(attempt, released_at)
+        self.0
+            .release_task_board_provider_scope_attempt(attempt, released_at)
             .await
     }
 
@@ -213,7 +228,8 @@ impl TaskBoardSyncStore for AsyncDaemonDb {
         base_revision: Option<&str>,
         completed_at: &str,
     ) -> Result<(), CliError> {
-        self.complete_task_board_provider_scope_success(attempt, base_revision, completed_at)
+        self.0
+            .complete_task_board_provider_scope_success(attempt, base_revision, completed_at)
             .await
     }
 
@@ -222,7 +238,8 @@ impl TaskBoardSyncStore for AsyncDaemonDb {
         attempt: &ExternalProviderScopeAttempt,
         completed_at: &str,
     ) -> Result<ExternalProviderScopeState, CliError> {
-        self.complete_task_board_provider_scope_failure(attempt, completed_at)
+        self.0
+            .complete_task_board_provider_scope_failure(attempt, completed_at)
             .await
     }
 
@@ -234,14 +251,15 @@ impl TaskBoardSyncStore for AsyncDaemonDb {
         item_revision: i64,
         conflicts: &[TaskBoardSyncConflict],
     ) -> Result<(), CliError> {
-        self.replace_open_task_board_sync_conflicts(
-            item_id,
-            provider,
-            external_ref,
-            item_revision,
-            conflicts,
-        )
-        .await
+        self.0
+            .replace_open_task_board_sync_conflicts(
+                item_id,
+                provider,
+                external_ref,
+                item_revision,
+                conflicts,
+            )
+            .await
     }
 
     async fn supersede_open_sync_conflicts(
@@ -252,14 +270,15 @@ impl TaskBoardSyncStore for AsyncDaemonDb {
         item_revision: i64,
         resolved_fields: &[ExternalSyncField],
     ) -> Result<(), CliError> {
-        self.supersede_open_task_board_sync_conflicts(
-            item_id,
-            provider,
-            external_ref,
-            item_revision,
-            resolved_fields,
-        )
-        .await
+        self.0
+            .supersede_open_task_board_sync_conflicts(
+                item_id,
+                provider,
+                external_ref,
+                item_revision,
+                resolved_fields,
+            )
+            .await
     }
 }
 
@@ -272,6 +291,7 @@ mod tests {
     use tempfile::tempdir;
 
     use super::*;
+    use crate::daemon::db::AsyncDaemonDb;
     use crate::daemon::db_open::AsyncDaemonDbConnect;
     use crate::task_board::{
         ExternalCreateOutcome, ExternalRefProvider, ExternalRefSyncState, ExternalSyncField,
@@ -285,6 +305,7 @@ mod tests {
         let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
             .await
             .expect("open database");
+        let db = AsyncDaemonDbHandle(db);
         let created = db
             .create_task_board_item(TaskBoardItem::new(
                 "task-concurrent-sync".into(),
@@ -301,9 +322,10 @@ mod tests {
         })
         .await
         .expect("local edit");
+        let handle = db.clone();
 
-        let error = <AsyncDaemonDb as TaskBoardSyncStore>::update_item(
-            &db,
+        let error = <AsyncDaemonDbHandle as TaskBoardSyncStore>::update_item(
+            &handle,
             &created,
             TaskBoardItemPatch {
                 title: Some("Remote title".into()),
@@ -325,6 +347,7 @@ mod tests {
         let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
             .await
             .expect("open database");
+        let db = AsyncDaemonDbHandle(db);
         db.create_task_board_item(TaskBoardItem::new(
             "task-create-store".into(),
             "Create title".into(),
@@ -333,10 +356,11 @@ mod tests {
         ))
         .await
         .expect("create item");
+        let handle = db.clone();
 
         let started =
-            <AsyncDaemonDb as TaskBoardExternalCreateStore>::begin_external_create_intent(
-                &db,
+            <AsyncDaemonDbHandle as TaskBoardExternalCreateStore>::begin_external_create_intent(
+                &handle,
                 "task-create-store",
                 ExternalProvider::GitHub,
                 "acme/widgets",
@@ -348,15 +372,15 @@ mod tests {
             panic!("expected a newly started create intent");
         };
         assert_eq!(
-            <AsyncDaemonDb as TaskBoardExternalCreateStore>::
-                list_in_flight_external_create_intents(&db, ExternalProvider::GitHub)
+            <AsyncDaemonDbHandle as TaskBoardExternalCreateStore>::
+                list_in_flight_external_create_intents(&handle, ExternalProvider::GitHub)
                 .await
                 .expect("list in-flight"),
             vec![intent.clone()]
         );
         assert_eq!(
-            <AsyncDaemonDb as TaskBoardExternalCreateStore>::external_create_intent_by_create_key(
-                &db,
+            <AsyncDaemonDbHandle as TaskBoardExternalCreateStore>::external_create_intent_by_create_key(
+                &handle,
                 ExternalProvider::GitHub,
                 &intent.create_key,
             )
@@ -367,22 +391,22 @@ mod tests {
 
         let (outcome, baseline) = create_evidence(&intent);
         let created =
-            <AsyncDaemonDb as TaskBoardExternalCreateStore>::record_external_create_outcome(
-                &db, &intent, &outcome, &baseline,
+            <AsyncDaemonDbHandle as TaskBoardExternalCreateStore>::record_external_create_outcome(
+                &handle, &intent, &outcome, &baseline,
             )
             .await
             .expect("record create outcome");
         assert_eq!(
-            <AsyncDaemonDb as TaskBoardExternalCreateStore>::list_created_external_create_intents(
-                &db
+            <AsyncDaemonDbHandle as TaskBoardExternalCreateStore>::list_created_external_create_intents(
+                &handle
             )
             .await
             .expect("list created"),
             vec![created.clone()]
         );
         let finalized =
-            <AsyncDaemonDb as TaskBoardExternalCreateStore>::finalize_external_create_intent(
-                &db, &created,
+            <AsyncDaemonDbHandle as TaskBoardExternalCreateStore>::finalize_external_create_intent(
+                &handle, &created,
             )
             .await
             .expect("finalize create");
@@ -392,8 +416,8 @@ mod tests {
             TaskBoardExternalCreateFinalizeDisposition::Attached
         );
         assert_eq!(
-            <AsyncDaemonDb as TaskBoardExternalCreateStore>::external_create_intent_by_create_key(
-                &db,
+            <AsyncDaemonDbHandle as TaskBoardExternalCreateStore>::external_create_intent_by_create_key(
+                &handle,
                 ExternalProvider::GitHub,
                 &intent.create_key,
             )
@@ -402,8 +426,8 @@ mod tests {
             Some(finalized.intent.clone())
         );
         assert_eq!(
-            <AsyncDaemonDb as TaskBoardExternalCreateStore>::list_pending_external_create_follow_ups(
-                &db,
+            <AsyncDaemonDbHandle as TaskBoardExternalCreateStore>::list_pending_external_create_follow_ups(
+                &handle,
                 Some(ExternalProvider::GitHub),
             )
             .await
@@ -418,6 +442,7 @@ mod tests {
         let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
             .await
             .expect("open database");
+        let db = AsyncDaemonDbHandle(db);
         db.create_task_board_item(TaskBoardItem::new(
             "task-conflict-store".into(),
             "Conflict title".into(),
@@ -438,9 +463,10 @@ mod tests {
         )
         .await
         .expect("record conflicts");
+        let handle = db.clone();
 
-        <AsyncDaemonDb as TaskBoardSyncStore>::supersede_open_sync_conflicts(
-            &db,
+        <AsyncDaemonDbHandle as TaskBoardSyncStore>::supersede_open_sync_conflicts(
+            &handle,
             "task-conflict-store",
             ExternalProvider::GitHub,
             "acme/widgets#17",

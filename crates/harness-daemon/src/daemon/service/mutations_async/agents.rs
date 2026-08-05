@@ -2,11 +2,12 @@ use std::path::PathBuf;
 
 use super::super::{
     AgentRemoveRequest, CliError, CliErrorKind, RoleChangeRequest, SessionDetail, build_log_entry,
-    db::AsyncDaemonDb, effective_project_dir, session_detail_from_async_daemon_db, session_service,
+    effective_project_dir, session_detail_from_async_daemon_db, session_service,
     sync_file_state_from_async_db, utc_now,
 };
 use super::{bump_session, persist_leave_signal_mutation, resolved_session_for_mutation};
 use crate::daemon::db::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use tokio::task::spawn_blocking;
 
 /// Change an agent role through the canonical async daemon DB.
@@ -17,7 +18,7 @@ pub(crate) async fn change_role_async(
     session_id: &str,
     agent_id: &str,
     request: &RoleChangeRequest,
-    async_db: &AsyncDaemonDb,
+    async_db: &AsyncDaemonDbHandle,
 ) -> Result<SessionDetail, CliError> {
     let now = utc_now();
     let from_role = async_db
@@ -50,7 +51,7 @@ pub(crate) async fn remove_agent_async(
     session_id: &str,
     agent_id: &str,
     request: &AgentRemoveRequest,
-    async_db: &AsyncDaemonDb,
+    async_db: &AsyncDaemonDbHandle,
 ) -> Result<SessionDetail, CliError> {
     let project_dir =
         effective_project_dir(&resolved_session_for_mutation(async_db, session_id).await?)

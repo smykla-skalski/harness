@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use async_trait::async_trait;
 
-use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::task_board::external::{
     ExternalCreateOutcome, ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision,
     ExternalProviderScopeState, TaskBoardSyncCoordinatorFence,
@@ -20,14 +20,14 @@ use crate::task_board::{
 use harness_kernel::errors::CliError;
 
 pub(super) struct ProviderSyncRunStore<'a> {
-    db: &'a AsyncDaemonDb,
+    db: &'a AsyncDaemonDbHandle,
     coordinator_fence: Option<Arc<dyn TaskBoardSyncCoordinatorFence>>,
     coordinator_cancelled: AtomicBool,
 }
 
 impl<'a> ProviderSyncRunStore<'a> {
     pub(super) fn new(
-        db: &'a AsyncDaemonDb,
+        db: &'a AsyncDaemonDbHandle,
         coordinator_fence: Option<Arc<dyn TaskBoardSyncCoordinatorFence>>,
     ) -> Self {
         Self {
@@ -47,7 +47,7 @@ impl TaskBoardExternalCreateStore for ProviderSyncRunStore<'_> {
         scope_id: &str,
         provider_target: &str,
     ) -> Result<TaskBoardExternalCreateBegin, CliError> {
-        <AsyncDaemonDb as TaskBoardExternalCreateStore>::begin_external_create_intent(
+        <AsyncDaemonDbHandle as TaskBoardExternalCreateStore>::begin_external_create_intent(
             self.db,
             item_id,
             provider,
@@ -63,7 +63,7 @@ impl TaskBoardExternalCreateStore for ProviderSyncRunStore<'_> {
         outcome: &ExternalCreateOutcome,
         provider_baseline: &ExternalRef,
     ) -> Result<TaskBoardExternalCreateIntent, CliError> {
-        <AsyncDaemonDb as TaskBoardExternalCreateStore>::record_external_create_outcome(
+        <AsyncDaemonDbHandle as TaskBoardExternalCreateStore>::record_external_create_outcome(
             self.db,
             intent,
             outcome,
@@ -76,7 +76,7 @@ impl TaskBoardExternalCreateStore for ProviderSyncRunStore<'_> {
         &self,
         intent: &TaskBoardExternalCreateIntent,
     ) -> Result<TaskBoardExternalCreateFinalizeResult, CliError> {
-        <AsyncDaemonDb as TaskBoardExternalCreateStore>::finalize_external_create_intent(
+        <AsyncDaemonDbHandle as TaskBoardExternalCreateStore>::finalize_external_create_intent(
             self.db, intent,
         )
         .await
@@ -85,7 +85,7 @@ impl TaskBoardExternalCreateStore for ProviderSyncRunStore<'_> {
     async fn list_created_external_create_intents(
         &self,
     ) -> Result<Vec<TaskBoardExternalCreateIntent>, CliError> {
-        <AsyncDaemonDb as TaskBoardExternalCreateStore>::list_created_external_create_intents(
+        <AsyncDaemonDbHandle as TaskBoardExternalCreateStore>::list_created_external_create_intents(
             self.db,
         )
         .await
@@ -95,7 +95,7 @@ impl TaskBoardExternalCreateStore for ProviderSyncRunStore<'_> {
         &self,
         provider: ExternalProvider,
     ) -> Result<Vec<TaskBoardExternalCreateIntent>, CliError> {
-        <AsyncDaemonDb as TaskBoardExternalCreateStore>::list_in_flight_external_create_intents(
+        <AsyncDaemonDbHandle as TaskBoardExternalCreateStore>::list_in_flight_external_create_intents(
             self.db, provider,
         )
         .await
@@ -106,7 +106,7 @@ impl TaskBoardExternalCreateStore for ProviderSyncRunStore<'_> {
         provider: ExternalProvider,
         create_key: &str,
     ) -> Result<Option<TaskBoardExternalCreateIntent>, CliError> {
-        <AsyncDaemonDb as TaskBoardExternalCreateStore>::external_create_intent_by_create_key(
+        <AsyncDaemonDbHandle as TaskBoardExternalCreateStore>::external_create_intent_by_create_key(
             self.db, provider, create_key,
         )
         .await
@@ -116,7 +116,7 @@ impl TaskBoardExternalCreateStore for ProviderSyncRunStore<'_> {
         &self,
         provider: Option<ExternalProvider>,
     ) -> Result<Vec<TaskBoardExternalCreateIntent>, CliError> {
-        <AsyncDaemonDb as TaskBoardExternalCreateStore>::list_pending_external_create_follow_ups(
+        <AsyncDaemonDbHandle as TaskBoardExternalCreateStore>::list_pending_external_create_follow_ups(
             self.db, provider,
         )
         .await
@@ -129,21 +129,22 @@ impl TaskBoardSyncStore for ProviderSyncRunStore<'_> {
         &self,
         status: Option<TaskBoardStatus>,
     ) -> Result<Vec<TaskBoardItem>, CliError> {
-        <AsyncDaemonDb as TaskBoardSyncStore>::list_items(self.db, status).await
+        <AsyncDaemonDbHandle as TaskBoardSyncStore>::list_items(self.db, status).await
     }
 
     async fn list_items_including_deleted(&self) -> Result<Vec<TaskBoardItem>, CliError> {
-        <AsyncDaemonDb as TaskBoardSyncStore>::list_items_including_deleted(self.db).await
+        <AsyncDaemonDbHandle as TaskBoardSyncStore>::list_items_including_deleted(self.db).await
     }
 
     async fn list_item_snapshots_including_deleted(
         &self,
     ) -> Result<Vec<TaskBoardSyncItemSnapshot>, CliError> {
-        <AsyncDaemonDb as TaskBoardSyncStore>::list_item_snapshots_including_deleted(self.db).await
+        <AsyncDaemonDbHandle as TaskBoardSyncStore>::list_item_snapshots_including_deleted(self.db)
+            .await
     }
 
     async fn create_item(&self, item: TaskBoardItem) -> Result<TaskBoardItem, CliError> {
-        <AsyncDaemonDb as TaskBoardSyncStore>::create_item(self.db, item).await
+        <AsyncDaemonDbHandle as TaskBoardSyncStore>::create_item(self.db, item).await
     }
 
     async fn update_item(
@@ -151,11 +152,12 @@ impl TaskBoardSyncStore for ProviderSyncRunStore<'_> {
         expected_item: &TaskBoardItem,
         patch: TaskBoardItemPatch,
     ) -> Result<TaskBoardItem, CliError> {
-        <AsyncDaemonDb as TaskBoardSyncStore>::update_item(self.db, expected_item, patch).await
+        <AsyncDaemonDbHandle as TaskBoardSyncStore>::update_item(self.db, expected_item, patch)
+            .await
     }
 
     async fn item_snapshot(&self, item_id: &str) -> Result<TaskBoardSyncItemSnapshot, CliError> {
-        <AsyncDaemonDb as TaskBoardSyncStore>::item_snapshot(self.db, item_id).await
+        <AsyncDaemonDbHandle as TaskBoardSyncStore>::item_snapshot(self.db, item_id).await
     }
 
     async fn hide_for_provider_exclusion(
@@ -166,7 +168,7 @@ impl TaskBoardSyncStore for ProviderSyncRunStore<'_> {
         context: ProviderExclusionAuditContext,
         conflicts: Option<Vec<TaskBoardSyncConflict>>,
     ) -> Result<Option<TaskBoardItem>, CliError> {
-        <AsyncDaemonDb as TaskBoardSyncStore>::hide_for_provider_exclusion(
+        <AsyncDaemonDbHandle as TaskBoardSyncStore>::hide_for_provider_exclusion(
             self.db,
             item_id,
             expected_revision,
@@ -184,7 +186,7 @@ impl TaskBoardSyncStore for ProviderSyncRunStore<'_> {
         context: ProviderExclusionAuditContext,
         conflicts: Option<Vec<TaskBoardSyncConflict>>,
     ) -> Result<ProviderExclusionRestoreOutcome, CliError> {
-        <AsyncDaemonDb as TaskBoardSyncStore>::restore_from_provider_exclusion(
+        <AsyncDaemonDbHandle as TaskBoardSyncStore>::restore_from_provider_exclusion(
             self.db, expected, patch, context, conflicts,
         )
         .await
@@ -195,8 +197,10 @@ impl TaskBoardSyncStore for ProviderSyncRunStore<'_> {
         provider: ExternalProvider,
         scope_id: &str,
     ) -> Result<ExternalProviderScopeState, CliError> {
-        <AsyncDaemonDb as TaskBoardSyncStore>::provider_scope_state(self.db, provider, scope_id)
-            .await
+        <AsyncDaemonDbHandle as TaskBoardSyncStore>::provider_scope_state(
+            self.db, provider, scope_id,
+        )
+        .await
     }
 
     async fn begin_provider_scope_attempt(
@@ -205,7 +209,7 @@ impl TaskBoardSyncStore for ProviderSyncRunStore<'_> {
         scope_id: &str,
         now: &str,
     ) -> Result<ExternalProviderScopeAttemptDecision, CliError> {
-        <AsyncDaemonDb as TaskBoardSyncStore>::begin_provider_scope_attempt(
+        <AsyncDaemonDbHandle as TaskBoardSyncStore>::begin_provider_scope_attempt(
             self.db, provider, scope_id, now,
         )
         .await
@@ -216,8 +220,10 @@ impl TaskBoardSyncStore for ProviderSyncRunStore<'_> {
         attempt: &ExternalProviderScopeAttempt,
         now: &str,
     ) -> Result<(), CliError> {
-        <AsyncDaemonDb as TaskBoardSyncStore>::renew_provider_scope_attempt(self.db, attempt, now)
-            .await
+        <AsyncDaemonDbHandle as TaskBoardSyncStore>::renew_provider_scope_attempt(
+            self.db, attempt, now,
+        )
+        .await
     }
 
     async fn check_coordinator_fence(
@@ -245,7 +251,7 @@ impl TaskBoardSyncStore for ProviderSyncRunStore<'_> {
         attempt: &ExternalProviderScopeAttempt,
         released_at: &str,
     ) -> Result<(), CliError> {
-        <AsyncDaemonDb as TaskBoardSyncStore>::release_provider_scope_attempt(
+        <AsyncDaemonDbHandle as TaskBoardSyncStore>::release_provider_scope_attempt(
             self.db,
             attempt,
             released_at,
@@ -259,7 +265,7 @@ impl TaskBoardSyncStore for ProviderSyncRunStore<'_> {
         base_revision: Option<&str>,
         completed_at: &str,
     ) -> Result<(), CliError> {
-        <AsyncDaemonDb as TaskBoardSyncStore>::complete_provider_scope_success(
+        <AsyncDaemonDbHandle as TaskBoardSyncStore>::complete_provider_scope_success(
             self.db,
             attempt,
             base_revision,
@@ -273,7 +279,7 @@ impl TaskBoardSyncStore for ProviderSyncRunStore<'_> {
         attempt: &ExternalProviderScopeAttempt,
         completed_at: &str,
     ) -> Result<ExternalProviderScopeState, CliError> {
-        <AsyncDaemonDb as TaskBoardSyncStore>::complete_provider_scope_failure(
+        <AsyncDaemonDbHandle as TaskBoardSyncStore>::complete_provider_scope_failure(
             self.db,
             attempt,
             completed_at,
@@ -289,7 +295,7 @@ impl TaskBoardSyncStore for ProviderSyncRunStore<'_> {
         item_revision: i64,
         conflicts: &[TaskBoardSyncConflict],
     ) -> Result<(), CliError> {
-        <AsyncDaemonDb as TaskBoardSyncStore>::replace_open_sync_conflicts(
+        <AsyncDaemonDbHandle as TaskBoardSyncStore>::replace_open_sync_conflicts(
             self.db,
             item_id,
             provider,
@@ -308,7 +314,7 @@ impl TaskBoardSyncStore for ProviderSyncRunStore<'_> {
         item_revision: i64,
         resolved_fields: &[ExternalSyncField],
     ) -> Result<(), CliError> {
-        <AsyncDaemonDb as TaskBoardSyncStore>::supersede_open_sync_conflicts(
+        <AsyncDaemonDbHandle as TaskBoardSyncStore>::supersede_open_sync_conflicts(
             self.db,
             item_id,
             provider,

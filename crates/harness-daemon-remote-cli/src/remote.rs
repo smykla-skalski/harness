@@ -7,6 +7,7 @@ use uuid::Uuid;
 use harness_daemon::app::{AppContext, Execute};
 use harness_daemon::daemon::cli_support::{adopt_daemon_root_for_transport_command, print_json};
 use harness_daemon::daemon::db::{DaemonDb, DaemonDbOpen};
+use harness_daemon::daemon::db_handle::DaemonDbOwnedHandle;
 use harness_daemon::daemon::http::companion::CompanionAuthToken;
 use harness_daemon::daemon::http::{
     CompanionRouteConfig, DEFAULT_COMPANION_PATH_PREFIX, DaemonHttpAuthMode,
@@ -210,7 +211,7 @@ pub struct DaemonRemotePairCreateArgs {
 impl Execute for DaemonRemotePairCreateArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         adopt_daemon_root_for_transport_command("daemon-remote-pair-create");
-        let db = open_remote_daemon_db()?;
+        let db = DaemonDbOwnedHandle(open_remote_daemon_db()?);
         let code = RemotePairingCode::generate();
         let pairing_id = format!("pairing-{}", Uuid::new_v4());
         let audit_event_id = format!("remote-pair-create-{}", Uuid::new_v4());
@@ -236,7 +237,7 @@ impl DaemonRemotePairCreateArgs {
     /// persistence fails.
     pub(crate) fn create_pairing_with(
         &self,
-        db: &DaemonDb,
+        db: &DaemonDbOwnedHandle,
         pairing_id: &str,
         audit_event_id: &str,
         code: &RemotePairingCode,

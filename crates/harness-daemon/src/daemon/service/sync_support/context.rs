@@ -1,10 +1,11 @@
 use crate::agents::runtime::{AgentRuntime, signal::SignalAck};
-use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
-use crate::session::{storage as session_storage, types::SessionState};
+use crate::session::storage as session_storage;
+use crate::session::types::SessionState;
 use tokio::task::spawn_blocking;
 
 use super::{CliError, CliErrorKind, HookAgent, Path, PathBuf, ResolvedSession};
 use crate::daemon::db::prelude::*;
+use crate::daemon::db_handle::{AsyncDaemonDbHandle, DaemonDbOwnedHandle};
 
 pub(crate) fn resolve_hook_agent(runtime_name: &str) -> Option<HookAgent> {
     match runtime_name {
@@ -23,7 +24,7 @@ pub(crate) fn session_not_found(session_id: &str) -> CliError {
 }
 
 pub(crate) fn project_dir_for_db_session(
-    db: &DaemonDb,
+    db: &DaemonDbOwnedHandle,
     session_id: &str,
 ) -> Result<PathBuf, CliError> {
     if let Some(project_dir) = db.project_dir_for_session(session_id)? {
@@ -71,7 +72,7 @@ pub(crate) async fn sync_file_state_for_resolved_async(
 }
 
 pub(crate) async fn sync_file_state_from_async_db(
-    async_db: &AsyncDaemonDb,
+    async_db: &AsyncDaemonDbHandle,
     session_id: &str,
 ) -> Result<(), CliError> {
     let resolved = async_db

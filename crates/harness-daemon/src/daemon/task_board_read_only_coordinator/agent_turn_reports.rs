@@ -5,7 +5,8 @@ use crate::agents::turn::{
 };
 use crate::daemon::db::prelude::*;
 use crate::daemon::db::task_board::prelude::*;
-use crate::daemon::db::{AgentTurnRunSnapshot, AgentTurnRunStatus, AsyncDaemonDb};
+use crate::daemon::db::{AgentTurnRunSnapshot, AgentTurnRunStatus};
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::task_board::{
     TaskBoardAttemptResultArtifact, TaskBoardAttemptState, TaskBoardExecutionAttemptRecord,
     TaskBoardExecutionState, TaskBoardFailureClass, TaskBoardPhaseVerdict,
@@ -27,7 +28,7 @@ use super::reports::{
 use super::requests::{codex_attempt_request, run_context};
 
 pub(super) async fn reconcile_agent_turn_report_attempt<R>(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     runtime: &R,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
@@ -75,7 +76,7 @@ where
 }
 
 async fn refuse_unsupported_runtime(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
     runtime_name: &str,
@@ -104,7 +105,7 @@ async fn refuse_unsupported_runtime(
 }
 
 async fn start_new_run<R>(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     runtime: &R,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
@@ -175,7 +176,7 @@ where
 }
 
 async fn settle_preflight_error(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
     error: &CliError,
@@ -224,7 +225,7 @@ where
 }
 
 async fn reconcile_start_error(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     claimed: &TaskBoardExecutionAttemptRecord,
     start_error: &CliError,
@@ -240,7 +241,7 @@ async fn reconcile_start_error(
 }
 
 async fn mark_running(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
     now: &str,
@@ -269,7 +270,7 @@ async fn mark_running(
 }
 
 async fn reconcile_loaded_run(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
     mut run: AgentTurnRunSnapshot,
@@ -323,7 +324,7 @@ fn validate_run_binding(
 }
 
 async fn settle_terminal_run(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
     run: &AgentTurnRunSnapshot,
@@ -387,7 +388,7 @@ async fn settle_terminal_run(
 }
 
 async fn settle_completed_run(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
     run: &AgentTurnRunSnapshot,
@@ -486,7 +487,7 @@ fn completed_run_result(
 }
 
 async fn settle_invalid_run(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
     run: &AgentTurnRunSnapshot,

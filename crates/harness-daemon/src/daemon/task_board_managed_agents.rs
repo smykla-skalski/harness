@@ -3,9 +3,9 @@ use std::time::Duration;
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
 
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::workflow_owner;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::http::{
     DaemonHttpState, require_async_db, run_codex_agent_blocking, run_terminal_agent_blocking,
 };
@@ -82,7 +82,7 @@ impl Drop for TaskBoardDispatchClaimHeartbeat {
 }
 
 pub(crate) fn maintain_task_board_dispatch_claim(
-    db: AsyncDaemonDb,
+    db: AsyncDaemonDbHandle,
     intent_id: &str,
     claim_token: &str,
 ) -> TaskBoardDispatchClaimHeartbeat {
@@ -198,7 +198,7 @@ fn resolve_start_failure(
 #[cfg(test)]
 async fn begin_worker_compensation(
     state: &DaemonHttpState,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     applied: &DispatchAppliedTask,
     dispatch_intent_id: &str,
     claim_token: &str,
@@ -217,7 +217,7 @@ async fn begin_worker_compensation(
 
 pub(crate) async fn resume_worker_compensation(
     state: &DaemonHttpState,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     applied: &DispatchAppliedTask,
     dispatch_intent_id: &str,
     claim_token: &str,
@@ -228,7 +228,7 @@ pub(crate) async fn resume_worker_compensation(
 
 async fn compensate_worker_for_applied_task(
     state: &DaemonHttpState,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     applied: &DispatchAppliedTask,
     dispatch_intent_id: &str,
     claim_token: &str,

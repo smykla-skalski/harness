@@ -307,23 +307,28 @@ impl SignalIndexQueries for DaemonDb {
 }
 
 // `harness-daemon-snapshot` depends on this trait, not on `DaemonDb` itself
-// (see that crate's `storage` module); implementing it here, next to the
-// inherent methods it forwards to, is the same shape `AuditEventStore` and
-// `PullRequestActionStore` already use for a trait defined outside `db`.
+// (see that crate's `storage` module). `DaemonDb` moved into its own crate
+// for #1231, so this trait and `DaemonDb` are both foreign here now; the
+// local `DaemonDbOwnedHandle` newtype (`crate::daemon::db_handle`) is what
+// implements it instead, the same orphan-rule workaround
+// `daemon::db_timeline_source::DaemonDbTimelineHandle` already uses for
+// `TimelineDbSource`.
 //
 // Fully qualifies through `SignalIndexQueries` rather than `Self::`: once
 // this trait's methods share a name with `SignalIndexQueries`'s, bare
 // `Self::method` resolves to this very impl and cycles instead of forwarding.
-impl harness_daemon_snapshot::SessionSignalQueries for DaemonDb {
+impl harness_daemon_snapshot::SessionSignalQueries
+    for crate::daemon::db_handle::DaemonDbOwnedHandle
+{
     fn load_signals(&self, session_id: &str) -> Result<Vec<SessionSignalRecord>, CliError> {
-        <Self as SignalIndexQueries>::load_signals(self, session_id)
+        <DaemonDb as SignalIndexQueries>::load_signals(&self.0, session_id)
     }
 
     fn session_has_shared_runtime_signal_dir(
         &self,
         state: &SessionState,
     ) -> Result<bool, CliError> {
-        <Self as SignalIndexQueries>::session_has_shared_runtime_signal_dir(self, state)
+        <DaemonDb as SignalIndexQueries>::session_has_shared_runtime_signal_dir(&self.0, state)
     }
 
     fn sync_signal_index(
@@ -331,7 +336,7 @@ impl harness_daemon_snapshot::SessionSignalQueries for DaemonDb {
         session_id: &str,
         signals: &[SessionSignalRecord],
     ) -> Result<(), CliError> {
-        <Self as SignalIndexQueries>::sync_signal_index(self, session_id, signals)
+        <DaemonDb as SignalIndexQueries>::sync_signal_index(&self.0, session_id, signals)
     }
 }
 

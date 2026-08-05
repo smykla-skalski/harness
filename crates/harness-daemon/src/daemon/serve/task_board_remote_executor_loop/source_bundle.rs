@@ -4,8 +4,9 @@ use std::path::{Path, PathBuf};
 use tokio::task::spawn_blocking;
 
 use super::{RemoteWorkerIdentity, concurrent, invalid_transition};
+use crate::daemon::db::TaskBoardRemoteAssignmentRecord;
 use crate::daemon::db::task_board::prelude::*;
-use crate::daemon::db::{AsyncDaemonDb, TaskBoardRemoteAssignmentRecord};
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::git::GitError;
 use crate::git::bundle::{GitBundleImportPlan, GitBundleWorktreeState};
 use crate::git::source_bundle_import::GitSourceBundleImportPlan;
@@ -14,7 +15,7 @@ use crate::task_board::remote_wire::wire::{RemoteOfferRequest, RemoteSourceMater
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 pub(super) async fn materialize_repository_snapshot(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     record: &TaskBoardRemoteAssignmentRecord,
     offer: &RemoteOfferRequest,
     repository: &Path,
@@ -66,7 +67,7 @@ pub(super) async fn cleanup_repository_snapshot_import(
 }
 
 pub(super) async fn apply_prior_phase_bundle(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     record: &TaskBoardRemoteAssignmentRecord,
     offer: &RemoteOfferRequest,
     identity: &RemoteWorkerIdentity,
@@ -178,7 +179,7 @@ fn import_ref(offer: &RemoteOfferRequest, bundle_sha256: &str) -> String {
 }
 
 async fn exact_materialized_request(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     record: &TaskBoardRemoteAssignmentRecord,
     offer: &RemoteOfferRequest,
 ) -> Result<RemoteSourceBundleUploadRequest, CliError> {

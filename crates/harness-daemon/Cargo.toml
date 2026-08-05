@@ -29,6 +29,7 @@ harness-command = { path = "../harness-command", version = "57.0.0" }
 harness-daemon-acp-probe = { path = "../harness-daemon-acp-probe", version = "57.0.0" }
 harness-daemon-client = { path = "../harness-daemon-client", version = "57.0.0" }
 harness-daemon-codex = { path = "../harness-daemon-codex", version = "57.0.0" }
+harness-daemon-db-core = { path = "../harness-daemon-db-core", version = "57.0.0" }
 harness-daemon-discovery = { path = "../harness-daemon-discovery", version = "57.0.0" }
 harness-daemon-launchd = { path = "../harness-daemon-launchd", version = "57.0.0" }
 harness-daemon-provider-credentials = { path = "../harness-daemon-provider-credentials", version = "57.0.0" }
@@ -119,6 +120,7 @@ security-framework = "3"
 agent-client-protocol-http = { version = "=2.0.0", default-features = false, features = ["client", "server"] }
 assert_cmd = "=2.2.2"
 harness-agents = { path = "../harness-agents", version = "57.0.0", features = ["test-support"] }
+harness-daemon-db-core = { path = "../harness-daemon-db-core", version = "57.0.0", features = ["test-support"] }
 harness-daemon-provider-credentials = { path = "../harness-daemon-provider-credentials", version = "57.0.0", features = ["test-support"] }
 harness-daemon-state = { path = "../harness-daemon-state", version = "57.0.0", features = ["test-support"] }
 harness-db-schema = { path = "../harness-db-schema", version = "57.0.0", features = ["test-support"] }

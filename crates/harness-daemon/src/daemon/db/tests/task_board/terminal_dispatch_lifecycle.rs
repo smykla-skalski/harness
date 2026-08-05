@@ -80,7 +80,7 @@ struct LedgerSnapshot {
 }
 
 struct Fixture {
-    db: AsyncDaemonDb,
+    db: crate::daemon::db_handle::AsyncDaemonDbHandle,
     _directory: TempDir,
     item_id: String,
     intent_id: String,
@@ -266,7 +266,10 @@ async fn fixture(phase: IntentPhase, action: TerminalAction) -> Fixture {
     }
 }
 
-async fn approved_grant(db: &AsyncDaemonDb, item_id: &str) -> String {
+async fn approved_grant(
+    db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
+    item_id: &str,
+) -> String {
     let grant = db
         .ensure_pending_approval_grant(&NewApprovalGrant {
             board_item_id: item_id.to_string(),
@@ -331,7 +334,7 @@ async fn configure_policy(db: &AsyncDaemonDb) {
 }
 
 struct TestDb {
-    db: AsyncDaemonDb,
+    db: crate::daemon::db_handle::AsyncDaemonDbHandle,
     directory: TempDir,
 }
 
@@ -347,13 +350,15 @@ async fn test_db() -> TestDb {
         .expect("sync session");
     drop(sync_db);
     TestDb {
-        db: AsyncDaemonDb::connect(&path).await.expect("open db"),
+        db: crate::daemon::db_handle::AsyncDaemonDbHandle(
+            AsyncDaemonDb::connect(&path).await.expect("open db"),
+        ),
         directory,
     }
 }
 
 impl Deref for TestDb {
-    type Target = AsyncDaemonDb;
+    type Target = crate::daemon::db_handle::AsyncDaemonDbHandle;
 
     fn deref(&self) -> &Self::Target {
         &self.db

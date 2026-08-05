@@ -1,4 +1,5 @@
 use super::*;
+use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::task_board::{
     ExternalRef, ExternalRefProvider, ExternalRefSyncState, PlanningState, TaskBoardItem,
@@ -95,6 +96,7 @@ async fn external_ref_creation_rejects_client_sync_state() {
     let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
         .await
         .expect("open database");
+    let db = AsyncDaemonDbHandle(db);
     let request = TaskBoardCreateItemRequest {
         title: "Task".into(),
         body: "Body".into(),

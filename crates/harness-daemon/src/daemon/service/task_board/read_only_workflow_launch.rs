@@ -3,8 +3,8 @@ use std::path::{Path, PathBuf};
 use tokio::task::spawn_blocking;
 
 use crate::agents::runtime::models;
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::service::{
     assess_provider_readiness, provider_prerequisite_reasons, runtime_requires_provider_credential,
 };
@@ -31,7 +31,7 @@ pub(in crate::daemon) use test_override::with_read_only_launch_test_override;
 use test_override::{read_only_launch_test_override, read_only_launch_test_serial};
 
 pub(super) async fn prepare_read_only_workflow_launch(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     item_id: &str,
     session_id: &str,
     worktree: &str,
@@ -96,7 +96,7 @@ pub(super) async fn prepare_read_only_workflow_launch(
 }
 
 pub(crate) async fn validate_read_only_workflow_launch(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     applied: &DispatchAppliedTask,
 ) -> Result<(), CliError> {
     let Some(launch) = applied.read_only_workflow.as_ref() else {

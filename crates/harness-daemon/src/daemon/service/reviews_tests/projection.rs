@@ -17,6 +17,7 @@ use super::super::{
 };
 use super::parsed;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 #[path = "projection/db_backed.rs"]
 mod db_backed;
@@ -180,7 +181,12 @@ async fn repository_source_aggregate_reuses_canonical_per_repository_buckets() {
     );
 }
 
-async fn create_imported_review(db: &AsyncDaemonDb, item_id: &str, repository: &str, number: u64) {
+async fn create_imported_review(
+    db: &AsyncDaemonDbHandle,
+    item_id: &str,
+    repository: &str,
+    number: u64,
+) {
     let mut item = TaskBoardItem::new(
         item_id.to_owned(),
         format!("Review {repository}#{number}"),
@@ -228,7 +234,7 @@ fn requested_review_item(
     item
 }
 
-async fn configure_review_inbox(db: &AsyncDaemonDb, repositories: &[&str], labels: &[&str]) {
+async fn configure_review_inbox(db: &AsyncDaemonDbHandle, repositories: &[&str], labels: &[&str]) {
     let settings = TaskBoardOrchestratorSettings {
         github_inbox: TaskBoardGitHubInboxConfig {
             repositories: repositories

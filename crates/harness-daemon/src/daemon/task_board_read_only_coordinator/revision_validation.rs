@@ -1,4 +1,3 @@
-use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::{
     TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionRecord,
     TaskBoardWorkflowRevisionGuard, validate_plan_approval,
@@ -7,9 +6,10 @@ use harness_kernel::errors::CliError;
 
 use super::attempts::invalid_transition;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 pub(super) async fn current_revisions(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     item_revision: i64,
     execution: &TaskBoardWorkflowExecutionRecord,
 ) -> Result<(TaskBoardWorkflowRevisionGuard, String), CliError> {
@@ -36,7 +36,7 @@ pub(super) fn revisions_match(
 }
 
 pub(super) async fn invalidate_revisions(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     revisions: &TaskBoardWorkflowRevisionGuard,
     policy_version: &str,

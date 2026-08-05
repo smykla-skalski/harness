@@ -2,15 +2,14 @@ use super::controller::{
     RemoteExecutionControllerClient, RemoteExecutionControllerError, binding_error,
 };
 use crate::daemon::db::task_board::prelude::*;
-use crate::daemon::db::{
-    AsyncDaemonDb, TaskBoardRemoteHostTrustFence, TaskBoardRemoteMutationOutcome,
-};
+use crate::daemon::db::{TaskBoardRemoteHostTrustFence, TaskBoardRemoteMutationOutcome};
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::task_board::remote_wire::wire::{RemoteLeaseRenewRequest, RemoteLeaseRenewResponse};
 
 impl RemoteExecutionControllerClient {
     pub(crate) async fn reconcile_pending_renewal(
         &self,
-        db: &AsyncDaemonDb,
+        db: &AsyncDaemonDbHandle,
         request: &RemoteLeaseRenewRequest,
     ) -> Result<
         (RemoteLeaseRenewResponse, TaskBoardRemoteMutationOutcome),
@@ -40,7 +39,7 @@ impl RemoteExecutionControllerClient {
     /// record under a fence this check never saw.
     async fn authorize_pending_renewal_replay(
         &self,
-        db: &AsyncDaemonDb,
+        db: &AsyncDaemonDbHandle,
         request: &RemoteLeaseRenewRequest,
     ) -> Result<TaskBoardRemoteHostTrustFence, RemoteExecutionControllerError> {
         let trust = self.current_stable_host_trust_for_replay(db).await?;

@@ -3,7 +3,7 @@ use rusqlite::Connection;
 use super::{CliError, db_error};
 
 const REMOTE_ACME_CONFIG_DDL: &str = include_str!(
-    "../../harness-daemon/src/daemon/db/migrations/0022_daemon_v28_remote_acme_config.sql"
+    "../../harness-daemon-db-core/src/migrations/0022_daemon_v28_remote_acme_config.sql"
 );
 const ADD_REMOTE_ACME_COLUMN_PREFIX: &str = "ALTER TABLE remote_acme_state ADD COLUMN ";
 

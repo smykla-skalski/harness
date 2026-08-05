@@ -3,10 +3,10 @@ use rusqlite::Connection;
 use super::CliError;
 
 const COLOR_COLUMN_SQL: &str = include_str!(
-    "../../harness-daemon/src/daemon/db/migrations/0048_daemon_v52_task_board_project_color.sql"
+    "../../harness-daemon-db-core/src/migrations/0048_daemon_v52_task_board_project_color.sql"
 );
 pub(super) const COLOR_BACKFILL_SQL: &str = include_str!(
-    "../../harness-daemon/src/daemon/db/migrations/0049_daemon_v52_task_board_project_color_backfill.sql"
+    "../../harness-daemon-db-core/src/migrations/0049_daemon_v52_task_board_project_color_backfill.sql"
 );
 
 /// # Errors

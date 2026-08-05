@@ -4,6 +4,7 @@ use tempfile::tempdir;
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::task_board::policy_graph::PolicyWaitCondition;
 use crate::task_board::policy_runtime::executor::PolicyRuntimeExecutor;
@@ -21,7 +22,7 @@ async fn executor_starts_and_resumes_the_same_database_run() {
             .expect("open database"),
     );
     let runtime = PolicyRuntimeExecutor::new_database(
-        Arc::clone(&database),
+        Arc::new(AsyncDaemonDbHandle((*database).clone())),
         PolicyProviderRegistry::default(),
     );
     let started = runtime

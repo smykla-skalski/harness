@@ -9,8 +9,9 @@ use super::controller_authority_test_support::{
     BarrierServer, HOST_ID, TOKEN_ENV, TestTlsMaterial, pinned_controller_for_trust_with_times,
     remote_host_config, spawn_barrier_server, spawn_probe_server, test_tls_material,
 };
+use crate::daemon::db::remote_controller_fixture;
 use crate::daemon::db::task_board::prelude::*;
-use crate::daemon::db::{AsyncDaemonDb, remote_controller_fixture};
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::task_board::remote_wire::wire::{
     RemoteHostAdvertisement, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
@@ -147,7 +148,7 @@ async fn advertisement_response_cannot_cross_a_trust_rotation() {
 }
 
 async fn execute_trust_rotation_barrier(
-    db: AsyncDaemonDb,
+    db: AsyncDaemonDbHandle,
     old_controller: Arc<RemoteExecutionControllerClient>,
     old_server: BarrierServer,
     new_server: BarrierServer,
@@ -257,7 +258,10 @@ fn advertisement(sent_at: chrono::DateTime<Utc>) -> RemoteHostAdvertisement {
     }
 }
 
-async fn replace_remote_host(db: &AsyncDaemonDb, config: TaskBoardExecutionHostConfig) -> u64 {
+async fn replace_remote_host(
+    db: &AsyncDaemonDbHandle,
+    config: TaskBoardExecutionHostConfig,
+) -> u64 {
     let mut settings = db
         .task_board_orchestrator_settings()
         .await
@@ -272,7 +276,7 @@ async fn replace_remote_host(db: &AsyncDaemonDb, config: TaskBoardExecutionHostC
         .configuration_revision
 }
 
-async fn observation_count(db: &AsyncDaemonDb) -> i64 {
+async fn observation_count(db: &AsyncDaemonDbHandle) -> i64 {
     query_scalar(
         "SELECT COUNT(*) FROM task_board_execution_hosts
          WHERE host_id = 'executor-a' AND (

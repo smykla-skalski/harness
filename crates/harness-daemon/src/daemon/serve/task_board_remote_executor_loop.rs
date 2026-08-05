@@ -3,7 +3,7 @@
 
 use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{
-    AsyncDaemonDb, TaskBoardRemoteAssignmentRecord, TaskBoardRemoteExecutorIdentity,
+    TaskBoardRemoteAssignmentRecord, TaskBoardRemoteExecutorIdentity,
     TaskBoardRemoteExecutorStartAuthority, TaskBoardRemoteExecutorStartIoPermit,
     TaskBoardRemoteExecutorStartIoPermitOutcome, executor_start_authority,
     executor_start_io_permit, remote_executor_identity,
@@ -40,6 +40,7 @@ mod source_bundle;
 mod stop;
 #[path = "task_board_remote_executor_loop/terminal.rs"]
 mod terminal;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use adoption::execute_and_reconcile_remote_worker;
 use adoption::reconcile_persisted_start_without_run;
 use cleanup::{cleanup_unstarted_executor_provisioning, reconcile_settled_executor_cleanup};
@@ -143,7 +144,7 @@ pub(crate) async fn reconcile_task_board_remote_executor_tick(
 #[cfg(test)]
 async fn reconcile_remote_executor_assignment(
     state: &DaemonHttpState,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     assignment_id: &str,
 ) -> Result<(), CliError> {
     Box::pin(reconcile_remote_executor_assignment_with_shutdown(
@@ -157,7 +158,7 @@ async fn reconcile_remote_executor_assignment(
 
 async fn reconcile_remote_executor_assignment_with_shutdown(
     state: &DaemonHttpState,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     assignment_id: &str,
     shutdown_rx: Option<&watch::Receiver<bool>>,
 ) -> Result<(), CliError> {
@@ -187,7 +188,7 @@ async fn reconcile_remote_executor_assignment_with_shutdown(
 /// serialises, so calling this unlocked races another reconciler.
 async fn reconcile_remote_executor_assignment_locked(
     state: &DaemonHttpState,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     assignment_id: &str,
     identity: &RemoteWorkerIdentity,
     shutdown_rx: Option<&watch::Receiver<bool>>,
@@ -227,7 +228,7 @@ async fn reconcile_remote_executor_assignment_locked(
 
 async fn reconcile_active_remote_worker(
     state: &DaemonHttpState,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     mut record: TaskBoardRemoteAssignmentRecord,
     identity: &RemoteWorkerIdentity,
     shutdown_rx: Option<&watch::Receiver<bool>>,
@@ -288,7 +289,7 @@ struct PreparedRemoteWorker {
 }
 
 async fn prepare_active_remote_worker(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     record: &TaskBoardRemoteAssignmentRecord,
     offer: &RemoteOfferRequest,
     identity: &RemoteWorkerIdentity,
@@ -315,7 +316,7 @@ async fn prepare_active_remote_worker(
 }
 
 async fn authorize_or_cleanup_remote_provisioning(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     authority: Option<&TaskBoardRemoteExecutorStartAuthority>,
 ) -> Result<Option<TaskBoardRemoteExecutorStartAuthority>, CliError> {
     let authority = authority
@@ -336,7 +337,7 @@ async fn authorize_or_cleanup_remote_provisioning(
 }
 
 async fn claim_or_cleanup_remote_start_io(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     authority: Option<&TaskBoardRemoteExecutorStartAuthority>,
     workspace: &Path,
 ) -> Result<TaskBoardRemoteExecutorStartIoPermitOutcome, CliError> {
@@ -356,7 +357,7 @@ async fn claim_or_cleanup_remote_start_io(
 }
 
 async fn cleanup_predecessor_remote_start(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     authority: Option<&TaskBoardRemoteExecutorStartAuthority>,
     successor_instance_id: &str,
 ) -> Result<(), CliError> {
@@ -382,7 +383,7 @@ struct ActiveLifecycleOwner {
 
 async fn claim_active_lifecycle_owner(
     state: &DaemonHttpState,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     record: &TaskBoardRemoteAssignmentRecord,
 ) -> Result<Option<ActiveLifecycleOwner>, CliError> {
     if !matches!(
@@ -415,7 +416,7 @@ async fn claim_active_lifecycle_owner(
 }
 
 async fn start_authority_for_action(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     record: &TaskBoardRemoteAssignmentRecord,
     identity: &RemoteWorkerIdentity,
     action: RemoteWorkerAction,
@@ -451,7 +452,7 @@ async fn start_authority_for_action(
 
 async fn stop_terminal_remote_worker(
     state: &DaemonHttpState,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     record: &TaskBoardRemoteAssignmentRecord,
     identity: &RemoteWorkerIdentity,
 ) -> Result<(), CliError> {

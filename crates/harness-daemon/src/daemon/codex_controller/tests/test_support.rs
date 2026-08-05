@@ -9,6 +9,7 @@ use tokio::sync::broadcast;
 use crate::daemon::codex_controller::CodexControllerHandle;
 use crate::daemon::db::prelude::*;
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
+use crate::daemon::db_handle::{AsyncDaemonDbHandle, DaemonDbOwnedHandle};
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::daemon::index::DiscoveredProject;
 use crate::daemon::protocol::{
@@ -45,18 +46,28 @@ pub(super) fn codex_approval_request(
     }
 }
 
-pub(crate) fn controller_with_db() -> (CodexControllerHandle, Arc<Mutex<DaemonDb>>, TempDir) {
+pub(crate) fn controller_with_db() -> (
+    CodexControllerHandle,
+    Arc<Mutex<DaemonDbOwnedHandle>>,
+    TempDir,
+) {
     controller_with_session_state(sample_session_state())
 }
 
 pub(super) fn controller_with_session_state(
     mut state: SessionState,
-) -> (CodexControllerHandle, Arc<Mutex<DaemonDb>>, TempDir) {
+) -> (
+    CodexControllerHandle,
+    Arc<Mutex<DaemonDbOwnedHandle>>,
+    TempDir,
+) {
     let (sender, _) = broadcast::channel::<StreamEvent>(8);
     let tempdir = tempdir().expect("temp dir");
     let project_root = prepare_test_project(&tempdir, &mut state);
     let db_path = tempdir.path().join("harness.db");
-    let db = Arc::new(Mutex::new(DaemonDb::open(&db_path).expect("open db")));
+    let db = Arc::new(Mutex::new(crate::daemon::db_handle::DaemonDbOwnedHandle(
+        DaemonDb::open(&db_path).expect("open db"),
+    )));
     {
         let db_guard = db.lock().expect("db lock");
         db_guard
@@ -77,15 +88,15 @@ pub(super) fn controller_with_session_state(
 
 pub(super) async fn controller_with_async_session_state(
     mut state: SessionState,
-) -> (CodexControllerHandle, Arc<AsyncDaemonDb>, TempDir) {
+) -> (CodexControllerHandle, Arc<AsyncDaemonDbHandle>, TempDir) {
     let (sender, _) = broadcast::channel::<StreamEvent>(8);
     let tempdir = tempdir().expect("temp dir");
     let project_root = prepare_test_project(&tempdir, &mut state);
-    let async_db = Arc::new(
+    let async_db = Arc::new(AsyncDaemonDbHandle(
         AsyncDaemonDb::connect(&tempdir.path().join("harness.db"))
             .await
             .expect("open async db"),
-    );
+    ));
     async_db
         .sync_project(&sample_project(&project_root))
         .await
@@ -143,7 +154,7 @@ where
 }
 
 pub(super) async fn assert_worker_checkpoint(
-    async_db: &AsyncDaemonDb,
+    async_db: &AsyncDaemonDbHandle,
     session_id: &str,
     task_id: &str,
     actor: &str,

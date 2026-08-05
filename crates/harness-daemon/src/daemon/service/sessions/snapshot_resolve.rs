@@ -1,9 +1,9 @@
-use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
 use crate::daemon::index::ResolvedSession;
 use crate::daemon::service::reconcile_expired_pending_signals_for_db;
 use harness_kernel::errors::CliError;
 
 use super::liveness::reconcile_session_liveness_for_read_returning;
+use crate::daemon::db_handle::{AsyncDaemonDbHandle, DaemonDbOwnedHandle};
 
 /// Resolve a session once for a post-mutation snapshot broadcast.
 ///
@@ -18,7 +18,7 @@ use super::liveness::reconcile_session_liveness_for_read_returning;
 /// the underlying resolve fails.
 pub(crate) fn resolve_session_for_snapshot(
     session_id: &str,
-    db: &DaemonDb,
+    db: &DaemonDbOwnedHandle,
 ) -> Result<Option<ResolvedSession>, CliError> {
     reconcile_expired_pending_signals_for_db(session_id, db)?;
     reconcile_session_liveness_for_read_returning(session_id, db)
@@ -31,7 +31,7 @@ pub(crate) fn resolve_session_for_snapshot(
 /// the underlying resolve fails.
 pub(crate) async fn resolve_session_for_snapshot_async(
     session_id: &str,
-    async_db: &AsyncDaemonDb,
+    async_db: &AsyncDaemonDbHandle,
 ) -> Result<Option<ResolvedSession>, CliError> {
     harness_daemon_session_service::reconcile_expired_pending_signals_async(session_id, async_db)
         .await?;

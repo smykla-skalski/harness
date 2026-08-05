@@ -6,6 +6,7 @@ use std::collections::HashMap;
 
 use crate::daemon::db::prelude::*;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::task_board::{
     AgentMode, HARNESS_GITHUB_TOKEN_ENV, TaskBoardGitHubProjectConfig, TaskBoardItem,
@@ -13,7 +14,7 @@ use crate::task_board::{
 };
 
 struct CrashedDispatchPreparation {
-    db: crate::daemon::db::AsyncDaemonDb,
+    db: crate::daemon::db_handle::AsyncDaemonDbHandle,
     first_claim_token: String,
     session_id: String,
     work_item_id: String,
@@ -29,6 +30,7 @@ async fn dispatch_resume_prepare_and_simulate_crash(
     let db = crate::daemon::db::AsyncDaemonDb::connect(&db_path)
         .await
         .expect("open async daemon db");
+    let db = AsyncDaemonDbHandle(db);
     let mut settings = db
         .task_board_orchestrator_settings()
         .await
@@ -208,6 +210,7 @@ fn read_only_dispatch_rejects_aba_after_claim_before_late_head_resolution() {
             )
             .await
             .expect("open async daemon db");
+            let db = AsyncDaemonDbHandle(db);
             let mut item = TaskBoardItem::new(
                 "dispatch-read-only-aba".into(),
                 "Review exact head".into(),

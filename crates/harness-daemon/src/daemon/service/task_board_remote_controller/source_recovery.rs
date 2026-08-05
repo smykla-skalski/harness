@@ -1,10 +1,10 @@
 use super::{canonical_now, controller_database_error, missing_execution, requests};
 use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{
-    AsyncDaemonDb, TaskBoardRemoteAssignmentRecord, TaskBoardRemoteMutationOutcome,
-    TaskBoardRemoteOfferOutcome, TaskBoardRemoteOperationTrustFence,
-    TaskBoardRemoteSourceOfferReassignment,
+    TaskBoardRemoteAssignmentRecord, TaskBoardRemoteMutationOutcome, TaskBoardRemoteOfferOutcome,
+    TaskBoardRemoteOperationTrustFence, TaskBoardRemoteSourceOfferReassignment,
 };
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::task_board_remote_transport::controller::RemoteExecutionControllerClient;
 use crate::daemon::task_board_remote_transport::controller_offer_recovery::RemotePredecessorOfferRecoveryOutcome;
 use crate::daemon::task_board_remote_transport::controller_source_bundle::RemoteSourceBundleRecoveryOutcome;
@@ -23,7 +23,7 @@ use harness_kernel::errors::{CliError, CliErrorKind};
     reason = "flat match over source-bundle recovery outcome; each arm delegates to one helper"
 )]
 pub(super) async fn progress_unclaimed_offer(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     client: &RemoteExecutionControllerClient,
     assignment: &TaskBoardRemoteAssignmentRecord,
 ) -> Result<bool, CliError> {
@@ -68,7 +68,7 @@ pub(super) async fn progress_unclaimed_offer(
 }
 
 async fn recover_offer_after_source_receipt(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     client: &RemoteExecutionControllerClient,
     assignment: &TaskBoardRemoteAssignmentRecord,
     offer: &RemoteOfferRequest,
@@ -93,7 +93,7 @@ async fn recover_offer_after_source_receipt(
 }
 
 async fn reassign_abandoned_source(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     assignment: &TaskBoardRemoteAssignmentRecord,
     request: &RemoteSourceBundleAbandonRequest,
     response: &RemoteSourceBundleAbandonResponse,
@@ -121,7 +121,7 @@ async fn reassign_abandoned_source(
 }
 
 async fn reassign_rejected_offer(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     assignment: &TaskBoardRemoteAssignmentRecord,
     offer: &RemoteOfferRequest,
     response: &RemoteOfferResponse,
@@ -155,7 +155,7 @@ struct ReassignmentContext {
 }
 
 async fn reassignment_context(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     assignment: &TaskBoardRemoteAssignmentRecord,
     predecessor: &RemoteOfferRequest,
     trust: &TaskBoardRemoteOperationTrustFence,
@@ -196,7 +196,7 @@ async fn reassignment_context(
 }
 
 async fn exact_outbound_upload(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     assignment: &TaskBoardRemoteAssignmentRecord,
     offer: &RemoteOfferRequest,
 ) -> Result<RemoteSourceBundleUploadRequest, CliError> {

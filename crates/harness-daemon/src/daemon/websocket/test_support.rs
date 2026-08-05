@@ -26,6 +26,8 @@ use crate::session::types::{
 
 use super::ReplayBuffer;
 use crate::daemon::db::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
+use crate::daemon::db_handle::DaemonDbOwnedHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 pub(super) fn test_ws_state() -> DaemonHttpState {
@@ -91,6 +93,7 @@ pub(super) async fn test_http_state_with_async_db_timeline() -> DaemonHttpState 
     let async_db = Arc::new(OnceLock::new());
     let db_path = temp_dir().join(format!("harness-ws-test-async-{}.db", Uuid::new_v4()));
     let sync_db = DaemonDb::open(&db_path).expect("open file db");
+    let sync_db = DaemonDbOwnedHandle(sync_db);
     persist_sample_session(&sync_db);
     sync_db
         .sync_conversation_events(
@@ -104,11 +107,11 @@ pub(super) async fn test_http_state_with_async_db_timeline() -> DaemonHttpState 
 
     assert!(
         async_db
-            .set(Arc::new(
+            .set(Arc::new(AsyncDaemonDbHandle(
                 AsyncDaemonDb::connect(&db_path)
                     .await
                     .expect("open async daemon db"),
-            ))
+            )))
             .is_ok(),
         "install async db"
     );
@@ -160,9 +163,9 @@ fn build_test_http_state(version: &str, started_at: &str, install_db: bool) -> D
         install_db.then(|| temp_dir().join(format!("harness-ws-test-{}.db", Uuid::new_v4())));
     if install_db {
         let db_path = db_path.as_ref().expect("db path");
-        db.set(Arc::new(Mutex::new(
+        db.set(Arc::new(Mutex::new(DaemonDbOwnedHandle(
             DaemonDb::open(db_path).expect("open file db"),
-        )))
+        ))))
         .expect("install db");
         async_db
             .set(crate::daemon::http::connect_async_db_for_tests(db_path))
@@ -235,7 +238,7 @@ fn sample_manifest(version: &str, started_at: &str) -> DaemonManifest {
     .expect("deserialize daemon manifest")
 }
 
-fn persist_sample_session(db: &DaemonDb) {
+fn persist_sample_session(db: &DaemonDbOwnedHandle) {
     let project = sample_project();
     db.sync_project(&project).expect("sync project");
     db.save_session_state(&project.project_id, &sample_session_state())

@@ -11,12 +11,13 @@ use super::task_board_sync_coordinator::{
 };
 use super::{
     BTreeMap, CliError, DiscoveredProject, LIVENESS_CANDIDATE_IDS_SQL, Path, PathBuf,
-    SCHEMA_VERSION, SchemaRepairHooks, async_bootstrap, daemon_protocol, db_error,
-    trace_async_db_operation, usize_from_i64,
+    SCHEMA_VERSION, SchemaRepairHooks, async_bootstrap, db_error, trace_async_db_operation,
+    usize_from_i64,
 };
-use crate::session::storage;
-use crate::task_board::TaskBoardTriageEscalationConfig;
-use crate::telemetry::{record_daemon_db_health_counts, record_daemon_db_pool_state};
+use harness_session::storage;
+use harness_session::wire::{ProjectSummary, WorktreeSummary};
+use harness_task_board::triage_escalation::TaskBoardTriageEscalationConfig;
+use harness_telemetry::{record_daemon_db_health_counts, record_daemon_db_pool_state};
 
 const ASYNC_DB_ACQUIRE_TIMEOUT: Duration = Duration::from_secs(5);
 const ASYNC_DB_BUSY_TIMEOUT: Duration = Duration::from_secs(5);
@@ -75,7 +76,7 @@ impl AsyncDaemonDb {
     ///
     /// # Errors
     /// Returns [`CliError`] when the pool or schema probe cannot be initialized.
-    pub(crate) async fn connect_with_hooks(
+    pub async fn connect_with_hooks(
         path: &Path,
         hooks: &SchemaRepairHooks,
     ) -> Result<Self, CliError> {
@@ -131,19 +132,20 @@ impl AsyncDaemonDb {
     }
 
     #[must_use]
-    pub(crate) fn storage_path(&self) -> &Path {
+    pub fn storage_path(&self) -> &Path {
         &self.path
     }
 
-    pub(crate) async fn begin_task_board_sync(&self) -> TaskBoardSyncPermit {
+    pub async fn begin_task_board_sync(&self) -> TaskBoardSyncPermit {
         self.task_board_sync_coordinator.begin().await
     }
 
-    pub(crate) fn schedule_requested_task_board_sync(&self) -> u64 {
+    #[must_use]
+    pub fn schedule_requested_task_board_sync(&self) -> u64 {
         self.task_board_sync_coordinator.schedule_requested()
     }
 
-    pub(crate) async fn begin_scheduled_task_board_sync(
+    pub async fn begin_scheduled_task_board_sync(
         &self,
         generation: u64,
     ) -> Option<TaskBoardSyncPermit> {
@@ -152,11 +154,13 @@ impl AsyncDaemonDb {
             .await
     }
 
-    pub(crate) fn cancel_active_task_board_sync(&self) -> bool {
+    #[must_use]
+    pub fn cancel_active_task_board_sync(&self) -> bool {
         self.task_board_sync_coordinator.cancel_active()
     }
 
-    pub(crate) fn task_board_sync_status(&self) -> TaskBoardSyncStatus {
+    #[must_use]
+    pub fn task_board_sync_status(&self) -> TaskBoardSyncStatus {
         self.task_board_sync_coordinator.status()
     }
 
@@ -165,12 +169,12 @@ impl AsyncDaemonDb {
     /// (`OnceLock::set`): a second call is a silent no-op rather than a
     /// panic, since the daemon has exactly one startup path in practice but
     /// nothing here depends on that staying true.
-    pub(crate) fn set_triage_escalation_config(&self, config: TaskBoardTriageEscalationConfig) {
+    pub fn set_triage_escalation_config(&self, config: TaskBoardTriageEscalationConfig) {
         let _ = self.triage_escalation_config.set(config);
     }
 
     #[must_use]
-    pub(super) fn triage_escalation_config(&self) -> TaskBoardTriageEscalationConfig {
+    pub fn triage_escalation_config(&self) -> TaskBoardTriageEscalationConfig {
         self.triage_escalation_config
             .get()
             .copied()
@@ -201,7 +205,7 @@ impl AsyncDaemonDb {
     ///
     /// # Errors
     /// Returns [`CliError`] on SQL failures.
-    pub(crate) async fn health_counts(&self) -> Result<(usize, usize, usize), CliError> {
+    pub async fn health_counts(&self) -> Result<(usize, usize, usize), CliError> {
         trace_async_db_operation("health_counts", "read", Some(&self.path), || async {
             record_daemon_db_pool_state(
                 "async",
@@ -228,11 +232,7 @@ impl AsyncDaemonDb {
     ///
     /// # Errors
     /// Returns [`CliError`] on SQL failures.
-    pub(crate) async fn list_project_summaries(
-        &self,
-    ) -> Result<Vec<daemon_protocol::ProjectSummary>, CliError> {
-        use daemon_protocol::{ProjectSummary, WorktreeSummary};
-
+    pub async fn list_project_summaries(&self) -> Result<Vec<ProjectSummary>, CliError> {
         trace_async_db_operation(
             "list_project_summaries",
             "read",
@@ -310,7 +310,7 @@ impl AsyncDaemonDb {
     ///
     /// # Errors
     /// Returns [`CliError`] on SQL failures.
-    pub(crate) async fn list_liveness_candidate_ids(&self) -> Result<Vec<String>, CliError> {
+    pub async fn list_liveness_candidate_ids(&self) -> Result<Vec<String>, CliError> {
         trace_async_db_operation(
             "list_liveness_candidate_ids",
             "read",

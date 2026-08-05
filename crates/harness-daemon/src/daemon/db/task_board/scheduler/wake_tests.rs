@@ -6,6 +6,7 @@ use tokio::sync::Barrier;
 use super::test_support::{database, instant};
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::task_board::scheduler::queries::TaskBoardAutomationSchedulerQueries;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::task_board::{
     TaskBoardAutomationWakeEntityKind, TaskBoardAutomationWakePayload,
@@ -212,6 +213,7 @@ async fn unacknowledged_wake_survives_database_reopen() {
     let reopened = AsyncDaemonDb::connect(&path)
         .await
         .expect("reopen wake database");
+    let reopened = AsyncDaemonDbHandle(reopened);
     assert_eq!(
         reopened
             .pending_task_board_automation_wake_events(10)
@@ -222,7 +224,7 @@ async fn unacknowledged_wake_survives_database_reopen() {
 }
 
 async fn enqueue_after_barrier(
-    db: AsyncDaemonDb,
+    db: crate::daemon::db_handle::AsyncDaemonDbHandle,
     request: TaskBoardAutomationWakeRequest,
     barrier: Arc<Barrier>,
 ) -> Result<crate::task_board::TaskBoardAutomationWakeEvent, CliError> {

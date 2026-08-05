@@ -1,7 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+use crate::daemon::db::TaskBoardItemSnapshot;
 use crate::daemon::db::task_board::prelude::*;
-use crate::daemon::db::{AsyncDaemonDb, TaskBoardItemSnapshot};
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::task_board::project::{TaskBoardProject, TaskBoardProjectSource};
 use crate::task_board::{
     TaskBoardItem, TaskBoardOrchestratorSettings, TaskBoardStatus, normalize_repository_slug,
@@ -15,13 +16,13 @@ pub(crate) struct TaskBoardRepositoryScope {
 }
 
 impl TaskBoardRepositoryScope {
-    pub(crate) async fn load(db: &AsyncDaemonDb) -> Result<Self, CliError> {
+    pub(crate) async fn load(db: &AsyncDaemonDbHandle) -> Result<Self, CliError> {
         let settings = db.task_board_orchestrator_settings().await?;
         Self::load_with_settings(db, &settings).await
     }
 
     pub(crate) async fn load_with_settings(
-        db: &AsyncDaemonDb,
+        db: &AsyncDaemonDbHandle,
         settings: &TaskBoardOrchestratorSettings,
     ) -> Result<Self, CliError> {
         let repositories = settings
@@ -93,7 +94,7 @@ impl TaskBoardRepositoryScope {
 }
 
 pub(crate) async fn scoped_task_board_items_db(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     status: Option<TaskBoardStatus>,
 ) -> Result<Vec<TaskBoardItem>, CliError> {
     let scope = TaskBoardRepositoryScope::load(db).await?;
@@ -101,7 +102,7 @@ pub(crate) async fn scoped_task_board_items_db(
 }
 
 pub(crate) async fn scoped_task_board_item_db(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     item_id: &str,
 ) -> Result<TaskBoardItem, CliError> {
     let item = db.task_board_item(item_id).await?;

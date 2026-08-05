@@ -30,7 +30,7 @@ pub(super) fn session_updated_core_event_from_resolved(
 /// the synchronous DB for the expensive extension fields.
 pub(super) fn session_extensions_event_from_resolved(
     resolved: &ResolvedSession,
-    db: &super::db::DaemonDb,
+    db: &crate::daemon::db_handle::DaemonDbOwnedHandle,
 ) -> Result<StreamEvent, CliError> {
     let payload = snapshot::build_session_extensions(resolved, Some(db))?;
     stream_event(
@@ -44,7 +44,7 @@ pub(super) fn session_extensions_event_from_resolved(
 /// the canonical async DB for signals and agent activity.
 pub(super) async fn session_extensions_event_from_resolved_async(
     resolved: &ResolvedSession,
-    async_db: &super::db::AsyncDaemonDb,
+    async_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
 ) -> Result<StreamEvent, CliError> {
     let session_id = resolved.state.session_id.as_str();
     let signals = async_db.load_signals(session_id).await?;
@@ -57,7 +57,7 @@ pub(super) async fn session_extensions_event_from_resolved_async(
 /// Build a `sessions_updated_delta` event carrying a single changed session.
 pub(super) fn sessions_updated_delta_changed_event(
     resolved: &ResolvedSession,
-    db: &super::db::DaemonDb,
+    db: &crate::daemon::db_handle::DaemonDbOwnedHandle,
 ) -> Result<StreamEvent, CliError> {
     let payload = SessionsUpdatedDeltaPayload {
         changed: vec![snapshot::summary_from_resolved(resolved)],
@@ -74,7 +74,7 @@ pub(super) fn sessions_updated_delta_changed_event(
 /// Build a `sessions_updated_delta` event marking a single session removed.
 pub(super) fn sessions_updated_delta_removed_event(
     session_id: &str,
-    db: &super::db::DaemonDb,
+    db: &crate::daemon::db_handle::DaemonDbOwnedHandle,
 ) -> Result<StreamEvent, CliError> {
     let payload = SessionsUpdatedDeltaPayload {
         changed: Vec::new(),
@@ -87,7 +87,7 @@ pub(super) fn sessions_updated_delta_removed_event(
 /// Async counterpart of [`sessions_updated_delta_changed_event`].
 pub(super) async fn sessions_updated_delta_changed_event_async(
     resolved: &ResolvedSession,
-    async_db: &super::db::AsyncDaemonDb,
+    async_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
 ) -> Result<StreamEvent, CliError> {
     let payload = SessionsUpdatedDeltaPayload {
         changed: vec![snapshot::summary_from_resolved(resolved)],
@@ -104,7 +104,7 @@ pub(super) async fn sessions_updated_delta_changed_event_async(
 /// Async counterpart of [`sessions_updated_delta_removed_event`].
 pub(super) async fn sessions_updated_delta_removed_event_async(
     session_id: &str,
-    async_db: &super::db::AsyncDaemonDb,
+    async_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
 ) -> Result<StreamEvent, CliError> {
     let payload = SessionsUpdatedDeltaPayload {
         changed: Vec::new(),

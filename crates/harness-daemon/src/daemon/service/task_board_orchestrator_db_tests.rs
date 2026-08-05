@@ -4,6 +4,7 @@ use super::{
 };
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::daemon::protocol::TaskBoardOrchestratorRunOnceRequest;
 use crate::task_board::github::GitHubAutomation;
@@ -131,6 +132,7 @@ async fn a_run_dispatches_only_items_present_when_it_was_prepared() {
     let db = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
         .await
         .expect("open database");
+    let db = AsyncDaemonDbHandle(db);
     let settings = settings_without_a_source();
     db.replace_task_board_orchestrator_settings(&settings)
         .await
@@ -179,6 +181,7 @@ async fn a_run_uses_only_configured_repository_candidates() {
     let db = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
         .await
         .expect("open database");
+    let db = AsyncDaemonDbHandle(db);
     let mut settings = settings_without_a_source();
     settings.github_inbox.repositories = vec!["smykla-skalski/harness".into()];
     db.replace_task_board_orchestrator_settings(&settings)
@@ -219,6 +222,7 @@ async fn an_explicit_item_outside_repository_scope_is_refused() {
     let db = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
         .await
         .expect("open database");
+    let db = AsyncDaemonDbHandle(db);
     let mut settings = settings_without_a_source();
     settings.github_inbox.repositories = vec!["smykla-skalski/harness".into()];
     db.replace_task_board_orchestrator_settings(&settings)
@@ -258,6 +262,7 @@ async fn stop_fences_dispatch_before_another_item_can_start() {
     let db = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
         .await
         .expect("open database");
+    let db = AsyncDaemonDbHandle(db);
     db.start_task_board_automation(
         TaskBoardAutomationDesiredMode::Continuous,
         chrono::Utc::now(),
@@ -324,6 +329,7 @@ async fn stop_fences_evaluation_and_publication() {
     let db = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
         .await
         .expect("open database");
+    let db = AsyncDaemonDbHandle(db);
     db.start_task_board_automation(
         TaskBoardAutomationDesiredMode::Continuous,
         chrono::Utc::now(),

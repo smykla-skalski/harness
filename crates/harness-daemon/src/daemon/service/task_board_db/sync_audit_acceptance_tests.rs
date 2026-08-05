@@ -3,6 +3,7 @@ use tempfile::tempdir;
 
 use super::*;
 use crate::daemon::db::AsyncAuditQueries;
+use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::daemon::protocol::{
     HarnessMonitorAuditEvent, HarnessMonitorAuditEventsRequest, TaskBoardSyncRequest,
@@ -439,15 +440,16 @@ async fn requested_sync_fails_when_audit_event_cannot_be_persisted() {
     );
 }
 
-async fn open_db() -> (tempfile::TempDir, AsyncDaemonDb) {
+async fn open_db() -> (tempfile::TempDir, AsyncDaemonDbHandle) {
     let dir = tempdir().expect("tempdir");
     let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
         .await
         .expect("open async database");
+    let db = AsyncDaemonDbHandle(db);
     (dir, db)
 }
 
-async fn sync_events(db: &AsyncDaemonDb) -> Vec<HarnessMonitorAuditEvent> {
+async fn sync_events(db: &AsyncDaemonDbHandle) -> Vec<HarnessMonitorAuditEvent> {
     db.load_audit_events(&HarnessMonitorAuditEventsRequest {
         action_keys: vec!["task_board.sync".into()],
         ..HarnessMonitorAuditEventsRequest::default()

@@ -7,6 +7,7 @@ use crate::daemon::db::{
     AsyncDaemonDb, TaskBoardRemoteControllerScanStep, TaskBoardRemoteOfferOutcome,
     remote_controller_fixture,
 };
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::task_board::{
     TASK_BOARD_EXECUTION_TARGET_RESOURCE, TASK_BOARD_REMOTE_PROTOCOL_VERSION,
@@ -239,6 +240,7 @@ async fn transient_progress_failure_defers_exact_generation_and_survives_restart
     let reopened = AsyncDaemonDb::connect(&database_path)
         .await
         .expect("reopen controller after transient failure");
+    let reopened = AsyncDaemonDbHandle(reopened);
     assert!(
         reopened
             .task_board_remote_controller_progression_is_blocked()

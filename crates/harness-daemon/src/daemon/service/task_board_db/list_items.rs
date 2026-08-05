@@ -1,5 +1,6 @@
+use crate::daemon::db::TaskBoardItemSnapshot;
 use crate::daemon::db::task_board::prelude::*;
-use crate::daemon::db::{AsyncDaemonDb, TaskBoardItemSnapshot};
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::task_board::TaskBoardProgressRollup;
 use crate::task_board::progress_rollup::build_progress_rollups_from;
 use harness_kernel::errors::CliError;
@@ -42,7 +43,7 @@ impl From<TaskBoardListSource> for TaskBoardListProjectionSource {
 }
 
 pub(crate) async fn read_task_board_items_db(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
 ) -> Result<TaskBoardListSource, CliError> {
     let mut snapshot = db.task_board_items_snapshot(None).await?;
     let scope =

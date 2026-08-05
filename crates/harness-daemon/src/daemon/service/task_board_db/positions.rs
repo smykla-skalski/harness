@@ -1,17 +1,18 @@
 use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{
-    AsyncDaemonDb, CliError, TaskBoardLaneMutationResult, TaskBoardLanePositionInput,
-    TaskBoardLaneResetInput, db_error,
+    TaskBoardLaneMutationResult, TaskBoardLanePositionInput, TaskBoardLaneResetInput, db_error,
 };
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::protocol::{
     TaskBoardItemPositionMutationResponse, TaskBoardItemPositionSnapshot,
     TaskBoardResetItemPositionRequest, TaskBoardSetItemPositionRequest,
     TaskBoardShiftedItemRevision,
 };
 use crate::infra::io::validate_safe_segment;
+use harness_kernel::errors::CliError;
 
 pub(crate) async fn get_task_board_item_position_snapshot_db(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     item_id: &str,
 ) -> Result<TaskBoardItemPositionSnapshot, CliError> {
     validate_safe_segment(item_id)?;
@@ -30,7 +31,7 @@ pub(crate) async fn get_task_board_item_position_snapshot_db(
 }
 
 pub(crate) async fn set_task_board_item_position_db(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     item_id: &str,
     request: &TaskBoardSetItemPositionRequest,
 ) -> Result<TaskBoardItemPositionMutationResponse, CliError> {
@@ -50,7 +51,7 @@ pub(crate) async fn set_task_board_item_position_db(
 }
 
 pub(crate) async fn reset_task_board_item_position_db(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     item_id: &str,
     request: &TaskBoardResetItemPositionRequest,
 ) -> Result<TaskBoardItemPositionMutationResponse, CliError> {

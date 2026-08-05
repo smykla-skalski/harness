@@ -15,7 +15,7 @@ use harness_kernel::errors::CliError;
 /// the implementer, so this module never names `db`'s concrete async
 /// connection type. `db` implements it once, next to that concrete type
 /// (`daemon/db/audit.rs`); every consumer here keeps passing a plain
-/// `&AsyncDaemonDb` and the compiler infers the rest.
+/// `&AsyncDaemonDbHandle` and the compiler infers the rest.
 pub(crate) trait AuditEventStore: Send + Sync {
     /// # Errors
     /// Returns [`CliError`] on persistence failure.

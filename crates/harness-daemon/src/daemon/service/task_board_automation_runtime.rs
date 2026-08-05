@@ -5,8 +5,7 @@ use serde_json::{Value, json};
 use uuid::Uuid;
 
 use crate::daemon::db::{
-    AsyncDaemonDb, TaskBoardAutomationRunAdmission, TaskBoardAutomationRunStage,
-    TaskBoardRunAcquireRequest,
+    TaskBoardAutomationRunAdmission, TaskBoardAutomationRunStage, TaskBoardRunAcquireRequest,
 };
 use crate::task_board::{
     TaskBoardAutomationRunOutcome, TaskBoardAutomationRunTrigger, TaskBoardAutomationScope,
@@ -16,7 +15,10 @@ use harness_kernel::errors::CliError;
 
 use super::TaskBoardOrchestratorRunGuard;
 use super::task_board_db::TaskBoardSyncRunContext;
+#[cfg(test)]
+use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 pub(crate) enum TaskBoardAutomationRunStart {
     Acquired(Box<TaskBoardAutomationRunSession>),
@@ -25,13 +27,13 @@ pub(crate) enum TaskBoardAutomationRunStart {
 }
 
 pub(crate) async fn task_board_automation_snapshot(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
 ) -> Result<TaskBoardAutomationSnapshot, CliError> {
     db.task_board_automation_snapshot().await
 }
 
 pub(crate) struct TaskBoardAutomationRunSession {
-    db: AsyncDaemonDb,
+    db: AsyncDaemonDbHandle,
     guard: Option<TaskBoardOrchestratorRunGuard>,
     run_id: String,
     sync_failed_scopes: Arc<AtomicBool>,
@@ -39,7 +41,7 @@ pub(crate) struct TaskBoardAutomationRunSession {
 
 impl TaskBoardAutomationRunSession {
     pub(crate) async fn acquire(
-        db: &AsyncDaemonDb,
+        db: &AsyncDaemonDbHandle,
         trigger: TaskBoardAutomationRunTrigger,
         actor: Option<String>,
         dry_run: bool,
@@ -185,10 +187,10 @@ mod tests {
     use crate::daemon::db_open::AsyncDaemonDbConnect;
     use crate::task_board::TaskBoardAutomationDesiredMode;
 
-    async fn database() -> AsyncDaemonDb {
+    async fn database() -> AsyncDaemonDbHandle {
         let temp = tempfile::tempdir().expect("temp dir");
         let path = temp.keep().join("harness.db");
-        AsyncDaemonDb::connect(&path).await.expect("open database")
+        AsyncDaemonDbHandle(AsyncDaemonDb::connect(&path).await.expect("open database"))
     }
 
     #[tokio::test]

@@ -82,6 +82,7 @@ pub(super) fn protocol_manager(
 ) -> AcpAgentManagerHandle {
     let (sender, _) = broadcast::channel(8);
     let db = ok(DaemonDb::open_in_memory(), "open db");
+    let db = crate::daemon::db_handle::DaemonDbOwnedHandle(db);
     let project = DiscoveredProject {
         project_id: "project-protocol".into(),
         name: "harness".into(),

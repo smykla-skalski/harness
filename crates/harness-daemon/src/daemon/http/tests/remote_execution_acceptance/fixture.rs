@@ -14,7 +14,8 @@ use tokio_rustls::{TlsAcceptor, server::TlsStream};
 
 use super::super::test_http_state_with_db_path;
 use crate::daemon::db::task_board::prelude::*;
-use crate::daemon::db::{AsyncDaemonDb, TaskBoardRemoteAssignmentRecord, workflow_owner};
+use crate::daemon::db::{TaskBoardRemoteAssignmentRecord, workflow_owner};
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::http::{DaemonHttpAuthMode, DaemonHttpState};
 use crate::daemon::remote::{RemoteAccessScope, RemoteRole};
 use crate::daemon::remote_identity::RemoteClientRegistration;
@@ -169,7 +170,7 @@ impl AcceptanceFixture {
             .expect("configure controller remote host");
     }
 
-    pub(super) async fn seed_default_task(&self, db: &AsyncDaemonDb) -> SeededExecution {
+    pub(super) async fn seed_default_task(&self, db: &AsyncDaemonDbHandle) -> SeededExecution {
         let now = crate::workspace::utc_now();
         let base_revision = git(&self.controller_worktree, &["rev-parse", "HEAD"]);
         let mut item = TaskBoardItem::new(
@@ -227,7 +228,7 @@ impl AcceptanceFixture {
 }
 
 pub(super) async fn assignment(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution_id: &str,
 ) -> TaskBoardRemoteAssignmentRecord {
     let execution = db

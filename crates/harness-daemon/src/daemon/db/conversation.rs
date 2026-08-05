@@ -398,15 +398,20 @@ impl DaemonDbConversation for DaemonDb {
 }
 
 // `harness-daemon-snapshot` depends on this trait, not on `DaemonDb` itself
-// (see that crate's `storage` module); implementing it here, next to the
-// inherent method it forwards to, is the same shape `AuditEventStore` and
-// `PullRequestActionStore` already use for a trait defined outside `db`.
-impl harness_daemon_snapshot::ConversationQueries for DaemonDb {
+// (see that crate's `storage` module). `DaemonDb` moved into its own crate
+// for #1231, so this trait and `DaemonDb` are both foreign here now; the
+// local `DaemonDbOwnedHandle` newtype (`crate::daemon::db_handle`) is what
+// implements it instead, the same orphan-rule workaround
+// `daemon::db_timeline_source::DaemonDbTimelineHandle` already uses for
+// `TimelineDbSource`.
+impl harness_daemon_snapshot::ConversationQueries
+    for crate::daemon::db_handle::DaemonDbOwnedHandle
+{
     fn load_agent_activity(
         &self,
         session_id: &str,
     ) -> Result<Vec<daemon_protocol::AgentToolActivitySummary>, CliError> {
-        DaemonDbConversation::load_agent_activity(self, session_id)
+        DaemonDbConversation::load_agent_activity(&self.0, session_id)
     }
 }
 

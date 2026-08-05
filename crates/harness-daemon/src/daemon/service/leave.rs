@@ -7,7 +7,7 @@ use super::{CliError, SessionDetail, SessionLeaveRequest};
 pub fn leave_session(
     session_id: &str,
     request: &SessionLeaveRequest,
-    db: Option<&super::db::DaemonDb>,
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
 ) -> Result<SessionDetail, CliError> {
     harness_daemon_session_service::leave_session(session_id, request, db)
 }
@@ -19,7 +19,7 @@ pub fn leave_session(
 pub(crate) async fn leave_session_async(
     session_id: &str,
     request: &SessionLeaveRequest,
-    async_db: &super::db::AsyncDaemonDb,
+    async_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
 ) -> Result<SessionDetail, CliError> {
     harness_daemon_session_service::leave_session_async(session_id, request, async_db).await
 }

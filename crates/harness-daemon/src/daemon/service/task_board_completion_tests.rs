@@ -3,6 +3,7 @@ use std::path::Path;
 use tempfile::tempdir;
 
 use super::*;
+use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::prelude::*;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::daemon::protocol::{
@@ -27,6 +28,7 @@ async fn assert_linked_item_completion_gate(base: &Path) {
     let db = AsyncDaemonDb::connect(&base.join("harness.db"))
         .await
         .expect("connect");
+    let db = AsyncDaemonDbHandle(db);
     let session = super::super::start_session_direct_async(
         &SessionStartRequest {
             title: "Completion gate".to_string(),
@@ -131,6 +133,7 @@ async fn unlinked_manual_item_can_still_complete() {
     let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
         .await
         .expect("connect");
+    let db = AsyncDaemonDbHandle(db);
     db.create_task_board_item(TaskBoardItem::new(
         "manual-item".to_string(),
         "Manual item".to_string(),

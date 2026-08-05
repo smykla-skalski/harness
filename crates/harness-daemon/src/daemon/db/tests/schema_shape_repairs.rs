@@ -193,8 +193,9 @@ async fn async_connect_refuses_external_create_table_with_weakened_state_checks(
     let tmp = tempdir().expect("tempdir");
     let db_path = tmp.path().join("harness.db");
     let sync_db = DaemonDb::open(&db_path).expect("open sync daemon db");
-    let migration =
-        include_str!("../migrations/0032_daemon_v38_task_board_external_create_intents.sql");
+    let migration = include_str!(
+        "../../../../../harness-daemon-db-core/src/migrations/0032_daemon_v38_task_board_external_create_intents.sql"
+    );
     let weakened = migration.replacen(
         "AND attached_item_revision >= item_revision",
         "AND attached_item_revision IS NOT NULL",
@@ -224,8 +225,9 @@ async fn async_connect_refuses_external_create_table_with_weakened_state_checks(
 
 #[tokio::test]
 async fn async_connect_refuses_each_omitted_external_create_constraint() {
-    let migration =
-        include_str!("../migrations/0032_daemon_v38_task_board_external_create_intents.sql");
+    let migration = include_str!(
+        "../../../../../harness-daemon-db-core/src/migrations/0032_daemon_v38_task_board_external_create_intents.sql"
+    );
     for (case, required, weakened) in [
         ("intent id", "CHECK (length(intent_id) > 0)", "CHECK (1)"),
         ("item id", "CHECK (length(item_id) > 0)", "CHECK (1)"),
@@ -301,8 +303,9 @@ async fn async_connect_refuses_each_omitted_external_create_constraint() {
 
 #[tokio::test]
 async fn async_connect_refuses_external_create_column_shape_drift() {
-    let migration =
-        include_str!("../migrations/0032_daemon_v38_task_board_external_create_intents.sql");
+    let migration = include_str!(
+        "../../../../../harness-daemon-db-core/src/migrations/0032_daemon_v38_task_board_external_create_intents.sql"
+    );
     let wrong_type = migration.replacen(
         "provider              TEXT NOT NULL",
         "provider              BLOB NOT NULL",
@@ -467,6 +470,7 @@ async fn async_connect_repairs_current_schema_missing_policy_columns() {
     let async_db = AsyncDaemonDb::connect(&db_path)
         .await
         .expect("open async daemon db");
+    let async_db = crate::daemon::db_handle::AsyncDaemonDbHandle(async_db);
     let workspace = async_db
         .load_policy_workspace()
         .await

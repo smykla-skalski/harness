@@ -3,7 +3,7 @@ use rusqlite::Connection;
 use super::{CliError, db_error};
 
 const POLICY_DECISIONS_DDL: &str = include_str!(
-    "../../harness-daemon/src/daemon/db/migrations/0018_daemon_v24_policy_decisions.sql"
+    "../../harness-daemon-db-core/src/migrations/0018_daemon_v24_policy_decisions.sql"
 );
 
 /// # Errors

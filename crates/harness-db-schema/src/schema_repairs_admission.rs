@@ -3,7 +3,7 @@ use rusqlite::{OptionalExtension, Transaction, TransactionBehavior};
 use super::{CliError, Connection, db_error};
 
 const MIGRATION_SQL: &str = include_str!(
-    "../../harness-daemon/src/daemon/db/migrations/0033_daemon_v39_task_board_policy_admission.sql"
+    "../../harness-daemon-db-core/src/migrations/0033_daemon_v39_task_board_policy_admission.sql"
 );
 const OBJECTS_MARKER: &str =
     "CREATE UNIQUE INDEX IF NOT EXISTS task_board_dispatch_intents_admission_identity";

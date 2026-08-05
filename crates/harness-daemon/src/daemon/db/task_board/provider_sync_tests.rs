@@ -4,6 +4,7 @@ use tempfile::tempdir;
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
 use crate::daemon::db::task_board::provider_queries::ProviderQueries;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::task_board::external::ExternalProviderScopeAttemptDecision;
 use crate::task_board::{
@@ -20,6 +21,7 @@ async fn provider_scope_failure_backoff_is_isolated_and_reset_by_success() {
     let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
         .await
         .expect("database");
+    let db = AsyncDaemonDbHandle(db);
 
     let first_attempt = begin_attempt(&db, "acme/widgets", "2026-07-16T10:00:00Z").await;
     let first = db
@@ -68,6 +70,7 @@ async fn failed_provider_scope_does_not_block_a_successful_scope() {
     let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
         .await
         .expect("database");
+    let db = AsyncDaemonDbHandle(db);
     let clients: Vec<Box<dyn ExternalSyncClient>> = vec![
         Box::new(ScopedPullClient::failing("acme/broken")),
         Box::new(ScopedPullClient::successful(
@@ -119,6 +122,7 @@ async fn a_mutual_parent_cycle_does_not_abort_the_batch_or_get_stuck() {
     let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
         .await
         .expect("database");
+    let db = AsyncDaemonDbHandle(db);
     let tasks = |unrelated_title: &str| {
         vec![
             cyclic_task("acme/widgets#100", "acme/widgets#101"),
@@ -180,6 +184,7 @@ async fn replacing_conflicts_keeps_current_fields_and_supersedes_removed_fields(
     let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
         .await
         .expect("database");
+    let db = AsyncDaemonDbHandle(db);
     let item = TaskBoardItem::new(
         "task-1".into(),
         "Local title".into(),
@@ -230,6 +235,7 @@ async fn pull_title_conflict_persists_three_way_values_without_overwriting_local
     let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
         .await
         .expect("database");
+    let db = AsyncDaemonDbHandle(db);
     let mut item = TaskBoardItem::new(
         "task-sync".into(),
         "Local title".into(),
@@ -301,6 +307,7 @@ async fn remote_open_state_never_resets_an_internal_in_progress_lane() {
     let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
         .await
         .expect("database");
+    let db = AsyncDaemonDbHandle(db);
     let mut item = linked_item("task-open", TaskBoardStatus::InProgress);
     item.external_refs[0].sync_state = None;
     db.create_task_board_item(item).await.expect("create item");
@@ -459,7 +466,7 @@ fn cyclic_task(external_id: &str, parent_external_id: &str) -> ExternalTask {
 }
 
 async fn sync_scoped(
-    db: &AsyncDaemonDb,
+    db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
     tasks: Vec<ExternalTask>,
 ) -> Result<crate::task_board::external::ExternalSyncBatch, CliError> {
     let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(

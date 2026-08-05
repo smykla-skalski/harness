@@ -17,6 +17,7 @@ use super::task_board_workflow_test_support::{
 };
 use crate::daemon::db::prelude::*;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 #[tokio::test]
@@ -56,6 +57,7 @@ async fn active_execution_create_is_idempotent_and_rejects_competing_contracts()
     let reopened = AsyncDaemonDb::connect(&test.path)
         .await
         .expect("reopen database");
+    let reopened = AsyncDaemonDbHandle(reopened);
     assert_eq!(
         reopened
             .active_task_board_workflow_execution("task-lantern")

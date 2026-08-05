@@ -4,6 +4,7 @@ use std::sync::{Arc, Mutex};
 use tokio::task::spawn_blocking;
 
 use super::super::db;
+use super::super::db_handle;
 use super::{CliError, CliErrorKind, SessionStatus, index, state};
 use crate::daemon::db::prelude::*;
 
@@ -11,7 +12,7 @@ use crate::daemon::db::prelude::*;
 /// manifest that tells the Monitor which port to dial is only written once
 /// startup returns, so awaiting it left the daemon undiscoverable for as long
 /// as the walk took.
-pub(crate) fn spawn_background_reconciliation(db: &Arc<Mutex<db::DaemonDb>>) {
+pub(crate) fn spawn_background_reconciliation(db: &Arc<Mutex<db_handle::DaemonDbOwnedHandle>>) {
     let db = Arc::clone(db);
     spawn_blocking(move || run_background_reconciliation(&db));
 }
@@ -20,7 +21,7 @@ pub(crate) fn spawn_background_reconciliation(db: &Arc<Mutex<db::DaemonDb>>) {
     clippy::cognitive_complexity,
     reason = "tracing macro expansion; tokio-rs/tracing#553"
 )]
-pub(crate) fn run_background_reconciliation(db: &Arc<Mutex<db::DaemonDb>>) {
+pub(crate) fn run_background_reconciliation(db: &Arc<Mutex<db_handle::DaemonDbOwnedHandle>>) {
     await_test_gate();
     let (projects, sessions) = match discover_background_reconciliation_inputs() {
         Ok(inputs) => inputs,
@@ -70,7 +71,7 @@ pub(crate) fn discover_background_reconciliation_inputs()
 }
 
 pub(crate) fn sync_background_projects_and_collect_candidates(
-    db: &Arc<Mutex<db::DaemonDb>>,
+    db: &Arc<Mutex<db_handle::DaemonDbOwnedHandle>>,
     projects: &[index::DiscoveredProject],
     sessions: &[index::ResolvedSession],
     result: &mut db::ReconcileResult,
@@ -115,7 +116,7 @@ enum BackgroundSessionCandidate {
 }
 
 fn apply_background_session_import(
-    db: &Arc<Mutex<db::DaemonDb>>,
+    db: &Arc<Mutex<db_handle::DaemonDbOwnedHandle>>,
     resolved: &index::ResolvedSession,
 ) -> Result<BackgroundSessionImportOutcome, CliError> {
     let Some(prepared) = prepare_background_session_import(resolved) else {
@@ -135,7 +136,7 @@ fn apply_background_session_import(
 /// now overlaps a serving daemon, and request handlers contend for the same
 /// mutex, so one long hold would stall them for the length of the walk.
 pub(crate) fn sync_background_projects(
-    db: &Arc<Mutex<db::DaemonDb>>,
+    db: &Arc<Mutex<db_handle::DaemonDbOwnedHandle>>,
     projects: &[index::DiscoveredProject],
     result: &mut db::ReconcileResult,
 ) -> Result<(), CliError> {
@@ -157,7 +158,7 @@ pub(crate) fn sync_background_projects(
 }
 
 pub(crate) fn collect_background_session_candidates(
-    db: &Arc<Mutex<db::DaemonDb>>,
+    db: &Arc<Mutex<db_handle::DaemonDbOwnedHandle>>,
     sessions: &[index::ResolvedSession],
     result: &mut db::ReconcileResult,
 ) -> Result<Vec<index::ResolvedSession>, CliError> {
@@ -187,7 +188,7 @@ pub(crate) fn prepare_background_session_import(
 }
 
 fn apply_prepared_background_session_import(
-    db: &db::DaemonDb,
+    db: &db_handle::DaemonDbOwnedHandle,
     prepared: &db::PreparedSessionResync,
 ) -> BackgroundSessionImportOutcome {
     let Some(import_required) = prepared_session_import_required(db, prepared) else {
@@ -200,7 +201,7 @@ fn apply_prepared_background_session_import(
 }
 
 pub(crate) fn session_import_required(
-    db: &db::DaemonDb,
+    db: &db_handle::DaemonDbOwnedHandle,
     resolved: &index::ResolvedSession,
 ) -> Result<bool, CliError> {
     let db_version = db.session_state_version(&resolved.state.session_id)?;
@@ -209,7 +210,7 @@ pub(crate) fn session_import_required(
 }
 
 fn background_session_candidate(
-    db: &db::DaemonDb,
+    db: &db_handle::DaemonDbOwnedHandle,
     resolved: &index::ResolvedSession,
 ) -> BackgroundSessionCandidate {
     match session_import_required(db, resolved) {
@@ -238,7 +239,7 @@ pub(crate) fn log_background_session_prepare_error(
 }
 
 pub(crate) fn prepared_session_import_required(
-    db: &db::DaemonDb,
+    db: &db_handle::DaemonDbOwnedHandle,
     prepared: &db::PreparedSessionResync,
 ) -> Option<bool> {
     session_import_required(db, &prepared.resolved)
@@ -247,7 +248,7 @@ pub(crate) fn prepared_session_import_required(
 }
 
 fn import_prepared_background_session(
-    db: &db::DaemonDb,
+    db: &db_handle::DaemonDbOwnedHandle,
     prepared: &db::PreparedSessionResync,
 ) -> BackgroundSessionImportOutcome {
     if let Err(error) = db.apply_prepared_session_resync(prepared) {

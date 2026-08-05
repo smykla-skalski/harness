@@ -8,7 +8,6 @@ use tokio::task::JoinHandle;
 use tokio::time::{MissedTickBehavior, interval, timeout};
 use uuid::Uuid;
 
-use super::db::DaemonDb;
 use super::remote::{RemoteAccessScope, RemoteDaemonServeConfig};
 use super::remote_acme::{
     RemoteAcmeAccountCredentials, RemoteAcmeAutomaticRenewalIssuer, RemoteAcmeRenewalRequest,
@@ -22,6 +21,7 @@ use super::remote_identity::{RemoteAuditEvent, RemoteAuditOutcome, RemoteAuditSc
 use super::remote_tls::{
     RemoteTlsConfigError, RemoteTlsConfigHandle, build_remote_tls_server_config,
 };
+use crate::daemon::db_handle::DaemonDbOwnedHandle;
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_kernel::remote_redaction::redact_secret_detail;
 
@@ -60,7 +60,7 @@ pub(crate) fn remote_certificate_needs_renewal(
 }
 
 pub(crate) fn spawn_remote_acme_renewal_loop(
-    db: Arc<Mutex<DaemonDb>>,
+    db: Arc<Mutex<DaemonDbOwnedHandle>>,
     tls: RemoteTlsConfigHandle,
     shutdown_rx: tokio_watch::Receiver<bool>,
 ) -> JoinHandle<()> {
@@ -76,7 +76,7 @@ pub(crate) fn spawn_remote_acme_renewal_loop(
 }
 
 pub(crate) fn spawn_remote_acme_renewal_loop_with<I, Now>(
-    db: Arc<Mutex<DaemonDb>>,
+    db: Arc<Mutex<DaemonDbOwnedHandle>>,
     tls: RemoteTlsConfigHandle,
     issuer: Arc<I>,
     shutdown_rx: tokio_watch::Receiver<bool>,
@@ -98,7 +98,7 @@ where
 }
 
 async fn run_remote_acme_renewal_loop<I, Now>(
-    db: Arc<Mutex<DaemonDb>>,
+    db: Arc<Mutex<DaemonDbOwnedHandle>>,
     tls: RemoteTlsConfigHandle,
     issuer: Arc<I>,
     mut shutdown_rx: tokio_watch::Receiver<bool>,
@@ -130,7 +130,7 @@ async fn run_remote_acme_renewal_loop<I, Now>(
 }
 
 async fn run_remote_acme_renewal_check_or_shutdown<I, Now>(
-    db: Arc<Mutex<DaemonDb>>,
+    db: Arc<Mutex<DaemonDbOwnedHandle>>,
     tls: RemoteTlsConfigHandle,
     issuer: Arc<I>,
     shutdown_rx: &mut tokio_watch::Receiver<bool>,
@@ -220,7 +220,7 @@ fn log_renewal_check(result: &Result<RemoteAcmeRenewalCheckOutcome, CliError>) {
 
 #[cfg(test)]
 pub(crate) async fn run_remote_acme_renewal_check<I>(
-    db: &Arc<Mutex<DaemonDb>>,
+    db: &Arc<Mutex<DaemonDbOwnedHandle>>,
     tls: &RemoteTlsConfigHandle,
     issuer: &I,
     now: DateTime<Utc>,
@@ -233,7 +233,7 @@ where
 }
 
 async fn run_remote_acme_renewal_check_with_cleanup<I>(
-    db: &Arc<Mutex<DaemonDb>>,
+    db: &Arc<Mutex<DaemonDbOwnedHandle>>,
     tls: &RemoteTlsConfigHandle,
     issuer: &I,
     now: DateTime<Utc>,
@@ -251,7 +251,7 @@ where
 }
 
 fn reload_not_due_certificate(
-    db: &Arc<Mutex<DaemonDb>>,
+    db: &Arc<Mutex<DaemonDbOwnedHandle>>,
     tls: &RemoteTlsConfigHandle,
     bundle: &RemoteCertificateBundle,
     now: DateTime<Utc>,
@@ -289,7 +289,9 @@ fn log_persisted_tls_reload_failure(error: &RemoteTlsConfigError) {
     );
 }
 
-fn load_renewal_snapshot(db: &Arc<Mutex<DaemonDb>>) -> Result<RemoteAcmeRenewalSnapshot, CliError> {
+fn load_renewal_snapshot(
+    db: &Arc<Mutex<DaemonDbOwnedHandle>>,
+) -> Result<RemoteAcmeRenewalSnapshot, CliError> {
     let db = lock_db(db)?;
     let stored = db.load_remote_acme_state()?;
     let config = stored.serve_config.ok_or_else(|| {
@@ -315,7 +317,7 @@ fn load_renewal_snapshot(db: &Arc<Mutex<DaemonDb>>) -> Result<RemoteAcmeRenewalS
 }
 
 async fn renew_due_certificate<I>(
-    db: &Arc<Mutex<DaemonDb>>,
+    db: &Arc<Mutex<DaemonDbOwnedHandle>>,
     tls: &RemoteTlsConfigHandle,
     issuer: &I,
     snapshot: &RemoteAcmeRenewalSnapshot,
@@ -357,7 +359,7 @@ where
 }
 
 fn persist_renewal_failure(
-    db: &Arc<Mutex<DaemonDb>>,
+    db: &Arc<Mutex<DaemonDbOwnedHandle>>,
     now: DateTime<Utc>,
     detail: &str,
 ) -> Result<RemoteAcmeRenewalCheckOutcome, CliError> {
@@ -374,7 +376,7 @@ fn persist_renewal_failure(
 }
 
 fn persist_renewal_success(
-    db: &Arc<Mutex<DaemonDb>>,
+    db: &Arc<Mutex<DaemonDbOwnedHandle>>,
     now: DateTime<Utc>,
     bundle: &RemoteCertificateBundle,
     snapshot: &RemoteAcmeRenewalSnapshot,
@@ -396,7 +398,7 @@ fn persist_renewal_success(
 }
 
 fn reload_superseding_certificate(
-    db: &Arc<Mutex<DaemonDb>>,
+    db: &Arc<Mutex<DaemonDbOwnedHandle>>,
     tls: &RemoteTlsConfigHandle,
     now: DateTime<Utc>,
 ) -> Result<RemoteAcmeRenewalCheckOutcome, CliError> {
@@ -420,7 +422,7 @@ fn reload_superseding_certificate(
 }
 
 fn record_automatic_audit(
-    db: &Arc<Mutex<DaemonDb>>,
+    db: &Arc<Mutex<DaemonDbOwnedHandle>>,
     now: DateTime<Utc>,
     route_or_method: &str,
     outcome: RemoteAuditOutcome,
@@ -444,7 +446,9 @@ fn timestamp(now: DateTime<Utc>) -> String {
     now.format("%Y-%m-%dT%H:%M:%SZ").to_string()
 }
 
-fn lock_db(db: &Arc<Mutex<DaemonDb>>) -> Result<MutexGuard<'_, DaemonDb>, CliError> {
+fn lock_db(
+    db: &Arc<Mutex<DaemonDbOwnedHandle>>,
+) -> Result<MutexGuard<'_, DaemonDbOwnedHandle>, CliError> {
     db.lock().map_err(|error| {
         CliErrorKind::workflow_io(format!("daemon database lock poisoned: {error}")).into()
     })

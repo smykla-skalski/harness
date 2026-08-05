@@ -4,7 +4,7 @@ use super::{CliError, Connection, db_error};
 
 const TABLE_NAME: &str = "task_board_reconciliation_cursors";
 const MIGRATION_SQL: &str = include_str!(
-    "../../harness-daemon/src/daemon/db/migrations/0034_daemon_v40_task_board_reconciliation_cursors.sql"
+    "../../harness-daemon-db-core/src/migrations/0034_daemon_v40_task_board_reconciliation_cursors.sql"
 );
 const EXPECTED_TABLE_SQL: &str = "
 CREATE TABLE task_board_reconciliation_cursors (

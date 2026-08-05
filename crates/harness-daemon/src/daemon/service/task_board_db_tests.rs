@@ -15,12 +15,15 @@ use super::{
     update_task_board_project_db,
 };
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 
-async fn connect(directory: &tempfile::TempDir) -> AsyncDaemonDb {
-    AsyncDaemonDb::connect(&directory.path().join("harness.db"))
-        .await
-        .expect("database")
+async fn connect(directory: &tempfile::TempDir) -> AsyncDaemonDbHandle {
+    AsyncDaemonDbHandle(
+        AsyncDaemonDb::connect(&directory.path().join("harness.db"))
+            .await
+            .expect("database"),
+    )
 }
 
 /// Settings saved before the single publication repository was removed still
@@ -453,6 +456,7 @@ async fn setting_and_resetting_a_color_together_is_refused() {
     let db = AsyncDaemonDb::connect(&directory.path().join("harness.db"))
         .await
         .expect("database");
+    let db = AsyncDaemonDbHandle(db);
     let project_id = db
         .ensure_task_board_project(TaskBoardProjectSource::GitHub, "acme/widgets")
         .await

@@ -3,7 +3,7 @@ use rusqlite::Connection;
 use super::{CliError, db_error};
 
 const REMOTE_CLIENT_ACTIVITY_DDL: &str = include_str!(
-    "../../harness-daemon/src/daemon/db/migrations/0025_daemon_v31_remote_client_activity.sql"
+    "../../harness-daemon-db-core/src/migrations/0025_daemon_v31_remote_client_activity.sql"
 );
 
 /// # Errors

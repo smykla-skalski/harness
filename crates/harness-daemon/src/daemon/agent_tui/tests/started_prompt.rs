@@ -15,6 +15,7 @@ use crate::workspace::utc_now;
 
 use super::support::with_agent_tui_home;
 use crate::daemon::db::prelude::*;
+use crate::daemon::db_handle::DaemonDbOwnedHandle;
 
 const SESSION_ID: &str = "0d1f9b0e-4b25-5f37-9b0f-9a1a6a4c9e21";
 
@@ -45,6 +46,7 @@ fn manager_with_project(root: &std::path::Path) -> AgentTuiManagerHandle {
     let context_root = root.join("context-root");
     fs_err::create_dir_all(&project_dir).expect("project dir");
     let db = DaemonDb::open_in_memory().expect("open db");
+    let db = DaemonDbOwnedHandle(db);
     let project = crate::daemon::index::DiscoveredProject {
         project_id: "project-tui-prompt".into(),
         name: "project".into(),

@@ -3,7 +3,7 @@ use rusqlite::Connection;
 use super::CliError;
 
 const AI_REVIEW_REPORTS_SQL: &str = include_str!(
-    "../../harness-daemon/src/daemon/db/migrations/0057_daemon_v58_ai_review_reports.sql"
+    "../../harness-daemon-db-core/src/migrations/0057_daemon_v58_ai_review_reports.sql"
 );
 
 /// # Errors

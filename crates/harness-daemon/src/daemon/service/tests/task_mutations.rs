@@ -1,5 +1,6 @@
 use super::*;
 use crate::daemon::db::AsyncSessionSummaryQueries;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 #[test]
@@ -116,6 +117,7 @@ fn create_assign_and_checkpoint_task_async_round_trip() {
                 let async_db = crate::daemon::db::AsyncDaemonDb::connect(&db_path)
                     .await
                     .expect("open async daemon db");
+                let async_db = AsyncDaemonDbHandle(async_db);
 
                 let state = start_direct_session_async(
                     &async_db,
@@ -218,6 +220,7 @@ fn async_mutations_sync_file_backed_state() {
                 let async_db = crate::daemon::db::AsyncDaemonDb::connect(&db_path)
                     .await
                     .expect("open async daemon db");
+                let async_db = AsyncDaemonDbHandle(async_db);
 
                 let state = start_direct_session_async(
                     &async_db,
@@ -313,11 +316,11 @@ fn concurrent_create_task_async_preserves_all_tasks_in_db() {
                 .parent()
                 .expect("project parent")
                 .join("daemon.sqlite");
-            let async_db = std::sync::Arc::new(
+            let async_db = std::sync::Arc::new(crate::daemon::db_handle::AsyncDaemonDbHandle(
                 crate::daemon::db::AsyncDaemonDb::connect(&db_path)
                     .await
                     .expect("open async daemon db"),
-            );
+            ));
 
             let state = start_direct_session_async(
                 async_db.as_ref(),
@@ -399,6 +402,7 @@ fn change_role_and_transfer_leader_async_update_session_state() {
                 let async_db = crate::daemon::db::AsyncDaemonDb::connect(&db_path)
                     .await
                     .expect("open async daemon db");
+                let async_db = AsyncDaemonDbHandle(async_db);
 
                 let state = start_direct_session_async(
                     &async_db,

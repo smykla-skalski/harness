@@ -19,6 +19,7 @@ use super::super::task_board_support::{
 };
 use crate::daemon::db::prelude::*;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 pub(super) const DEEPSEEK_MODEL: &str = "deepseek/deepseek-v4-flash";
@@ -26,7 +27,7 @@ pub(super) const ADVANCED_HEAD: &str = "89abcdef0123456789abcdef0123456789abcdef
 
 pub(super) struct PublicReviewCase {
     pub(super) state: DaemonHttpState,
-    pub(super) db: Arc<AsyncDaemonDb>,
+    pub(super) db: Arc<AsyncDaemonDbHandle>,
     pub(super) runtime: FakeReadOnlyRuntime,
     pub(super) client: reqwest::Client,
     pub(super) base_url: String,
@@ -74,11 +75,11 @@ impl PublicReviewCase {
         self.server.abort();
         let state = test_http_state_with_db_path(&self.database_path, "acceptance-restarted");
         let db = state.async_db.get().expect("restarted async db").clone();
-        let runtime = FakeReadOnlyRuntime::new([]).with_durable_db(
+        let runtime = FakeReadOnlyRuntime::new([]).with_durable_db(AsyncDaemonDbHandle(
             AsyncDaemonDb::connect(&self.database_path)
                 .await
                 .expect("reopen acceptance runtime store"),
-        );
+        ));
         runtime.set_head(&self.frozen_head);
         let (base_url, server) = serve_http(state.clone()).await;
         self.state = state;
@@ -197,6 +198,7 @@ async fn start_public_review_with_override(
     let runtime_store = AsyncDaemonDb::connect(&database_path)
         .await
         .expect("open acceptance runtime store");
+    let runtime_store = AsyncDaemonDbHandle(runtime_store);
     let runtime = FakeReadOnlyRuntime::new([]).with_durable_db(runtime_store);
     runtime.set_head(&frozen_head);
     runtime.set_immutable_content(immutable_content);
@@ -228,7 +230,7 @@ async fn start_public_review_with_override(
 }
 
 pub(super) async fn finish_run(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     run_id: &str,
     status: AgentTurnRunStatus,
     report: Option<&str>,

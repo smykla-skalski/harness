@@ -1,6 +1,7 @@
 use clap::Parser;
 
 use harness_daemon::daemon::db::{DaemonDb, DaemonDbOpen};
+use harness_daemon::daemon::db_handle::DaemonDbOwnedHandle;
 use harness_remote_trust::remote_pairing::RemotePairingCode;
 
 use super::super::{DaemonRemoteCommand, DaemonRemotePairCommand};
@@ -69,7 +70,7 @@ fn daemon_remote_pair_create_returns_persisted_reviews_query() {
     else {
         panic!("expected pair create");
     };
-    let db = DaemonDb::open_in_memory().expect("open db");
+    let db = DaemonDbOwnedHandle(DaemonDb::open_in_memory().expect("open db"));
     seed_remote_tls_identity(&db);
     let code = RemotePairingCode::from_value_for_tests("reviews-pairing-secret");
 

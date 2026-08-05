@@ -8,7 +8,6 @@ use chrono::Utc;
 use tokio::task::JoinHandle;
 use tokio::time::interval as tokio_interval;
 
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::service::observe_async_db;
 use crate::reviews::policy::REVIEWS_CHECKS_PASSED_EVENT;
 #[cfg(test)]
@@ -23,6 +22,7 @@ use harness_kernel::errors::CliError;
 use super::policy::resume_reviews_policy_event_with_executor;
 use super::policy::{require_policy_runtime_db, resume_reviews_policy_event};
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 /// Derive `reviews.checks_passed` wake-ups from a fresh reviews snapshot,
 /// durably enqueue them, and immediately attempt an inline resume so an open
@@ -52,7 +52,7 @@ pub(crate) async fn resume_waiting_reviews_policy_runs(items: &[ReviewItem]) {
 /// transient resume error still leaves the event durably queued for the drain
 /// loop.
 async fn enqueue_and_resume_checks_passed_event(
-    database: &Arc<AsyncDaemonDb>,
+    database: &Arc<AsyncDaemonDbHandle>,
     event: &PolicyWorkflowEvent,
 ) {
     let _ = database

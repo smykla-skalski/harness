@@ -1,6 +1,5 @@
 use chrono::{DateTime, Duration};
 
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{CodexRunMode, CodexRunRequest, CodexRunSnapshot};
 use crate::task_board::{
     TASK_BOARD_SIDE_EFFECT_CLAIM_GRACE_SECONDS, TaskBoardAttemptState,
@@ -14,12 +13,13 @@ use super::attempts::{invalid_transition, require_human};
 use super::reports::{load_codex_run, record_retry_or_human, transition_attempt};
 use super::requests::{attempt_run_identity, codex_attempt_request, run_context};
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 /// Starts the Codex run backing a fresh attempt. `Ok(None)` means the attempt
 /// was already settled here - refused, claimed by another reconciler, or handed
 /// to grace recovery - so the caller has nothing left to reconcile this tick.
 pub(super) async fn start_new_report_run<R>(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     runtime: &R,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
@@ -75,7 +75,7 @@ where
     reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
 )]
 async fn reconcile_report_start_error<R>(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     runtime: &R,
     execution: &TaskBoardWorkflowExecutionRecord,
     claimed: &TaskBoardExecutionAttemptRecord,
@@ -109,7 +109,7 @@ where
 }
 
 pub(super) async fn claim_report_side_effect(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     attempt: &TaskBoardExecutionAttemptRecord,
     now: &str,
 ) -> Result<Option<TaskBoardExecutionAttemptRecord>, CliError> {
@@ -172,7 +172,7 @@ fn report_claim_deadline(now: &str) -> Result<String, CliError> {
 /// fault, and nothing was started. Retrying it on a backoff would only repeat
 /// the same refusal, so the attempt fails permanently and says what to fix.
 pub(super) async fn refuse_unrenderable_request(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
     now: &str,

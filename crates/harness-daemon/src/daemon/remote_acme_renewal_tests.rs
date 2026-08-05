@@ -13,6 +13,7 @@ use super::{
     spawn_remote_acme_renewal_loop_with,
 };
 use crate::daemon::db::DaemonDb;
+use crate::daemon::db_handle::DaemonDbOwnedHandle;
 use crate::daemon::db_open::DaemonDbOpen;
 use crate::daemon::remote::{RemoteAcmeChallenge, RemoteDaemonServeConfig};
 use crate::daemon::remote_acme::{
@@ -269,7 +270,7 @@ async fn remote_acme_renewal_loop_stops_while_check_is_in_flight() {
 }
 
 struct RenewalFixture {
-    db: Arc<Mutex<DaemonDb>>,
+    db: Arc<Mutex<DaemonDbOwnedHandle>>,
     tls: RemoteTlsConfigHandle,
     initial: RemoteCertificateBundle,
 }
@@ -277,6 +278,7 @@ struct RenewalFixture {
 impl RenewalFixture {
     fn new(not_after: (i32, u8, u8)) -> Self {
         let db = DaemonDb::open_in_memory().expect("open daemon database");
+        let db = DaemonDbOwnedHandle(db);
         let initial = certificate_bundle(not_after);
         let account = RemoteAcmeAccountCredentials::new(
             "https://acme.test/acct/1",

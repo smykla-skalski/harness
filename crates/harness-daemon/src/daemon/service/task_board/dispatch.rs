@@ -1,8 +1,5 @@
 use std::collections::HashMap;
 
-use crate::daemon::db::AsyncDaemonDb;
-#[cfg(test)]
-use crate::daemon::db::DaemonDb;
 #[cfg(test)]
 use crate::daemon::protocol::{SessionDetail, SessionStartRequest, TaskCreateRequest};
 use crate::daemon::protocol::{
@@ -34,6 +31,9 @@ use super::super::task_board_db::task_board_host_local_db;
 use super::super::{create_task, start_session_direct};
 use super::dispatch_preparation::reserve_and_prepare_task_board_dispatch;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
+#[cfg(test)]
+use crate::daemon::db_handle::DaemonDbOwnedHandle;
 use crate::daemon::reviews_store::PolicyGraphQueries;
 
 /// Build dispatch plans for task-board items.
@@ -46,7 +46,7 @@ use crate::daemon::reviews_store::PolicyGraphQueries;
 #[cfg(test)]
 pub fn dispatch_task_board(
     request: &TaskBoardDispatchRequest,
-    db: Option<&DaemonDb>,
+    db: Option<&DaemonDbOwnedHandle>,
     board: &TaskBoardStore,
 ) -> Result<TaskBoardDispatchResponse, CliError> {
     let plans = build_dispatch_plans_for_request(board, request)?;
@@ -84,7 +84,7 @@ pub fn dispatch_task_board(
 /// Returns `CliError` only when board items cannot be loaded up front.
 pub async fn dispatch_task_board_async(
     request: &TaskBoardDispatchRequest,
-    async_db: &AsyncDaemonDb,
+    async_db: &AsyncDaemonDbHandle,
 ) -> Result<TaskBoardDispatchResponse, CliError> {
     let plans = build_dispatch_plans_for_request_async(async_db, request).await?;
     if request.dry_run {
@@ -157,7 +157,7 @@ pub(super) fn reject_explicit_kind_block(
 /// # Errors
 /// Returns `CliError` when board items or policy state cannot be loaded.
 pub async fn pick_task_board_dispatch_async(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
 ) -> Result<TaskBoardDispatchPickResponse, CliError> {
     const PICK_REVALIDATION_ATTEMPTS: usize = 3;
     let request = TaskBoardDispatchRequest {
@@ -237,7 +237,7 @@ fn selected_items(
 #[cfg(test)]
 fn apply_dispatch_plan(
     request: &TaskBoardDispatchRequest,
-    db: Option<&DaemonDb>,
+    db: Option<&DaemonDbOwnedHandle>,
     board: &TaskBoardStore,
     plan: &DispatchPlan,
 ) -> Result<DispatchAppliedTask, (DispatchFailureKind, CliError)> {
@@ -273,7 +273,7 @@ fn apply_dispatch_plan(
 
 pub(super) async fn apply_dispatch_plan_async(
     request: &TaskBoardDispatchRequest,
-    async_db: &AsyncDaemonDb,
+    async_db: &AsyncDaemonDbHandle,
     plan: &DispatchPlan,
     hold_worker: bool,
 ) -> Result<DispatchAppliedTask, (DispatchFailureKind, CliError)> {
@@ -289,7 +289,7 @@ pub(super) async fn apply_dispatch_plan_async(
 #[cfg(test)]
 fn dispatch_session_id(
     request: &TaskBoardDispatchRequest,
-    db: Option<&DaemonDb>,
+    db: Option<&DaemonDbOwnedHandle>,
     plan: &DispatchPlan,
 ) -> Result<String, CliError> {
     match &plan.session {
@@ -404,7 +404,7 @@ pub fn unlink_dispatched_item(
 }
 
 pub(super) async fn build_dispatch_plans_for_request_async(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &TaskBoardDispatchRequest,
 ) -> Result<Vec<DispatchPlan>, CliError> {
     let items = if let Some(item_id) = request.item_id.as_deref() {
@@ -420,7 +420,7 @@ pub(super) async fn build_dispatch_plans_for_request_async(
 }
 
 async fn build_dispatch_plans_for_items_async(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     items: Vec<TaskBoardItem>,
     _request: &TaskBoardDispatchRequest,
 ) -> Result<Vec<DispatchPlan>, CliError> {
@@ -465,7 +465,7 @@ async fn build_dispatch_plans_for_items_async(
 /// graph exists (a grant is keyed to that graph's revision); returns an empty
 /// map otherwise so no injection happens on the built-in fallback path.
 pub(crate) async fn load_live_spawn_grants(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     policy: Option<(&str, &PolicyGraph)>,
     kept: &[TaskBoardItem],
     rejected: &[(TaskBoardItem, Machine)],

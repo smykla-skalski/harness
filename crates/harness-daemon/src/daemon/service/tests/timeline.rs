@@ -1,6 +1,7 @@
 use super::*;
 use crate::daemon::db::conversation::DaemonDbConversation;
 use crate::daemon::db::prelude::*;
+use crate::daemon::db_handle::DaemonDbOwnedHandle;
 
 #[test]
 fn session_timeline_window_known_revision_reloads_when_visible_rows_change_without_count_change() {
@@ -8,6 +9,7 @@ fn session_timeline_window_known_revision_reloads_when_visible_rows_change_witho
         use crate::session::service::build_new_session;
 
         let db = crate::daemon::db::DaemonDb::open_in_memory().expect("open in-memory db");
+        let db = DaemonDbOwnedHandle(db);
         let project_record = index::discovered_project_for_checkout(project);
         db.sync_project(&project_record).expect("sync project");
         let state = build_new_session(

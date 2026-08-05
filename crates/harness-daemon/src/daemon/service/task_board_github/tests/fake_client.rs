@@ -9,7 +9,6 @@ use crate::task_board::github::{
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
 
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::task_board::prelude::*;
 
 use super::{git_ref, git_ref_exists, git_tree, remote_repo_path, run_git};
@@ -28,7 +27,8 @@ pub(super) struct FakeGitHubClient {
     pub(super) merge_calls: Mutex<usize>,
     pub(super) ready_error: Mutex<Option<String>>,
     pub(super) parent_interleaving: Mutex<Option<String>>,
-    pub(super) stop_automation_on_fresh_evidence: Option<AsyncDaemonDb>,
+    pub(super) stop_automation_on_fresh_evidence:
+        Option<crate::daemon::db_handle::AsyncDaemonDbHandle>,
 }
 
 #[async_trait::async_trait]

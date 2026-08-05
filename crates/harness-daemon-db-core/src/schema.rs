@@ -11,8 +11,8 @@ use std::time::{Duration, Instant};
 #[path = "schema_test_support.rs"]
 mod test_support;
 
-#[cfg(test)]
-pub(crate) use test_support::set_schema_init_hook;
+#[cfg(any(test, feature = "test-support"))]
+pub use test_support::set_schema_init_hook;
 
 #[path = "schema_migration_steps.rs"]
 mod migration_steps;
@@ -37,9 +37,9 @@ static SCHEMA_MIGRATION_LOCK: Mutex<()> = Mutex::new(());
 /// (`SessionWriteQueries`/`DaemonDbTimeline`) by name - a caller supplies
 /// the callbacks instead, keeping this file's only dependency on the rest
 /// of the crate an explicit function argument.
-pub(crate) struct SchemaRepairHooks {
-    pub(crate) sync_session: fn(&DaemonDb, &str, &SessionState) -> Result<(), CliError>,
-    pub(crate) backfill_legacy_timelines: fn(&DaemonDb) -> Result<(), CliError>,
+pub struct SchemaRepairHooks {
+    pub sync_session: fn(&DaemonDb, &str, &SessionState) -> Result<(), CliError>,
+    pub backfill_legacy_timelines: fn(&DaemonDb) -> Result<(), CliError>,
 }
 
 impl DaemonDb {
@@ -48,10 +48,7 @@ impl DaemonDb {
     ///
     /// # Errors
     /// Returns [`CliError`] on SQL failures.
-    pub(crate) fn open_with_hooks(
-        path: &Path,
-        hooks: &SchemaRepairHooks,
-    ) -> Result<Self, CliError> {
+    pub fn open_with_hooks(path: &Path, hooks: &SchemaRepairHooks) -> Result<Self, CliError> {
         let conn = Connection::open(path)
             .map_err(|error| db_error(format!("open daemon database: {error}")))?;
         init::apply_pragmas(&conn)?;
@@ -75,7 +72,7 @@ impl DaemonDb {
     // bootstrap, so its dev-dependency on this crate needs this reachable
     // outside `harness-daemon`'s own test build too.
     #[cfg(any(test, feature = "test-support"))]
-    pub(crate) fn open_in_memory_with_hooks(hooks: &SchemaRepairHooks) -> Result<Self, CliError> {
+    pub fn open_in_memory_with_hooks(hooks: &SchemaRepairHooks) -> Result<Self, CliError> {
         let conn = Connection::open_in_memory()
             .map_err(|error| db_error(format!("open in-memory database: {error}")))?;
         init::apply_pragmas(&conn)?;

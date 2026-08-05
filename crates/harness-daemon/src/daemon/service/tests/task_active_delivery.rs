@@ -3,12 +3,13 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use super::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 const ACTIVE_DELIVERY_SESSION_ID: &str = "4f2f2a50-142c-583c-a0b5-e0d671b61e40";
 
 struct ActiveDeliveryFixture {
-    async_db: Arc<crate::daemon::db::AsyncDaemonDb>,
+    async_db: Arc<crate::daemon::db_handle::AsyncDaemonDbHandle>,
     manager: AgentTuiManagerHandle,
     tui_id: String,
     leader_id: String,
@@ -20,11 +21,11 @@ async fn active_delivery_start_idle_worker(project: &Path) -> ActiveDeliveryFixt
         .parent()
         .expect("project parent")
         .join("daemon.sqlite");
-    let async_db = Arc::new(
+    let async_db = Arc::new(AsyncDaemonDbHandle(
         crate::daemon::db::AsyncDaemonDb::connect(&db_path)
             .await
             .expect("open async daemon db"),
-    );
+    ));
     let db_slot = Arc::new(OnceLock::new());
     let async_db_slot = Arc::new(OnceLock::new());
     async_db_slot

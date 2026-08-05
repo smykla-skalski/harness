@@ -8,6 +8,7 @@ use tempfile::tempdir;
 use tokio::runtime::Builder as RuntimeBuilder;
 
 use super::*;
+use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::daemon::service::sync_task_board_github_tokens;
 use crate::task_board::{
@@ -310,6 +311,7 @@ fn write_launch_targets_each_item_own_repository() {
             let db = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
                 .await
                 .expect("database");
+            let db = AsyncDaemonDbHandle(db);
             db.replace_task_board_orchestrator_settings(&TaskBoardOrchestratorSettings::default())
                 .await
                 .expect("default settings");
@@ -351,6 +353,7 @@ fn write_launch_without_a_repository_is_rejected() {
             let db = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
                 .await
                 .expect("database");
+            let db = AsyncDaemonDbHandle(db);
             db.replace_task_board_orchestrator_settings(&TaskBoardOrchestratorSettings::default())
                 .await
                 .expect("default settings");
@@ -391,6 +394,7 @@ fn write_launch_without_a_repository_token_is_rejected() {
             let db = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
                 .await
                 .expect("database");
+            let db = AsyncDaemonDbHandle(db);
             db.replace_task_board_orchestrator_settings(&TaskBoardOrchestratorSettings::default())
                 .await
                 .expect("default settings");

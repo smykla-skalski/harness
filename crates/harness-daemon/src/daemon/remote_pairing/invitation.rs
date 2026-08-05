@@ -2,7 +2,7 @@ use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use serde::Serialize;
 
-use crate::daemon::db::DaemonDb;
+use crate::daemon::db_handle::DaemonDbOwnedHandle;
 use crate::daemon::remote_acme::build_remote_acme_runtime_plan;
 use crate::daemon::remote_acme_queries::RemoteAcmeQueries;
 use harness_kernel::errors::{CliError, CliErrorKind};
@@ -25,7 +25,7 @@ struct RemotePairingInvitationPayload<'a> {
 }
 
 pub(crate) fn build_remote_pairing_invitation(
-    db: &DaemonDb,
+    db: &DaemonDbOwnedHandle,
     code: &str,
     role: &str,
     scopes: &[String],

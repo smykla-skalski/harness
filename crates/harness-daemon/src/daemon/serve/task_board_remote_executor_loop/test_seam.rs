@@ -18,9 +18,8 @@ use super::RemoteWorkerIdentity;
 use super::runtime::PreparedRemoteWorkerAction;
 use crate::daemon::db::prelude::*;
 use crate::daemon::db::task_board::prelude::*;
-use crate::daemon::db::{
-    AgentTurnRunSnapshot, AgentTurnRunStatus, AsyncDaemonDb, TaskBoardRemoteExecutorRun,
-};
+use crate::daemon::db::{AgentTurnRunSnapshot, AgentTurnRunStatus, TaskBoardRemoteExecutorRun};
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::protocol::{CodexRunSnapshot, CodexRunStatus};
 use crate::task_board::remote_wire::wire::RemoteOfferRequest;
 use crate::workspace::utc_now;
@@ -105,7 +104,7 @@ pub(crate) async fn install_deterministic_runtime_seam() -> RuntimeSeamScope {
 }
 
 pub(super) async fn execute_runtime_seam(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     offer: &RemoteOfferRequest,
     identity: &RemoteWorkerIdentity,
     action: &PreparedRemoteWorkerAction,
@@ -227,7 +226,7 @@ async fn disarm_completed_probe(
 }
 
 async fn runtime_snapshot(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     offer: &RemoteOfferRequest,
     identity: &RemoteWorkerIdentity,
     workspace: &Path,
@@ -264,7 +263,7 @@ async fn runtime_snapshot(
 }
 
 async fn persist_agent_turn_snapshot(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     offer: &RemoteOfferRequest,
     identity: &RemoteWorkerIdentity,
     workspace: &Path,

@@ -6,6 +6,7 @@ use tempfile::tempdir;
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::task_board::provider_queries::ProviderQueries;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::task_board::external::ExternalProviderScopeAttemptDecision;
 use crate::task_board::{
@@ -20,6 +21,7 @@ async fn malformed_persisted_backoff_fails_closed_without_calling_provider() {
     let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
         .await
         .expect("database");
+    let db = AsyncDaemonDbHandle(db);
     set_backoff(&db, "not-a-timestamp").await;
     let calls = Arc::new(AtomicUsize::new(0));
     let clients: Vec<Box<dyn ExternalSyncClient>> =
@@ -40,6 +42,7 @@ async fn valid_expired_backoff_retries_provider() {
     let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
         .await
         .expect("database");
+    let db = AsyncDaemonDbHandle(db);
     set_backoff(&db, "2000-01-01T00:00:00Z").await;
     let calls = Arc::new(AtomicUsize::new(0));
     let clients: Vec<Box<dyn ExternalSyncClient>> =
@@ -60,6 +63,7 @@ async fn missing_persisted_backoff_fails_closed_without_calling_provider() {
     let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
         .await
         .expect("database");
+    let db = AsyncDaemonDbHandle(db);
     set_backoff(&db, "2000-01-01T00:00:00Z").await;
     sqlx::query(
         "UPDATE task_board_provider_scope_state SET backoff_until = NULL

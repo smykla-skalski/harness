@@ -58,18 +58,16 @@ pub(super) fn parse_and_check_schema_version(version: &str) -> Result<u8, CliErr
             "invalid daemon database schema version '{version}': {error}"
         ))
     })?;
-    let expected_version = crate::daemon::db::SCHEMA_VERSION
-        .parse::<u8>()
-        .map_err(|error| {
-            db_error(format!(
-                "invalid compiled daemon database schema version '{}': {error}",
-                crate::daemon::db::SCHEMA_VERSION
-            ))
-        })?;
+    let expected_version = crate::SCHEMA_VERSION.parse::<u8>().map_err(|error| {
+        db_error(format!(
+            "invalid compiled daemon database schema version '{}': {error}",
+            crate::SCHEMA_VERSION
+        ))
+    })?;
     if version_number > expected_version {
         return Err(db_error(format!(
             "daemon database schema version '{version}' is newer than expected '{}'; downgrade is not supported",
-            crate::daemon::db::SCHEMA_VERSION
+            crate::SCHEMA_VERSION
         )));
     }
     Ok(version_number)

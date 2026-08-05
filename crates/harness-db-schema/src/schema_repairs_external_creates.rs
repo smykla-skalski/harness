@@ -1,7 +1,7 @@
 use super::{CliError, Connection, db_error};
 
 const MIGRATION_SQL: &str = include_str!(
-    "../../harness-daemon/src/daemon/db/migrations/0032_daemon_v38_task_board_external_create_intents.sql"
+    "../../harness-daemon-db-core/src/migrations/0032_daemon_v38_task_board_external_create_intents.sql"
 );
 
 #[derive(Debug, Clone, Copy)]

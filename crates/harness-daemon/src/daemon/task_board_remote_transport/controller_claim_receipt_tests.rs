@@ -10,6 +10,7 @@ use crate::daemon::db::{
     accept_remote_executor, remote_controller_fixture, remote_executor_claim_request,
     remote_executor_fixture,
 };
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::task_board::remote_wire::wire::{
     RemoteAssignmentWireState, RemoteCancelRequest, RemoteCancelResponse, RemoteClaimRequest,
@@ -88,6 +89,7 @@ async fn executor_claim_receipt_survives_renewal_terminalization_and_restart() {
     let restarted = AsyncDaemonDb::connect(&database_path)
         .await
         .expect("restart executor database");
+    let restarted = AsyncDaemonDbHandle(restarted);
     assert_exact_executor_replay(&restarted, &claim, &original_json).await;
     assert_claim_replay_rejects_conflicting_evidence(&restarted, &claim).await;
 }
@@ -165,7 +167,7 @@ async fn controller_claim_receipt_replays_without_network_after_renewal_and_term
 }
 
 async fn assert_exact_executor_replay(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     claim: &RemoteClaimRequest,
     original_json: &[u8],
 ) {
@@ -211,7 +213,7 @@ fn assert_original_claim(response: &RemoteClaimResponse, claim: &RemoteClaimRequ
 }
 
 async fn assert_claim_replay_rejects_conflicting_evidence(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     claim: &RemoteClaimRequest,
 ) {
     assert!(matches!(
@@ -427,7 +429,7 @@ async fn renew_controller_assignment(
 }
 
 async fn assert_controller_replay_without_network(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     claim: &RemoteClaimRequest,
     original: &RemoteClaimResponse,
 ) {

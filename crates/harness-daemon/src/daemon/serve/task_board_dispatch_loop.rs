@@ -7,9 +7,10 @@ use tracing::warn;
 
 use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{
-    AsyncDaemonDb, ClaimedTaskBoardDispatch, ClaimedTaskBoardDispatchPreparation,
-    TaskBoardDispatchClaimAction, TaskBoardPreparationRelease,
+    ClaimedTaskBoardDispatch, ClaimedTaskBoardDispatchPreparation, TaskBoardDispatchClaimAction,
+    TaskBoardPreparationRelease,
 };
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::http::DaemonHttpState;
 use crate::daemon::service::task_board::prepare_claimed_task_board_dispatch;
 use crate::daemon::task_board_managed_agents::{
@@ -55,7 +56,7 @@ async fn run_task_board_dispatch_loop(
     clippy::cognitive_complexity,
     reason = "recovery drains preparation and worker intent queues while preserving per-claim errors"
 )]
-async fn recover_pending_dispatches(state: &DaemonHttpState, db: &AsyncDaemonDb) {
+async fn recover_pending_dispatches(state: &DaemonHttpState, db: &AsyncDaemonDbHandle) {
     match crate::daemon::automation_kill_switch::enforce_automation_kill_switch(state, db).await {
         Ok(true) => return,
         Ok(false) => {}
@@ -122,7 +123,7 @@ async fn recover_pending_dispatches(state: &DaemonHttpState, db: &AsyncDaemonDb)
 )]
 async fn finish_claim(
     state: &DaemonHttpState,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     mut claim: ClaimedTaskBoardDispatch,
 ) {
     let _heartbeat =
@@ -148,7 +149,7 @@ async fn finish_claim(
     reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
 )]
 async fn report_failed_preparation(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     preparation: &ClaimedTaskBoardDispatchPreparation,
     error: &CliError,
 ) {
@@ -197,7 +198,7 @@ fn compensation_reason(action: &TaskBoardDispatchClaimAction) -> Option<&str> {
 )]
 async fn finish_compensating_claim(
     state: &DaemonHttpState,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     claim: &ClaimedTaskBoardDispatch,
     reason: &str,
 ) {

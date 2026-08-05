@@ -1,5 +1,5 @@
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::protocol::{
     TaskBoardGitRuntimeSecretHandoffAckRequest, TaskBoardGitRuntimeSecretHandoffAckResponse,
     TaskBoardGitRuntimeSecretHandoffPrepareResponse, TaskBoardGitSigningVerifyRequest,
@@ -25,7 +25,7 @@ pub use harness_task_board_git_runtime::{
 };
 
 pub(crate) async fn task_board_git_runtime_config_db(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
 ) -> Result<TaskBoardGitRuntimeConfig, CliError> {
     let mut config = db.task_board_runtime_config().await?;
     state::overlay_task_board_git_runtime_secret_flags(&mut config);
@@ -33,7 +33,7 @@ pub(crate) async fn task_board_git_runtime_config_db(
 }
 
 pub(crate) async fn verify_task_board_git_signing_db(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &TaskBoardGitSigningVerifyRequest,
 ) -> Result<TaskBoardGitSigningVerifyResponse, CliError> {
     let repository = validated_repository(request.repository.as_deref())?;
@@ -44,7 +44,7 @@ pub(crate) async fn verify_task_board_git_signing_db(
 }
 
 pub(crate) async fn prepare_task_board_git_runtime_secret_handoff(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
 ) -> Result<TaskBoardGitRuntimeSecretHandoffPrepareResponse, CliError> {
     let Some(marker) = db.pending_task_board_secret_handoff().await? else {
         return Ok(TaskBoardGitRuntimeSecretHandoffPrepareResponse {
@@ -66,7 +66,7 @@ pub(crate) async fn prepare_task_board_git_runtime_secret_handoff(
 }
 
 pub(crate) async fn acknowledge_task_board_git_runtime_secret_handoff(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &TaskBoardGitRuntimeSecretHandoffAckRequest,
 ) -> Result<TaskBoardGitRuntimeSecretHandoffAckResponse, CliError> {
     let marker = db
@@ -95,7 +95,7 @@ pub(crate) async fn acknowledge_task_board_git_runtime_secret_handoff(
 }
 
 pub(crate) async fn update_task_board_git_runtime_config_db(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &TaskBoardGitRuntimeConfig,
 ) -> Result<TaskBoardGitRuntimeConfig, CliError> {
     let retained = state::retaining_task_board_git_runtime_secrets(request);

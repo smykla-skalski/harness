@@ -1,12 +1,12 @@
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::TaskBoardDispatchRequest;
 use crate::task_board::{TaskBoardOrchestratorDispatchInput, TaskBoardOrchestratorSettings};
 use harness_kernel::errors::CliError;
 
 use super::task_board::pick_task_board_dispatch_async;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 pub(super) async fn scoped_dispatch_request(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     settings: &TaskBoardOrchestratorSettings,
     input: &TaskBoardOrchestratorDispatchInput,
 ) -> Result<Option<TaskBoardDispatchRequest>, CliError> {

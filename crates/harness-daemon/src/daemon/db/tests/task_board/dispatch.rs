@@ -310,9 +310,11 @@ async fn active_dispatch_intent_requires_matching_linkage() {
 #[tokio::test]
 async fn approved_grant_is_consumed_at_reservation() {
     let dir = tempdir().expect("tempdir");
-    let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
-        .await
-        .expect("open db");
+    let db = crate::daemon::db_handle::AsyncDaemonDbHandle(
+        AsyncDaemonDb::connect(&dir.path().join("harness.db"))
+            .await
+            .expect("open db"),
+    );
     db.create_task_board_item(approved_write_item(TaskBoardItem::new(
         "task-grant-consume".to_owned(),
         "Grant consume".to_owned(),

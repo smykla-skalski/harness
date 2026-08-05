@@ -2,7 +2,7 @@ use std::env;
 
 use uuid::Uuid;
 
-use crate::daemon::db::{AsyncDaemonDb, ColorEdit, DisplayNameEdit, ProjectEdit};
+use crate::daemon::db::{ColorEdit, DisplayNameEdit, ProjectEdit};
 use crate::daemon::protocol::{
     TaskBoardAuditRequest, TaskBoardAuditResponse, TaskBoardCatalogRequest,
     TaskBoardCreateItemRequest, TaskBoardDeleteItemRequest, TaskBoardGetItemRequest,
@@ -25,6 +25,7 @@ use super::task_board_repository_scope::{
 };
 use crate::daemon::db::task_board::prelude::*;
 
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::reviews_store::PolicyGraphQueries;
 pub(crate) use crate::task_board::external::{
     TaskBoardSyncCoordinatorFence, TaskBoardSyncCoordinatorFenceDecision,
@@ -82,7 +83,7 @@ use update_request::{apply_update_request, replacement_external_refs};
 pub(crate) use workflow_progress::get_task_board_workflow_progress_db;
 
 pub(crate) async fn create_task_board_item_db(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &TaskBoardCreateItemRequest,
 ) -> Result<TaskBoardItem, CliError> {
     validate_create_title(&request.title)?;
@@ -131,14 +132,14 @@ pub(crate) async fn create_task_board_item_db(
 }
 
 pub(crate) async fn get_task_board_item_db(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &TaskBoardGetItemRequest,
 ) -> Result<TaskBoardItem, CliError> {
     scoped_task_board_item_db(db, &request.id).await
 }
 
 pub(crate) async fn update_task_board_item_db(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     id: &str,
     request: &TaskBoardUpdateItemRequest,
 ) -> Result<TaskBoardItem, CliError> {
@@ -158,7 +159,7 @@ pub(crate) async fn update_task_board_item_db(
 }
 
 pub(crate) async fn delete_task_board_item_db(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &TaskBoardDeleteItemRequest,
 ) -> Result<TaskBoardItem, CliError> {
     scoped_task_board_item_db(db, &request.id).await?;
@@ -166,7 +167,7 @@ pub(crate) async fn delete_task_board_item_db(
 }
 
 pub(crate) async fn audit_task_board_db(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &TaskBoardAuditRequest,
 ) -> Result<TaskBoardAuditResponse, CliError> {
     let items = scoped_task_board_items_db(db, request.status).await?;
@@ -191,7 +192,7 @@ pub(crate) async fn audit_task_board_db(
 }
 
 pub(crate) async fn list_task_board_projects_db(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &TaskBoardCatalogRequest,
 ) -> Result<TaskBoardProjectsResponse, CliError> {
     let scope = TaskBoardRepositoryScope::load(db).await?;
@@ -201,7 +202,7 @@ pub(crate) async fn list_task_board_projects_db(
 }
 
 pub(crate) async fn update_task_board_project_db(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &TaskBoardProjectUpdateRequest,
 ) -> Result<TaskBoardProjectUpdateResponse, CliError> {
     let display_name = match (request.clear_display_name, request.display_name.as_deref()) {
@@ -242,7 +243,7 @@ pub(crate) async fn update_task_board_project_db(
 }
 
 pub(crate) async fn list_task_board_machines_db(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &TaskBoardCatalogRequest,
 ) -> Result<TaskBoardMachinesResponse, CliError> {
     let items = scoped_task_board_items_db(db, request.status).await?;
@@ -250,13 +251,13 @@ pub(crate) async fn list_task_board_machines_db(
 }
 
 pub(crate) async fn task_board_host_local_db(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
 ) -> Result<TaskBoardHostLocalResponse, CliError> {
     ensure_local_machine(db).await
 }
 
 pub(crate) async fn touch_task_board_host_local_db(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
 ) -> Result<TaskBoardHostLocalResponse, CliError> {
     if let Some((machine, _)) = db.touch_task_board_local_machine().await? {
         return Ok(machine);
@@ -265,13 +266,13 @@ pub(crate) async fn touch_task_board_host_local_db(
 }
 
 pub(crate) async fn task_board_host_list_db(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
 ) -> Result<TaskBoardHostListResponse, CliError> {
     db.task_board_machines().await
 }
 
 pub(crate) async fn task_board_host_set_project_types_db(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &TaskBoardHostSetProjectTypesRequest,
 ) -> Result<TaskBoardHostSetProjectTypesResponse, CliError> {
     let mut machine = ensure_local_machine(db).await?;
@@ -282,7 +283,7 @@ pub(crate) async fn task_board_host_set_project_types_db(
 }
 
 pub(crate) async fn sync_task_board_db(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &TaskBoardSyncRequest,
 ) -> Result<TaskBoardSyncResponse, CliError> {
     if request.dry_run {
@@ -313,13 +314,13 @@ pub(crate) async fn sync_task_board_db(
     Ok(response)
 }
 
-pub(crate) fn cancel_task_board_sync_db(db: &AsyncDaemonDb) -> TaskBoardSyncCancelResponse {
+pub(crate) fn cancel_task_board_sync_db(db: &AsyncDaemonDbHandle) -> TaskBoardSyncCancelResponse {
     TaskBoardSyncCancelResponse {
         cancelled: db.cancel_active_task_board_sync(),
     }
 }
 
-pub(crate) fn task_board_sync_status_db(db: &AsyncDaemonDb) -> TaskBoardSyncStatusResponse {
+pub(crate) fn task_board_sync_status_db(db: &AsyncDaemonDbHandle) -> TaskBoardSyncStatusResponse {
     let status = db.task_board_sync_status();
     TaskBoardSyncStatusResponse {
         active: status.active,
@@ -331,7 +332,7 @@ pub(crate) fn task_board_sync_status_db(db: &AsyncDaemonDb) -> TaskBoardSyncStat
 }
 
 pub(crate) async fn sync_task_board_for_orchestrator_db(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &TaskBoardSyncRequest,
 ) -> Result<TaskBoardSyncResponse, CliError> {
     sync_task_board_for_orchestrator_with_context_db(
@@ -343,7 +344,7 @@ pub(crate) async fn sync_task_board_for_orchestrator_db(
 }
 
 pub(crate) async fn sync_task_board_for_orchestrator_with_context_db(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &TaskBoardSyncRequest,
     context: &TaskBoardSyncRunContext,
 ) -> Result<TaskBoardSyncResponse, CliError> {
@@ -351,7 +352,7 @@ pub(crate) async fn sync_task_board_for_orchestrator_with_context_db(
 }
 
 async fn sync_task_board_db_with_context(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &TaskBoardSyncRequest,
     context: &TaskBoardSyncRunContext,
 ) -> Result<TaskBoardSyncResponse, CliError> {
@@ -360,7 +361,7 @@ async fn sync_task_board_db_with_context(
 }
 
 async fn sync_task_board_db_with_permit(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &TaskBoardSyncRequest,
     context: &TaskBoardSyncRunContext,
     mut permit: crate::daemon::db::TaskBoardSyncPermit,
@@ -417,7 +418,7 @@ task-board sync audit persistence failed: {audit_error}"
 }
 
 pub(crate) async fn active_external_sync_config_db(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
 ) -> Result<ExternalSyncConfig, CliError> {
     let settings = db.task_board_orchestrator_settings().await?;
     Ok(
@@ -429,7 +430,7 @@ pub(crate) async fn active_external_sync_config_db(
     )
 }
 
-async fn ensure_local_machine(db: &AsyncDaemonDb) -> Result<Machine, CliError> {
+async fn ensure_local_machine(db: &AsyncDaemonDbHandle) -> Result<Machine, CliError> {
     if let Some(id) = db.task_board_local_machine_id().await? {
         if let Some(machine) = db
             .task_board_machines()

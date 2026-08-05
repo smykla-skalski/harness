@@ -3,9 +3,8 @@ use tokio::runtime::Builder as TokioRuntimeBuilder;
 #[cfg(test)]
 use uuid::Uuid;
 
-use crate::daemon::db::AsyncDaemonDb;
 #[cfg(test)]
-use crate::daemon::db::DaemonDb;
+use crate::daemon::db_handle::DaemonDbOwnedHandle;
 #[cfg(test)]
 use crate::daemon::protocol::{
     TaskBoardAuditRequest, TaskBoardAuditResponse, TaskBoardCatalogRequest,
@@ -46,6 +45,7 @@ pub(crate) use self::sync::{
 };
 #[cfg(test)]
 use super::repository_sync_support::external_sync_config_for_repository;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 mod dispatch;
 mod dispatch_orchestrator;
@@ -295,7 +295,7 @@ pub fn list_task_board_machines(
 #[cfg(test)]
 pub fn dispatch_task_board(
     request: &TaskBoardDispatchRequest,
-    db: Option<&DaemonDb>,
+    db: Option<&DaemonDbOwnedHandle>,
 ) -> Result<TaskBoardDispatchResponse, CliError> {
     let board = store();
     dispatch::dispatch_task_board(request, db, &board)
@@ -308,13 +308,13 @@ pub fn dispatch_task_board(
 /// be created, or linked board items cannot be persisted.
 pub(crate) async fn dispatch_task_board_async(
     request: &TaskBoardDispatchRequest,
-    async_db: &AsyncDaemonDb,
+    async_db: &AsyncDaemonDbHandle,
 ) -> Result<TaskBoardDispatchResponse, CliError> {
     Box::pin(dispatch::dispatch_task_board_async(request, async_db)).await
 }
 
 pub(crate) async fn pick_task_board_dispatch_async(
-    async_db: &AsyncDaemonDb,
+    async_db: &AsyncDaemonDbHandle,
 ) -> Result<TaskBoardDispatchPickResponse, CliError> {
     dispatch::pick_task_board_dispatch_async(async_db).await
 }

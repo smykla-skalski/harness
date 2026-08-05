@@ -1,6 +1,6 @@
 use super::{CliError, Connection, DaemonDb, db_error};
 
-pub(crate) const PRUNE_REMOTE_AUDIT_EVENTS_SQL: &str = "
+pub const PRUNE_REMOTE_AUDIT_EVENTS_SQL: &str = "
 DELETE FROM remote_audit_events
 WHERE event_id IN (
     SELECT event_id
@@ -14,11 +14,11 @@ WHERE event_id IN (
 /// The cap is intentionally independent of the in-memory unauthenticated
 /// admission limiter: it survives process restarts and bounds every remote
 /// audit writer, including pairing and lifecycle paths.
-pub(crate) const REMOTE_AUDIT_EVENT_RETENTION_LIMIT: i64 = 10_000;
+pub const REMOTE_AUDIT_EVENT_RETENTION_LIMIT: i64 = 10_000;
 
 /// # Errors
 /// Returns [`CliError`] when the retention transaction cannot complete.
-pub(crate) fn prune_remote_audit_events_in_transaction(conn: &Connection) -> Result<u64, CliError> {
+pub fn prune_remote_audit_events_in_transaction(conn: &Connection) -> Result<u64, CliError> {
     conn.execute(
         PRUNE_REMOTE_AUDIT_EVENTS_SQL,
         [REMOTE_AUDIT_EVENT_RETENTION_LIMIT],
@@ -35,7 +35,7 @@ pub(crate) fn prune_remote_audit_events_in_transaction(conn: &Connection) -> Res
 ///
 /// # Errors
 /// Returns [`CliError`] when the retention transaction cannot complete.
-pub(crate) fn prune_remote_audit_events(db: &DaemonDb) -> Result<u64, CliError> {
+pub fn prune_remote_audit_events(db: &DaemonDb) -> Result<u64, CliError> {
     let transaction = db
         .connection()
         .unchecked_transaction()

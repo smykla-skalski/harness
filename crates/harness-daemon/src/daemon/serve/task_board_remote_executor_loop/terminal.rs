@@ -5,11 +5,12 @@ use tokio::task::spawn_blocking;
 
 use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{
-    AsyncDaemonDb, REMOTE_IMPLEMENTATION_BUNDLE_MEDIA_TYPE, REMOTE_IMPLEMENTATION_BUNDLE_PATH,
+    REMOTE_IMPLEMENTATION_BUNDLE_MEDIA_TYPE, REMOTE_IMPLEMENTATION_BUNDLE_PATH,
     REMOTE_RESULT_ARTIFACT_MEDIA_TYPE, REMOTE_RESULT_ARTIFACT_PATH,
     TaskBoardRemoteAssignmentRecord, TaskBoardRemoteExecutorRun, TaskBoardRemoteMutationOutcome,
     TaskBoardRemoteRunStatus, TaskBoardRemoteTerminalArtifact,
 };
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::git::bundle_export::GitBundleExportPlan;
 use crate::task_board::remote_wire::wire::{
     RemoteArtifactEntry, RemoteArtifactManifest, RemoteAssignmentWireState, RemoteLease,
@@ -35,7 +36,7 @@ enum TerminalEvidence {
 }
 
 pub(super) async fn persist_terminal_snapshot<S>(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     owner_instance_id: &str,
     record: &TaskBoardRemoteAssignmentRecord,
     snapshot: &S,

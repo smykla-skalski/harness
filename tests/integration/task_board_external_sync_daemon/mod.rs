@@ -12,6 +12,7 @@ mod support;
 use tempfile::tempdir;
 
 use harness::daemon::db::{AsyncDaemonDb, AsyncDaemonDbConnect};
+use harness::daemon::db_handle::AsyncDaemonDbHandle;
 use harness::task_board::external::{
     ExternalSyncClient, ExternalSyncOptions, TaskBoardSyncStore, sync_external_tasks,
 };
@@ -65,6 +66,7 @@ async fn sync_external_tasks_uses_injected_clients_without_network() {
     let board = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
         .await
         .expect("database");
+    let board = AsyncDaemonDbHandle(board);
     let mut local = TaskBoardItem::new(
         "local-1".to_owned(),
         "Local task".to_owned(),

@@ -8,6 +8,7 @@ use harness_task_board_provider_sync::ProviderSyncStore;
 use sqlx::{Sqlite, SqlitePool, Transaction};
 
 use crate::daemon::db::{AsyncDaemonDb, AsyncDaemonTransactions, CliError};
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::task_board::TaskBoardItem;
 
 use super::items::{
@@ -15,16 +16,17 @@ use super::items::{
     replace_item_in_tx,
 };
 
-impl ProviderSyncStore for AsyncDaemonDb {
+impl ProviderSyncStore for AsyncDaemonDbHandle {
     fn pool(&self) -> &SqlitePool {
-        AsyncDaemonDb::pool(self)
+        AsyncDaemonDb::pool(&self.0)
     }
 
     async fn begin_immediate_transaction(
         &self,
         context: &str,
     ) -> Result<Transaction<'_, Sqlite>, CliError> {
-        <Self as AsyncDaemonTransactions>::begin_immediate_transaction(self, context).await
+        <AsyncDaemonDb as AsyncDaemonTransactions>::begin_immediate_transaction(&self.0, context)
+            .await
     }
 
     async fn bump_change_in_tx(

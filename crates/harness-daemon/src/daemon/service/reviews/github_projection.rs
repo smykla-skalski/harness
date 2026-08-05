@@ -2,7 +2,6 @@ use std::collections::HashSet;
 
 use chrono::SecondsFormat;
 
-use crate::daemon::db::AsyncDaemonDb;
 use crate::github_api::stable_data_revision_guard;
 use crate::github_api::{GitHubProtectedClient, GitHubPullRequestSnapshot};
 use crate::reviews::{
@@ -18,6 +17,7 @@ use super::super::task_board_db::{
     ReviewsProjectionAuditSummary, record_reviews_projection_result,
 };
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 pub(super) enum MissingReviewResolution {
     ExactActiveImports(ReviewsQueryRequest),
@@ -34,7 +34,7 @@ impl MissingReviewResolution {
 }
 
 pub(super) async fn reconcile_task_board(
-    database: Option<&AsyncDaemonDb>,
+    database: Option<&AsyncDaemonDbHandle>,
     items: &[ReviewItem],
     authoritative_viewer_keys: &HashSet<String>,
     missing_review_resolution: MissingReviewResolution,
@@ -59,7 +59,7 @@ pub(super) async fn reconcile_task_board(
 }
 
 async fn reconcile_task_board_inner(
-    database: Option<&AsyncDaemonDb>,
+    database: Option<&AsyncDaemonDbHandle>,
     items: &[ReviewItem],
     authoritative_viewer_keys: &HashSet<String>,
     missing_review_resolution: MissingReviewResolution,
@@ -109,7 +109,7 @@ async fn reconcile_task_board_inner(
 }
 
 async fn resolve_missing_review_items(
-    database: &AsyncDaemonDb,
+    database: &AsyncDaemonDbHandle,
     snapshots: &[GitHubPullRequestSnapshot],
     query_scope: &ReviewsQueryRequest,
     backport_detection_enabled: bool,
@@ -130,7 +130,7 @@ async fn resolve_missing_review_items(
 }
 
 async fn load_imported_review_references(
-    database: &AsyncDaemonDb,
+    database: &AsyncDaemonDbHandle,
 ) -> Result<Vec<(String, u64)>, CliError> {
     database
         .list_task_board_items(None)
@@ -196,7 +196,7 @@ fn snapshot_key(repository: &str, number: u64) -> String {
 }
 
 async fn reconcile_snapshots(
-    database: &AsyncDaemonDb,
+    database: &AsyncDaemonDbHandle,
     snapshots: Vec<GitHubPullRequestSnapshot>,
 ) -> Result<usize, CliError> {
     let items = database.list_task_board_items(None).await?;

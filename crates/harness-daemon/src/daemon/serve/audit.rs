@@ -2,11 +2,11 @@ use std::process::id;
 use std::sync::Arc;
 
 use crate::daemon::audit_events::{AuditEventRecordDraft, record_audit_event};
-use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use harness_kernel::errors::CliError;
 
 pub(super) async fn record_daemon_started(
-    async_db: Option<&Arc<AsyncDaemonDb>>,
+    async_db: Option<&Arc<AsyncDaemonDbHandle>>,
     endpoint: &str,
     sandboxed: bool,
 ) {
@@ -27,7 +27,7 @@ pub(super) async fn record_daemon_started(
 }
 
 pub(super) async fn record_remote_daemon_bound(
-    async_db: Option<&Arc<AsyncDaemonDb>>,
+    async_db: Option<&Arc<AsyncDaemonDbHandle>>,
     endpoint: &str,
     sandboxed: bool,
 ) {
@@ -53,7 +53,7 @@ pub(super) fn remote_daemon_bound_summary(endpoint: &str) -> String {
 }
 
 pub(super) async fn record_daemon_stopped(
-    async_db: Option<&Arc<AsyncDaemonDb>>,
+    async_db: Option<&Arc<AsyncDaemonDbHandle>>,
     serve_result: &Result<(), CliError>,
 ) {
     let (severity, outcome, summary, payload) = match serve_result {
@@ -86,7 +86,7 @@ pub(super) async fn record_daemon_stopped(
 }
 
 async fn record_daemon_lifecycle_event(
-    async_db: Option<&Arc<AsyncDaemonDb>>,
+    async_db: Option<&Arc<AsyncDaemonDbHandle>>,
     kind: &'static str,
     severity: &'static str,
     outcome: &'static str,

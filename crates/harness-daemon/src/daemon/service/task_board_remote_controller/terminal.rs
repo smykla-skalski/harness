@@ -1,7 +1,7 @@
 use std::future::Future;
 
 use crate::daemon::db::{
-    AsyncDaemonDb, TaskBoardRemoteAssignmentRecord, TaskBoardRemoteMutationOutcome,
+    TaskBoardRemoteAssignmentRecord, TaskBoardRemoteMutationOutcome,
     TaskBoardRemoteResultAdoptionOutcome, exact_active_remote_target, parent_points_to_assignment,
 };
 use crate::daemon::task_board_remote_result_import::import_and_adopt_task_board_remote_implementation_result;
@@ -20,9 +20,10 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::requests;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 pub(super) async fn finish_terminal_assignment(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     client: &RemoteExecutionControllerClient,
     assignment: &TaskBoardRemoteAssignmentRecord,
 ) -> Result<bool, CliError> {
@@ -60,7 +61,7 @@ pub(super) async fn finish_terminal_assignment_with<
     Settle,
     SettleFuture,
 >(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     assignment: &TaskBoardRemoteAssignmentRecord,
     fetch_manifest: FetchManifest,
     observe_cleanup: ObserveCleanup,
@@ -117,7 +118,7 @@ where
 /// handoff checks above can advance the assignment, and the settlement request
 /// has to carry that later state.
 async fn settle_current_assignment<Settle, SettleFuture>(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     assignment_id: &str,
     settle: Settle,
 ) -> Result<bool, CliError>
@@ -141,7 +142,7 @@ enum TerminalHandoff {
 }
 
 async fn classify_terminal_handoff(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     assignment: &TaskBoardRemoteAssignmentRecord,
     parent: &TaskBoardWorkflowExecutionRecord,
 ) -> Result<TerminalHandoff, CliError> {
@@ -179,7 +180,7 @@ async fn classify_terminal_handoff(
 }
 
 async fn adopt_terminal_result(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     assignment: &TaskBoardRemoteAssignmentRecord,
     parent: &TaskBoardWorkflowExecutionRecord,
 ) -> Result<bool, CliError> {
@@ -208,7 +209,7 @@ async fn adopt_terminal_result(
 }
 
 async fn fetch_manifest(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     client: &RemoteExecutionControllerClient,
     assignment: &TaskBoardRemoteAssignmentRecord,
 ) -> Result<(), CliError> {

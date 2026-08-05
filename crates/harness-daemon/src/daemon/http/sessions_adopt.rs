@@ -7,7 +7,8 @@ use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 
-use crate::daemon::db::{DaemonDb, ensure_shared_db};
+use crate::daemon::db::ensure_shared_db;
+use crate::daemon::db_handle::DaemonDbOwnedHandle;
 use crate::daemon::protocol::{AdoptSessionRequest, SessionMutationResponse};
 use crate::daemon::service;
 #[cfg(target_os = "macos")]
@@ -121,7 +122,9 @@ pub(crate) async fn record_adopt_in_db(
     service::adopt_session_record(outcome, &db_guard)
 }
 
-fn lock_db(db: &Arc<Mutex<DaemonDb>>) -> Result<MutexGuard<'_, DaemonDb>, CliError> {
+fn lock_db(
+    db: &Arc<Mutex<DaemonDbOwnedHandle>>,
+) -> Result<MutexGuard<'_, DaemonDbOwnedHandle>, CliError> {
     db.lock().map_err(|error| {
         CliErrorKind::workflow_io(format!("daemon database lock poisoned: {error}")).into()
     })

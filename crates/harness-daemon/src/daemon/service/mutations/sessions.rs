@@ -8,7 +8,7 @@ use crate::daemon::protocol::{SessionArchiveRequest, SessionArchiveResponse};
 pub fn transfer_leader(
     session_id: &str,
     request: &LeaderTransferRequest,
-    db: Option<&super::super::db::DaemonDb>,
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
 ) -> Result<SessionDetail, CliError> {
     harness_daemon_session_service::transfer_leader(session_id, request, db)
 }
@@ -20,7 +20,7 @@ pub fn transfer_leader(
 pub fn end_session(
     session_id: &str,
     request: &SessionEndRequest,
-    db: Option<&super::super::db::DaemonDb>,
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
 ) -> Result<SessionDetail, CliError> {
     harness_daemon_session_service::end_session(session_id, request, db)
 }
@@ -32,7 +32,7 @@ pub fn end_session(
 pub fn archive_session(
     session_id: &str,
     request: &SessionArchiveRequest,
-    db: Option<&super::super::db::DaemonDb>,
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
 ) -> Result<SessionArchiveResponse, CliError> {
     harness_daemon_session_service::archive_session(session_id, request, db)
 }

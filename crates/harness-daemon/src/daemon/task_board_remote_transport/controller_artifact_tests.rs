@@ -9,8 +9,8 @@ use super::controller_authority_test_support::{
 use super::controller_prepared_test_support::{
     PreparedLifecycle, completed_status, persist_claim, prepared_acceptance, status_request,
 };
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::task_board::remote_wire::wire::{
     RemoteArtifactEntry, RemoteArtifactFetchRequest, RemoteArtifactFetchResponse,
     RemoteArtifactManifest, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
@@ -251,12 +251,12 @@ async fn claim_fetch(fixture: &ArtifactFixture) {
     );
 }
 
-async fn assert_fetch_pending(db: &AsyncDaemonDb, request: &RemoteArtifactFetchRequest) {
+async fn assert_fetch_pending(db: &AsyncDaemonDbHandle, request: &RemoteArtifactFetchRequest) {
     assert_fetch_authority(db, request).await;
     assert_eq!(artifact_count(db, request).await, 0);
 }
 
-async fn assert_fetch_settled(db: &AsyncDaemonDb, request: &RemoteArtifactFetchRequest) {
+async fn assert_fetch_settled(db: &AsyncDaemonDbHandle, request: &RemoteArtifactFetchRequest) {
     let assignment = db
         .task_board_remote_assignment(&request.binding.assignment_id)
         .await
@@ -266,7 +266,7 @@ async fn assert_fetch_settled(db: &AsyncDaemonDb, request: &RemoteArtifactFetchR
     assert_eq!(artifact_count(db, request).await, 1);
 }
 
-async fn assert_fetch_authority(db: &AsyncDaemonDb, request: &RemoteArtifactFetchRequest) {
+async fn assert_fetch_authority(db: &AsyncDaemonDbHandle, request: &RemoteArtifactFetchRequest) {
     let assignment = db
         .task_board_remote_assignment(&request.binding.assignment_id)
         .await
@@ -279,7 +279,7 @@ async fn assert_fetch_authority(db: &AsyncDaemonDb, request: &RemoteArtifactFetc
     assert_eq!(operation.request_sha256, request.request_sha256);
 }
 
-async fn artifact_count(db: &AsyncDaemonDb, request: &RemoteArtifactFetchRequest) -> i64 {
+async fn artifact_count(db: &AsyncDaemonDbHandle, request: &RemoteArtifactFetchRequest) -> i64 {
     query_scalar(
         "SELECT COUNT(*) FROM task_board_remote_artifacts
          WHERE assignment_id = ?1 AND fencing_epoch = ?2 AND relative_path = ?3",
@@ -317,7 +317,7 @@ async fn insert_conflicting_artifact(fixture: &ArtifactFixture) {
     .expect("insert conflicting immutable artifact");
 }
 
-async fn rotate_host_trust(db: &AsyncDaemonDb) {
+async fn rotate_host_trust(db: &AsyncDaemonDbHandle) {
     let mut settings = db
         .task_board_orchestrator_settings()
         .await

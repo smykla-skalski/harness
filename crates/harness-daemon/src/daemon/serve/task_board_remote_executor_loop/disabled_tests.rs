@@ -12,11 +12,12 @@ use crate::daemon::codex_controller::CodexControllerHandle;
 use crate::daemon::db::prelude::*;
 use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{
-    AsyncDaemonDb, DaemonDb, REMOTE_EXECUTOR_CLAIMED_AT, REMOTE_EXECUTOR_PRINCIPAL,
-    RemoteExecutorFixture, TaskBoardRemoteAssignmentRecord, TaskBoardRemoteExecutorStartAuthority,
+    REMOTE_EXECUTOR_CLAIMED_AT, REMOTE_EXECUTOR_PRINCIPAL, RemoteExecutorFixture,
+    TaskBoardRemoteAssignmentRecord, TaskBoardRemoteExecutorStartAuthority,
     TaskBoardRemoteMutationOutcome, accept_remote_executor, remote_executor_claim_request,
     remote_executor_fixture, remote_executor_identity,
 };
+use crate::daemon::db_handle::{AsyncDaemonDbHandle, DaemonDbOwnedHandle};
 use crate::daemon::http::{
     AsyncDaemonDbSlot, DaemonHttpAuthMode, DaemonHttpState, ManagedAgentMutationLocks,
     default_remote_pairing_limiter, default_remote_pairing_status_limiter,
@@ -228,7 +229,7 @@ async fn live_claimed_fixture() -> (RemoteExecutorFixture, TaskBoardRemoteAssign
     (fixture, claimed)
 }
 
-pub(super) async fn drift_executor_settings(db: &AsyncDaemonDb, drift: SettingsDrift) {
+pub(super) async fn drift_executor_settings(db: &AsyncDaemonDbHandle, drift: SettingsDrift) {
     let mut settings = db
         .task_board_orchestrator_settings()
         .await
@@ -241,7 +242,7 @@ pub(super) async fn drift_executor_settings(db: &AsyncDaemonDb, drift: SettingsD
         .expect("persist executor settings drift");
 }
 
-pub(super) async fn configure_checkout(db: &AsyncDaemonDb, origin: &Path) {
+pub(super) async fn configure_checkout(db: &AsyncDaemonDbHandle, origin: &Path) {
     // Session provisioning canonicalizes origin_path (resolve_project_input ->
     // fs::canonicalize), so on macOS the frozen checkout must resolve the
     // /var -> /private/var symlink or exact_provisioned_session never matches.
@@ -283,7 +284,7 @@ pub(super) fn request_for_revision(
 }
 
 pub(super) async fn persist_exact_run(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     assignment: &TaskBoardRemoteAssignmentRecord,
     authority: &TaskBoardRemoteExecutorStartAuthority,
     workspace: &Path,
@@ -319,9 +320,9 @@ pub(super) async fn persist_exact_run(
     .expect("persist exact durable executor run");
 }
 
-pub(super) fn executor_state(db: &AsyncDaemonDb, daemon_epoch: &str) -> DaemonHttpState {
+pub(super) fn executor_state(db: &AsyncDaemonDbHandle, daemon_epoch: &str) -> DaemonHttpState {
     let (sender, _) = broadcast::channel::<StreamEvent>(8);
-    let db_slot = Arc::new(OnceLock::<Arc<Mutex<DaemonDb>>>::new());
+    let db_slot = Arc::new(OnceLock::<Arc<Mutex<DaemonDbOwnedHandle>>>::new());
     let async_db = Arc::new(OnceLock::new());
     async_db
         .set(Arc::new(db.clone()))
@@ -378,7 +379,7 @@ fn test_manifest() -> DaemonManifest {
 }
 
 pub(super) async fn load_assignment(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     assignment_id: &str,
 ) -> TaskBoardRemoteAssignmentRecord {
     db.task_board_remote_assignment(assignment_id)
@@ -387,14 +388,14 @@ pub(super) async fn load_assignment(
         .expect("executor assignment")
 }
 
-pub(super) async fn codex_run_count(db: &AsyncDaemonDb) -> i64 {
+pub(super) async fn codex_run_count(db: &AsyncDaemonDbHandle) -> i64 {
     query_scalar("SELECT COUNT(*) FROM codex_runs")
         .fetch_one(db.pool())
         .await
         .expect("count executor Codex runs")
 }
 
-pub(super) async fn executor_session_count(db: &AsyncDaemonDb) -> i64 {
+pub(super) async fn executor_session_count(db: &AsyncDaemonDbHandle) -> i64 {
     query_scalar("SELECT COUNT(*) FROM sessions")
         .fetch_one(db.pool())
         .await

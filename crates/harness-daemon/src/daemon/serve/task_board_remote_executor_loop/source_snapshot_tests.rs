@@ -8,6 +8,7 @@ use crate::daemon::db::{
     AsyncDaemonDb, REMOTE_EXECUTOR_PRINCIPAL, RemoteExecutorFixture, accept_remote_executor,
     remote_executor_claim_request, remote_executor_fixture, remote_executor_identity,
 };
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::git::source_bundle_export::GitSourceBundleExportPlan;
 use crate::task_board::remote_wire::wire::{
@@ -66,6 +67,7 @@ async fn snapshot_import_survives_restart_then_creates_exact_session_and_cleans_
             let reopened = AsyncDaemonDb::connect(&db_path)
                 .await
                 .expect("reopen snapshot executor database");
+            let reopened = AsyncDaemonDbHandle(reopened);
             let assignment = reopened
                 .task_board_remote_assignment(&assignment.assignment_id)
                 .await

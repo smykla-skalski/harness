@@ -4,7 +4,6 @@
 //! as JSON; import validates an external document and creates a new active
 //! canvas from it. Both reuse the workspace helpers in [`super::policy_canvas`].
 
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{
     PolicyCanvasExportRequest, PolicyCanvasExportResponse, PolicyCanvasImportRequest,
     PolicyCanvasImportResponse,
@@ -14,6 +13,7 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::policy_canvas::{bump_change_policy, feed_gate_cache, load_or_seed_workspace};
 use super::policy_canvas_response::policy_canvas_workspace_response;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::reviews_store::PolicyGraphQueries;
 
 /// Serialize the active (or named) canvas document so the caller can save it
@@ -23,7 +23,7 @@ use crate::daemon::reviews_store::PolicyGraphQueries;
 /// Returns `CliError` when durable policy state cannot be loaded or when the
 /// requested canvas does not exist.
 pub(crate) async fn export_policy(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &PolicyCanvasExportRequest,
 ) -> Result<PolicyCanvasExportResponse, CliError> {
     let workspace = load_or_seed_workspace(db).await?;
@@ -54,7 +54,7 @@ pub(crate) async fn export_policy(
 /// Returns `CliError` when the document fails validation or the database
 /// cannot be written.
 pub(crate) async fn import_policy(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &PolicyCanvasImportRequest,
 ) -> Result<PolicyCanvasImportResponse, CliError> {
     let document = request.document.clone();

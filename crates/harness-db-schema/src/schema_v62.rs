@@ -3,7 +3,7 @@ use rusqlite::Connection;
 use super::CliError;
 
 const REPORT_ORDER_SQL: &str = include_str!(
-    "../../harness-daemon/src/daemon/db/migrations/0063_daemon_v62_ai_review_report_order.sql"
+    "../../harness-daemon-db-core/src/migrations/0063_daemon_v62_ai_review_report_order.sql"
 );
 
 /// Add a durable append sequence for retained AI review reports.

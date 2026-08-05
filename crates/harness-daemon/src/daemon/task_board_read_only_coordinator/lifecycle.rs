@@ -1,6 +1,5 @@
 use chrono::{DateTime, Duration, Utc};
 
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::task_board::prelude::*;
 use crate::task_board::TaskBoardWorkflowExecutionCas;
 use crate::task_board::{
@@ -23,9 +22,10 @@ use super::attempts::{
     invalid_transition, require_human, set_execution_state, settle_execution_running_in_phase,
 };
 use super::reports::transition_attempt;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 pub(super) async fn preflight_publish<R>(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     runtime: &R,
     execution: &TaskBoardWorkflowExecutionRecord,
     now: &str,
@@ -68,7 +68,7 @@ where
 }
 
 pub(super) async fn reconcile_lifecycle_attempt<R>(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     runtime: &R,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
@@ -92,7 +92,7 @@ where
 }
 
 async fn prepare_lifecycle_attempt(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
     now: &str,
@@ -131,7 +131,7 @@ async fn prepare_lifecycle_attempt(
 }
 
 async fn reconcile_publish<R>(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     runtime: &R,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
@@ -192,7 +192,7 @@ where
     reason = "single match over publish verification result; every arm is one delegate call"
 )]
 async fn verify_successful_publish<R>(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     runtime: &R,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
@@ -252,7 +252,7 @@ where
 }
 
 async fn reconcile_cleanup(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
     now: &str,
@@ -289,7 +289,7 @@ async fn reconcile_cleanup(
 }
 
 async fn claim_lifecycle_attempt(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
     now: &str,
@@ -378,7 +378,7 @@ fn publish_verification_due(
     reason = "single match over publish verification result; every arm is one delegate call"
 )]
 async fn settle_ambiguous_publish<R>(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     runtime: &R,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
@@ -434,7 +434,7 @@ where
 }
 
 async fn complete_lifecycle(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
     outcome: TaskBoardLifecycleOutcome,

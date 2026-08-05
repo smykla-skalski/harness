@@ -8,7 +8,6 @@ use tokio::sync::watch as tokio_watch;
 use tokio::task::JoinHandle;
 use tokio::time::{MissedTickBehavior, interval};
 
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::http::{DaemonHttpState, task_board_route_executor};
 use crate::daemon::protocol::TaskBoardOrchestratorRunOnceRequest;
 use crate::task_board::{
@@ -23,13 +22,14 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 use super::super::task_board_automation_startup::initialize_control_from_legacy_intent;
 use crate::daemon::db::prelude::*;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 const MINIMUM_TICK_INTERVAL: Duration = Duration::from_secs(1);
 const MAX_COORDINATOR_BACKOFF_SECONDS: u64 = 3_600;
 
 pub(super) fn spawn_task_board_automation_loop(
     state: DaemonHttpState,
-    db: Arc<AsyncDaemonDb>,
+    db: Arc<AsyncDaemonDbHandle>,
     tick_interval: Duration,
     shutdown_rx: tokio_watch::Receiver<bool>,
 ) -> JoinHandle<()> {
@@ -47,7 +47,7 @@ pub(super) fn spawn_task_board_automation_loop(
 )]
 async fn run_task_board_automation_loop(
     state: DaemonHttpState,
-    db: Arc<AsyncDaemonDb>,
+    db: Arc<AsyncDaemonDbHandle>,
     tick_interval: Duration,
     mut shutdown_rx: tokio_watch::Receiver<bool>,
 ) {
@@ -98,7 +98,7 @@ impl AutomationLoopState {
             .is_some_and(|deadline| Instant::now() < deadline)
     }
 
-    async fn record_failure(&mut self, db: &AsyncDaemonDb, stable_key: &str) {
+    async fn record_failure(&mut self, db: &AsyncDaemonDbHandle, stable_key: &str) {
         self.consecutive_failures = self.consecutive_failures.saturating_add(1);
         let retry = db.task_board_orchestrator_settings().await.map_or_else(
             |_| TaskBoardAutomationRetrySettings::default(),
@@ -166,7 +166,7 @@ fn deterministic_jitter(base: u64, stable_key: &str, attempt: u32, percent: u8) 
     clippy::cognitive_complexity,
     reason = "sequential legacy-intent/state/wake-enqueue steps, each already its own helper"
 )]
-async fn initialize_automation(db: &AsyncDaemonDb) -> Result<i64, CliError> {
+async fn initialize_automation(db: &AsyncDaemonDbHandle) -> Result<i64, CliError> {
     let now = Utc::now();
     initialize_control_from_legacy_intent(db, now).await?;
     let expired = maintain_automation_state(db, now).await?;
@@ -190,7 +190,7 @@ async fn initialize_automation(db: &AsyncDaemonDb) -> Result<i64, CliError> {
 }
 
 async fn maintain_automation_state(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     now: chrono::DateTime<Utc>,
 ) -> Result<u64, CliError> {
     db.finish_task_board_automation_drain_if_idle(now).await?;
@@ -201,7 +201,7 @@ async fn maintain_automation_state(
 
 async fn run_loop_tick(
     state: &DaemonHttpState,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     loop_state: &mut AutomationLoopState,
 ) -> Result<(), CliError> {
     maintain_automation_tick(db).await?;
@@ -233,7 +233,7 @@ async fn run_loop_tick(
     run_interval_fallback(state, db, loop_state).await
 }
 
-async fn maintain_automation_tick(db: &AsyncDaemonDb) -> Result<(), CliError> {
+async fn maintain_automation_tick(db: &AsyncDaemonDbHandle) -> Result<(), CliError> {
     let now = Utc::now();
     let expired = maintain_automation_state(db, now).await?;
     if expired > 0 && automatic_runs_enabled(db).await? {
@@ -254,7 +254,7 @@ async fn maintain_automation_tick(db: &AsyncDaemonDb) -> Result<(), CliError> {
 
 async fn run_interval_fallback(
     state: &DaemonHttpState,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     loop_state: &mut AutomationLoopState,
 ) -> Result<(), CliError> {
     let settings = db.task_board_orchestrator_settings().await?;
@@ -274,7 +274,7 @@ async fn run_interval_fallback(
 }
 
 async fn capture_automatic_change_wakes(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     change_sequence: &mut i64,
 ) -> Result<bool, CliError> {
     if !automatic_runs_enabled(db).await? {
@@ -286,7 +286,7 @@ async fn capture_automatic_change_wakes(
 }
 
 async fn enqueue_change_wakes(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     change_sequence: &mut i64,
 ) -> Result<(), CliError> {
     for (scope, sequence) in db.load_change_tracking_since(*change_sequence).await? {
@@ -321,7 +321,7 @@ fn wake_entity_kind(scope: &str) -> Option<TaskBoardAutomationWakeEntityKind> {
 }
 
 async fn process_wake_batch<Run, RunFuture>(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     wakes: &[TaskBoardAutomationWakeEvent],
     run: Run,
 ) -> Result<(), CliError>
@@ -338,7 +338,7 @@ where
     Ok(())
 }
 
-async fn automatic_runs_enabled(db: &AsyncDaemonDb) -> Result<bool, CliError> {
+async fn automatic_runs_enabled(db: &AsyncDaemonDbHandle) -> Result<bool, CliError> {
     let control = db.task_board_automation_control().await?;
     Ok(
         control.desired_mode == TaskBoardAutomationDesiredMode::Continuous

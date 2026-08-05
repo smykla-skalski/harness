@@ -15,6 +15,7 @@ use crate::agents::acp::catalog::{
 use crate::daemon::agent_acp::{AcpAgentManagerHandle, AcpAgentStartRequest};
 use crate::daemon::db::prelude::*;
 use crate::daemon::db::{AgentTurnRunSnapshot, AgentTurnRunStatus, AsyncDaemonDb};
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 const SESSION_ID: &str = "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc";
@@ -28,11 +29,11 @@ const TURN_FAILURE_DEADLINE: Duration = Duration::from_secs(30);
 async fn production_load_keeps_the_provider_failure_after_the_turn_detaches() {
     let directory = tempdir().expect("tempdir");
     let db_path = directory.path().join("harness.db");
-    let db = Arc::new(
+    let db = Arc::new(AsyncDaemonDbHandle(
         AsyncDaemonDb::connect(&db_path)
             .await
             .expect("open async database"),
-    );
+    ));
     seed_session(db.as_ref(), SESSION_ID).await;
     let state = restarted_state(&db_path, db.clone());
 

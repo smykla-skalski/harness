@@ -3,7 +3,7 @@ use rusqlite::Connection;
 use super::{CliError, db_error};
 
 const HELD_DISPATCH_DDL: &str =
-    include_str!("../../harness-daemon/src/daemon/db/migrations/0027_daemon_v33_held_dispatch.sql");
+    include_str!("../../harness-daemon-db-core/src/migrations/0027_daemon_v33_held_dispatch.sql");
 
 /// # Errors
 /// Returns [`CliError`] on SQL failures.

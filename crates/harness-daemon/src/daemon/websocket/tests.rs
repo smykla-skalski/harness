@@ -19,6 +19,7 @@ use crate::daemon::agent_tui::AgentTuiManagerHandle;
 use crate::daemon::codex_controller::CodexControllerHandle;
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::AsyncSessionSummaryQueries;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::daemon::db_open::DaemonDbOpen;
 use crate::daemon::http::{AsyncDaemonDbSlot, DaemonHttpState};
@@ -39,11 +40,11 @@ pub(super) async fn test_websocket_state_with_empty_async_db(db_path: &Path) -> 
 
     assert!(
         async_db_slot
-            .set(Arc::new(
+            .set(Arc::new(AsyncDaemonDbHandle(
                 AsyncDaemonDb::connect(db_path)
                     .await
                     .expect("open async daemon db"),
-            ))
+            )))
             .is_ok(),
         "install async db"
     );
@@ -108,7 +109,9 @@ pub(super) fn test_websocket_state_with_sync_db_only(db_path: &Path) -> DaemonHt
     assert!(
         db_slot
             .set(Arc::new(Mutex::new(
-                crate::daemon::db::DaemonDb::open(db_path).expect("open sync daemon db"),
+                crate::daemon::db_handle::DaemonDbOwnedHandle(
+                    crate::daemon::db::DaemonDb::open(db_path).expect("open sync daemon db"),
+                ),
             )))
             .is_ok(),
         "install sync db"

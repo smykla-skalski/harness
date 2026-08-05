@@ -1,13 +1,15 @@
 use super::{
-    AsyncDaemonDb, CliError, PreparedRemoteWorker, PreparedRemoteWorkerAction, RemoteWorkerAction,
-    RemoteWorkerIdentity, TaskBoardRemoteAssignmentRecord, TaskBoardRemoteExecutorStartIoPermit,
-    concurrent, executor_start_authority, reconcile_persisted_start_without_run, utc_now,
+    PreparedRemoteWorker, PreparedRemoteWorkerAction, RemoteWorkerAction, RemoteWorkerIdentity,
+    TaskBoardRemoteAssignmentRecord, TaskBoardRemoteExecutorStartIoPermit, concurrent,
+    executor_start_authority, reconcile_persisted_start_without_run, utc_now,
 };
 use crate::daemon::db::AsyncSessionSummaryQueries;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
+use harness_kernel::errors::CliError;
 
 pub(super) async fn abandon_predecessor_claim(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     record: &TaskBoardRemoteAssignmentRecord,
     identity: &RemoteWorkerIdentity,
     daemon_epoch: &str,
@@ -29,7 +31,7 @@ pub(super) async fn abandon_predecessor_claim(
 }
 
 pub(super) async fn prepare_recovery(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     record: &TaskBoardRemoteAssignmentRecord,
     identity: &RemoteWorkerIdentity,
     action: RemoteWorkerAction,

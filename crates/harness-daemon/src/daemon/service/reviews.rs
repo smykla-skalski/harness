@@ -1,8 +1,8 @@
 use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
 
-use crate::daemon::db::AsyncDaemonDb;
-use crate::daemon::service::observe_async_db;
+use super::observe_async_db;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::github_api::retry_stable_read;
 use crate::reviews::{
     ReviewActionPreviewKind, ReviewItem, ReviewRepositoryLabel, ReviewsActionPreviewRequest,
@@ -164,7 +164,7 @@ pub(super) async fn query_repository_reviews_snapshot_parts(
 
 async fn query_reviews_with_database(
     request: &ReviewsQueryRequest,
-    database: Option<&AsyncDaemonDb>,
+    database: Option<&AsyncDaemonDbHandle>,
 ) -> Result<ReviewsQueryResponse, CliError> {
     request.validate()?;
     let (source, _) = retry_stable_read("reviews.query", |revision| async move {
@@ -364,7 +364,7 @@ pub async fn preview_review_action(
 
 pub(crate) async fn preview_review_action_with_audit_db(
     request: &ReviewsActionPreviewRequest,
-    database: Option<Arc<AsyncDaemonDb>>,
+    database: Option<Arc<AsyncDaemonDbHandle>>,
 ) -> Result<ReviewsActionPreviewResponse, CliError> {
     request.validate()?;
     if request.action == ReviewActionPreviewKind::Auto {

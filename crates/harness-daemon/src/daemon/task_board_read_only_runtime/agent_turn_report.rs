@@ -11,7 +11,8 @@ use crate::daemon::agent_acp::{
 };
 use crate::daemon::db::prelude::*;
 use crate::daemon::db::task_board::prelude::AutomationKillSwitchQueries;
-use crate::daemon::db::{AgentTurnRunSnapshot, AgentTurnRunStatus, AsyncDaemonDb};
+use crate::daemon::db::{AgentTurnRunSnapshot, AgentTurnRunStatus};
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::http::DaemonHttpState;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
@@ -94,7 +95,7 @@ pub(crate) async fn start_agent_turn_report_run(
 /// cannot be persisted.
 pub(crate) async fn load_agent_turn_report_run(
     state: &DaemonHttpState,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     run_id: &str,
 ) -> Result<Option<AgentTurnRunSnapshot>, CliError> {
     let Some(mut run) = db.agent_turn_run(run_id).await? else {
@@ -160,7 +161,7 @@ pub(crate) async fn load_agent_turn_report_run(
 }
 
 async fn save_and_reload(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     mut run: AgentTurnRunSnapshot,
     run_id: &str,
 ) -> Result<Option<AgentTurnRunSnapshot>, CliError> {

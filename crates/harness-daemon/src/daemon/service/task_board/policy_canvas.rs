@@ -1,4 +1,3 @@
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{
     PolicyCanvasCreateRequest, PolicyCanvasDeleteRequest, PolicyCanvasDuplicateRequest,
     PolicyCanvasRenameRequest, PolicyCanvasSetActiveRequest,
@@ -16,6 +15,7 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::policy_canvas_response::policy_canvas_workspace_response;
 use crate::daemon::db::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::reviews_store::PolicyGraphQueries;
 
 #[cfg(test)]
@@ -36,7 +36,7 @@ const MAX_REPLAY_LIMIT: u32 = 500;
 /// # Errors
 /// Returns `CliError` when the database read or seed write fails.
 pub(super) async fn load_or_seed_workspace(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
 ) -> Result<PolicyCanvasWorkspace, CliError> {
     if let Some(mut workspace) = db.load_policy_workspace().await? {
         let repaired_canvases = workspace.ensure_seeded_automation_canvases();
@@ -74,7 +74,7 @@ pub(super) fn feed_gate_cache(workspace: &PolicyCanvasWorkspace) {
     clippy::cognitive_complexity,
     reason = "tracing::warn! macro expands into a chain clippy reads as branchy"
 )]
-pub(super) async fn bump_change_policy(db: &AsyncDaemonDb) {
+pub(super) async fn bump_change_policy(db: &AsyncDaemonDbHandle) {
     if let Err(error) = db.bump_change(POLICY_PIPELINE_CHANGE_CHANNEL).await {
         tracing::warn!(
             %error,
@@ -88,7 +88,7 @@ pub(super) async fn bump_change_policy(db: &AsyncDaemonDb) {
 /// # Errors
 /// Returns `CliError` when durable policy state cannot be loaded.
 pub(crate) async fn policy_canvas_workspace(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
 ) -> Result<PolicyCanvasWorkspaceResponse, CliError> {
     let workspace = load_or_seed_workspace(db).await?;
     Ok(policy_canvas_workspace_response(&workspace))
@@ -99,7 +99,7 @@ pub(crate) async fn policy_canvas_workspace(
 /// # Errors
 /// Returns `CliError` when durable policy state cannot be written.
 pub(crate) async fn create_policy_canvas(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &PolicyCanvasCreateRequest,
 ) -> Result<PolicyCanvasWorkspaceResponse, CliError> {
     let title = request.title.clone();
@@ -120,7 +120,7 @@ pub(crate) async fn create_policy_canvas(
 /// # Errors
 /// Returns `CliError` when durable policy state cannot be written.
 pub(crate) async fn duplicate_policy_canvas(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &PolicyCanvasDuplicateRequest,
 ) -> Result<PolicyCanvasWorkspaceResponse, CliError> {
     let canvas_id = request.canvas_id.clone();
@@ -142,7 +142,7 @@ pub(crate) async fn duplicate_policy_canvas(
 /// # Errors
 /// Returns `CliError` when durable policy state cannot be written.
 pub(crate) async fn rename_policy_canvas(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &PolicyCanvasRenameRequest,
 ) -> Result<PolicyCanvasWorkspaceResponse, CliError> {
     let canvas_id = request.canvas_id.clone();
@@ -164,7 +164,7 @@ pub(crate) async fn rename_policy_canvas(
 /// # Errors
 /// Returns `CliError` when durable policy state cannot be written.
 pub(crate) async fn set_active_policy_canvas(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &PolicyCanvasSetActiveRequest,
 ) -> Result<PolicyCanvasWorkspaceResponse, CliError> {
     let canvas_id = request.canvas_id.clone();
@@ -185,7 +185,7 @@ pub(crate) async fn set_active_policy_canvas(
 /// # Errors
 /// Returns `CliError` when durable policy state cannot be written.
 pub(crate) async fn delete_policy_canvas(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &PolicyCanvasDeleteRequest,
 ) -> Result<PolicyCanvasWorkspaceResponse, CliError> {
     let canvas_id = request.canvas_id.clone();
@@ -206,7 +206,7 @@ pub(crate) async fn delete_policy_canvas(
 /// # Errors
 /// Returns `CliError` when durable policy state cannot be written.
 pub(crate) async fn set_policy_canvas_global_enforcement(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &PolicyCanvasSetGlobalEnforcementRequest,
 ) -> Result<PolicyCanvasWorkspaceResponse, CliError> {
     let enabled = request.enabled;
@@ -232,7 +232,7 @@ pub(crate) async fn set_policy_canvas_global_enforcement(
 /// # Errors
 /// Returns `CliError` when the scenario name is blank or persistence fails.
 pub(crate) async fn create_policy_scenario(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &PolicyScenarioCreateRequest,
 ) -> Result<PolicyCanvasWorkspaceResponse, CliError> {
     let input = request.input.clone();
@@ -253,7 +253,7 @@ pub(crate) async fn create_policy_scenario(
 /// Returns `CliError` when the name is blank, the id is unknown, or persistence
 /// fails.
 pub(crate) async fn update_policy_scenario(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &PolicyScenarioUpdateRequest,
 ) -> Result<PolicyCanvasWorkspaceResponse, CliError> {
     let id = request.id.clone();
@@ -274,7 +274,7 @@ pub(crate) async fn update_policy_scenario(
 /// # Errors
 /// Returns `CliError` when the id is unknown or persistence fails.
 pub(crate) async fn delete_policy_scenario(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &PolicyScenarioDeleteRequest,
 ) -> Result<PolicyCanvasWorkspaceResponse, CliError> {
     let id = request.id.clone();
@@ -294,7 +294,7 @@ pub(crate) async fn delete_policy_scenario(
 /// # Errors
 /// Returns `CliError` when durable policy state cannot be written.
 pub(crate) async fn reset_policy_scenarios(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
 ) -> Result<PolicyCanvasWorkspaceResponse, CliError> {
     let (workspace, _scenarios) = db
         .update_policy_workspace(|workspace| {
@@ -311,7 +311,7 @@ pub(crate) async fn reset_policy_scenarios(
 /// # Errors
 /// Returns `CliError` when durable policy state cannot be loaded.
 pub(crate) async fn policy_pipeline(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &PolicyPipelineGetRequest,
 ) -> Result<PolicyPipelineResponse, CliError> {
     let workspace = load_or_seed_workspace(db).await?;
@@ -323,7 +323,7 @@ pub(crate) async fn policy_pipeline(
 /// # Errors
 /// Returns `CliError` when durable policy state cannot be written.
 pub(crate) async fn save_policy_pipeline_draft(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &PolicyPipelineSaveDraftRequest,
 ) -> Result<PolicyPipelineSaveDraftResponse, CliError> {
     let canvas_id = request.canvas_id.as_deref().ok_or_else(|| {
@@ -350,7 +350,7 @@ pub(crate) async fn save_policy_pipeline_draft(
 /// # Errors
 /// Returns `CliError` when simulation state cannot be written.
 pub(crate) async fn simulate_policy_pipeline(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &PolicyPipelineSimulateRequest,
 ) -> Result<PolicyPipelineSimulationResponse, CliError> {
     let document = request.document.clone();
@@ -370,7 +370,7 @@ pub(crate) async fn simulate_policy_pipeline(
 /// # Errors
 /// Returns `CliError` on invalid revision, validation, or persistence failure.
 pub(crate) async fn promote_policy_pipeline(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &PolicyPipelinePromoteRequest,
 ) -> Result<PolicyPipelinePromoteResponse, CliError> {
     let request = PolicyPipelineMakeLiveRequest {
@@ -399,7 +399,7 @@ pub(crate) async fn promote_policy_pipeline(
 /// # Errors
 /// Returns `CliError` on invalid revision, validation, or persistence failure.
 pub(crate) async fn make_live_policy_pipeline(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &PolicyPipelineMakeLiveRequest,
 ) -> Result<PolicyPipelineMakeLiveResponse, CliError> {
     let request = request.clone();
@@ -426,7 +426,7 @@ pub(crate) async fn make_live_policy_pipeline(
 /// # Errors
 /// Returns `CliError` when state or the active canvas cannot be resolved.
 pub(crate) async fn go_live_diff_policy_pipeline(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &PolicyPipelineGoLiveDiffRequest,
 ) -> Result<PolicyPipelineGoLiveDiffResponse, CliError> {
     let workspace = load_or_seed_workspace(db).await?;
@@ -446,7 +446,7 @@ pub(crate) async fn go_live_diff_policy_pipeline(
 /// # Errors
 /// Returns `CliError` when state, feed, or active canvas cannot be resolved.
 pub(crate) async fn replay_policy_pipeline(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &PolicyPipelineReplayRequest,
 ) -> Result<PolicyPipelineReplayResponse, CliError> {
     let workspace = load_or_seed_workspace(db).await?;
@@ -469,7 +469,7 @@ pub(crate) async fn replay_policy_pipeline(
 /// # Errors
 /// Returns `CliError` when durable policy state cannot be loaded.
 pub(crate) async fn audit_policy_pipeline(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &PolicyPipelineAuditRequest,
 ) -> Result<PolicyPipelineAuditResponse, CliError> {
     let workspace = load_or_seed_workspace(db).await?;

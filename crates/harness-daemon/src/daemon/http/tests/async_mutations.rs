@@ -18,6 +18,7 @@ use crate::session::types::SessionRole;
 use harness_testkit::with_isolated_harness_env;
 
 use super::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 pub(super) async fn test_http_state_with_empty_async_db(
@@ -29,11 +30,11 @@ pub(super) async fn test_http_state_with_empty_async_db(
 
     assert!(
         async_db_slot
-            .set(Arc::new(
+            .set(Arc::new(AsyncDaemonDbHandle(
                 AsyncDaemonDb::connect(db_path)
                     .await
                     .expect("open async daemon db"),
-            ))
+            )))
             .is_ok(),
         "install async db"
     );

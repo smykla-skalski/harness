@@ -1,6 +1,5 @@
 use chrono::Utc;
 
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{
     TaskBoardOrchestratorSettingsResponse, TaskBoardOrchestratorSettingsUpdateRequest,
     TaskBoardOrchestratorStatusResponse,
@@ -17,24 +16,27 @@ use harness_kernel::errors::CliErrorKind;
 
 use super::task_board_db::task_board_host_local_db;
 use super::task_board_orchestrator_settings::{apply_settings_update, normalize_github_inbox};
+#[cfg(test)]
+use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 pub(crate) async fn task_board_orchestrator_status_db(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
 ) -> Result<TaskBoardOrchestratorStatusResponse, CliError> {
     let state = db.task_board_orchestrator_state().await?;
     status_from_state(db, state, task_board_automation_v2_enabled_from_env()).await
 }
 
 pub(crate) async fn start_task_board_orchestrator_db(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
 ) -> Result<TaskBoardOrchestratorStatusResponse, CliError> {
     start_task_board_orchestrator_with_durable(db, task_board_automation_v2_enabled_from_env())
         .await
 }
 
 async fn start_task_board_orchestrator_with_durable(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     durable_enabled: bool,
 ) -> Result<TaskBoardOrchestratorStatusResponse, CliError> {
     if db.automation_kill_switch_engaged().await? {
@@ -65,13 +67,13 @@ async fn start_task_board_orchestrator_with_durable(
 }
 
 pub(crate) async fn stop_task_board_orchestrator_db(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
 ) -> Result<TaskBoardOrchestratorStatusResponse, CliError> {
     stop_task_board_orchestrator_with_durable(db, task_board_automation_v2_enabled_from_env()).await
 }
 
 pub(crate) async fn enforce_task_board_orchestrator_kill_switch_db(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
 ) -> Result<(), CliError> {
     let durable_enabled = task_board_automation_v2_enabled_from_env();
     if durable_enabled {
@@ -94,7 +96,7 @@ pub(crate) async fn enforce_task_board_orchestrator_kill_switch_db(
 }
 
 async fn stop_task_board_orchestrator_with_durable(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     durable_enabled: bool,
 ) -> Result<TaskBoardOrchestratorStatusResponse, CliError> {
     if durable_enabled {
@@ -106,13 +108,13 @@ async fn stop_task_board_orchestrator_with_durable(
 }
 
 pub(crate) async fn task_board_orchestrator_settings_db(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
 ) -> Result<TaskBoardOrchestratorSettingsResponse, CliError> {
     db.task_board_orchestrator_settings().await
 }
 
 pub(crate) async fn update_task_board_orchestrator_settings_db(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &TaskBoardOrchestratorSettingsUpdateRequest,
 ) -> Result<TaskBoardOrchestratorSettingsResponse, CliError> {
     let mut settings = db.task_board_orchestrator_settings().await?;
@@ -128,7 +130,7 @@ pub(crate) async fn update_task_board_orchestrator_settings_db(
 }
 
 async fn replace_orchestrator_settings_with_durable(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     settings: &TaskBoardOrchestratorSettings,
     durable_enabled: bool,
 ) -> Result<i64, CliError> {
@@ -154,7 +156,7 @@ const fn desired_mode_for_settings(
 }
 
 async fn set_running_intent(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     enabled: bool,
     running: bool,
     durable_enabled: bool,
@@ -167,7 +169,7 @@ async fn set_running_intent(
 }
 
 async fn status_from_state(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     state: TaskBoardOrchestratorState,
     durable_enabled: bool,
 ) -> Result<TaskBoardOrchestratorStatusResponse, CliError> {
@@ -248,6 +250,7 @@ mod tests {
         let db = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
             .await
             .expect("open database");
+        let db = AsyncDaemonDbHandle(db);
 
         let status = start_task_board_orchestrator_with_durable(&db, false)
             .await
@@ -283,6 +286,7 @@ mod tests {
         let db = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
             .await
             .expect("open database");
+        let db = AsyncDaemonDbHandle(db);
         let mut settings = TaskBoardOrchestratorSettings::default();
         settings.github_inbox.repositories = vec!["smykla-skalski/harness".into()];
         db.replace_task_board_orchestrator_settings(&settings)
@@ -346,6 +350,7 @@ mod tests {
         let db = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
             .await
             .expect("open database");
+        let db = AsyncDaemonDbHandle(db);
 
         start_task_board_orchestrator_with_durable(&db, true)
             .await
@@ -370,6 +375,7 @@ mod tests {
         let db = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
             .await
             .expect("open database");
+        let db = AsyncDaemonDbHandle(db);
         db.replace_task_board_orchestrator_settings(&TaskBoardOrchestratorSettings {
             step_mode: true,
             ..TaskBoardOrchestratorSettings::default()
@@ -395,6 +401,7 @@ mod tests {
         let db = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
             .await
             .expect("open database");
+        let db = AsyncDaemonDbHandle(db);
         db.replace_task_board_orchestrator_state(&TaskBoardOrchestratorState::default())
             .await
             .expect("advance unrelated change revision");
@@ -437,6 +444,7 @@ mod tests {
         let db = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
             .await
             .expect("open database");
+        let db = AsyncDaemonDbHandle(db);
         start_task_board_orchestrator_with_durable(&db, true)
             .await
             .expect("start durable orchestrator");
@@ -463,6 +471,7 @@ mod tests {
         let db = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
             .await
             .expect("open database");
+        let db = AsyncDaemonDbHandle(db);
         let now = Utc::now();
         db.start_task_board_automation(TaskBoardAutomationDesiredMode::Continuous, now)
             .await

@@ -1,4 +1,3 @@
-use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::{
     TaskBoardExecutionPhase, TaskBoardExecutionState, TaskBoardReviewCycle,
     TaskBoardReviewRoundDecision, TaskBoardReviewerOutcome, TaskBoardTerminalOutcome,
@@ -13,9 +12,10 @@ use super::task_board_workflow_execution::{
     canonical_time, guarded_execution, require_human, stale_outcome,
 };
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 pub(crate) async fn record_workflow_reviewer_outcome(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     expected: &TaskBoardWorkflowExecutionCas,
     outcome: TaskBoardReviewerOutcome,
     updated_at: &str,

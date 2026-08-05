@@ -2,9 +2,8 @@ use rusqlite::Connection;
 
 use super::{CliError, db_error};
 
-const REMOTE_IDENTITY_DDL: &str = include_str!(
-    "../../harness-daemon/src/daemon/db/migrations/0021_daemon_v27_remote_identity.sql"
-);
+const REMOTE_IDENTITY_DDL: &str =
+    include_str!("../../harness-daemon-db-core/src/migrations/0021_daemon_v27_remote_identity.sql");
 
 /// # Errors
 /// Returns [`CliError`] on SQL failures.

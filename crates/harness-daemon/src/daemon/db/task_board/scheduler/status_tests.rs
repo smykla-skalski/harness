@@ -352,7 +352,10 @@ fn timestamp(value: DateTime<Utc>) -> String {
     value.to_rfc3339()
 }
 
-async fn seed_policy_live_revision(db: &AsyncDaemonDb, revision: u64) {
+async fn seed_policy_live_revision(
+    db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
+    revision: u64,
+) {
     let mut workspace = PolicyCanvasWorkspace::seeded();
     let canvas = workspace.active_canvas_mut().expect("active policy canvas");
     let mut live = canvas.document.clone();

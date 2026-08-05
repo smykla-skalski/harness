@@ -1,4 +1,4 @@
-use crate::daemon::db::{AsyncDaemonDb, TaskBoardRemoteOfferOutcome, TaskBoardRemoteOfferWindow};
+use crate::daemon::db::{TaskBoardRemoteOfferOutcome, TaskBoardRemoteOfferWindow};
 use crate::task_board::{
     TaskBoardExecutionAttemptCas, TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionRecord,
 };
@@ -9,13 +9,14 @@ use super::{
     remote_preparing_attempt, requests, select_local_target, warn_offer_render_refused,
 };
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 /// Offers one candidate execution to a remote host. Every way a candidate can
 /// fail to go remote ends the same way - select the local target and return -
 /// so `Ok(())` means "this candidate is settled", not "an offer was made". Only
 /// a broken provenance invariant returns `Err` and aborts the whole pass.
 pub(super) async fn offer_remote_candidate(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     report: &mut TaskBoardRemoteControllerReport,
     execution: &TaskBoardWorkflowExecutionRecord,
 ) -> Result<(), CliError> {

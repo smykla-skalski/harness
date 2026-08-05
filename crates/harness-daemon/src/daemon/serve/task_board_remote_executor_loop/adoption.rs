@@ -3,7 +3,7 @@
 use std::path::Path;
 
 use crate::daemon::db::{
-    AsyncDaemonDb, REMOTE_START_INTERRUPTED_WITHOUT_RUN_ERROR_CODE,
+    REMOTE_START_INTERRUPTED_WITHOUT_RUN_ERROR_CODE,
     REMOTE_START_INTERRUPTED_WITHOUT_RUN_FAILURE_CLASS, REMOTE_START_PREFLIGHT_ERROR_CODE,
     REMOTE_START_PREFLIGHT_FAILURE_CLASS, TaskBoardRemoteAssignmentRecord,
     TaskBoardRemoteExecutorRun, TaskBoardRemoteExecutorStartIoPermit,
@@ -27,6 +27,7 @@ use super::stop::settle_lifecycle_settings_drift;
 use super::terminal::persist_terminal_snapshot;
 use super::{RemoteWorkerIdentity, claim_active_lifecycle_owner, concurrent};
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 #[expect(
     clippy::cognitive_complexity,
@@ -34,7 +35,7 @@ use crate::daemon::db::task_board::prelude::*;
 )]
 pub(super) async fn execute_and_reconcile_remote_worker(
     state: &DaemonHttpState,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     mut record: TaskBoardRemoteAssignmentRecord,
     offer: &RemoteOfferRequest,
     identity: &RemoteWorkerIdentity,
@@ -100,7 +101,7 @@ pub(super) async fn execute_and_reconcile_remote_worker(
 /// reconciling it rather than treat the record as adopted.
 async fn reconcile_claimed_adoption(
     state: &DaemonHttpState,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     permit: Option<&TaskBoardRemoteExecutorStartIoPermit>,
     snapshot: &TaskBoardRemoteExecutorRun,
     workspace: &Path,
@@ -127,7 +128,7 @@ async fn reconcile_claimed_adoption(
 /// exact run behind a stop intent; the stop CAS rejects stale generations.
 async fn stop_pre_permit_remote_run(
     state: &DaemonHttpState,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     record: &TaskBoardRemoteAssignmentRecord,
     snapshot: &TaskBoardRemoteExecutorRun,
 ) -> Result<(), CliError> {
@@ -149,7 +150,7 @@ async fn stop_pre_permit_remote_run(
 /// seals the receipt or defers on a newly observed run; recovery never retries
 /// external Start for the same permit.
 pub(super) async fn reconcile_persisted_start_without_run(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     record: &TaskBoardRemoteAssignmentRecord,
     permit: &TaskBoardRemoteExecutorStartIoPermit,
 ) -> Result<(), CliError> {
@@ -179,7 +180,7 @@ pub(super) async fn reconcile_persisted_start_without_run(
 /// or ambiguous run instead retains the permit, authority, and capacity so a
 /// later scan can probe/adopt or stop it.
 async fn reconcile_fresh_start_failure(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     record: &TaskBoardRemoteAssignmentRecord,
     identity: &RemoteWorkerIdentity,
     permit: &TaskBoardRemoteExecutorStartIoPermit,
@@ -267,7 +268,7 @@ fn concurrent_owned(message: String) -> CliError {
 
 async fn stop_invalid_remote_run_if_fenced(
     state: &DaemonHttpState,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     record: &TaskBoardRemoteAssignmentRecord,
     permit: Option<&TaskBoardRemoteExecutorStartIoPermit>,
     snapshot: &TaskBoardRemoteExecutorRun,
@@ -315,7 +316,7 @@ fn invalid_run_stop_source(
 
 async fn adopt_remote_start(
     state: &DaemonHttpState,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     permit: &TaskBoardRemoteExecutorStartIoPermit,
     snapshot: &TaskBoardRemoteExecutorRun,
     workspace: &Path,
@@ -368,7 +369,7 @@ async fn adopt_remote_start(
 
 async fn settle_failed_adoption(
     state: &DaemonHttpState,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     permit: &TaskBoardRemoteExecutorStartIoPermit,
     snapshot: &TaskBoardRemoteExecutorRun,
     reason: TaskBoardRemoteExecutorStopReason,
@@ -384,7 +385,7 @@ async fn settle_failed_adoption(
 }
 
 async fn mark_running_if_active(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     record: &TaskBoardRemoteAssignmentRecord,
     snapshot: &TaskBoardRemoteExecutorRun,
 ) -> Result<(), CliError> {

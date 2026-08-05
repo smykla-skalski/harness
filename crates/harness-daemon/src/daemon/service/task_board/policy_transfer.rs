@@ -2,7 +2,6 @@
 
 use std::collections::HashSet;
 
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{
     POLICY_TRANSFER_FORMAT, POLICY_TRANSFER_VERSION, PolicyCanvasWorkspaceResponse,
     PolicyTransferBundle, PolicyTransferDumpRequest, PolicyTransferImportRequest,
@@ -16,6 +15,7 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::policy_canvas::{bump_change_policy, feed_gate_cache};
 use super::policy_canvas_response::policy_canvas_workspace_response;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::reviews_store::PolicyGraphQueries;
 
 #[cfg(test)]
@@ -28,7 +28,7 @@ mod tests;
 /// Returns `CliError` when policy state cannot be read, a requested ID is
 /// duplicated, or a requested policy does not exist.
 pub(crate) async fn dump_policies(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &PolicyTransferDumpRequest,
 ) -> Result<PolicyTransferBundle, CliError> {
     let workspace = db
@@ -61,7 +61,7 @@ pub(crate) async fn dump_policies(
 /// Returns `CliError` when the bundle format, records, or metadata are invalid,
 /// or when the database write fails.
 pub(crate) async fn import_policies(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &PolicyTransferImportRequest,
 ) -> Result<PolicyCanvasWorkspaceResponse, CliError> {
     validate_import(request)?;

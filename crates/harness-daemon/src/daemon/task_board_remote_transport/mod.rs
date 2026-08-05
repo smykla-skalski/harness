@@ -31,8 +31,8 @@
 //! real, load-bearing dependency on `http`'s auth/db helpers already exists
 //! here, naming `CompanionRouter` directly does not introduce a new one.
 pub(crate) type DaemonHttpState = crate::daemon::server_state::DaemonHttpState<
-    crate::daemon::db::DaemonDb,
-    crate::daemon::db::AsyncDaemonDb,
+    crate::daemon::db_handle::DaemonDbOwnedHandle,
+    crate::daemon::db_handle::AsyncDaemonDbHandle,
     crate::daemon::http::companion::CompanionRouter,
 >;
 

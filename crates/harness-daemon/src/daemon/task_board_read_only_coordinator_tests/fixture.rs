@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use crate::daemon::db::{AsyncDaemonDb, workflow_owner};
+use crate::daemon::db::workflow_owner;
 use crate::task_board::{
     AgentMode, ExternalRef, ExternalRefProvider, TASK_BOARD_EXECUTION_TARGET_ACTION_RESOURCE,
     TASK_BOARD_EXECUTION_TARGET_ATTEMPT_RESOURCE, TASK_BOARD_EXECUTION_TARGET_RESOURCE,
@@ -13,6 +13,7 @@ use crate::task_board::{
 };
 
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::service::task_board_workflow_test_support::{TestDatabase, reviewers};
 
 pub(super) const NOW: &str = "2026-07-17T10:00:00Z";
@@ -165,7 +166,7 @@ pub(super) async fn seed_execution_with_reviewers(
 }
 
 pub(super) async fn seed_additional_execution(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     label: &str,
     workflow_kind: TaskBoardWorkflowKind,
     phase: crate::task_board::TaskBoardExecutionPhase,
@@ -185,7 +186,7 @@ pub(super) async fn seed_additional_execution(
 }
 
 async fn seed_execution_in_database(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     label: &str,
     workflow_kind: TaskBoardWorkflowKind,
     phase: crate::task_board::TaskBoardExecutionPhase,
@@ -325,7 +326,7 @@ fn prepare_item(
     }
 }
 
-pub(super) async fn seed_settings(db: &AsyncDaemonDb) {
+pub(super) async fn seed_settings(db: &AsyncDaemonDbHandle) {
     if db
         .task_board_configuration_revision()
         .await
@@ -347,7 +348,7 @@ fn pull_request(workflow_kind: TaskBoardWorkflowKind) -> Option<TaskBoardPullReq
 }
 
 async fn seed_attempt(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     seed: AttemptSeed,
 ) {
@@ -371,7 +372,7 @@ async fn seed_attempt(
 }
 
 pub(super) async fn insert_committed_admission(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     item_id: &str,
     execution_id: &str,
     item_revision: i64,

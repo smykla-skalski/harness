@@ -15,11 +15,12 @@ use super::{
     cleanup_predecessor_remote_start, executor_start_authority, prepare_remote_workspace,
     shutdown_observed, start_authority_for_action, start_window_is_open, utc_now,
 };
-use crate::daemon::db::{AsyncDaemonDb, TaskBoardRemoteAssignmentRecord};
+use crate::daemon::db::TaskBoardRemoteAssignmentRecord;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use harness_kernel::errors::CliError;
 
 pub(super) async fn prepare_fresh_remote_worker_start(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     record: &TaskBoardRemoteAssignmentRecord,
     offer: &RemoteOfferRequest,
     identity: &RemoteWorkerIdentity,

@@ -8,6 +8,7 @@ use harness_daemon::app::{AppContext, Execute};
 use harness_daemon::daemon::db::{
     DaemonDb, DaemonDbOpen, RemoteAcmeQueries, RemoteIdentitySyncQueries,
 };
+use harness_daemon::daemon::db_handle::DaemonDbOwnedHandle;
 use harness_daemon::daemon::remote::{RemoteAcmeChallenge, RemoteDaemonServeConfig};
 use harness_daemon::daemon::remote_acme::{RemoteAcmeAccountCredentials, RemoteCertificateBundle};
 use harness_daemon::daemon::state;
@@ -364,7 +365,7 @@ fn daemon_remote_pair_create_reports_ttl_overflow_as_too_large() {
 
 #[test]
 fn daemon_remote_pair_create_builds_persisted_record_and_response() {
-    let db = DaemonDb::open_in_memory().expect("open db");
+    let db = DaemonDbOwnedHandle(DaemonDb::open_in_memory().expect("open db"));
     let expected_pin = seed_remote_tls_identity(&db);
     let parsed = DaemonRemoteCommandTestHarness::try_parse_from([
         "test", "pair", "create", "--role", "operator", "--scopes", "read", "--ttl", "2m",

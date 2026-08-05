@@ -4,8 +4,8 @@
 
 use tokio::sync::mpsc;
 
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::NewApprovalGrant;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::reviews_store::PolicyGraphQueries;
 use crate::task_board::policy_graph::{
     PolicyCanvasWorkspace, PolicyPendingGrantRequest, RecordedPolicyDecision,
@@ -17,7 +17,9 @@ use harness_kernel::errors::CliError;
 ///
 /// # Errors
 /// Returns `CliError` when the database read/seed fails.
-pub(super) async fn bootstrap_policy_storage(async_db: &AsyncDaemonDb) -> Result<(), CliError> {
+pub(super) async fn bootstrap_policy_storage(
+    async_db: &AsyncDaemonDbHandle,
+) -> Result<(), CliError> {
     install_decision_recording(async_db);
     install_pending_grant_recording(async_db);
     ensure_policy_workspace(async_db).await?;
@@ -43,7 +45,7 @@ const POLICY_DECISION_PRUNE_INTERVAL: u32 = 256;
 /// The drain also bounds the feed: it trims once at boot (clearing any backlog
 /// from before retention existed) and again every `POLICY_DECISION_PRUNE_INTERVAL`
 /// records, keeping the table near `POLICY_DECISION_RETENTION` rows.
-fn install_decision_recording(async_db: &AsyncDaemonDb) {
+fn install_decision_recording(async_db: &AsyncDaemonDbHandle) {
     let db = async_db.clone();
     let (sender, mut receiver) = mpsc::unbounded_channel::<RecordedPolicyDecision>();
     tokio::spawn(async move {
@@ -72,7 +74,7 @@ fn install_decision_recording(async_db: &AsyncDaemonDb) {
 /// and idempotently creates the pending grant per request, so the synchronous
 /// evaluation path only enqueues and never blocks on the database. Creation
 /// failures are logged, never propagated.
-fn install_pending_grant_recording(async_db: &AsyncDaemonDb) {
+fn install_pending_grant_recording(async_db: &AsyncDaemonDbHandle) {
     let db = async_db.clone();
     let (sender, mut receiver) = mpsc::unbounded_channel::<PolicyPendingGrantRequest>();
     tokio::spawn(async move {
@@ -91,7 +93,7 @@ fn install_pending_grant_recording(async_db: &AsyncDaemonDb) {
     clippy::cognitive_complexity,
     reason = "tracing::warn! macro expands into a chain clippy reads as branchy"
 )]
-async fn record_one_pending_grant(db: &AsyncDaemonDb, request: PolicyPendingGrantRequest) {
+async fn record_one_pending_grant(db: &AsyncDaemonDbHandle, request: PolicyPendingGrantRequest) {
     let grant = NewApprovalGrant {
         board_item_id: request.board_item_id,
         action: request.action,
@@ -112,14 +114,14 @@ async fn record_one_pending_grant(db: &AsyncDaemonDb, request: PolicyPendingGran
     clippy::cognitive_complexity,
     reason = "tracing::warn! macro expands into a chain clippy reads as branchy"
 )]
-async fn prune_recorded_decisions(db: &AsyncDaemonDb) {
+async fn prune_recorded_decisions(db: &AsyncDaemonDbHandle) {
     if let Err(error) = db.prune_policy_decisions(POLICY_DECISION_RETENTION).await {
         tracing::warn!(%error, "failed to prune policy decisions");
     }
 }
 
 /// Persist a default workspace when the database is still empty.
-async fn ensure_policy_workspace(async_db: &AsyncDaemonDb) -> Result<(), CliError> {
+async fn ensure_policy_workspace(async_db: &AsyncDaemonDbHandle) -> Result<(), CliError> {
     if async_db.load_policy_workspace().await?.is_none() {
         let seeded = PolicyCanvasWorkspace::seeded();
         async_db.replace_policy_workspace(&seeded).await?;

@@ -2,13 +2,12 @@ use super::{
     CONTROLLER_SCAN_LIMIT, TaskBoardRemoteControllerReport, canonical_now, progress_assignment,
 };
 use crate::daemon::db::task_board::prelude::*;
-use crate::daemon::db::{
-    AsyncDaemonDb, TaskBoardRemoteControllerScanItem, TaskBoardRemoteControllerScanStep,
-};
+use crate::daemon::db::{TaskBoardRemoteControllerScanItem, TaskBoardRemoteControllerScanStep};
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use harness_kernel::errors::CliError;
 
 pub(super) async fn progress_existing_assignments(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     report: &mut TaskBoardRemoteControllerReport,
 ) -> Result<(), CliError> {
     report.scan_incomplete = false;
@@ -44,7 +43,7 @@ pub(super) async fn progress_existing_assignments(
 }
 
 pub(super) async fn finish_progress_attempt(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     item: &TaskBoardRemoteControllerScanItem,
     result: Result<bool, CliError>,
     report: &mut TaskBoardRemoteControllerReport,

@@ -11,6 +11,7 @@ use crate::daemon::agent_tui::{
 };
 use crate::daemon::codex_controller::CodexControllerHandle;
 use crate::daemon::db::DaemonDb;
+use crate::daemon::db_handle::DaemonDbOwnedHandle;
 use crate::daemon::db_open::DaemonDbOpen;
 use crate::daemon::http::{
     AsyncDaemonDbSlot, DaemonHttpState, ManagedAgentMutationLocks, connect_async_db_for_tests,
@@ -31,9 +32,9 @@ pub(super) fn test_http_state() -> DaemonHttpState {
     let async_db = Arc::new(OnceLock::new());
     let db_path = temp_dir().join(format!("harness-tb-managed-{}.db", Uuid::new_v4()));
     db_slot
-        .set(Arc::new(Mutex::new(
+        .set(Arc::new(Mutex::new(DaemonDbOwnedHandle(
             DaemonDb::open(&db_path).expect("open file db"),
-        )))
+        ))))
         .expect("install db");
     async_db
         .set(connect_async_db_for_tests(&db_path))
@@ -133,7 +134,10 @@ pub(super) fn applied_task(mode: AgentMode) -> DispatchAppliedTask {
     }
 }
 
-pub(super) async fn seed_session(db: &crate::daemon::db::AsyncDaemonDb, session_id: &str) {
+pub(super) async fn seed_session(
+    db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
+    session_id: &str,
+) {
     let now = "2026-07-17T10:00:00Z";
     let state_json = serde_json::json!({
         "schema_version": crate::session::types::CURRENT_VERSION,

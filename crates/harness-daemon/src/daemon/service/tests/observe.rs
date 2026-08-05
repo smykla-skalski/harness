@@ -365,7 +365,7 @@ fn incremental_observe_skips_change_bump_when_snapshot_is_unchanged() {
     });
 }
 
-async fn latest_change_sequence(async_db: &crate::daemon::db::AsyncDaemonDb) -> i64 {
+async fn latest_change_sequence(async_db: &crate::daemon::db_handle::AsyncDaemonDbHandle) -> i64 {
     async_db
         .load_change_tracking_since(0)
         .await

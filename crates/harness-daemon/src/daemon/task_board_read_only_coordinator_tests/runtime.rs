@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use async_trait::async_trait;
 use tokio::sync::Semaphore;
 
-use crate::daemon::db::{AgentTurnRunSnapshot, AgentTurnRunStatus, AsyncDaemonDb};
+use crate::daemon::db::{AgentTurnRunSnapshot, AgentTurnRunStatus};
 use crate::daemon::protocol::{CodexRunRequest, CodexRunSnapshot, CodexRunStatus};
 use crate::daemon::test_liveness::LIVENESS;
 use crate::task_board::{
@@ -23,6 +23,7 @@ use super::fixture::{FROZEN_HEAD, NOW};
 mod planned_report;
 
 use crate::daemon::db::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 pub(super) use planned_report::PlannedReport;
 
 enum HeadBehavior {
@@ -40,7 +41,7 @@ pub(in crate::daemon) struct CapturedAgentTurnStart {
 }
 
 pub(in crate::daemon) struct FakeReadOnlyRuntime {
-    durable_db: Option<AsyncDaemonDb>,
+    durable_db: Option<AsyncDaemonDbHandle>,
     reports: Mutex<VecDeque<PlannedReport>>,
     runs: Mutex<BTreeMap<String, CodexRunSnapshot>>,
     head: Mutex<HeadBehavior>,
@@ -98,7 +99,7 @@ impl FakeReadOnlyRuntime {
         }
     }
 
-    pub(in crate::daemon) fn with_durable_db(mut self, db: AsyncDaemonDb) -> Self {
+    pub(in crate::daemon) fn with_durable_db(mut self, db: AsyncDaemonDbHandle) -> Self {
         self.durable_db = Some(db);
         self
     }

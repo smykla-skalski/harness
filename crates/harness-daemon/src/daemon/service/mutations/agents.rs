@@ -14,7 +14,7 @@ pub fn change_role(
     session_id: &str,
     agent_id: &str,
     request: &RoleChangeRequest,
-    db: Option<&super::super::db::DaemonDb>,
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
 ) -> Result<SessionDetail, CliError> {
     if let Some(db) = db
         && let Some(mut state) = db.load_session_state_for_mutation(session_id)?
@@ -62,7 +62,7 @@ pub fn remove_agent(
     session_id: &str,
     agent_id: &str,
     request: &AgentRemoveRequest,
-    db: Option<&super::super::db::DaemonDb>,
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
 ) -> Result<SessionDetail, CliError> {
     if let Some(db) = db
         && let Some(mut state) = db.load_session_state_for_mutation(session_id)?

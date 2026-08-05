@@ -4,10 +4,11 @@ use crate::session::types::{SessionRole, SessionSignalStatus};
 
 use super::*;
 use crate::daemon::db::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 async fn seed_pending_signal(
-    async_db: &crate::daemon::db::AsyncDaemonDb,
+    async_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
     session_id: &str,
     actor_id: &str,
     agent_id: &str,
@@ -56,6 +57,7 @@ fn send_signal_async_returns_detail_with_pending_signal_without_sync_handle() {
                 let async_db = crate::daemon::db::AsyncDaemonDb::connect(&db_path)
                     .await
                     .expect("open async daemon db");
+                let async_db = AsyncDaemonDbHandle(async_db);
                 let state = start_direct_session_async(
                     &async_db,
                     project,
@@ -132,6 +134,7 @@ fn cancel_signal_async_updates_async_db_without_sync_handle() {
                     let async_db = crate::daemon::db::AsyncDaemonDb::connect(&db_path)
                         .await
                         .expect("open async daemon db");
+                    let async_db = AsyncDaemonDbHandle(async_db);
                     let state = start_direct_session_async(
                         &async_db,
                         project,
@@ -216,6 +219,7 @@ fn record_signal_ack_direct_async_updates_signal_index_without_sync_handle() {
                 let async_db = crate::daemon::db::AsyncDaemonDb::connect(&db_path)
                     .await
                     .expect("open async daemon db");
+                let async_db = AsyncDaemonDbHandle(async_db);
                 let state = start_direct_session_async(
                     &async_db,
                     project,
@@ -294,7 +298,7 @@ fn record_signal_ack_direct_async_updates_signal_index_without_sync_handle() {
 const EXPIRED_DELIVERY_SESSION_ID: &str = "6a74589a-e06a-5cac-9fed-c7ca7954d3c8";
 
 struct ExpiredDeliveryFixture {
-    async_db: crate::daemon::db::AsyncDaemonDb,
+    async_db: crate::daemon::db_handle::AsyncDaemonDbHandle,
     task_id: String,
     worker_id: String,
 }
@@ -307,6 +311,7 @@ async fn expired_delivery_setup(project: &std::path::Path) -> ExpiredDeliveryFix
     let async_db = crate::daemon::db::AsyncDaemonDb::connect(&db_path)
         .await
         .expect("open async daemon db");
+    let async_db = AsyncDaemonDbHandle(async_db);
     let state = start_direct_session_async(
         &async_db,
         project,
@@ -391,7 +396,7 @@ async fn expired_delivery_setup(project: &std::path::Path) -> ExpiredDeliveryFix
 // timestamp, then resyncs the daemon's signal index so it observes the
 // rewritten file instead of the one it wrote during dispatch.
 async fn expire_pending_signal_and_resync(
-    async_db: &crate::daemon::db::AsyncDaemonDb,
+    async_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
     project: &std::path::Path,
     signal: crate::agents::runtime::signal::Signal,
 ) {

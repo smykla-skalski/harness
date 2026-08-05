@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use serde::Deserialize;
 
-use super::async_pool::AsyncDaemonDb;
+use super::AsyncDaemonDb;
 use super::async_writes::AsyncSessionWriteQueries;
 use super::writes::SessionWriteQueries;
 use super::{

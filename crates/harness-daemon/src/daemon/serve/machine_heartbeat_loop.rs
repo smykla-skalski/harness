@@ -5,23 +5,23 @@ use tokio::sync::watch as tokio_watch;
 use tokio::task::JoinHandle;
 use tokio::time::{MissedTickBehavior, interval};
 
-use crate::daemon::db::AsyncDaemonDb;
 #[cfg(test)]
-use crate::daemon::db::task_board::prelude::OrchestratorSettingsQueries;
+use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::service;
 
 const MIN_HEARTBEAT_INTERVAL: Duration = Duration::from_secs(15);
 const DEFAULT_HEARTBEAT_INTERVAL: Duration = Duration::from_mins(1);
 
 pub(super) fn spawn_machine_heartbeat_loop(
-    db: Arc<AsyncDaemonDb>,
+    db: Arc<AsyncDaemonDbHandle>,
     shutdown_rx: tokio_watch::Receiver<bool>,
 ) -> JoinHandle<()> {
     spawn_machine_heartbeat_loop_with(db, shutdown_rx, DEFAULT_HEARTBEAT_INTERVAL)
 }
 
 fn spawn_machine_heartbeat_loop_with(
-    db: Arc<AsyncDaemonDb>,
+    db: Arc<AsyncDaemonDbHandle>,
     shutdown_rx: tokio_watch::Receiver<bool>,
     tick_interval: Duration,
 ) -> JoinHandle<()> {
@@ -29,7 +29,7 @@ fn spawn_machine_heartbeat_loop_with(
 }
 
 async fn run_machine_heartbeat_loop(
-    db: Arc<AsyncDaemonDb>,
+    db: Arc<AsyncDaemonDbHandle>,
     mut shutdown_rx: tokio_watch::Receiver<bool>,
     tick_interval: Duration,
 ) {
@@ -58,7 +58,7 @@ async fn wait_for_shutdown(shutdown_rx: &mut tokio_watch::Receiver<bool>) {
     clippy::cognitive_complexity,
     reason = "tracing macro expansion; tokio-rs/tracing#553"
 )]
-async fn touch_local(db: &AsyncDaemonDb) {
+async fn touch_local(db: &AsyncDaemonDbHandle) {
     match service::touch_task_board_host_local_db(db).await {
         Ok(machine) => {
             tracing::debug!(
@@ -80,6 +80,7 @@ mod tests {
     use tokio::time::{Duration, sleep, timeout};
 
     use super::*;
+    use crate::daemon::db::task_board::prelude::OrchestratorSettingsQueries;
     use crate::daemon::db_open::AsyncDaemonDbConnect;
     use crate::task_board::Machine;
 
@@ -89,11 +90,11 @@ mod tests {
         let xdg = temp.path().join("xdg");
         let xdg_value = xdg.to_string_lossy().into_owned();
         temp_env::async_with_vars([("XDG_DATA_HOME", Some(xdg_value.as_str()))], async {
-            let db = Arc::new(
+            let db = Arc::new(AsyncDaemonDbHandle(
                 AsyncDaemonDb::connect(&temp.path().join("harness.db"))
                     .await
                     .expect("open database"),
-            );
+            ));
             let (tx, rx) = tokio_watch::channel(false);
             let handle =
                 spawn_machine_heartbeat_loop_with(Arc::clone(&db), rx, MIN_HEARTBEAT_INTERVAL);
@@ -131,6 +132,7 @@ mod tests {
         let db = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
             .await
             .expect("open database");
+        let db = AsyncDaemonDbHandle(db);
         let mut machine = Machine::new("machine-1", "Local Mac");
         machine.project_types = vec!["swift".to_string()];
         machine.agent_modes = vec![crate::task_board::AgentMode::Interactive];

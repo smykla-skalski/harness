@@ -1,5 +1,6 @@
 use super::super::*;
 use crate::daemon::db::AsyncSessionSummaryQueries;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 #[test]
@@ -15,6 +16,7 @@ fn remove_agent_async_direct_sends_abort_signal() {
                 let async_db = crate::daemon::db::AsyncDaemonDb::connect(&db_path)
                     .await
                     .expect("open async daemon db");
+                let async_db = AsyncDaemonDbHandle(async_db);
                 let state = start_direct_session_async(
                     &async_db,
                     project,
@@ -85,6 +87,7 @@ fn end_session_async_direct_marks_inactive() {
                 let async_db = crate::daemon::db::AsyncDaemonDb::connect(&db_path)
                     .await
                     .expect("open async daemon db");
+                let async_db = AsyncDaemonDbHandle(async_db);
                 let state = start_direct_session_async(
                     &async_db,
                     project,
@@ -154,6 +157,7 @@ fn start_session_direct_async_creates_in_sqlite() {
             let async_db = crate::daemon::db::AsyncDaemonDb::connect(&db_path)
                 .await
                 .expect("open async daemon db");
+            let async_db = AsyncDaemonDbHandle(async_db);
 
             let session_id = "00000000-0000-4000-8000-000000000501";
             let state = start_session_direct_async(
@@ -206,6 +210,7 @@ fn join_session_direct_async_adds_agent() {
                 let async_db = crate::daemon::db::AsyncDaemonDb::connect(&db_path)
                     .await
                     .expect("open async daemon db");
+                let async_db = AsyncDaemonDbHandle(async_db);
 
                 let session_id = "00000000-0000-4000-8000-000000000502";
                 start_session_direct_async(

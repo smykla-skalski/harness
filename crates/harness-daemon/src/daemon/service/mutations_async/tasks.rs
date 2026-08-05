@@ -3,10 +3,11 @@ use super::super::{CliError, session_detail_from_async_daemon_db};
 use super::super::{
     CliErrorKind, SessionDetail, TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest,
     TaskDeleteRequest, TaskDropRequest, TaskQueuePolicyRequest, TaskSource, TaskUpdateRequest,
-    db::AsyncDaemonDb, session_not_found, session_service, sync_file_state_from_async_db, utc_now,
+    session_not_found, session_service, sync_file_state_from_async_db, utc_now,
 };
 use super::{append_log, bump_session, persist_task_signal_effects, resolved_session_for_mutation};
 use crate::daemon::db::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::infra::io::validate_safe_segment;
 use crate::session::types::{SessionState, TaskStatus, WorkItem};
 
@@ -30,7 +31,7 @@ struct DeleteTaskMutation {
 pub(crate) async fn create_task_async(
     session_id: &str,
     request: &TaskCreateRequest,
-    async_db: &AsyncDaemonDb,
+    async_db: &AsyncDaemonDbHandle,
 ) -> Result<SessionDetail, CliError> {
     let spec = session_service::TaskSpec {
         title: &request.title,
@@ -67,7 +68,7 @@ pub(crate) async fn create_task_with_id_async(
     session_id: &str,
     task_id: &str,
     request: &TaskCreateRequest,
-    async_db: &AsyncDaemonDb,
+    async_db: &AsyncDaemonDbHandle,
 ) -> Result<SessionDetail, CliError> {
     validate_safe_segment(task_id)?;
     let spec = session_service::TaskSpec {
@@ -144,7 +145,7 @@ pub(crate) async fn delete_task_async(
     session_id: &str,
     task_id: &str,
     request: &TaskDeleteRequest,
-    async_db: &AsyncDaemonDb,
+    async_db: &AsyncDaemonDbHandle,
     dispatch: WakeDispatch<'_>,
 ) -> Result<SessionDetail, CliError> {
     let mutation =
@@ -170,7 +171,7 @@ pub(crate) async fn delete_task_async(
 }
 
 async fn prepare_delete_task_mutation(
-    async_db: &AsyncDaemonDb,
+    async_db: &AsyncDaemonDbHandle,
     session_id: &str,
     task_id: &str,
     actor_id: &str,
@@ -194,7 +195,7 @@ async fn prepare_delete_task_mutation(
 }
 
 async fn persist_delete_audit_or_rollback(
-    async_db: &AsyncDaemonDb,
+    async_db: &AsyncDaemonDbHandle,
     session_id: &str,
     task_id: &str,
     request: &TaskDeleteRequest,
@@ -229,7 +230,7 @@ async fn persist_delete_audit_or_rollback(
 
 async fn rollback_delete_step<T>(
     step: Result<T, CliError>,
-    async_db: &AsyncDaemonDb,
+    async_db: &AsyncDaemonDbHandle,
     session_id: &str,
     rollback: &DeleteRollback<'_>,
 ) -> Result<T, CliError> {
@@ -243,7 +244,7 @@ async fn rollback_delete_step<T>(
 }
 
 async fn restore_delete_rollback(
-    async_db: &AsyncDaemonDb,
+    async_db: &AsyncDaemonDbHandle,
     session_id: &str,
     rollback: &DeleteRollback<'_>,
     original_error: &CliError,
@@ -273,7 +274,7 @@ pub(crate) async fn assign_task_async(
     session_id: &str,
     task_id: &str,
     request: &TaskAssignRequest,
-    async_db: &AsyncDaemonDb,
+    async_db: &AsyncDaemonDbHandle,
     dispatch: WakeDispatch<'_>,
 ) -> Result<SessionDetail, CliError> {
     let now = utc_now();
@@ -310,7 +311,7 @@ pub(crate) async fn checkpoint_task_async(
     session_id: &str,
     task_id: &str,
     request: &TaskCheckpointRequest,
-    async_db: &AsyncDaemonDb,
+    async_db: &AsyncDaemonDbHandle,
 ) -> Result<SessionDetail, CliError> {
     let now = utc_now();
     let checkpoint = async_db
@@ -351,7 +352,7 @@ pub(crate) async fn drop_task_async(
     session_id: &str,
     task_id: &str,
     request: &TaskDropRequest,
-    async_db: &AsyncDaemonDb,
+    async_db: &AsyncDaemonDbHandle,
     dispatch: WakeDispatch<'_>,
 ) -> Result<SessionDetail, CliError> {
     let now = utc_now();
@@ -390,7 +391,7 @@ pub(crate) async fn update_task_queue_policy_async(
     session_id: &str,
     task_id: &str,
     request: &TaskQueuePolicyRequest,
-    async_db: &AsyncDaemonDb,
+    async_db: &AsyncDaemonDbHandle,
     dispatch: WakeDispatch<'_>,
 ) -> Result<SessionDetail, CliError> {
     let now = utc_now();
@@ -427,7 +428,7 @@ pub(crate) async fn update_task_async(
     session_id: &str,
     task_id: &str,
     request: &TaskUpdateRequest,
-    async_db: &AsyncDaemonDb,
+    async_db: &AsyncDaemonDbHandle,
     dispatch: WakeDispatch<'_>,
 ) -> Result<SessionDetail, CliError> {
     let now = utc_now();

@@ -435,7 +435,7 @@ async fn claimed_read_only_dispatch_with_policy(
 }
 
 async fn read_only_launch(
-    db: &crate::daemon::db::AsyncDaemonDb,
+    db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
     session_id: &str,
     worktree: &Path,
     exact_head_revision: String,
@@ -476,7 +476,7 @@ async fn read_only_launch(
 }
 
 async fn seed_exact_read_only_worker(
-    db: &crate::daemon::db::AsyncDaemonDb,
+    db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
     claim: &ClaimedTaskBoardDispatch,
     status: CodexRunStatus,
 ) -> crate::daemon::protocol::CodexRunSnapshot {

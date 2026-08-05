@@ -6,6 +6,7 @@ use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::task_board::dispatch_admission_queries::DispatchAdmissionQueries;
 use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
 use crate::daemon::db::task_board::lane_placement_queries::LanePlacementQueries;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::task_board::store::TaskBoardItemPatch;
 use crate::task_board::{
@@ -149,7 +150,7 @@ async fn generic_cross_lane_move_preserves_an_explicit_slot_and_manual_wins_over
     .await
     .expect("anchor a");
     let anchored = db.task_board_item("a").await.expect("anchored item");
-    let synced = <AsyncDaemonDb as TaskBoardSyncStore>::update_item(
+    let synced = <AsyncDaemonDbHandle as TaskBoardSyncStore>::update_item(
         &db,
         &anchored,
         TaskBoardItemPatch {
@@ -447,11 +448,12 @@ async fn dispatch_transitions_shift_anchors_once_and_emit_one_audit_per_transiti
     );
 }
 
-async fn connect() -> (tempfile::TempDir, AsyncDaemonDb) {
+async fn connect() -> (tempfile::TempDir, AsyncDaemonDbHandle) {
     let directory = tempdir().expect("tempdir");
     let db = AsyncDaemonDb::connect(&directory.path().join("harness.db"))
         .await
         .expect("database");
+    let db = AsyncDaemonDbHandle(db);
     (directory, db)
 }
 

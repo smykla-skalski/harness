@@ -7,8 +7,8 @@ use tokio::task::spawn_blocking;
 
 use crate::agents::kind::DisconnectReason;
 use crate::agents::runtime::event::ConversationEvent;
+use crate::daemon::db::ensure_shared_db;
 use crate::daemon::db::prelude::*;
-use crate::daemon::db::{AsyncDaemonDb, DaemonDb, ensure_shared_db};
 use crate::daemon::protocol::StreamEvent;
 use crate::daemon::service;
 use crate::session::service as orchestration_service;
@@ -20,18 +20,19 @@ use super::port::{
     AcpManagerPort, AcpRegistrationRequest, AcpRuntimeBinding, AcpWakeAcceptRequest,
 };
 use super::{AcpAgentSnapshot, AcpOrchestrationRegistration};
+use crate::daemon::db_handle::{AsyncDaemonDbHandle, DaemonDbOwnedHandle};
 
 pub(super) struct DaemonAcpManagerPort {
     sender: broadcast::Sender<StreamEvent>,
-    db: Arc<OnceLock<Arc<Mutex<DaemonDb>>>>,
-    async_db: Arc<OnceLock<Arc<AsyncDaemonDb>>>,
+    db: Arc<OnceLock<Arc<Mutex<DaemonDbOwnedHandle>>>>,
+    async_db: Arc<OnceLock<Arc<AsyncDaemonDbHandle>>>,
 }
 
 impl DaemonAcpManagerPort {
     pub(super) const fn new(
         sender: broadcast::Sender<StreamEvent>,
-        db: Arc<OnceLock<Arc<Mutex<DaemonDb>>>>,
-        async_db: Arc<OnceLock<Arc<AsyncDaemonDb>>>,
+        db: Arc<OnceLock<Arc<Mutex<DaemonDbOwnedHandle>>>>,
+        async_db: Arc<OnceLock<Arc<AsyncDaemonDbHandle>>>,
     ) -> Self {
         Self {
             sender,
@@ -40,11 +41,13 @@ impl DaemonAcpManagerPort {
         }
     }
 
-    fn db(&self) -> Result<Arc<Mutex<DaemonDb>>, CliError> {
+    fn db(&self) -> Result<Arc<Mutex<DaemonDbOwnedHandle>>, CliError> {
         ensure_shared_db(&self.db)
     }
 
-    fn lock_db(db: &Arc<Mutex<DaemonDb>>) -> Result<MutexGuard<'_, DaemonDb>, CliError> {
+    fn lock_db(
+        db: &Arc<Mutex<DaemonDbOwnedHandle>>,
+    ) -> Result<MutexGuard<'_, DaemonDbOwnedHandle>, CliError> {
         db.lock().map_err(|error| {
             CliError::from(CliErrorKind::workflow_io(format!(
                 "daemon database lock poisoned: {error}"
@@ -348,7 +351,7 @@ impl AcpManagerPort for DaemonAcpManagerPort {
     }
 
     #[cfg(test)]
-    fn daemon_db_slot(&self) -> Option<Arc<OnceLock<Arc<Mutex<DaemonDb>>>>> {
+    fn daemon_db_slot(&self) -> Option<Arc<OnceLock<Arc<Mutex<DaemonDbOwnedHandle>>>>> {
         Some(Arc::clone(&self.db))
     }
 }
@@ -373,7 +376,7 @@ impl From<AcpRuntimeBinding<'_>> for OwnedRuntimeBinding {
 }
 
 async fn bind_runtime_session_async(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     binding: AcpRuntimeBinding<'_>,
 ) -> Result<bool, CliError> {
     let now = utc_now();
@@ -402,7 +405,7 @@ async fn bind_runtime_session_async(
 }
 
 fn bind_runtime_session_sync(
-    db: &Arc<Mutex<DaemonDb>>,
+    db: &Arc<Mutex<DaemonDbOwnedHandle>>,
     binding: &OwnedRuntimeBinding,
 ) -> Result<bool, CliError> {
     let db = DaemonAcpManagerPort::lock_db(db)?;

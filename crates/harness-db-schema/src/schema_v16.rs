@@ -5,7 +5,7 @@ use super::{CliError, db_error};
 /// Historical v16 migration. The active code no longer reads this column, but
 /// the `SQLx` migration identity must stay stable for existing local databases.
 const POLICY_ENFORCEMENT_SNAPSHOT_DDL: &str = include_str!(
-    "../../harness-daemon/src/daemon/db/migrations/0010_daemon_v16_policy_enforcement_snapshot.sql"
+    "../../harness-daemon-db-core/src/migrations/0010_daemon_v16_policy_enforcement_snapshot.sql"
 );
 
 /// # Errors

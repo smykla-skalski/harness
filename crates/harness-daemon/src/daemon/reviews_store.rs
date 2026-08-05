@@ -30,7 +30,7 @@ use harness_policy_graph_store::{
     live_approval_grant_at, resolve_approval_grant_at, revoke_approval_grant_at,
 };
 
-use crate::daemon::db::{AsyncDaemonDb, CliError, DaemonDb};
+use crate::daemon::db::{CliError, DaemonDb};
 use crate::task_board::policy_graph::{PolicyCanvasWorkspace, PolicyGraph, RecordedPolicyDecision};
 use crate::task_board::{PolicyAction, PolicyApprovalGrant};
 
@@ -132,7 +132,7 @@ pub(crate) trait PolicyGraphQueries: Send + Sync {
         R: Send;
 }
 
-impl PolicyGraphQueries for AsyncDaemonDb {
+impl PolicyGraphQueries for crate::daemon::db_handle::AsyncDaemonDbHandle {
     async fn ensure_pending_approval_grant(
         &self,
         grant: &NewApprovalGrant,

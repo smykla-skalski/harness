@@ -7,6 +7,7 @@ use tempfile::tempdir;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use harness::daemon::db::{AsyncDaemonDb, AsyncDaemonDbConnect};
+use harness::daemon::db_handle::AsyncDaemonDbHandle;
 use harness::task_board::external::{
     ExternalCreateLease, ExternalCreateProbe, ExternalCreateRecoveryClient, ExternalCreateRequest,
     ExternalProviderScopeIdentity, ExternalSyncClient, ExternalSyncOptions,
@@ -176,7 +177,7 @@ async fn done_create_and_close_preserve_exact_unknown_provider_revisions() {
 }
 
 async fn sync(
-    board: &AsyncDaemonDb,
+    board: &AsyncDaemonDbHandle,
     client: CreateDoneClient,
 ) -> Result<Vec<ExternalSyncOperation>, CliError> {
     let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(client)];
@@ -193,11 +194,12 @@ fn push_options() -> ExternalSyncOptions {
     }
 }
 
-async fn board_with_done_item() -> (tempfile::TempDir, AsyncDaemonDb) {
+async fn board_with_done_item() -> (tempfile::TempDir, AsyncDaemonDbHandle) {
     let temp = tempdir().expect("tempdir");
     let board = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
         .await
         .expect("database");
+    let board = AsyncDaemonDbHandle(board);
     let mut item = TaskBoardItem::new(
         "done-1".to_owned(),
         "Finished task".to_owned(),
@@ -210,7 +212,7 @@ async fn board_with_done_item() -> (tempfile::TempDir, AsyncDaemonDb) {
     (temp, board)
 }
 
-async fn stored_sync_state(board: &AsyncDaemonDb) -> ExternalRefSyncState {
+async fn stored_sync_state(board: &AsyncDaemonDbHandle) -> ExternalRefSyncState {
     board
         .item_snapshot("done-1")
         .await

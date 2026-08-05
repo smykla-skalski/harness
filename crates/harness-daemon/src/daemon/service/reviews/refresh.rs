@@ -14,7 +14,6 @@ use crate::task_board::{
 use crate::workspace::utc_now;
 use harness_kernel::errors::CliError;
 
-use super::super::db::AsyncDaemonDb;
 use super::super::task_board_db::{
     ReviewsProjectionAuditSummary, record_targeted_reviews_projection_result,
 };
@@ -24,6 +23,7 @@ use super::{
     github_projection, merge_segment_repository_labels, policy, policy_event_inbox, review_item_key,
 };
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::service::observe_async_db;
 
 /// Re-fetch a focused list of dependency update pull requests by GraphQL ID,
@@ -83,7 +83,7 @@ pub async fn refresh_reviews(
 }
 
 pub(super) async fn reconcile_targeted_missing_task_board_reviews(
-    database: Option<&AsyncDaemonDb>,
+    database: Option<&AsyncDaemonDbHandle>,
     request: &ReviewsRefreshRequest,
     missing_pull_request_ids: &[String],
     expected_revision: u64,
@@ -102,7 +102,7 @@ pub(super) async fn reconcile_targeted_missing_task_board_reviews(
 }
 
 async fn reconcile_targeted_missing_task_board_reviews_inner(
-    database: Option<&AsyncDaemonDb>,
+    database: Option<&AsyncDaemonDbHandle>,
     request: &ReviewsRefreshRequest,
     missing_pull_request_ids: &[String],
     expected_revision: u64,

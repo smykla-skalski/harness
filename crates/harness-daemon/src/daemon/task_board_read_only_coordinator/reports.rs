@@ -1,6 +1,5 @@
 use chrono::{DateTime, Utc};
 
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{CodexRunMode, CodexRunSnapshot, CodexRunStatus};
 use crate::task_board::{
     TaskBoardAttemptResultArtifact, TaskBoardAttemptRetryDecision, TaskBoardAttemptState,
@@ -16,13 +15,14 @@ use super::attempts::{invalid_transition, require_human, set_execution_state};
 use super::report_starts::start_new_report_run;
 use super::requests::attempt_run_identity;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 #[expect(
     clippy::cognitive_complexity,
     reason = "flat match resolving the durable run snapshot; each arm is one terminal attempt outcome"
 )]
 pub(super) async fn reconcile_report_attempt<R>(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     runtime: &R,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
@@ -122,7 +122,7 @@ pub(super) fn report_claim_verification_due(
     reason = "flat match over codex run status; each arm handles one status variant"
 )]
 async fn handle_run_status(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
     run: CodexRunSnapshot,
@@ -201,7 +201,7 @@ async fn handle_run_status(
     reason = "two-arm match over retry decision; each arm is a short transition-then-notify sequence"
 )]
 pub(super) async fn record_retry_or_human(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
     detail: &str,
@@ -274,7 +274,7 @@ pub(super) async fn record_retry_or_human(
 }
 
 pub(super) async fn mark_unknown(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
     now: &str,
@@ -306,7 +306,7 @@ pub(super) async fn mark_unknown(
     reason = "sequential attempt-record builder followed by one flat match over the CAS outcome"
 )]
 pub(super) async fn transition_attempt(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     current: &TaskBoardExecutionAttemptRecord,
     state: TaskBoardAttemptState,
     now: &str,
@@ -360,7 +360,7 @@ pub(super) async fn transition_attempt(
 /// `Ok(None)` leaves the attempt without a deadline, which is what a policy that
 /// declines to retry means here.
 async fn retry_wait_available_at(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     current: &TaskBoardExecutionAttemptRecord,
     failure_class: Option<TaskBoardFailureClass>,
     now: &str,
@@ -384,7 +384,7 @@ async fn retry_wait_available_at(
 }
 
 pub(super) async fn current_attempt(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     expected: &TaskBoardExecutionAttemptRecord,
 ) -> Result<TaskBoardExecutionAttemptRecord, CliError> {
     db.task_board_workflow_execution(&expected.execution_id)

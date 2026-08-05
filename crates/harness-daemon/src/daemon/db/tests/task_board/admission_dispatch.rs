@@ -243,12 +243,12 @@ async fn terminal_run_before_dispatch_commit_releases_only_concurrency() {
 }
 
 pub(crate) struct TestDb {
-    db: AsyncDaemonDb,
+    db: crate::daemon::db_handle::AsyncDaemonDbHandle,
     directory: TempDir,
 }
 
 impl Deref for TestDb {
-    type Target = AsyncDaemonDb;
+    type Target = crate::daemon::db_handle::AsyncDaemonDbHandle;
 
     fn deref(&self) -> &Self::Target {
         &self.db
@@ -256,10 +256,12 @@ impl Deref for TestDb {
 }
 
 impl TestDb {
-    pub(crate) async fn reopen(&self) -> AsyncDaemonDb {
-        AsyncDaemonDb::connect(&self.directory.path().join("harness.db"))
-            .await
-            .expect("reopen test db")
+    pub(crate) async fn reopen(&self) -> crate::daemon::db_handle::AsyncDaemonDbHandle {
+        crate::daemon::db_handle::AsyncDaemonDbHandle(
+            AsyncDaemonDb::connect(&self.directory.path().join("harness.db"))
+                .await
+                .expect("reopen test db"),
+        )
     }
 }
 
@@ -274,7 +276,9 @@ pub(super) async fn test_db() -> TestDb {
         .sync_session(&project.project_id, &session)
         .expect("sync session");
     drop(sync_db);
-    let db = AsyncDaemonDb::connect(&path).await.expect("open db");
+    let db = crate::daemon::db_handle::AsyncDaemonDbHandle(
+        AsyncDaemonDb::connect(&path).await.expect("open db"),
+    );
     TestDb { db, directory }
 }
 

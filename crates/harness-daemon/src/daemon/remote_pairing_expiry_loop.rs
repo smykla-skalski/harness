@@ -6,20 +6,24 @@ use tokio::sync::watch;
 use tokio::task::JoinHandle;
 use tokio::time::{MissedTickBehavior, interval};
 
-use super::db::AsyncDaemonDb;
+#[cfg(test)]
+use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
+#[cfg(test)]
+use crate::daemon::db_handle::DaemonDbOwnedHandle;
 use crate::workspace::utc_now;
 
 const REMOTE_PAIRING_EXPIRY_INTERVAL: Duration = Duration::from_secs(30);
 
 pub(crate) fn spawn_remote_pairing_expiry_loop(
-    db: Arc<AsyncDaemonDb>,
+    db: Arc<AsyncDaemonDbHandle>,
     shutdown_rx: watch::Receiver<bool>,
 ) -> JoinHandle<()> {
     tokio::spawn(run_remote_pairing_expiry_loop(db, shutdown_rx))
 }
 
 async fn run_remote_pairing_expiry_loop(
-    db: Arc<AsyncDaemonDb>,
+    db: Arc<AsyncDaemonDbHandle>,
     mut shutdown_rx: watch::Receiver<bool>,
 ) {
     let mut ticker = interval(REMOTE_PAIRING_EXPIRY_INTERVAL);
@@ -47,7 +51,7 @@ async fn wait_for_shutdown(shutdown_rx: &mut watch::Receiver<bool>) {
     clippy::cognitive_complexity,
     reason = "tracing macro expansion; tokio-rs/tracing#553"
 )]
-async fn record_expired_pairings(db: &AsyncDaemonDb) {
+async fn record_expired_pairings(db: &AsyncDaemonDbHandle) {
     let now = utc_now();
     match db.record_expired_remote_pairings(now.as_str()).await {
         Ok(0) => {}
@@ -83,11 +87,11 @@ mod tests {
         let temp = tempdir().expect("create pairing expiry tempdir");
         let db_path = temp.path().join("harness.db");
         seed_expired_pairing(&db_path);
-        let async_db = Arc::new(
+        let async_db = Arc::new(AsyncDaemonDbHandle(
             AsyncDaemonDb::connect(&db_path)
                 .await
                 .expect("open async pairing expiry database"),
-        );
+        ));
 
         let (shutdown_tx, shutdown_rx) = watch::channel(false);
         let handle = spawn_remote_pairing_expiry_loop(Arc::clone(&async_db), shutdown_rx);
@@ -121,6 +125,7 @@ mod tests {
         let db = AsyncDaemonDb::connect(&db_path)
             .await
             .expect("open async pairing expiry sweep database");
+        let db = AsyncDaemonDbHandle(db);
 
         assert_eq!(
             db.record_expired_remote_pairings("2026-07-14T12:00:00Z")
@@ -141,11 +146,11 @@ mod tests {
         let temp = tempdir().expect("create presignaled shutdown tempdir");
         let db_path = temp.path().join("harness.db");
         seed_expired_pairing(&db_path);
-        let async_db = Arc::new(
+        let async_db = Arc::new(AsyncDaemonDbHandle(
             AsyncDaemonDb::connect(&db_path)
                 .await
                 .expect("open presignaled shutdown database"),
-        );
+        ));
         let (_shutdown_tx, shutdown_rx) = watch::channel(true);
 
         let handle = spawn_remote_pairing_expiry_loop(async_db, shutdown_rx);
@@ -161,7 +166,7 @@ mod tests {
     /// on the runtime thread, so a poll every five milliseconds spent most of
     /// the wait starving the very task it was waiting for - which is why a busy
     /// machine could burn the deadline without the sweep ever being scheduled.
-    async fn wait_for_expiration(db: &AsyncDaemonDb) {
+    async fn wait_for_expiration(db: &AsyncDaemonDbHandle) {
         tokio::time::timeout(EXPIRY_LOOP_BACKSTOP, async {
             while recorded_expirations(db).await == 0 {
                 tokio::time::sleep(Duration::from_millis(5)).await;
@@ -171,7 +176,7 @@ mod tests {
         .expect("pairing expiration audit backstop");
     }
 
-    async fn recorded_expirations(db: &AsyncDaemonDb) -> i64 {
+    async fn recorded_expirations(db: &AsyncDaemonDbHandle) -> i64 {
         sqlx::query_scalar::<_, i64>(
             "SELECT COUNT(*) FROM remote_audit_events WHERE route_or_method = ?1",
         )
@@ -183,6 +188,7 @@ mod tests {
 
     fn seed_expired_pairing(db_path: &std::path::Path) {
         let db = DaemonDb::open(db_path).expect("open pairing expiry database");
+        let db = DaemonDbOwnedHandle(db);
         let code = RemotePairingCode::from_value_for_tests("background-expired-secret");
         let record = RemotePairingRecord::new_for_tests(
             "pairing-background-expired",

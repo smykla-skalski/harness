@@ -18,47 +18,48 @@ use super::super::protocol::{
 };
 use super::wake_route::{WakeDispatch, WakeRoute, log_wake_attempt, wake_route_for_registration};
 use super::{ManagedTuiWake, SignalCoords, broadcast_session_snapshot, sessions};
+use crate::daemon::db_handle::DaemonDbOwnedHandle;
 
 pub(crate) use harness_daemon_session_service::build_active_signal_prompt;
 pub(crate) use harness_daemon_session_service::managed_tui_id_for_registration;
 
-impl SignalStorage for DaemonDb {
+impl SignalStorage for DaemonDbOwnedHandle {
     fn load_session_state_for_mutation(
         &self,
         session_id: &str,
     ) -> Result<Option<SessionState>, CliError> {
-        <Self as SessionCoreQueries>::load_session_state_for_mutation(self, session_id)
+        <DaemonDb as SessionCoreQueries>::load_session_state_for_mutation(&self.0, session_id)
     }
 
     fn load_session_state(&self, session_id: &str) -> Result<Option<SessionState>, CliError> {
-        <Self as SessionCoreQueries>::load_session_state(self, session_id)
+        <DaemonDb as SessionCoreQueries>::load_session_state(&self.0, session_id)
     }
 
     fn load_session_log(&self, session_id: &str) -> Result<Vec<SessionLogEntry>, CliError> {
-        <Self as SessionCoreQueries>::load_session_log(self, session_id)
+        <DaemonDb as SessionCoreQueries>::load_session_log(&self.0, session_id)
     }
 
     fn project_id_for_session(&self, session_id: &str) -> Result<Option<String>, CliError> {
-        <Self as SessionCoreQueries>::project_id_for_session(self, session_id)
+        <DaemonDb as SessionCoreQueries>::project_id_for_session(&self.0, session_id)
     }
 
     fn project_dir_for_session(&self, session_id: &str) -> Result<Option<String>, CliError> {
-        <Self as SessionCoreQueries>::project_dir_for_session(self, session_id)
+        <DaemonDb as SessionCoreQueries>::project_dir_for_session(&self.0, session_id)
     }
 
     fn save_session_state(&self, project_id: &str, state: &SessionState) -> Result<(), CliError> {
-        <Self as SessionCoreQueries>::save_session_state(self, project_id, state)
+        <DaemonDb as SessionCoreQueries>::save_session_state(&self.0, project_id, state)
     }
 
     fn resolve_session(
         &self,
         session_id: &str,
     ) -> Result<Option<harness_session::index::ResolvedSession>, CliError> {
-        <Self as SessionSummaryQueries>::resolve_session(self, session_id)
+        <DaemonDb as SessionSummaryQueries>::resolve_session(&self.0, session_id)
     }
 
     fn load_signals(&self, session_id: &str) -> Result<Vec<SessionSignalRecord>, CliError> {
-        <Self as SignalIndexQueries>::load_signals(self, session_id)
+        <DaemonDb as SignalIndexQueries>::load_signals(&self.0, session_id)
     }
 
     fn merge_signal_records(
@@ -66,7 +67,7 @@ impl SignalStorage for DaemonDb {
         session_id: &str,
         records: &[SessionSignalRecord],
     ) -> Result<(), CliError> {
-        <Self as SignalIndexQueries>::merge_signal_records(self, session_id, records)
+        <DaemonDb as SignalIndexQueries>::merge_signal_records(&self.0, session_id, records)
     }
 
     fn sync_signal_index(
@@ -74,15 +75,15 @@ impl SignalStorage for DaemonDb {
         session_id: &str,
         records: &[SessionSignalRecord],
     ) -> Result<(), CliError> {
-        <Self as SignalIndexQueries>::sync_signal_index(self, session_id, records)
+        <DaemonDb as SignalIndexQueries>::sync_signal_index(&self.0, session_id, records)
     }
 
     fn append_log_entry(&self, entry: &SessionLogEntry) -> Result<(), CliError> {
-        <Self as SessionWriteQueries>::append_log_entry(self, entry)
+        <DaemonDb as SessionWriteQueries>::append_log_entry(&self.0, entry)
     }
 
     fn bump_change(&self, scope: &str) -> Result<(), CliError> {
-        <Self as SessionWriteQueries>::bump_change(self, scope)
+        <DaemonDb as SessionWriteQueries>::bump_change(&self.0, scope)
     }
 
     fn session_detail(&self, session_id: &str) -> Result<SessionDetail, CliError> {
@@ -90,7 +91,7 @@ impl SignalStorage for DaemonDb {
     }
 
     fn mark_session_inactive(&self, session_id: &str) -> Result<(), CliError> {
-        <Self as SessionCoreQueries>::mark_session_inactive(self, session_id)
+        <DaemonDb as SessionCoreQueries>::mark_session_inactive(&self.0, session_id)
     }
 
     fn load_expired_pending_signals(
@@ -98,26 +99,26 @@ impl SignalStorage for DaemonDb {
         session_id: &str,
     ) -> Result<Vec<harness_daemon_session_service::ExpiredPendingSignalIndexRecord>, CliError>
     {
-        <Self as SignalIndexQueries>::load_expired_pending_signals(self, session_id)
+        <DaemonDb as SignalIndexQueries>::load_expired_pending_signals(&self.0, session_id)
     }
 
     fn list_project_summaries(
         &self,
     ) -> Result<Vec<harness_session::wire::ProjectSummary>, CliError> {
-        <Self as SessionSummaryQueries>::list_project_summaries(self)
+        <DaemonDb as SessionSummaryQueries>::list_project_summaries(&self.0)
     }
 
     fn list_session_summaries_full(
         &self,
     ) -> Result<Vec<harness_session::wire::SessionSummary>, CliError> {
-        <Self as SessionSummaryQueries>::list_session_summaries_full(self)
+        <DaemonDb as SessionSummaryQueries>::list_session_summaries_full(&self.0)
     }
 
     fn sync_project(
         &self,
         project: &harness_session::index::DiscoveredProject,
     ) -> Result<(), CliError> {
-        <Self as SessionWriteQueries>::sync_project(self, project)
+        <DaemonDb as SessionWriteQueries>::sync_project(&self.0, project)
     }
 
     fn create_session_record(
@@ -125,11 +126,11 @@ impl SignalStorage for DaemonDb {
         project_id: &str,
         state: &SessionState,
     ) -> Result<(), CliError> {
-        <Self as SessionCoreQueries>::create_session_record(self, project_id, state)
+        <DaemonDb as SessionCoreQueries>::create_session_record(&self.0, project_id, state)
     }
 
     fn delete_session_row(&self, session_id: &str) -> Result<bool, CliError> {
-        <Self as SessionWriteQueries>::delete_session_row(self, session_id)
+        <DaemonDb as SessionWriteQueries>::delete_session_row(&self.0, session_id)
     }
 }
 
@@ -256,7 +257,7 @@ fn warn_active_signal_delivery_timeout(
 pub fn send_signal(
     session_id: &str,
     request: &SignalSendRequest,
-    db: Option<&DaemonDb>,
+    db: Option<&DaemonDbOwnedHandle>,
     manager: Option<&AgentTuiManagerHandle>,
 ) -> Result<SessionDetail, CliError> {
     harness_daemon_session_service::send_signal(
@@ -274,7 +275,7 @@ pub fn send_signal(
 pub fn cancel_signal(
     session_id: &str,
     request: &SignalCancelRequest,
-    db: Option<&DaemonDb>,
+    db: Option<&DaemonDbOwnedHandle>,
 ) -> Result<SessionDetail, CliError> {
     harness_daemon_session_service::cancel_signal(session_id, request, db)
 }
@@ -285,7 +286,7 @@ pub(crate) fn record_signal_ack_and_broadcast(
     signal_id: &str,
     result: AckResult,
     project_dir: &Path,
-    db: Option<&DaemonDb>,
+    db: Option<&DaemonDbOwnedHandle>,
     sender: Option<&broadcast::Sender<StreamEvent>>,
 ) -> Result<(), CliError> {
     harness_daemon_session_service::record_signal_ack(
@@ -311,7 +312,7 @@ pub(crate) fn try_wake_started_workers(
     effects: &[session_service::TaskDropEffect],
     session_id: &str,
     project_dir: &Path,
-    db: Option<&DaemonDb>,
+    db: Option<&DaemonDbOwnedHandle>,
     dispatch: WakeDispatch<'_>,
 ) {
     for effect in effects {

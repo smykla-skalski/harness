@@ -2,8 +2,8 @@ use std::sync::{Arc, OnceLock};
 
 use chrono::{DateTime, Utc};
 
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::feature_flags::task_board_automation_v2_enabled_from_env;
 use crate::task_board::{
     TaskBoardAutomationDesiredMode, TaskBoardOrchestratorSettings, TaskBoardOrchestratorState,
@@ -11,7 +11,7 @@ use crate::task_board::{
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 pub(super) async fn initialize_control_before_serving(
-    async_db_slot: &Arc<OnceLock<Arc<AsyncDaemonDb>>>,
+    async_db_slot: &Arc<OnceLock<Arc<AsyncDaemonDbHandle>>>,
 ) -> Result<(), CliError> {
     if !task_board_automation_v2_enabled_from_env() {
         return Ok(());
@@ -26,7 +26,7 @@ pub(super) async fn initialize_control_before_serving(
 }
 
 pub(super) async fn initialize_control_from_legacy_intent(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     now: DateTime<Utc>,
 ) -> Result<(), CliError> {
     let state = db.task_board_orchestrator_state().await?;

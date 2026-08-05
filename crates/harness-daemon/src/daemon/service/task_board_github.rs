@@ -1,6 +1,5 @@
 use std::collections::BTreeMap;
 
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::reviews_store::PolicyGraphQueries;
 use crate::daemon::state::overlay_task_board_git_runtime_secrets;
@@ -20,6 +19,7 @@ mod support;
 mod workflow;
 mod write_publication;
 
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 #[cfg(test)]
 use write_publication::{
     default_publication_result, parse_publication_url, reconcile_publication_number,
@@ -49,7 +49,7 @@ pub(crate) async fn run_task_board_github_automation_async(
     settings: &TaskBoardOrchestratorSettings,
     input: &TaskBoardOrchestratorDispatchInput,
     items: &[TaskBoardItem],
-    async_db: &AsyncDaemonDb,
+    async_db: &AsyncDaemonDbHandle,
     session: Option<&super::TaskBoardAutomationRunSession>,
 ) -> Result<(), CliError> {
     ensure_active(session).await?;
@@ -95,7 +95,7 @@ struct GitHubAutomationPreparation {
 
 async fn prepare_github_automation(
     items: &[TaskBoardItem],
-    async_db: &AsyncDaemonDb,
+    async_db: &AsyncDaemonDbHandle,
 ) -> Result<GitHubAutomationPreparation, CliError> {
     let host_id = super::task_board_db::task_board_host_local_db(async_db)
         .await?
@@ -116,7 +116,7 @@ struct RepositoryGitHubAutomationRequest<'a> {
     settings: &'a TaskBoardOrchestratorSettings,
     defaults: &'a GitHubAutomationSettings,
     input: &'a TaskBoardOrchestratorDispatchInput,
-    async_db: &'a AsyncDaemonDb,
+    async_db: &'a AsyncDaemonDbHandle,
     policy: Option<(&'a str, &'a PolicyGraph)>,
     repository: &'a str,
     items: &'a [&'a TaskBoardItem],
@@ -326,7 +326,7 @@ fn log_unusable_item_repository(
     reason = "database automation keeps the policy, sync input, client, and host context explicit"
 )]
 async fn run_task_board_github_automation_with_database_client(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     policy: Option<(&str, &PolicyGraph)>,
     config: &GitHubProjectConfig,
     input: &TaskBoardOrchestratorDispatchInput,

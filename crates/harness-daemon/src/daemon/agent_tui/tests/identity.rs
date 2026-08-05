@@ -12,6 +12,7 @@ use crate::session::types::SessionRole;
 
 use super::support::sample_snapshot;
 use crate::daemon::db::prelude::*;
+use crate::daemon::db_handle::DaemonDbOwnedHandle;
 
 const SESSION_A: &str = "5d48fa82-b07a-5269-a876-9c8058399fd8";
 const SESSION_B: &str = "7dc03f87-fd5b-57d7-bca7-6fa4f68f74f3";
@@ -50,6 +51,7 @@ fn start_with_id_rejects_active_identity_from_different_session() {
 
 fn manager_with_active_snapshot() -> (AgentTuiManagerHandle, super::super::AgentTuiSnapshot) {
     let db = DaemonDb::open_in_memory().expect("open db");
+    let db = DaemonDbOwnedHandle(db);
     let project = crate::daemon::index::DiscoveredProject {
         project_id: "project-tui-durable-identity".into(),
         name: "project".into(),

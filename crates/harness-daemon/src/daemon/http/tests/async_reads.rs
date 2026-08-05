@@ -11,6 +11,8 @@ use crate::daemon::agent_tui::AgentTuiManagerHandle;
 use crate::daemon::codex_controller::CodexControllerHandle;
 use crate::daemon::db::prelude::*;
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
+use crate::daemon::db_handle::DaemonDbOwnedHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::daemon::state::DaemonManifest;
 
@@ -31,6 +33,7 @@ async fn build_async_http_state(seed_timeline: bool) -> DaemonHttpState {
     let async_db_slot = Arc::new(OnceLock::new());
     let db_path = temp_dir().join(format!("harness-http-test-async-{}.db", Uuid::new_v4()));
     let db = DaemonDb::open(&db_path).expect("open file db");
+    let db = DaemonDbOwnedHandle(db);
     let project = sample_project();
     db.sync_project(&project).expect("sync project");
     db.save_session_state(&project.project_id, &sample_session_state())
@@ -48,11 +51,11 @@ async fn build_async_http_state(seed_timeline: bool) -> DaemonHttpState {
 
     assert!(
         async_db_slot
-            .set(Arc::new(
+            .set(Arc::new(AsyncDaemonDbHandle(
                 AsyncDaemonDb::connect(&db_path)
                     .await
                     .expect("open async daemon db"),
-            ))
+            )))
             .is_ok(),
         "install async db"
     );

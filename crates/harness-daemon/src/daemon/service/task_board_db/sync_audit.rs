@@ -1,12 +1,12 @@
 use serde_json::{Value, json};
 
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{TaskBoardSyncRequest, TaskBoardSyncResponse};
 use crate::task_board::{
     ExternalProvider, ExternalSyncConflictPolicy, ExternalSyncDirection, ExternalSyncOperation,
 };
 use harness_kernel::errors::CliError;
 
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use metrics::{add_execution_metrics, add_summary_counts, applied_operation_count, conflict_count};
 use persistence::{SyncAuditClassification, persist_sync_audit_result};
 use state::{AuditObservation, PendingAudit, acquire_audit_lane, plan_audit};
@@ -87,7 +87,7 @@ impl TaskBoardSyncAuditTrigger {
 
 #[cfg(test)]
 pub(super) async fn record_request_result(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &TaskBoardSyncRequest,
     trigger: TaskBoardSyncAuditTrigger,
     result: &Result<TaskBoardSyncResponse, CliError>,
@@ -97,7 +97,7 @@ pub(super) async fn record_request_result(
 }
 
 pub(super) async fn record_request_result_with_correlation(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &TaskBoardSyncRequest,
     trigger: TaskBoardSyncAuditTrigger,
     correlation_id: Option<&str>,
@@ -133,14 +133,14 @@ fn correlated_audit_is_required(
 }
 
 pub(crate) async fn record_reviews_projection_result(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     result: &Result<ReviewsProjectionAuditSummary, CliError>,
 ) {
     record_reviews_result(db, TaskBoardSyncAuditTrigger::ReviewsProjection, result).await;
 }
 
 pub(crate) async fn record_targeted_reviews_projection_result(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     result: &Result<ReviewsProjectionAuditSummary, CliError>,
 ) {
     record_reviews_result(
@@ -152,7 +152,7 @@ pub(crate) async fn record_targeted_reviews_projection_result(
 }
 
 async fn record_reviews_result(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     trigger: TaskBoardSyncAuditTrigger,
     result: &Result<ReviewsProjectionAuditSummary, CliError>,
 ) {
@@ -169,7 +169,7 @@ async fn record_reviews_result(
 }
 
 fn reviews_pending_audit(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     trigger: TaskBoardSyncAuditTrigger,
     result: &Result<ReviewsProjectionAuditSummary, CliError>,
 ) -> Option<PendingAudit> {
@@ -187,7 +187,7 @@ fn reviews_pending_audit(
 }
 
 async fn persist_reviews_audit(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     trigger: TaskBoardSyncAuditTrigger,
     pending: PendingAudit,
     payload: Value,

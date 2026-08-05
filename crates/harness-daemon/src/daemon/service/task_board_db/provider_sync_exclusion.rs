@@ -1,5 +1,5 @@
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::task_board::external::TaskBoardSyncItemSnapshot;
 use crate::task_board::store::TaskBoardItemPatch;
 use crate::task_board::{
@@ -14,7 +14,7 @@ use harness_kernel::errors::CliError;
 /// admission, exact `expected_revision` CAS) and its own one-and-only-one
 /// audit event in the same transaction as the tombstone.
 pub(super) async fn hide_for_provider_exclusion(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     item_id: &str,
     expected_revision: i64,
     patch: TaskBoardItemPatch,
@@ -38,7 +38,7 @@ pub(super) async fn hide_for_provider_exclusion(
 /// resolution in the same transaction, retained-decision reconciliation, and
 /// its own one-and-only-one audit event.
 pub(super) async fn restore_from_provider_exclusion(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     expected: TaskBoardSyncItemSnapshot,
     patch: TaskBoardItemPatch,
     context: &ProviderExclusionAuditContext,

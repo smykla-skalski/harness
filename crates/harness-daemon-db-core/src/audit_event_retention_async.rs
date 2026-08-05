@@ -7,7 +7,7 @@ use super::{AsyncDaemonDb, CliError, db_error};
 
 /// # Errors
 /// Returns [`CliError`] when the retention transaction cannot complete.
-pub(crate) async fn prune_remote_audit_events_in_transaction(
+pub async fn prune_remote_audit_events_in_transaction(
     transaction: &mut Transaction<'_, Sqlite>,
 ) -> Result<u64, CliError> {
     query(PRUNE_REMOTE_AUDIT_EVENTS_SQL)
@@ -25,7 +25,7 @@ pub(crate) async fn prune_remote_audit_events_in_transaction(
 ///
 /// # Errors
 /// Returns [`CliError`] when the retention transaction cannot complete.
-pub(crate) async fn prune_remote_audit_events(db: &AsyncDaemonDb) -> Result<u64, CliError> {
+pub async fn prune_remote_audit_events(db: &AsyncDaemonDb) -> Result<u64, CliError> {
     let mut transaction = db
         .pool()
         .begin()

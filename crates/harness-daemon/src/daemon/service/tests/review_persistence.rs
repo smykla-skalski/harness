@@ -15,6 +15,7 @@ use crate::session::{storage as session_storage, types::SessionState};
 use super::*;
 use crate::daemon::db::AsyncSessionSummaryQueries;
 use crate::daemon::db::AsyncTaskReviewWrites;
+use crate::daemon::db_handle::{AsyncDaemonDbHandle, DaemonDbOwnedHandle};
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::daemon::db_open::DaemonDbOpen;
 
@@ -37,6 +38,7 @@ async fn set_up_review_persistence_fixture(
     let async_db = crate::daemon::db::AsyncDaemonDb::connect(&db_path)
         .await
         .expect("open async daemon db");
+    let async_db = AsyncDaemonDbHandle(async_db);
 
     let state = start_direct_session_async(
         &async_db,
@@ -162,6 +164,7 @@ fn submit_review_async_writes_task_reviews_row_without_rebuild() {
             let async_db = crate::daemon::db::AsyncDaemonDb::connect(&fixture.db_path)
                 .await
                 .expect("open async daemon db");
+            let async_db = AsyncDaemonDbHandle(async_db);
             submit_for_review_async(
                 &fixture.state.session_id,
                 &fixture.task_id,
@@ -233,6 +236,7 @@ fn submit_for_review_async_syncs_file_state_immediately() {
             let async_db = crate::daemon::db::AsyncDaemonDb::connect(&fixture.db_path)
                 .await
                 .expect("open async daemon db");
+            let async_db = AsyncDaemonDbHandle(async_db);
 
             submit_for_review_async(
                 &fixture.state.session_id,
@@ -280,6 +284,7 @@ fn stale_prepared_session_resync_does_not_clobber_async_review_state() {
             let async_db = crate::daemon::db::AsyncDaemonDb::connect(&fixture.db_path)
                 .await
                 .expect("open async daemon db");
+            let async_db = AsyncDaemonDbHandle(async_db);
             let prepared = crate::daemon::db::prepare_session_resync(&fixture.state.session_id)
                 .expect("prepare stale session resync");
 
@@ -297,6 +302,7 @@ fn stale_prepared_session_resync_does_not_clobber_async_review_state() {
             .expect("submit_for_review");
 
             let sync_db = crate::daemon::db::DaemonDb::open(&fixture.db_path).expect("open db");
+            let sync_db = DaemonDbOwnedHandle(sync_db);
             sync_db
                 .apply_prepared_session_resync(&prepared)
                 .expect("apply stale prepared session resync");

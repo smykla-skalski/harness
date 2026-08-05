@@ -1,8 +1,9 @@
 use async_trait::async_trait;
 
+use crate::daemon::db::AgentTurnRunSnapshot;
 use crate::daemon::db::prelude::*;
 use crate::daemon::db::task_board::prelude::AutomationKillSwitchQueries;
-use crate::daemon::db::{AgentTurnRunSnapshot, AsyncDaemonDb};
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::http::{DaemonHttpState, run_codex_agent_blocking};
 use crate::daemon::protocol::{CodexRunMode, CodexRunRequest, CodexRunSnapshot};
 use crate::reviews::{
@@ -134,11 +135,11 @@ pub(crate) trait TaskBoardReadOnlyRuntime: Send + Sync {
 
 pub(crate) struct ProductionTaskBoardReadOnlyRuntime<'a> {
     state: &'a DaemonHttpState,
-    db: &'a AsyncDaemonDb,
+    db: &'a AsyncDaemonDbHandle,
 }
 
 impl<'a> ProductionTaskBoardReadOnlyRuntime<'a> {
-    pub(crate) const fn new(state: &'a DaemonHttpState, db: &'a AsyncDaemonDb) -> Self {
+    pub(crate) const fn new(state: &'a DaemonHttpState, db: &'a AsyncDaemonDbHandle) -> Self {
         Self { state, db }
     }
 }
@@ -357,7 +358,7 @@ impl TaskBoardReadOnlyRuntime for ProductionTaskBoardReadOnlyRuntime<'_> {
     }
 }
 
-async fn ensure_automation_kill_switch_clear(db: &AsyncDaemonDb) -> Result<(), CliError> {
+async fn ensure_automation_kill_switch_clear(db: &AsyncDaemonDbHandle) -> Result<(), CliError> {
     if db.automation_kill_switch_engaged().await? {
         return Err(invalid_transition("automation kill switch is engaged"));
     }
@@ -366,7 +367,7 @@ async fn ensure_automation_kill_switch_clear(db: &AsyncDaemonDb) -> Result<(), C
 
 async fn stop_codex_run_if_killed(
     state: &DaemonHttpState,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     snapshot: CodexRunSnapshot,
 ) -> Result<CodexRunSnapshot, CliError> {
     if !db.automation_kill_switch_engaged().await? {

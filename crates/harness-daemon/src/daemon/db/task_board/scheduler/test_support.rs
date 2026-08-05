@@ -12,10 +12,12 @@ pub(super) fn instant(value: &str) -> DateTime<Utc> {
         .with_timezone(&Utc)
 }
 
-pub(super) async fn database() -> AsyncDaemonDb {
+pub(super) async fn database() -> crate::daemon::db_handle::AsyncDaemonDbHandle {
     let temp = tempfile::tempdir().expect("temp dir");
     let path = temp.keep().join("harness.db");
-    AsyncDaemonDb::connect(&path).await.expect("open database")
+    crate::daemon::db_handle::AsyncDaemonDbHandle(
+        AsyncDaemonDb::connect(&path).await.expect("open database"),
+    )
 }
 
 pub(super) async fn fail_automation_audit_inserts(db: &AsyncDaemonDb) {

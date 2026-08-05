@@ -12,12 +12,13 @@ use super::task_board_workflow_execution::{
     TaskBoardWorkflowExecutionCreateRequest, create_or_load_workflow_execution,
 };
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 pub(super) const CREATED_AT: &str = "2026-07-15T10:00:00Z";
 
 pub(crate) struct TestDatabase {
-    pub db: AsyncDaemonDb,
+    pub db: AsyncDaemonDbHandle,
     pub path: std::path::PathBuf,
     _temp: TempDir,
 }
@@ -27,6 +28,7 @@ impl TestDatabase {
         let temp = tempfile::tempdir().expect("tempdir");
         let path = temp.path().join("harness.db");
         let db = AsyncDaemonDb::connect(&path).await.expect("open database");
+        let db = AsyncDaemonDbHandle(db);
         Self {
             db,
             path,
@@ -60,7 +62,7 @@ pub(crate) fn reviewers(reviewer_count: u32, required_approvals: u32) -> TaskBoa
 }
 
 pub(super) async fn seed_snapshot(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     item_id: &str,
     workflow_kind: TaskBoardWorkflowKind,
     reviewers: TaskBoardResolvedReviewer,
@@ -110,7 +112,7 @@ pub(super) async fn seed_snapshot(
 }
 
 pub(super) async fn create_execution(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     item_id: &str,
     workflow_kind: TaskBoardWorkflowKind,
     reviewers: TaskBoardResolvedReviewer,

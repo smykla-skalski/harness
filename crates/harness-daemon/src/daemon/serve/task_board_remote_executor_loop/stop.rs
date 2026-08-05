@@ -4,7 +4,7 @@ use std::future::Future;
 use std::pin::Pin;
 
 use crate::daemon::db::{
-    AsyncDaemonDb, TaskBoardRemoteAssignmentRecord, TaskBoardRemoteExecutorRun,
+    TaskBoardRemoteAssignmentRecord, TaskBoardRemoteExecutorRun,
     TaskBoardRemoteExecutorStopAuthority, TaskBoardRemoteExecutorStopPending,
     TaskBoardRemoteExecutorStopReason, TaskBoardRemoteMutationOutcome,
     stop_pending_snapshot_matches,
@@ -15,10 +15,11 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::runtime::stop_remote_run;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 pub(super) async fn settle_lifecycle_settings_drift(
     state: &DaemonHttpState,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     record: &TaskBoardRemoteAssignmentRecord,
     snapshot: &TaskBoardRemoteExecutorRun,
 ) -> Result<(), CliError> {
@@ -38,7 +39,7 @@ pub(super) async fn settle_lifecycle_settings_drift(
 
 pub(super) fn claim_and_settle_invalid_remote_run<'a>(
     state: &'a DaemonHttpState,
-    db: &'a AsyncDaemonDb,
+    db: &'a AsyncDaemonDbHandle,
     authority: &'a TaskBoardRemoteExecutorStopAuthority,
     snapshot: &'a TaskBoardRemoteExecutorRun,
     reason: TaskBoardRemoteExecutorStopReason,
@@ -54,7 +55,7 @@ pub(super) fn claim_and_settle_invalid_remote_run<'a>(
 
 pub(super) fn reconcile_stop_pending<'a>(
     state: &'a DaemonHttpState,
-    db: &'a AsyncDaemonDb,
+    db: &'a AsyncDaemonDbHandle,
     pending: &'a TaskBoardRemoteExecutorStopPending,
 ) -> Pin<Box<dyn Future<Output = Result<(), CliError>> + Send + 'a>> {
     Box::pin(async move {

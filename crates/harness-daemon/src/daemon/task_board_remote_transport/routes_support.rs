@@ -5,9 +5,10 @@ use axum::response::{IntoResponse as _, Response};
 use super::DaemonHttpState;
 use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{
-    AsyncDaemonDb, TaskBoardRemoteAssignmentRecord, TaskBoardRemoteOfferOutcome,
-    TaskBoardRemoteOfferReceipt, TaskBoardRemoteOfferReceiptDisposition,
+    TaskBoardRemoteAssignmentRecord, TaskBoardRemoteOfferOutcome, TaskBoardRemoteOfferReceipt,
+    TaskBoardRemoteOfferReceiptDisposition,
 };
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::http::{require_async_db, require_execution_remote_client};
 use crate::task_board::remote_wire::wire::{
     RemoteAttemptBinding, RemoteLease, RemoteOfferDisposition, RemoteOfferRequest,
@@ -24,7 +25,7 @@ pub(super) async fn assignment_route<'a>(
     state: &'a DaemonHttpState,
     operation: &'static str,
     binding: &RemoteAttemptBinding,
-) -> Result<(&'a AsyncDaemonDb, String), CliError> {
+) -> Result<(&'a AsyncDaemonDbHandle, String), CliError> {
     let db = require_async_db(state, "handle remote executor operation")?;
     let client = require_execution_remote_client(headers, state, operation).map_err(|_| {
         CliErrorKind::session_permission_denied("remote executor authorization denied")
@@ -46,7 +47,7 @@ pub(super) async fn assignment_route<'a>(
 }
 
 pub(super) async fn local_host(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
 ) -> Result<TaskBoardLocalExecutionHostConfig, CliError> {
     let TaskBoardOrchestratorSettings {
         local_execution_host: host,
@@ -60,7 +61,7 @@ pub(super) async fn local_host(
 }
 
 pub(super) async fn active_assignments(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     host: &TaskBoardLocalExecutionHostConfig,
 ) -> Result<u32, CliError> {
     let active = db
@@ -205,7 +206,7 @@ pub(super) fn record_lease(
 }
 
 pub(super) async fn load_assignment(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     assignment_id: &str,
 ) -> Result<TaskBoardRemoteAssignmentRecord, CliError> {
     db.task_board_remote_assignment(assignment_id)

@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::SessionStartRequest;
 use crate::daemon::service::start_session_direct_async;
 use crate::session::types::SessionState;
@@ -14,6 +13,7 @@ use crate::task_board::{
 
 use super::fixture::{FROZEN_HEAD, Fixture, NOW, seed_settings};
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::service::task_board_workflow_test_support::TestDatabase;
 
 pub(super) async fn seed_dispatched_initial_report(label: &str) -> Fixture {
@@ -96,7 +96,7 @@ pub(super) async fn seed_dispatched_initial_report(label: &str) -> Fixture {
 }
 
 async fn start_dispatch_session(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     fixture_root: &Path,
     session_id: &str,
 ) -> SessionState {
@@ -132,7 +132,7 @@ async fn start_dispatch_session(
     state
 }
 
-async fn configure_admission(db: &AsyncDaemonDb) {
+async fn configure_admission(db: &AsyncDaemonDbHandle) {
     let mut settings = db
         .task_board_orchestrator_settings()
         .await
@@ -148,7 +148,7 @@ async fn configure_admission(db: &AsyncDaemonDb) {
 }
 
 async fn launch(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     item_id: &str,
     session: &SessionState,
 ) -> TaskBoardReadOnlyWorkflowLaunch {

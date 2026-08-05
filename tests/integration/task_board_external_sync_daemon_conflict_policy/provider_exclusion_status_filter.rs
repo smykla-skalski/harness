@@ -1,6 +1,7 @@
 use tempfile::tempdir;
 
 use harness::daemon::db::{AsyncDaemonDb, AsyncDaemonDbConnect};
+use harness::daemon::db_handle::AsyncDaemonDbHandle;
 use harness::task_board::external::{
     ExternalSyncClient, ExternalSyncOptions, TaskBoardSyncStore, sync_external_tasks,
 };
@@ -18,6 +19,7 @@ async fn todo_status_filtered_pull_restores_an_open_provider_exclusion_tombstone
     let db = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
         .await
         .expect("database");
+    let db = AsyncDaemonDbHandle(db);
     let mut item = linked_item(
         "hidden-inbox",
         "Hidden item",

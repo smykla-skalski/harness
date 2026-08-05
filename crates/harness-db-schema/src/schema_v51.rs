@@ -3,13 +3,13 @@ use rusqlite::Connection;
 use super::CliError;
 
 const PROJECTS_SQL: &str = include_str!(
-    "../../harness-daemon/src/daemon/db/migrations/0045_daemon_v51_task_board_projects.sql"
+    "../../harness-daemon-db-core/src/migrations/0045_daemon_v51_task_board_projects.sql"
 );
 const ATTRIBUTION_SQL: &str = include_str!(
-    "../../harness-daemon/src/daemon/db/migrations/0046_daemon_v51_task_board_item_attribution.sql"
+    "../../harness-daemon-db-core/src/migrations/0046_daemon_v51_task_board_item_attribution.sql"
 );
 const ATTRIBUTION_INDEX_SQL: &str = include_str!(
-    "../../harness-daemon/src/daemon/db/migrations/0047_daemon_v51_task_board_item_attribution_index.sql"
+    "../../harness-daemon-db-core/src/migrations/0047_daemon_v51_task_board_item_attribution_index.sql"
 );
 
 /// # Errors

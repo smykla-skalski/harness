@@ -9,7 +9,7 @@ pub(crate) fn liveness_project_dir_for_resolved(resolved: &ResolvedSession) -> O
 }
 
 pub(crate) fn sync_resolved_liveness(
-    db: &super::db::DaemonDb,
+    db: &crate::daemon::db_handle::DaemonDbOwnedHandle,
     resolved: &mut ResolvedSession,
     project_dir: &Path,
 ) -> Result<bool, CliError> {
@@ -17,7 +17,7 @@ pub(crate) fn sync_resolved_liveness(
 }
 
 pub(crate) async fn sync_resolved_liveness_async(
-    async_db: &super::db::AsyncDaemonDb,
+    async_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
     resolved: &mut ResolvedSession,
     project_dir: &Path,
 ) -> Result<bool, CliError> {
@@ -26,7 +26,7 @@ pub(crate) async fn sync_resolved_liveness_async(
 }
 
 pub(crate) fn refresh_resolved_session_from_files_if_newer(
-    db: &super::db::DaemonDb,
+    db: &crate::daemon::db_handle::DaemonDbOwnedHandle,
     resolved: &mut ResolvedSession,
 ) -> Result<(), CliError> {
     let file_resolved = match index::resolve_session(&resolved.state.session_id) {

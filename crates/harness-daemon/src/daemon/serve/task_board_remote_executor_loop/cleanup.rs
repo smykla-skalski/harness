@@ -8,10 +8,11 @@ use super::source_bundle::cleanup_prior_phase_import_ref;
 use crate::daemon::db::prelude::*;
 use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{
-    AsyncDaemonDb, TaskBoardRemoteAssignmentRecord, TaskBoardRemoteExecutorRun,
+    TaskBoardRemoteAssignmentRecord, TaskBoardRemoteExecutorRun,
     TaskBoardRemoteExecutorStartAuthority, TaskBoardRemoteExecutorStopReason,
     TaskBoardRemoteMutationOutcome,
 };
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::http::DaemonHttpState;
 use crate::session::storage as session_storage;
 use crate::session::types::SessionState;
@@ -27,7 +28,7 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 
 pub(super) async fn reconcile_settled_executor_cleanup(
     state: &DaemonHttpState,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     record: &TaskBoardRemoteAssignmentRecord,
     identity: &RemoteWorkerIdentity,
 ) -> Result<bool, CliError> {
@@ -74,7 +75,7 @@ pub(super) async fn reconcile_settled_executor_cleanup(
 )]
 async fn release_executor_local_state(
     state: &DaemonHttpState,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     record: &TaskBoardRemoteAssignmentRecord,
     identity: &RemoteWorkerIdentity,
 ) -> Result<bool, CliError> {
@@ -99,7 +100,7 @@ async fn release_executor_local_state(
 }
 
 pub(super) async fn cleanup_unstarted_executor_provisioning(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     authority: &TaskBoardRemoteExecutorStartAuthority,
 ) -> Result<bool, CliError> {
     let Some(record) = db
@@ -148,7 +149,7 @@ pub(super) async fn cleanup_unstarted_executor_provisioning(
 /// flag reports whether a session row backed that layout, which is what decides
 /// if the row itself has to be deleted once the files are gone.
 async fn resolve_provisioning_layout(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     record: &TaskBoardRemoteAssignmentRecord,
     authority: &TaskBoardRemoteExecutorStartAuthority,
     origin: &Path,
@@ -185,7 +186,7 @@ fn exact_unstarted_provisioning(
 }
 
 async fn preclaim_superseded_cleanup_is_empty(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     record: &TaskBoardRemoteAssignmentRecord,
     identity: &RemoteWorkerIdentity,
 ) -> Result<bool, CliError> {
@@ -239,7 +240,7 @@ fn require_exact_cleanup_generation(
 }
 
 async fn cleanup_executor_session(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     record: &TaskBoardRemoteAssignmentRecord,
     identity: &RemoteWorkerIdentity,
 ) -> Result<(), CliError> {
@@ -267,7 +268,7 @@ async fn cleanup_executor_session(
 }
 
 async fn validate_cleanup_run(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     record: &TaskBoardRemoteAssignmentRecord,
     identity: &RemoteWorkerIdentity,
     run: &TaskBoardRemoteExecutorRun,
@@ -400,7 +401,7 @@ fn require_unadopted_stop_cleanup(
 }
 
 async fn cleanup_orphan_executor_session(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     record: &TaskBoardRemoteAssignmentRecord,
     identity: &RemoteWorkerIdentity,
 ) -> Result<(), CliError> {

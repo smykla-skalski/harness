@@ -2,17 +2,19 @@ use sqlx::query;
 use tempfile::{TempDir, tempdir};
 
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
+use crate::daemon::db_handle::{AsyncDaemonDbHandle, DaemonDbOwnedHandle};
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::daemon::db_open::DaemonDbOpen;
 use crate::daemon::reviews_store::{PolicyGraphQueries, PolicyGraphSyncQueries};
 use crate::task_board::policy_graph::{PolicyCanvasWorkspace, apply_duplicate};
 use harness_kernel::errors::{CliError, CliErrorKind};
 
-async fn connect() -> (TempDir, AsyncDaemonDb) {
+async fn connect() -> (TempDir, AsyncDaemonDbHandle) {
     let dir = tempdir().expect("tempdir");
     let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
         .await
         .expect("connect async daemon db");
+    let db = AsyncDaemonDbHandle(db);
     (dir, db)
 }
 
@@ -25,6 +27,7 @@ async fn load_unseeded_workspace_returns_none() {
 #[test]
 fn sync_load_unseeded_returns_none() {
     let db = DaemonDb::open_in_memory().expect("open in-memory db");
+    let db = DaemonDbOwnedHandle(db);
     assert!(db.load_policy_workspace().expect("load").is_none());
 }
 
@@ -36,12 +39,14 @@ async fn sync_reads_workspace_written_by_async() {
     let async_db = AsyncDaemonDb::connect(&path)
         .await
         .expect("connect async db");
+    let async_db = AsyncDaemonDbHandle(async_db);
     async_db
         .replace_policy_workspace(&workspace)
         .await
         .expect("write workspace via async stack");
     drop(async_db);
     let db = DaemonDb::open(&path).expect("open sync db on same file");
+    let db = DaemonDbOwnedHandle(db);
     let loaded = db
         .load_policy_workspace()
         .expect("sync load")

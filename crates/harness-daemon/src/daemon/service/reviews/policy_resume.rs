@@ -7,7 +7,7 @@ use chrono::{DateTime, Utc};
 use tokio::task::JoinHandle;
 use tokio::time::interval as tokio_interval;
 
-use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::service::observe_async_db;
 use crate::daemon::service::reviews::policy_audit::record_policy_run_resume_result;
 #[cfg(test)]
@@ -64,7 +64,7 @@ where
 pub(crate) async fn resume_reviews_policy_event_with_executor_and_database<E>(
     executor: E,
     event: &PolicyWorkflowEvent,
-    database: Arc<AsyncDaemonDb>,
+    database: Arc<AsyncDaemonDbHandle>,
 ) -> Result<Vec<ReviewsPolicyRunResponse>, CliError>
 where
     E: ReviewsPolicyActionExecutor + Send + Sync + 'static,
@@ -126,7 +126,7 @@ pub(crate) fn spawn_reviews_policy_timer_loop(interval: Duration) -> JoinHandle<
 }
 
 async fn resume_due_reviews_policy_timers_at(
-    database: Arc<AsyncDaemonDb>,
+    database: Arc<AsyncDaemonDbHandle>,
     now: DateTime<Utc>,
 ) -> Result<Vec<ReviewsPolicyRunResponse>, CliError> {
     let ready_runs = database.policy_runs_ready_for_timer(now).await?;
@@ -141,7 +141,7 @@ async fn resume_due_reviews_policy_timers_at(
 
 async fn resume_due_reviews_policy_timer_run(
     ready_run: &PolicyWorkflowRun,
-    database: Arc<AsyncDaemonDb>,
+    database: Arc<AsyncDaemonDbHandle>,
 ) -> Vec<ReviewsPolicyRunResponse> {
     let Some(subject) = ReviewsPolicySubject::from_subject_key(&ready_run.subject.key) else {
         log_invalid_timer_run_subject(ready_run);
@@ -213,7 +213,7 @@ async fn resume_database_reviews_policy_run_ids<E>(
     executor: E,
     run_ids: &[String],
     trigger: PolicyRunTrigger,
-    database: Arc<AsyncDaemonDb>,
+    database: Arc<AsyncDaemonDbHandle>,
 ) -> Result<Vec<ReviewsPolicyRunResponse>, CliError>
 where
     E: ReviewsPolicyActionExecutor + Send + Sync + 'static,
@@ -250,7 +250,7 @@ async fn resume_policy_run_ids(
     runtime: &PolicyRuntimeExecutor,
     run_ids: &[String],
     trigger: PolicyRunTrigger,
-    database: Option<&Arc<AsyncDaemonDb>>,
+    database: Option<&Arc<AsyncDaemonDbHandle>>,
 ) -> Result<Vec<ReviewsPolicyRunResponse>, CliError> {
     let mut resumed_runs = Vec::with_capacity(run_ids.len());
     for run_id in run_ids {
@@ -264,7 +264,7 @@ async fn resume_policy_run_ids(
 }
 
 async fn resumable_database_reviews_policy_run_ids(
-    database: &AsyncDaemonDb,
+    database: &AsyncDaemonDbHandle,
     run_ids: &[String],
 ) -> Result<Vec<String>, CliError> {
     if !enforced_database_reviews_policy_active(database).await? {

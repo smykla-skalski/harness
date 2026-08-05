@@ -14,13 +14,15 @@ use crate::task_board::{
     TaskBoardItem, TaskBoardOrchestratorSettings, TaskBoardStatus, TaskBoardTriageEscalationConfig,
 };
 
-async fn database() -> AsyncDaemonDb {
+async fn database() -> crate::daemon::db_handle::AsyncDaemonDbHandle {
     let temp = tempfile::tempdir().expect("temp dir");
     let path = temp.keep().join("harness.db");
-    AsyncDaemonDb::connect(&path).await.expect("open database")
+    crate::daemon::db_handle::AsyncDaemonDbHandle(
+        AsyncDaemonDb::connect(&path).await.expect("open database"),
+    )
 }
 
-async fn set_kill_switch(db: &AsyncDaemonDb, enabled: bool) {
+async fn set_kill_switch(db: &crate::daemon::db_handle::AsyncDaemonDbHandle, enabled: bool) {
     let mut workspace = PolicyCanvasWorkspace::seeded();
     workspace.spawn_kill_switch = enabled;
     db.replace_policy_workspace(&workspace)

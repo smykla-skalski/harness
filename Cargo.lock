@@ -3759,6 +3759,7 @@ dependencies = [
  "harness-daemon-acp-probe",
  "harness-daemon-client",
  "harness-daemon-codex",
+ "harness-daemon-db-core",
  "harness-daemon-discovery",
  "harness-daemon-launchd",
  "harness-daemon-provider-credentials",
@@ -3915,6 +3916,25 @@ dependencies = [
  "harness-kernel",
  "tokio",
  "tokio-tungstenite 0.30.0",
+ "tracing",
+]
+
+[[package]]
+name = "harness-daemon-db-core"
+version = "57.0.0"
+dependencies = [
+ "harness-daemon-snapshot",
+ "harness-db-schema",
+ "harness-kernel",
+ "harness-protocol",
+ "harness-session",
+ "harness-task-board",
+ "harness-telemetry",
+ "hex",
+ "rusqlite",
+ "sqlx",
+ "tempfile",
+ "tokio",
  "tracing",
 ]
 
@@ -4087,6 +4107,7 @@ name = "harness-db-schema"
 version = "57.0.0"
 dependencies = [
  "harness-daemon",
+ "harness-daemon-db-core",
  "harness-kernel",
  "harness-protocol",
  "harness-session",

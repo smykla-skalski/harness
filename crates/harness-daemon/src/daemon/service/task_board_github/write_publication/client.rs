@@ -1,6 +1,5 @@
 use harness_kernel::errors::{CliError, CliErrorKind};
 
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::state::overlay_task_board_git_runtime_secrets;
 use crate::task_board::github::{
     GitHubApiAutomationClient, GitHubAutomationSettings, GitHubProjectConfig,
@@ -13,6 +12,7 @@ use super::super::repository_conventions;
 use super::super::support::{automation_config, github_token_for_repository};
 use super::preparation::validate_publication_automations;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 /// Stands in for the base branch until the publish path detects the real one.
 /// Named rather than spelled "main" inline so a reader hitting it in a debugger
@@ -31,7 +31,7 @@ pub(in crate::daemon::service::task_board_github) struct PublicationClient {
 /// item from anywhere else. The board is fed from many repositories, so the item
 /// names the target and settings only carry the conventions shared across them.
 pub(super) async fn publication_client_for_repository(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     settings: &TaskBoardOrchestratorSettings,
     workflow_kind: TaskBoardWorkflowKind,
     repository: Option<&str>,
@@ -87,7 +87,7 @@ pub(super) async fn resolve_base_branch(
 /// Build a client for a pull request's head repository, which is a different
 /// repository from the base whenever the contribution came from a fork.
 pub(super) async fn repository_publication_client(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     base: &GitHubProjectConfig,
     repository: &str,
 ) -> Result<PublicationClient, CliError> {
@@ -95,7 +95,7 @@ pub(super) async fn repository_publication_client(
 }
 
 async fn stamp_repository(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     settings: GitHubAutomationSettings,
     repository: &str,
 ) -> Result<PublicationClient, CliError> {

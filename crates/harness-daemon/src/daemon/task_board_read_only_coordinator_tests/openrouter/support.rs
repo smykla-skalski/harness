@@ -1,12 +1,13 @@
-use crate::daemon::db::{AgentTurnRunStatus, AsyncDaemonDb};
+use crate::daemon::db::AgentTurnRunStatus;
 use crate::task_board::TaskBoardWorkflowExecutionRecord;
 
 use super::super::fixture::{Fixture, RETRY_AT};
 use super::super::runtime::FakeReadOnlyRuntime;
 use crate::daemon::db::prelude::*;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
-pub(super) async fn reconcile(db: &AsyncDaemonDb, runtime: &FakeReadOnlyRuntime, now: &str) {
+pub(super) async fn reconcile(db: &AsyncDaemonDbHandle, runtime: &FakeReadOnlyRuntime, now: &str) {
     let report = super::super::super::task_board_read_only_coordinator::
         reconcile_task_board_read_only_workflows_with_runtime(db, runtime, now, 8)
             .await
@@ -16,7 +17,7 @@ pub(super) async fn reconcile(db: &AsyncDaemonDb, runtime: &FakeReadOnlyRuntime,
 
 pub(super) async fn load(
     fixture: &Fixture,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
 ) -> TaskBoardWorkflowExecutionRecord {
     db.task_board_workflow_execution(&fixture.execution_id)
         .await
@@ -25,7 +26,7 @@ pub(super) async fn load(
 }
 
 pub(super) async fn finish_run(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     run_id: &str,
     status: AgentTurnRunStatus,
     report: Option<&str>,

@@ -6,7 +6,7 @@
 
 use std::path::Path;
 
-use crate::daemon::db::{AsyncDaemonDb, AsyncTaskReviewWrites};
+use crate::daemon::db::AsyncTaskReviewWrites;
 use crate::daemon::protocol::{
     TaskArbitrateRequest, TaskAssignRequest, TaskClaimReviewRequest, TaskCreateRequest,
     TaskRespondReviewRequest, TaskSubmitForReviewRequest, TaskSubmitReviewRequest,
@@ -17,6 +17,7 @@ use crate::session::types::{
 };
 
 use super::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 #[test]
@@ -40,7 +41,7 @@ fn v10_task_columns_track_every_review_mutation_on_async_path() {
 // Everything the review-lifecycle phase helpers below need: a fresh async
 // database, a leader/worker/two-reviewer session, and one in-progress task.
 struct V10ColumnsFixture {
-    async_db: AsyncDaemonDb,
+    async_db: AsyncDaemonDbHandle,
     session_id: String,
     task_id: String,
     leader_id: String,
@@ -53,7 +54,7 @@ struct V10ColumnsFixture {
 // agent_id; `role`/`runtime` double as the lookup key since each runtime
 // only ever joins once per fixture.
 async fn v10_columns_join_agent(
-    async_db: &AsyncDaemonDb,
+    async_db: &AsyncDaemonDbHandle,
     project: &Path,
     session_id: &str,
     env_var: &'static str,
@@ -96,6 +97,7 @@ async fn v10_columns_setup(project: &Path) -> V10ColumnsFixture {
     let async_db = crate::daemon::db::AsyncDaemonDb::connect(&db_path)
         .await
         .expect("open async daemon db");
+    let async_db = AsyncDaemonDbHandle(async_db);
 
     let state = start_direct_session_async(
         &async_db,

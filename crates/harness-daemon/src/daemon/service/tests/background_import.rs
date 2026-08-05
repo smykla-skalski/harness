@@ -1,5 +1,6 @@
 use super::*;
 use crate::daemon::db::imports::{DaemonDbImports, DaemonDbSessionResync};
+use crate::daemon::db_handle::DaemonDbOwnedHandle;
 use crate::daemon::db_open::DaemonDbOpen;
 use crate::daemon::serve::{self, DaemonServeConfig, session_import_required};
 
@@ -43,7 +44,9 @@ fn serve_helpers_round_trip_smoke_covers_public_surface() {
         let standalone_db = serve::open_daemon_db(&db_path).expect("open standalone daemon db");
         drop(standalone_db);
 
-        let db_slot = Arc::new(OnceLock::<Arc<Mutex<crate::daemon::db::DaemonDb>>>::new());
+        let db_slot = Arc::new(OnceLock::<
+            Arc<Mutex<crate::daemon::db_handle::DaemonDbOwnedHandle>>,
+        >::new());
         let db = serve::open_and_publish_db(&db_slot).expect("publish daemon db");
 
         let (projects, sessions) = serve::discover_background_reconciliation_inputs()
@@ -114,6 +117,7 @@ fn session_import_required_skips_matching_db_versions() {
         let db_root = tempdir().expect("db root");
         let db =
             crate::daemon::db::DaemonDb::open(&db_root.path().join("harness.db")).expect("open db");
+        let db = DaemonDbOwnedHandle(db);
         let projects = crate::daemon::index::discover_projects().expect("discover projects");
         let sessions = crate::daemon::index::discover_sessions_for(&projects, true)
             .expect("discover sessions");
@@ -148,6 +152,7 @@ fn session_import_required_detects_newer_file_versions() {
         let db_root = tempdir().expect("db root");
         let db =
             crate::daemon::db::DaemonDb::open(&db_root.path().join("harness.db")).expect("open db");
+        let db = DaemonDbOwnedHandle(db);
         let projects = crate::daemon::index::discover_projects().expect("discover projects");
         let sessions = crate::daemon::index::discover_sessions_for(&projects, true)
             .expect("discover sessions");
@@ -240,7 +245,9 @@ fn background_project_sync_surfaces_a_poisoned_db_lock() {
         append_project_ledger_entry(project);
         crate::daemon::state::ensure_daemon_dirs().expect("ensure daemon dirs");
 
-        let db_slot = Arc::new(OnceLock::<Arc<Mutex<crate::daemon::db::DaemonDb>>>::new());
+        let db_slot = Arc::new(OnceLock::<
+            Arc<Mutex<crate::daemon::db_handle::DaemonDbOwnedHandle>>,
+        >::new());
         let db = serve::open_and_publish_db(&db_slot).expect("publish daemon db");
         let (projects, sessions) = serve::discover_background_reconciliation_inputs()
             .expect("discover reconciliation inputs");
@@ -289,7 +296,9 @@ fn poisoned_db_lock_never_reports_a_clean_reconciliation() {
         append_project_ledger_entry(project);
         crate::daemon::state::ensure_daemon_dirs().expect("ensure daemon dirs");
 
-        let db_slot = Arc::new(OnceLock::<Arc<Mutex<crate::daemon::db::DaemonDb>>>::new());
+        let db_slot = Arc::new(OnceLock::<
+            Arc<Mutex<crate::daemon::db_handle::DaemonDbOwnedHandle>>,
+        >::new());
         let db = serve::open_and_publish_db(&db_slot).expect("publish daemon db");
 
         let poisoner = Arc::clone(&db);

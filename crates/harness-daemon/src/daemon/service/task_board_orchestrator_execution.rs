@@ -1,4 +1,3 @@
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{TaskBoardDispatchRequest, TaskBoardEvaluateRequest};
 use crate::task_board::orchestrator::TaskBoardOrchestratorPreparedRun;
 use crate::task_board::{
@@ -13,11 +12,12 @@ use super::task_board_evaluation::evaluate_task_board_async;
 use super::task_board_github::run_task_board_github_automation_async;
 use super::task_board_orchestrator_db::record_tick;
 use super::task_board_orchestrator_step_mode::scoped_dispatch_request;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 /// A dry run has no request to dispatch, so it reports an empty summary rather
 /// than skipping the stage: the caller still records stage 3 as run.
 pub(super) async fn run_dispatch_phase(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     settings: &TaskBoardOrchestratorSettings,
     prepared: &TaskBoardOrchestratorPreparedRun,
     session: Option<&TaskBoardAutomationRunSession>,
@@ -40,7 +40,7 @@ pub(super) async fn run_dispatch_phase(
 }
 
 pub(super) async fn run_evaluation_phase(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     prepared: &TaskBoardOrchestratorPreparedRun,
     session: Option<&TaskBoardAutomationRunSession>,
 ) -> Result<TaskBoardEvaluationSummary, CliError> {
@@ -73,7 +73,7 @@ pub(super) async fn run_evaluation_phase(
 /// Review workflows publish through their own route, so they are dropped here
 /// rather than filtered upstream where the dispatch stage still needs them.
 pub(super) async fn run_publish_phase(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     settings: &TaskBoardOrchestratorSettings,
     prepared: &TaskBoardOrchestratorPreparedRun,
     session: Option<&TaskBoardAutomationRunSession>,
@@ -98,7 +98,7 @@ fn merge_evaluation(
 }
 
 async fn load_candidate_items(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     item_ids: &[String],
     session: Option<&TaskBoardAutomationRunSession>,
 ) -> Result<Vec<TaskBoardItem>, CliError> {

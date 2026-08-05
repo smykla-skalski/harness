@@ -5,8 +5,8 @@ use harness_task_board::{
     TaskBoardDependencyCompletionStatus, TaskBoardStatus, TaskBoardWorkflowStatus,
 };
 
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 const COMPLETION_START: &str = "<!-- harness:dependency-completion:start -->";
 const COMPLETION_HEADER: &str =
@@ -14,42 +14,44 @@ const COMPLETION_HEADER: &str =
 const COMPLETION_CLOSE: &str = "\n```\n<!-- harness:dependency-completion:end -->";
 
 #[async_trait]
-impl TaskBoardDependencyCompletionSink for AsyncDaemonDb {
+impl TaskBoardDependencyCompletionSink for AsyncDaemonDbHandle {
     async fn record(&self, record: &TaskBoardDependencyCompletionRecord) -> Result<(), CliError> {
         validate_record(record)?;
         let record = record.clone();
         let item_id = record.board_item_id.clone();
-        self.update_task_board_item(&item_id, move |item| {
-            if item.workflow.execution_id.as_deref() != Some(record.workflow_execution_id.as_str())
-            {
-                return Err(CliErrorKind::workflow_parse(
-                    "dependency completion does not match the ticket workflow execution",
-                )
-                .into());
-            }
-            if let Some(existing) = completion_from_body(&item.body)? {
-                if existing == record {
-                    return Ok(false);
+        self.0
+            .update_task_board_item(&item_id, move |item| {
+                if item.workflow.execution_id.as_deref()
+                    != Some(record.workflow_execution_id.as_str())
+                {
+                    return Err(CliErrorKind::workflow_parse(
+                        "dependency completion does not match the ticket workflow execution",
+                    )
+                    .into());
                 }
-                validate_record_advance(&existing, &record)?;
-            }
-            if matches!(
-                item.workflow.status,
-                TaskBoardWorkflowStatus::Completed
-                    | TaskBoardWorkflowStatus::Failed
-                    | TaskBoardWorkflowStatus::Cancelled
-            ) {
-                return Err(CliErrorKind::workflow_io(
-                    "dependency completion cannot advance a terminal ticket workflow",
-                )
-                .into());
-            }
-            item.body = render_completion_body(&item.body, &record)?;
-            item.workflow.last_error = None;
-            apply_record_status(item, &record);
-            Ok(true)
-        })
-        .await?;
+                if let Some(existing) = completion_from_body(&item.body)? {
+                    if existing == record {
+                        return Ok(false);
+                    }
+                    validate_record_advance(&existing, &record)?;
+                }
+                if matches!(
+                    item.workflow.status,
+                    TaskBoardWorkflowStatus::Completed
+                        | TaskBoardWorkflowStatus::Failed
+                        | TaskBoardWorkflowStatus::Cancelled
+                ) {
+                    return Err(CliErrorKind::workflow_io(
+                        "dependency completion cannot advance a terminal ticket workflow",
+                    )
+                    .into());
+                }
+                item.body = render_completion_body(&item.body, &record)?;
+                item.workflow.last_error = None;
+                apply_record_status(item, &record);
+                Ok(true)
+            })
+            .await?;
         Ok(())
     }
 }
@@ -197,6 +199,7 @@ fn validate_record_advance(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::daemon::db::AsyncDaemonDb;
     use crate::daemon::db_open::AsyncDaemonDbConnect;
     use harness_task_board::TaskBoardItem;
     use harness_task_board::github::GitHubMergeMethod;
@@ -237,6 +240,7 @@ mod tests {
         let database = AsyncDaemonDb::connect(&directory.path().join("harness.db"))
             .await
             .expect("open db");
+        let database = AsyncDaemonDbHandle(database);
         let mut item = TaskBoardItem::new(
             "item-1".into(),
             "Dependency update".into(),
@@ -252,14 +256,14 @@ mod tests {
             .expect("create ticket");
 
         let approval = record(TaskBoardDependencyCompletionStatus::ApprovalSubmitted);
-        TaskBoardDependencyCompletionSink::record(&database, &approval)
+        TaskBoardDependencyCompletionSink::record(&database.clone(), &approval)
             .await
             .expect("record approval");
-        TaskBoardDependencyCompletionSink::record(&database, &approval)
+        TaskBoardDependencyCompletionSink::record(&database.clone(), &approval)
             .await
             .expect("idempotent approval replay");
         let merged = record(TaskBoardDependencyCompletionStatus::Merged);
-        TaskBoardDependencyCompletionSink::record(&database, &merged)
+        TaskBoardDependencyCompletionSink::record(&database.clone(), &merged)
             .await
             .expect("record merge");
 
@@ -283,6 +287,7 @@ mod tests {
         let database = AsyncDaemonDb::connect(&directory.path().join("harness.db"))
             .await
             .expect("open db");
+        let database = AsyncDaemonDbHandle(database);
         let mut item = TaskBoardItem::new(
             "item-1".into(),
             "Dependency update".into(),
@@ -297,7 +302,7 @@ mod tests {
             .expect("create ticket");
 
         let error = TaskBoardDependencyCompletionSink::record(
-            &database,
+            &database.clone(),
             &record(TaskBoardDependencyCompletionStatus::Merged),
         )
         .await

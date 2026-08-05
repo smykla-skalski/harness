@@ -4,7 +4,7 @@ use serde_json::Value;
 use super::CliError;
 
 const MIGRATION_SQL: &str = include_str!(
-    "../../harness-daemon/src/daemon/db/migrations/0055_daemon_v56_task_board_inbox.sql"
+    "../../harness-daemon-db-core/src/migrations/0055_daemon_v56_task_board_inbox.sql"
 );
 const STATUS_KEYS: &[&str] = &[
     "status",

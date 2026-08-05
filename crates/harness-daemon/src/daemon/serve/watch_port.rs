@@ -3,7 +3,7 @@ use std::time::Duration;
 use async_trait::async_trait;
 use tokio::sync::broadcast::Sender;
 
-use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
+use crate::daemon::db_handle::{AsyncDaemonDbHandle, DaemonDbOwnedHandle};
 use crate::daemon::protocol::StreamEvent;
 use crate::daemon::service;
 use crate::daemon::watch::WatchServicePort;
@@ -15,23 +15,27 @@ use harness_kernel::errors::CliError;
 pub(super) struct DaemonWatchServicePort;
 
 #[async_trait]
-impl WatchServicePort<DaemonDb, AsyncDaemonDb> for DaemonWatchServicePort {
+impl WatchServicePort<DaemonDbOwnedHandle, AsyncDaemonDbHandle> for DaemonWatchServicePort {
     fn liveness_refresh_ttl(&self) -> Duration {
         service::SESSION_LIVENESS_REFRESH_TTL
     }
 
-    fn reconcile_liveness(&self, db: Option<&DaemonDb>) -> Result<(), CliError> {
+    fn reconcile_liveness(&self, db: Option<&DaemonDbOwnedHandle>) -> Result<(), CliError> {
         service::reconcile_active_session_liveness_background(db)
     }
 
     async fn reconcile_liveness_async(
         &self,
-        async_db: Option<&AsyncDaemonDb>,
+        async_db: Option<&AsyncDaemonDbHandle>,
     ) -> Result<(), CliError> {
         service::reconcile_active_session_liveness_background_async(async_db).await
     }
 
-    fn broadcast_sessions_updated(&self, sender: &Sender<StreamEvent>, db: Option<&DaemonDb>) {
+    fn broadcast_sessions_updated(
+        &self,
+        sender: &Sender<StreamEvent>,
+        db: Option<&DaemonDbOwnedHandle>,
+    ) {
         service::broadcast_sessions_updated(sender, db);
     }
 
@@ -39,7 +43,7 @@ impl WatchServicePort<DaemonDb, AsyncDaemonDb> for DaemonWatchServicePort {
         &self,
         sender: &Sender<StreamEvent>,
         session_id: &str,
-        db: Option<&DaemonDb>,
+        db: Option<&DaemonDbOwnedHandle>,
     ) {
         service::broadcast_session_updated_core(sender, session_id, db);
     }
@@ -48,7 +52,7 @@ impl WatchServicePort<DaemonDb, AsyncDaemonDb> for DaemonWatchServicePort {
         &self,
         sender: &Sender<StreamEvent>,
         session_id: &str,
-        db: Option<&DaemonDb>,
+        db: Option<&DaemonDbOwnedHandle>,
     ) {
         service::broadcast_session_extensions(sender, session_id, db);
     }
@@ -56,7 +60,7 @@ impl WatchServicePort<DaemonDb, AsyncDaemonDb> for DaemonWatchServicePort {
     async fn broadcast_sessions_updated_async(
         &self,
         sender: &Sender<StreamEvent>,
-        async_db: Option<&AsyncDaemonDb>,
+        async_db: Option<&AsyncDaemonDbHandle>,
     ) {
         service::broadcast_sessions_updated_async(sender, async_db).await;
     }
@@ -65,7 +69,7 @@ impl WatchServicePort<DaemonDb, AsyncDaemonDb> for DaemonWatchServicePort {
         &self,
         sender: &Sender<StreamEvent>,
         session_id: &str,
-        async_db: Option<&AsyncDaemonDb>,
+        async_db: Option<&AsyncDaemonDbHandle>,
     ) {
         service::broadcast_session_updated_core_async(sender, session_id, async_db).await;
     }
@@ -74,7 +78,7 @@ impl WatchServicePort<DaemonDb, AsyncDaemonDb> for DaemonWatchServicePort {
         &self,
         sender: &Sender<StreamEvent>,
         session_id: &str,
-        async_db: Option<&AsyncDaemonDb>,
+        async_db: Option<&AsyncDaemonDbHandle>,
     ) {
         service::broadcast_session_extensions_async(sender, session_id, async_db).await;
     }

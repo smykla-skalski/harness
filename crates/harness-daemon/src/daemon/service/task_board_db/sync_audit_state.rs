@@ -6,11 +6,10 @@ use std::time::{Duration, Instant};
 use serde_json::{Value, json};
 use tokio::sync::{Mutex as AsyncMutex, OwnedMutexGuard};
 
-use crate::daemon::db::AsyncDaemonDb;
-use harness_kernel::errors::CliError;
-
 use super::TaskBoardSyncAuditTrigger;
 use super::metrics::{ScopeAuditEvidence, ScopeOutcomeKind, SyncExecutionMetrics};
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
+use harness_kernel::errors::CliError;
 
 const BACKGROUND_FAILURE_REPEAT_INTERVAL: Duration = Duration::from_mins(15);
 
@@ -94,7 +93,7 @@ impl PendingAudit {
 }
 
 pub(super) fn plan_audit(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     trigger: TaskBoardSyncAuditTrigger,
     observation: AuditObservation,
 ) -> Option<PendingAudit> {
@@ -107,7 +106,7 @@ pub(super) fn plan_audit(
 }
 
 pub(super) async fn acquire_audit_lane(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     trigger: TaskBoardSyncAuditTrigger,
 ) -> OwnedMutexGuard<()> {
     let key = (database_fingerprint(db), trigger);
@@ -343,7 +342,7 @@ fn issue_is_due(current: Option<&IssueStamp>, fingerprint: u64, now: Instant) ->
     })
 }
 
-fn database_fingerprint(db: &AsyncDaemonDb) -> u64 {
+fn database_fingerprint(db: &AsyncDaemonDbHandle) -> u64 {
     fingerprint(db.storage_path())
 }
 

@@ -1,6 +1,5 @@
 use std::collections::BTreeSet;
 
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{TaskBoardDispatchRequest, TaskBoardDispatchResponse};
 use crate::task_board::{
     DispatchExecutionSummary, DispatchFailure, DispatchPlan, TaskBoardOrchestratorSettings,
@@ -13,10 +12,11 @@ use super::dispatch::{
     apply_dispatch_plan_async, build_dispatch_plans_for_request_async, reject_explicit_kind_block,
 };
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 pub(crate) async fn dispatch_task_board_for_orchestrator_async(
     request: &TaskBoardDispatchRequest,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     candidate_item_ids: &[String],
     settings: &TaskBoardOrchestratorSettings,
     session: Option<&TaskBoardAutomationRunSession>,
@@ -38,7 +38,7 @@ pub(crate) async fn dispatch_task_board_for_orchestrator_async(
 /// never targeted would starve the single item it did name.
 async fn request_dispatch_budget(
     request: &TaskBoardDispatchRequest,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     settings: &TaskBoardOrchestratorSettings,
 ) -> Result<usize, CliError> {
     if request.item_id.is_some() {
@@ -52,7 +52,7 @@ async fn request_dispatch_budget(
 
 async fn execute_plans(
     request: &TaskBoardDispatchRequest,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     plans: Vec<DispatchPlan>,
     budget: usize,
     session: Option<&TaskBoardAutomationRunSession>,

@@ -1,5 +1,5 @@
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::protocol::{
     TASK_BOARD_TRIAGE_RULES_LIST_DEFAULT_LIMIT, TaskBoardActivateTriageRulesRequest,
     TaskBoardPreviewTriageRulesRequest, TaskBoardSaveTriageRulesDraftRequest,
@@ -12,14 +12,14 @@ use crate::task_board::{
 use harness_kernel::errors::CliError;
 
 pub(crate) async fn get_task_board_triage_rules_draft_db(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
 ) -> Result<TaskBoardTriageRulesDraftResponse, CliError> {
     let draft = db.load_task_board_triage_rules_draft().await?;
     Ok(TaskBoardTriageRulesDraftResponse { draft })
 }
 
 pub(crate) async fn save_task_board_triage_rules_draft_db(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &TaskBoardSaveTriageRulesDraftRequest,
 ) -> Result<TriageRuleSetDraftSaveResult, CliError> {
     db.save_task_board_triage_rules_draft(
@@ -31,7 +31,7 @@ pub(crate) async fn save_task_board_triage_rules_draft_db(
 }
 
 pub(crate) async fn preview_task_board_triage_rules_db(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &TaskBoardPreviewTriageRulesRequest,
 ) -> Result<TriageRuleSetPreviewResult, CliError> {
     db.preview_task_board_triage_rules(request.rules.clone())
@@ -39,7 +39,7 @@ pub(crate) async fn preview_task_board_triage_rules_db(
 }
 
 pub(crate) async fn activate_task_board_triage_rules_db(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     request: &TaskBoardActivateTriageRulesRequest,
 ) -> Result<TriageRuleSetActivationResult, CliError> {
     db.activate_task_board_triage_rules(
@@ -51,7 +51,7 @@ pub(crate) async fn activate_task_board_triage_rules_db(
 }
 
 pub(crate) async fn get_task_board_triage_rules_revisions_db(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     limit: Option<u32>,
 ) -> Result<TaskBoardTriageRulesRevisionsResponse, CliError> {
     let revisions = db
@@ -63,7 +63,7 @@ pub(crate) async fn get_task_board_triage_rules_revisions_db(
 }
 
 pub(crate) async fn get_task_board_triage_rules_audit_db(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     limit: Option<u32>,
 ) -> Result<TaskBoardTriageRulesAuditResponse, CliError> {
     let audit = db

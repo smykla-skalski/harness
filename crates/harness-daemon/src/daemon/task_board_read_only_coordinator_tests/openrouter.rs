@@ -14,6 +14,7 @@ use crate::daemon::db_open::AsyncDaemonDbConnect;
 mod support;
 
 use crate::daemon::db::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use support::{finish_run, load, reconcile};
 
 #[tokio::test]
@@ -26,9 +27,11 @@ async fn openrouter_reviewer_starts_and_durably_tracks_an_agent_turn() {
     let db = AsyncDaemonDb::connect(&fixture.test.path)
         .await
         .expect("open coordinator database");
+    let db = AsyncDaemonDbHandle(db);
     let store = AsyncDaemonDb::connect(&fixture.test.path)
         .await
         .expect("open runtime store");
+    let store = AsyncDaemonDbHandle(store);
     let runtime = FakeReadOnlyRuntime::new([]).with_durable_db(store);
 
     reconcile(&db, &runtime, NOW).await;
@@ -66,6 +69,7 @@ async fn openrouter_reviewer_starts_and_durably_tracks_an_agent_turn() {
     let reopened = AsyncDaemonDb::connect(&fixture.test.path)
         .await
         .expect("reopen database for ticket report");
+    let reopened = AsyncDaemonDbHandle(reopened);
     let report = crate::daemon::service::get_task_board_ai_review_report_db(
         &reopened,
         &TaskBoardGetItemRequest {
@@ -96,9 +100,11 @@ async fn an_unknown_reviewer_runtime_is_refused_by_name_not_run_as_codex() {
     let db = AsyncDaemonDb::connect(&fixture.test.path)
         .await
         .expect("open coordinator database");
+    let db = AsyncDaemonDbHandle(db);
     let store = AsyncDaemonDb::connect(&fixture.test.path)
         .await
         .expect("open runtime store");
+    let store = AsyncDaemonDbHandle(store);
     let runtime = FakeReadOnlyRuntime::new([]).with_durable_db(store);
 
     // Schedule the attempt, then reconcile it: an unsupported runtime is refused.
@@ -150,9 +156,11 @@ async fn missing_immutable_content_fails_before_agent_work_and_schedules_retry()
     let db = AsyncDaemonDb::connect(&fixture.test.path)
         .await
         .expect("open coordinator database");
+    let db = AsyncDaemonDbHandle(db);
     let store = AsyncDaemonDb::connect(&fixture.test.path)
         .await
         .expect("open runtime store");
+    let store = AsyncDaemonDbHandle(store);
     let runtime = FakeReadOnlyRuntime::new([]).with_durable_db(store);
     runtime.fail_immutable_content("exact pull request diff is unavailable");
 
@@ -188,9 +196,11 @@ async fn mismatched_frozen_head_is_rejected_and_retained_before_harvest() {
     let db = AsyncDaemonDb::connect(&fixture.test.path)
         .await
         .expect("open coordinator database");
+    let db = AsyncDaemonDbHandle(db);
     let store = AsyncDaemonDb::connect(&fixture.test.path)
         .await
         .expect("open runtime store");
+    let store = AsyncDaemonDbHandle(store);
     let runtime = FakeReadOnlyRuntime::new([]).with_durable_db(store);
 
     reconcile(&db, &runtime, NOW).await;
@@ -253,9 +263,11 @@ async fn completed_openrouter_review_is_harvested_once_with_structured_findings(
     let db = AsyncDaemonDb::connect(&fixture.test.path)
         .await
         .expect("open coordinator database");
+    let db = AsyncDaemonDbHandle(db);
     let store = AsyncDaemonDb::connect(&fixture.test.path)
         .await
         .expect("open runtime store");
+    let store = AsyncDaemonDbHandle(store);
     let runtime = FakeReadOnlyRuntime::new([]).with_durable_db(store);
 
     reconcile(&db, &runtime, NOW).await;
@@ -307,9 +319,11 @@ async fn malformed_openrouter_completion_retains_output_and_rejection_reason() {
     let db = AsyncDaemonDb::connect(&fixture.test.path)
         .await
         .expect("open coordinator database");
+    let db = AsyncDaemonDbHandle(db);
     let store = AsyncDaemonDb::connect(&fixture.test.path)
         .await
         .expect("open runtime store");
+    let store = AsyncDaemonDbHandle(store);
     let runtime = FakeReadOnlyRuntime::new([]).with_durable_db(store);
 
     reconcile(&db, &runtime, NOW).await;
@@ -374,9 +388,11 @@ async fn failed_and_cancelled_openrouter_runs_retain_terminal_evidence() {
         let db = AsyncDaemonDb::connect(&fixture.test.path)
             .await
             .expect("open coordinator database");
+        let db = AsyncDaemonDbHandle(db);
         let store = AsyncDaemonDb::connect(&fixture.test.path)
             .await
             .expect("open runtime store");
+        let store = AsyncDaemonDbHandle(store);
         let runtime = FakeReadOnlyRuntime::new([]).with_durable_db(store);
         reconcile(&db, &runtime, NOW).await;
         reconcile(&db, &runtime, NOW).await;
@@ -420,9 +436,11 @@ async fn terminal_openrouter_failure_resumes_once_after_runtime_restart() {
     let db = AsyncDaemonDb::connect(&fixture.test.path)
         .await
         .expect("open coordinator database");
+    let db = AsyncDaemonDbHandle(db);
     let store = AsyncDaemonDb::connect(&fixture.test.path)
         .await
         .expect("open runtime store");
+    let store = AsyncDaemonDbHandle(store);
     let runtime = FakeReadOnlyRuntime::new([]).with_durable_db(store);
 
     reconcile(&db, &runtime, NOW).await;
@@ -456,6 +474,7 @@ async fn terminal_openrouter_failure_resumes_once_after_runtime_restart() {
     let restarted_store = AsyncDaemonDb::connect(&fixture.test.path)
         .await
         .expect("reopen runtime store");
+    let restarted_store = AsyncDaemonDbHandle(restarted_store);
     let restarted_runtime = FakeReadOnlyRuntime::new([]).with_durable_db(restarted_store);
 
     // Seeing the failed run after reopening the runtime store, the coordinator

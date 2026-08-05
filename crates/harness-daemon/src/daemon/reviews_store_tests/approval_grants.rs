@@ -6,6 +6,7 @@ use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{
     AsyncDaemonDb, ReservedTaskBoardDispatch, approved_write_item, complete_write_preparation,
 };
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::daemon::reviews_store::PolicyGraphQueries;
 use crate::task_board::{
@@ -17,15 +18,16 @@ use harness_policy_graph_store::{
     insert_pending_grant_at,
 };
 
-async fn connect() -> (TempDir, AsyncDaemonDb) {
+async fn connect() -> (TempDir, AsyncDaemonDbHandle) {
     let dir = tempdir().expect("tempdir");
     let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
         .await
         .expect("connect async daemon db");
+    let db = AsyncDaemonDbHandle(db);
     (dir, db)
 }
 
-async fn consume(db: &AsyncDaemonDb, id: &str) -> bool {
+async fn consume(db: &AsyncDaemonDbHandle, id: &str) -> bool {
     let mut transaction = db.pool().begin().await.expect("begin tx");
     let consumed = consume_approval_grant_in_tx(&mut *transaction, id)
         .await
@@ -34,7 +36,7 @@ async fn consume(db: &AsyncDaemonDb, id: &str) -> bool {
     consumed
 }
 
-async fn consume_at(db: &AsyncDaemonDb, id: &str, now: &str) -> bool {
+async fn consume_at(db: &AsyncDaemonDbHandle, id: &str, now: &str) -> bool {
     let mut transaction = db.pool().begin().await.expect("begin tx");
     let consumed = consume_approval_grant_in_tx_at(&mut *transaction, id, now)
         .await
@@ -43,7 +45,12 @@ async fn consume_at(db: &AsyncDaemonDb, id: &str, now: &str) -> bool {
     consumed
 }
 
-async fn set_grant_clock(db: &AsyncDaemonDb, id: &str, created_at: &str, expiry_seconds: i64) {
+async fn set_grant_clock(
+    db: &AsyncDaemonDbHandle,
+    id: &str,
+    created_at: &str,
+    expiry_seconds: i64,
+) {
     sqlx::query(
         "UPDATE policy_approval_grants
          SET created_at = ?2, updated_at = ?2, expiry_seconds = ?3

@@ -6,7 +6,7 @@ use serde_json::Value;
 mod request_parts;
 
 use crate::daemon::audit_events::{AuditEventDraft, record_audit_result};
-use crate::daemon::db::{AsyncDaemonDb, DaemonDb, ensure_shared_db};
+use crate::daemon::db::ensure_shared_db;
 use crate::daemon::http::{DaemonHttpState, error_status_and_body};
 use crate::daemon::protocol::{
     SessionDetail, SessionMutationResponse, SessionStartRequest, WsErrorPayload, WsRequest,
@@ -18,6 +18,7 @@ use harness_protocol::daemon::summaries::SetLogLevelRequest;
 
 use super::frames::{error_response, error_response_with_payload, ok_response};
 use super::params::{extract_session_agent_id, extract_session_id};
+use crate::daemon::db_handle::{AsyncDaemonDbHandle, DaemonDbOwnedHandle};
 use request_parts::{ActorBinding, task_mutation_request_parts};
 
 pub(crate) fn dispatch_query<T: serde::Serialize>(
@@ -144,12 +145,16 @@ pub(crate) async fn dispatch_session_start(
 pub(crate) fn dispatch_mutation(
     request: &WsRequest,
     state: &DaemonHttpState,
-    handler: impl FnOnce(String, Value, Option<&DaemonDb>) -> Result<SessionDetail, MutationError>,
+    handler: impl FnOnce(
+        String,
+        Value,
+        Option<&DaemonDbOwnedHandle>,
+    ) -> Result<SessionDetail, MutationError>,
 ) -> WsResponse {
     let db_guard = state
         .db
         .get()
-        .map(|db: &Arc<Mutex<DaemonDb>>| db.lock().expect("db lock"));
+        .map(|db: &Arc<Mutex<DaemonDbOwnedHandle>>| db.lock().expect("db lock"));
     let db_ref = db_guard.as_deref();
     let Some(session_id) = extract_session_id(&request.params) else {
         return error_response(&request.id, "MISSING_PARAM", "missing session_id");
@@ -180,8 +185,9 @@ pub(crate) async fn dispatch_mutation_prefer_async<SyncHandler, AsyncHandler, As
     async_handler: AsyncHandler,
 ) -> WsResponse
 where
-    SyncHandler: FnOnce(String, Value, Option<&DaemonDb>) -> Result<SessionDetail, MutationError>,
-    AsyncHandler: FnOnce(String, Value, Arc<AsyncDaemonDb>) -> AsyncResult,
+    SyncHandler:
+        FnOnce(String, Value, Option<&DaemonDbOwnedHandle>) -> Result<SessionDetail, MutationError>,
+    AsyncHandler: FnOnce(String, Value, Arc<AsyncDaemonDbHandle>) -> AsyncResult,
     AsyncResult: Future<Output = Result<SessionDetail, MutationError>>,
 {
     let Some(async_db) = state.async_db.get().cloned() else {
@@ -215,7 +221,7 @@ pub(crate) fn dispatch_mutation_with_task(
         String,
         String,
         Value,
-        Option<&DaemonDb>,
+        Option<&DaemonDbOwnedHandle>,
     ) -> Result<SessionDetail, MutationError>,
 ) -> WsResponse {
     dispatch_mutation_with_task_with_actor_binding(
@@ -234,7 +240,7 @@ pub(crate) fn dispatch_mutation_with_task_preserving_actor(
         String,
         String,
         Value,
-        Option<&DaemonDb>,
+        Option<&DaemonDbOwnedHandle>,
     ) -> Result<SessionDetail, MutationError>,
 ) -> WsResponse {
     dispatch_mutation_with_task_with_actor_binding(request, state, ActorBinding::Preserve, handler)
@@ -248,13 +254,13 @@ fn dispatch_mutation_with_task_with_actor_binding(
         String,
         String,
         Value,
-        Option<&DaemonDb>,
+        Option<&DaemonDbOwnedHandle>,
     ) -> Result<SessionDetail, MutationError>,
 ) -> WsResponse {
     let db_guard = state
         .db
         .get()
-        .map(|db: &Arc<Mutex<DaemonDb>>| db.lock().expect("db lock"));
+        .map(|db: &Arc<Mutex<DaemonDbOwnedHandle>>| db.lock().expect("db lock"));
     let db_ref = db_guard.as_deref();
     let (session_id, task_id, params) = match task_mutation_request_parts(request, actor_binding) {
         Ok(parts) => parts,
@@ -288,9 +294,13 @@ pub(crate) async fn dispatch_mutation_with_task_prefer_async<
     async_handler: AsyncHandler,
 ) -> WsResponse
 where
-    SyncHandler:
-        FnOnce(String, String, Value, Option<&DaemonDb>) -> Result<SessionDetail, MutationError>,
-    AsyncHandler: FnOnce(String, String, Value, Arc<AsyncDaemonDb>) -> AsyncResult,
+    SyncHandler: FnOnce(
+        String,
+        String,
+        Value,
+        Option<&DaemonDbOwnedHandle>,
+    ) -> Result<SessionDetail, MutationError>,
+    AsyncHandler: FnOnce(String, String, Value, Arc<AsyncDaemonDbHandle>) -> AsyncResult,
     AsyncResult: Future<Output = Result<SessionDetail, MutationError>>,
 {
     dispatch_mutation_with_task_prefer_async_with_actor_binding(
@@ -314,9 +324,13 @@ pub(crate) async fn dispatch_mutation_with_task_preserving_actor_prefer_async<
     async_handler: AsyncHandler,
 ) -> WsResponse
 where
-    SyncHandler:
-        FnOnce(String, String, Value, Option<&DaemonDb>) -> Result<SessionDetail, MutationError>,
-    AsyncHandler: FnOnce(String, String, Value, Arc<AsyncDaemonDb>) -> AsyncResult,
+    SyncHandler: FnOnce(
+        String,
+        String,
+        Value,
+        Option<&DaemonDbOwnedHandle>,
+    ) -> Result<SessionDetail, MutationError>,
+    AsyncHandler: FnOnce(String, String, Value, Arc<AsyncDaemonDbHandle>) -> AsyncResult,
     AsyncResult: Future<Output = Result<SessionDetail, MutationError>>,
 {
     dispatch_mutation_with_task_prefer_async_with_actor_binding(
@@ -341,9 +355,13 @@ async fn dispatch_mutation_with_task_prefer_async_with_actor_binding<
     async_handler: AsyncHandler,
 ) -> WsResponse
 where
-    SyncHandler:
-        FnOnce(String, String, Value, Option<&DaemonDb>) -> Result<SessionDetail, MutationError>,
-    AsyncHandler: FnOnce(String, String, Value, Arc<AsyncDaemonDb>) -> AsyncResult,
+    SyncHandler: FnOnce(
+        String,
+        String,
+        Value,
+        Option<&DaemonDbOwnedHandle>,
+    ) -> Result<SessionDetail, MutationError>,
+    AsyncHandler: FnOnce(String, String, Value, Arc<AsyncDaemonDbHandle>) -> AsyncResult,
     AsyncResult: Future<Output = Result<SessionDetail, MutationError>>,
 {
     let Some(async_db) = state.async_db.get().cloned() else {
@@ -380,13 +398,13 @@ pub(crate) fn dispatch_mutation_with_agent(
         String,
         String,
         Value,
-        Option<&DaemonDb>,
+        Option<&DaemonDbOwnedHandle>,
     ) -> Result<SessionDetail, MutationError>,
 ) -> WsResponse {
     let db_guard = state
         .db
         .get()
-        .map(|db: &Arc<Mutex<DaemonDb>>| db.lock().expect("db lock"));
+        .map(|db: &Arc<Mutex<DaemonDbOwnedHandle>>| db.lock().expect("db lock"));
     let db_ref = db_guard.as_deref();
     let Some(session_id) = extract_session_id(&request.params) else {
         return error_response(&request.id, "MISSING_PARAM", "missing session_id");
@@ -424,9 +442,13 @@ pub(crate) async fn dispatch_mutation_with_agent_prefer_async<
     async_handler: AsyncHandler,
 ) -> WsResponse
 where
-    SyncHandler:
-        FnOnce(String, String, Value, Option<&DaemonDb>) -> Result<SessionDetail, MutationError>,
-    AsyncHandler: FnOnce(String, String, Value, Arc<AsyncDaemonDb>) -> AsyncResult,
+    SyncHandler: FnOnce(
+        String,
+        String,
+        Value,
+        Option<&DaemonDbOwnedHandle>,
+    ) -> Result<SessionDetail, MutationError>,
+    AsyncHandler: FnOnce(String, String, Value, Arc<AsyncDaemonDbHandle>) -> AsyncResult,
     AsyncResult: Future<Output = Result<SessionDetail, MutationError>>,
 {
     let Some(async_db) = state.async_db.get().cloned() else {

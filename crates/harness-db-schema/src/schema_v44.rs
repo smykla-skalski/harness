@@ -6,7 +6,7 @@ use rusqlite::Connection;
 use super::{CliError, db_error};
 
 const LANES_SQL: &str = include_str!(
-    "../../harness-daemon/src/daemon/db/migrations/0038_daemon_v44_task_board_lane_order.sql"
+    "../../harness-daemon-db-core/src/migrations/0038_daemon_v44_task_board_lane_order.sql"
 );
 const LANE_COLUMNS: [(&str, &str); 5] = [
     ("lane_position", "INTEGER"),

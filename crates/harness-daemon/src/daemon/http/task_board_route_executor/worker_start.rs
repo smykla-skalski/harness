@@ -1,6 +1,6 @@
 use tracing::warn;
 
-use crate::daemon::db::{AsyncDaemonDb, ClaimedTaskBoardDispatch, TaskBoardDispatchClaimAction};
+use crate::daemon::db::{ClaimedTaskBoardDispatch, TaskBoardDispatchClaimAction};
 use crate::daemon::protocol::ManagedAgentSnapshot;
 use crate::daemon::task_board_managed_agents::{
     maintain_task_board_dispatch_claim, resume_worker_compensation,
@@ -13,10 +13,11 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::DaemonHttpState;
 use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 pub(super) async fn start_and_complete_delivered_worker(
     state: &DaemonHttpState,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     claim: &mut ClaimedTaskBoardDispatch,
 ) -> Result<Option<ManagedAgentSnapshot>, CliError> {
     let _heartbeat =
@@ -31,7 +32,7 @@ pub(super) async fn start_and_complete_delivered_worker(
 pub(super) async fn start_claimed_workers(
     state: &DaemonHttpState,
     applied: &[DispatchAppliedTask],
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
 ) -> (Vec<DispatchAppliedTask>, Vec<DispatchFailure>) {
     let mut kept = Vec::new();
     let mut failures = Vec::new();
@@ -74,7 +75,7 @@ pub(super) async fn start_claimed_workers(
 }
 
 async fn record_unclaimed_outcome(
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     applied: &DispatchAppliedTask,
     error: CliError,
     kept: &mut Vec<DispatchAppliedTask>,
@@ -100,7 +101,7 @@ async fn record_unclaimed_outcome(
 
 async fn resume_compensating_claim(
     state: &DaemonHttpState,
-    db: &AsyncDaemonDb,
+    db: &AsyncDaemonDbHandle,
     claim: &ClaimedTaskBoardDispatch,
     reason: &str,
 ) -> CliError {

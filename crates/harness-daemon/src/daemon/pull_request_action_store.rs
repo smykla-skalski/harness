@@ -2,16 +2,17 @@ use async_trait::async_trait;
 use harness_kernel::errors::CliError;
 use harness_task_board::github::{PullRequestActionStore, RecordedAction};
 
-use crate::daemon::db::{AsyncDaemonDb, AsyncPullRequestActionQueries};
+use crate::daemon::db::AsyncPullRequestActionQueries;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 #[async_trait]
-impl PullRequestActionStore for AsyncDaemonDb {
+impl PullRequestActionStore for AsyncDaemonDbHandle {
     async fn load(&self, id: &str) -> Result<Option<RecordedAction>, CliError> {
-        self.load_pull_request_action(id).await
+        self.0.load_pull_request_action(id).await
     }
 
     async fn upsert(&self, record: RecordedAction) -> Result<(), CliError> {
-        self.upsert_pull_request_action(record).await
+        self.0.upsert_pull_request_action(record).await
     }
 }
 
@@ -29,16 +30,17 @@ mod tests {
     use tempfile::{TempDir, tempdir};
 
     use crate::daemon::db::AsyncDaemonDb;
+    use crate::daemon::db_handle::AsyncDaemonDbHandle;
     use crate::daemon::db_open::AsyncDaemonDbConnect;
 
     // The caller keeps the returned TempDir alive; dropping it removes the
     // database files out from under the open pool.
-    async fn open_db() -> (AsyncDaemonDb, TempDir) {
+    async fn open_db() -> (AsyncDaemonDbHandle, TempDir) {
         let dir = tempdir().expect("tempdir");
         let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
             .await
             .expect("open database");
-        (db, dir)
+        (AsyncDaemonDbHandle(db), dir)
     }
 
     fn action(id: &str, url: Option<String>) -> PullRequestAction {
@@ -149,7 +151,8 @@ mod tests {
         // First process: the gate clears on a green pull request, the merge
         // request leaves, but its response is lost.
         {
-            let db = AsyncDaemonDb::connect(&path).await.expect("open database");
+            let db =
+                AsyncDaemonDbHandle(AsyncDaemonDb::connect(&path).await.expect("open database"));
             let before = InMemoryPullRequestEvidenceSource::new().with_evidence(open_evidence());
             let error = merge_with_ledger(
                 &db,
@@ -169,9 +172,11 @@ mod tests {
 
         // Restart: a fresh process reconnects the same database and observes the
         // pull request already merged - the lost request had in fact applied.
-        let db = AsyncDaemonDb::connect(&path)
-            .await
-            .expect("reopen database");
+        let db = AsyncDaemonDbHandle(
+            AsyncDaemonDb::connect(&path)
+                .await
+                .expect("reopen database"),
+        );
         let after = InMemoryPullRequestEvidenceSource::new().with_evidence(merged_evidence());
         let outcome = merge_with_ledger(
             &db,

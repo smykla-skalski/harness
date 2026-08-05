@@ -12,6 +12,7 @@ async fn observed_label_and_repository_eligibility_loss_completes_only_matching_
     let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
         .await
         .expect("open database");
+    let db = AsyncDaemonDbHandle(db);
     let api_request = cached_projection_request("eligibility/api");
     let web_request = cached_projection_request("eligibility/web");
     configure_review_inbox(

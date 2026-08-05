@@ -16,7 +16,7 @@ use crate::daemon::db::prelude::*;
 pub fn create_task(
     session_id: &str,
     request: &TaskCreateRequest,
-    db: Option<&super::super::db::DaemonDb>,
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
 ) -> Result<SessionDetail, CliError> {
     let spec = session_service::TaskSpec {
         title: &request.title,
@@ -66,7 +66,7 @@ pub fn delete_task(
     session_id: &str,
     task_id: &str,
     request: &TaskDeleteRequest,
-    db: Option<&super::super::db::DaemonDb>,
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
     dispatch: WakeDispatch<'_>,
 ) -> Result<SessionDetail, CliError> {
     if let Some(db) = db
@@ -130,7 +130,7 @@ pub fn assign_task(
     session_id: &str,
     task_id: &str,
     request: &TaskAssignRequest,
-    db: Option<&super::super::db::DaemonDb>,
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
     dispatch: WakeDispatch<'_>,
 ) -> Result<SessionDetail, CliError> {
     if let Some(db) = db
@@ -189,7 +189,7 @@ pub fn drop_task(
     session_id: &str,
     task_id: &str,
     request: &TaskDropRequest,
-    db: Option<&super::super::db::DaemonDb>,
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
     dispatch: WakeDispatch<'_>,
 ) -> Result<SessionDetail, CliError> {
     if let Some(db) = db
@@ -250,7 +250,7 @@ pub fn update_task_queue_policy(
     session_id: &str,
     task_id: &str,
     request: &TaskQueuePolicyRequest,
-    db: Option<&super::super::db::DaemonDb>,
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
     dispatch: WakeDispatch<'_>,
 ) -> Result<SessionDetail, CliError> {
     if let Some(db) = db
@@ -308,7 +308,7 @@ pub fn update_task(
     session_id: &str,
     task_id: &str,
     request: &TaskUpdateRequest,
-    db: Option<&super::super::db::DaemonDb>,
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
     dispatch: WakeDispatch<'_>,
 ) -> Result<SessionDetail, CliError> {
     if let Some(db) = db
@@ -376,7 +376,7 @@ pub fn checkpoint_task(
     session_id: &str,
     task_id: &str,
     request: &TaskCheckpointRequest,
-    db: Option<&super::super::db::DaemonDb>,
+    db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
 ) -> Result<SessionDetail, CliError> {
     if let Some(db) = db
         && let Some(mut state) = db.load_session_state_for_mutation(session_id)?
