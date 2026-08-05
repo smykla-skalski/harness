@@ -84,6 +84,7 @@ public enum DashboardAgentsPreviewRenderer {
         largestIndex: largestIndex,
         directory: directory
       )
+      && renderHeaderStates(textSizeIndex: defaultIndex, directory: directory)
   }
 
   @MainActor
@@ -159,6 +160,7 @@ public enum DashboardAgentsPreviewRenderer {
         initialCodexDetail: DashboardAgentsPreviewFixtures.managedCodexDetail
       )
   }
+
 }
 
 extension DashboardAgentsPreviewRenderer {
@@ -291,8 +293,10 @@ extension DashboardAgentsPreviewRenderer {
       screen: NSScreen.main
     )
     window.contentView = view
-    view.layoutSubtreeIfNeeded()
-    RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.05))
+    for _ in 0..<3 {
+      view.layoutSubtreeIfNeeded()
+      RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.1))
+    }
     view.layoutSubtreeIfNeeded()
 
     guard let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) else {
