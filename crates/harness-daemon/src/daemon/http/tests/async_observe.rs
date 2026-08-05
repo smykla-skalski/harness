@@ -1,4 +1,4 @@
-use crate::daemon::db::conversation::DaemonDbConversation;
+use crate::daemon::db::DaemonDbConversation;
 use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;

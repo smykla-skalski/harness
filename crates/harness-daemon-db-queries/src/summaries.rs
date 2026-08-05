@@ -1,14 +1,17 @@
-use crate::daemon::db::writes::SessionWriteQueries;
+use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
 
-use super::summary_rows::SessionSummaryRow;
-use super::{
-    BTreeMap, CliError, DaemonDb, DiscoveredProject, LIVENESS_CANDIDATE_IDS_SQL, Path, PathBuf,
-    SessionState, daemon_index, daemon_protocol, db_error, project_context_dir, project_context_id,
-    usize_from_i64,
-};
-use crate::session::service::canonicalize_persisted_session_state;
-use crate::session::storage;
-use crate::workspace::utc_now;
+use harness_daemon_db_core::{DaemonDb, LIVENESS_CANDIDATE_IDS_SQL, db_error, usize_from_i64};
+use harness_kernel::errors::CliError;
+use harness_protocol::session::SessionState;
+use harness_session::index::{DiscoveredProject, ResolvedSession};
+use harness_session::service::canonicalize_persisted_session_state;
+use harness_session::storage;
+use harness_session::wire::{ProjectSummary, SessionSummary, WorktreeSummary};
+use harness_workspace::workspace::{project_context_dir, project_context_id, utc_now};
+
+use crate::summary_rows::SessionSummaryRow;
+use crate::writes::SessionWriteQueries;
 
 /// Project/session summary reads for the API listing endpoints, plus
 /// session resolution by ID.
@@ -38,15 +41,14 @@ pub trait SessionSummaryQueries {
     ///
     /// # Errors
     /// Returns [`CliError`] on query failure.
-    fn list_project_summaries(&self) -> Result<Vec<daemon_protocol::ProjectSummary>, CliError>;
+    fn list_project_summaries(&self) -> Result<Vec<ProjectSummary>, CliError>;
 
     /// Load all session summaries for the sessions list endpoint.
     /// Joins session state with project data to produce protocol-level summaries.
     ///
     /// # Errors
     /// Returns [`CliError`] on query failure.
-    fn list_session_summaries_full(&self)
-    -> Result<Vec<daemon_protocol::SessionSummary>, CliError>;
+    fn list_session_summaries_full(&self) -> Result<Vec<SessionSummary>, CliError>;
 
     /// List session ids eligible for liveness reconciliation without parsing
     /// full session state. Mirrors the async pool query so both reconcile
@@ -68,10 +70,7 @@ pub trait SessionSummaryQueries {
     ///
     /// # Errors
     /// Returns [`CliError`] on query or parse failure.
-    fn resolve_session(
-        &self,
-        session_id: &str,
-    ) -> Result<Option<daemon_index::ResolvedSession>, CliError>;
+    fn resolve_session(&self, session_id: &str) -> Result<Option<ResolvedSession>, CliError>;
 }
 
 impl SessionSummaryQueries for DaemonDb {
@@ -108,9 +107,7 @@ impl SessionSummaryQueries for DaemonDb {
             .map_err(|error| db_error(format!("health counts: {error}")))
     }
 
-    fn list_project_summaries(&self) -> Result<Vec<daemon_protocol::ProjectSummary>, CliError> {
-        use daemon_protocol::{ProjectSummary, WorktreeSummary};
-
+    fn list_project_summaries(&self) -> Result<Vec<ProjectSummary>, CliError> {
         let mut statement = self
             .conn
             .prepare(
@@ -193,9 +190,7 @@ impl SessionSummaryQueries for DaemonDb {
         Ok(summaries)
     }
 
-    fn list_session_summaries_full(
-        &self,
-    ) -> Result<Vec<daemon_protocol::SessionSummary>, CliError> {
+    fn list_session_summaries_full(&self) -> Result<Vec<SessionSummary>, CliError> {
         let mut statement = self
             .conn
             .prepare(
@@ -320,10 +315,7 @@ impl SessionSummaryQueries for DaemonDb {
         Ok(sessions)
     }
 
-    fn resolve_session(
-        &self,
-        session_id: &str,
-    ) -> Result<Option<daemon_index::ResolvedSession>, CliError> {
+    fn resolve_session(&self, session_id: &str) -> Result<Option<ResolvedSession>, CliError> {
         storage::validate_session_id(session_id)?;
         let result = self.conn.query_row(
             "SELECT s.state_json, p.project_id, p.name, p.project_dir, p.repository_root,
@@ -383,7 +375,7 @@ impl SessionSummaryQueries for DaemonDb {
                 if canonicalize_persisted_session_state(&mut state, &utc_now()) {
                     self.sync_session(&project.project_id, &state)?;
                 }
-                Ok(Some(daemon_index::ResolvedSession { project, state }))
+                Ok(Some(ResolvedSession { project, state }))
             }
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(error) => Err(db_error(format!("resolve session: {error}"))),

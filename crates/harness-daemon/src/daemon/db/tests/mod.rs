@@ -7,7 +7,7 @@ pub(super) use std::time::{Duration, Instant};
 
 mod support;
 #[allow(unused_imports)]
-use crate::daemon::db::conversation::DaemonDbConversation;
+use crate::daemon::db::DaemonDbConversation;
 use crate::daemon::db::timeline::DaemonDbTimeline;
 use support::*;
 

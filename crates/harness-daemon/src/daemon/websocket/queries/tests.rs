@@ -1,4 +1,4 @@
-use crate::daemon::db::conversation::DaemonDbConversation;
+use crate::daemon::db::DaemonDbConversation;
 use serde_json::Value;
 
 use super::super::test_support::{

@@ -1,17 +1,25 @@
-use super::super::{
-    StoredTimelineEntry, bump_session_timeline_state, replace_session_timeline_entries_for_prefix,
+use harness_daemon_db_core::{db_error, i64_from_u64};
+use harness_kernel::errors::CliError;
+use harness_protocol::agent::ConversationEvent;
+use harness_session::wire::AgentToolActivitySummary;
+use harness_timeline::TimelinePayloadScope;
+use harness_workspace::workspace::utc_now;
+use rusqlite::{Connection, OptionalExtension};
+
+use super::{PreparedConversationEventImport, extract_conversation_event_kind};
+use crate::stored_timeline_entry::StoredTimelineEntry;
+use crate::timeline::stored_timeline_entry;
+use crate::timeline_store::{
+    bump_session_timeline_state, replace_session_timeline_entries_for_prefix,
     upsert_session_timeline_entry_row,
 };
-use super::{
-    CliError, Connection, ConversationEvent, OptionalExtension, PreparedConversationEventImport,
-    clear_session_conversation_events, daemon_protocol, daemon_timeline, db_error,
-    extract_conversation_event_kind, i64_from_u64, stored_timeline_entry, utc_now,
-};
+
+use super::clear_session_conversation_events;
 
 pub(super) fn replace_session_activity(
     conn: &Connection,
     session_id: &str,
-    activities: &[daemon_protocol::AgentToolActivitySummary],
+    activities: &[AgentToolActivitySummary],
 ) -> Result<(), CliError> {
     conn.execute(
         "DELETE FROM agent_activity_cache WHERE session_id = ?1",
@@ -28,7 +36,7 @@ pub(super) fn replace_session_activity(
 pub(super) fn upsert_agent_activity(
     conn: &Connection,
     session_id: &str,
-    activity: &daemon_protocol::AgentToolActivitySummary,
+    activity: &AgentToolActivitySummary,
 ) -> Result<(), CliError> {
     let json = serde_json::to_string(activity).unwrap_or_default();
     let existing_json = conn
@@ -139,12 +147,12 @@ pub(super) fn build_conversation_timeline_rows(
     let mut timeline_rows = Vec::new();
     for prepared in conversation_events {
         for event in &prepared.events {
-            if let Some(entry) = daemon_timeline::conversation_entry(
+            if let Some(entry) = harness_timeline::conversation_entry(
                 session_id,
                 &prepared.agent_id,
                 &prepared.runtime,
                 event,
-                daemon_timeline::TimelinePayloadScope::Full,
+                TimelinePayloadScope::Full,
             )? {
                 timeline_rows.push(stored_timeline_entry(
                     "conversation",
@@ -171,12 +179,12 @@ pub(super) fn conversation_timeline_rows_after(
         if i64_from_u64(event.sequence) <= after_sequence {
             continue;
         }
-        if let Some(entry) = daemon_timeline::conversation_entry(
+        if let Some(entry) = harness_timeline::conversation_entry(
             session_id,
             agent_id,
             runtime,
             event,
-            daemon_timeline::TimelinePayloadScope::Full,
+            TimelinePayloadScope::Full,
         )? {
             timeline_rows.push(stored_timeline_entry(
                 "conversation",

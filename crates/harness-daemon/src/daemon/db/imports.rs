@@ -1,4 +1,4 @@
-use super::conversation::DaemonDbConversation;
+use super::DaemonDbConversation;
 use super::timeline::DaemonDbTimeline;
 use super::{
     CliError, DaemonDb, DiscoveredProject, ImportResult, PreparedRuntimeTranscriptResync,

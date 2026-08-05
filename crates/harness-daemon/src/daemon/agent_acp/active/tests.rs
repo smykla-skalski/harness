@@ -2,7 +2,7 @@ use super::*;
 use crate::agents::runtime::RuntimeCapabilities;
 use crate::agents::runtime::event::{ConversationEvent, ConversationEventKind};
 use crate::daemon::db::DaemonDb;
-use crate::daemon::db::conversation::DaemonDbConversation;
+use crate::daemon::db::DaemonDbConversation;
 use crate::daemon::db::prelude::*;
 use crate::daemon::index::DiscoveredProject;
 use crate::session::types::{

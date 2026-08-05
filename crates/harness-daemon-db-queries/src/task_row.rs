@@ -1,9 +1,9 @@
-use crate::session::types::WorkItem;
+use harness_protocol::session::WorkItem;
 
 /// Precomputed bindings for a single row in the `tasks` table. Shared by
 /// the sync (rusqlite) and async (sqlx) task mirror writers so v10 columns
 /// stay in lock-step and the two paths cannot diverge silently.
-pub(super) struct TaskRowBindings {
+pub struct TaskRowBindings {
     pub severity: String,
     pub status: String,
     pub source: String,
@@ -19,7 +19,8 @@ pub(super) struct TaskRowBindings {
 }
 
 impl TaskRowBindings {
-    pub(super) fn from_task(task: &WorkItem) -> Self {
+    #[must_use]
+    pub fn from_task(task: &WorkItem) -> Self {
         let notes_json = serde_json::to_string(&task.notes).unwrap_or_default();
         let checkpoint_summary_json = task
             .checkpoint_summary
@@ -67,7 +68,7 @@ impl TaskRowBindings {
 #[cfg(test)]
 mod tests {
     use super::TaskRowBindings;
-    use crate::session::types::{
+    use harness_protocol::session::{
         AwaitingReview, ReviewClaim, ReviewConsensus, ReviewVerdict, ReviewerEntry,
         TaskQueuePolicy, TaskSeverity, TaskSource, TaskStatus, WorkItem,
     };

@@ -1,16 +1,57 @@
-use crate::daemon::db::activity_fold::DaemonDbActivityFold;
+use std::borrow::Cow;
+use std::collections::BTreeMap;
 use std::iter::repeat_n;
 
-use super::task_writes::replace_tasks;
-use super::{
-    AgentRegistration, BTreeMap, CliError, Connection, DaemonDb, DiscoveredProject,
-    SessionLogEntry, SessionState, TaskCheckpoint, daemon_timeline, db_error,
-    extract_transition_kind, i64_from_u64, normalize_change_scope, session_status_db_label,
-    stored_timeline_entry, u64_from_i64, upsert_session_timeline_entry, utc_now,
+use harness_daemon_db_core::{DaemonDb, db_error, i64_from_u64, u64_from_i64};
+use harness_kernel::errors::CliError;
+use harness_protocol::session::{
+    AgentRegistration, ManagedAgentKind, SessionLogEntry, SessionState, SessionStatus,
+    TaskCheckpoint,
 };
-use crate::session::service::{agent_status_db_label, canonicalize_persisted_session_state};
-use crate::session::storage;
-use crate::session::types::ManagedAgentKind;
+use harness_session::index::DiscoveredProject;
+use harness_session::service::{agent_status_db_label, canonicalize_persisted_session_state};
+use harness_session::storage;
+use rusqlite::Connection;
+
+use crate::activity_fold::DaemonDbActivityFold;
+use crate::task_writes::replace_tasks;
+use crate::timeline::stored_timeline_entry;
+use crate::timeline_store::upsert_session_timeline_entry;
+
+#[must_use]
+pub fn normalize_change_scope(scope: &str) -> Cow<'_, str> {
+    if scope == "global" || scope.starts_with("session:") || scope.starts_with("task_board:") {
+        Cow::Borrowed(scope)
+    } else {
+        Cow::Owned(format!("session:{scope}"))
+    }
+}
+
+/// # Errors
+/// Returns [`CliError`] when the status cannot be serialized.
+pub fn session_status_db_label(status: SessionStatus) -> Result<String, CliError> {
+    let value = serde_json::to_value(status)
+        .map_err(|error| db_error(format!("serialize session status: {error}")))?;
+    value
+        .as_str()
+        .map(ToOwned::to_owned)
+        .ok_or_else(|| db_error("serialize session status: expected string"))
+}
+
+/// Extract the serde tag from a serialized `SessionTransition` JSON string.
+/// Returns the variant name (e.g. `SessionStarted`, `AgentJoined`) for indexing.
+#[must_use]
+pub fn extract_transition_kind(json: &str) -> String {
+    serde_json::from_str::<serde_json::Value>(json)
+        .ok()
+        .and_then(|value| {
+            value
+                .as_object()
+                .and_then(|object| object.keys().next().cloned())
+                .or_else(|| value.as_str().map(String::from))
+        })
+        .unwrap_or_default()
+}
 
 /// Session and project writes: upserts, log/checkpoint appends, and the
 /// global change-tracking counter.
@@ -85,7 +126,7 @@ pub trait SessionWriteQueries {
 
 impl SessionWriteQueries for DaemonDb {
     fn sync_project(&self, project: &DiscoveredProject) -> Result<(), CliError> {
-        let now = utc_now();
+        let now = harness_workspace::workspace::utc_now();
         self.conn
             .execute(
                 "INSERT INTO projects (
@@ -129,7 +170,7 @@ impl SessionWriteQueries for DaemonDb {
     }
 
     fn sync_session(&self, project_id: &str, state: &SessionState) -> Result<(), CliError> {
-        let now = utc_now();
+        let now = harness_workspace::workspace::utc_now();
         let mut canonical_state = state.clone();
         canonicalize_persisted_session_state(&mut canonical_state, &now);
         storage::validate_session_id(&canonical_state.session_id)?;
@@ -261,12 +302,12 @@ impl SessionWriteQueries for DaemonDb {
             )
             .map_err(|error| db_error(format!("append log entry: {error}")))?;
         if inserted > 0 {
-            let timeline_entry = daemon_timeline::log_entry_timeline_entry(
+            let timeline_entry = harness_timeline::log_entry_timeline_entry(
                 &SessionLogEntry {
                     sequence,
                     ..entry.clone()
                 },
-                daemon_timeline::TimelinePayloadScope::Full,
+                harness_timeline::TimelinePayloadScope::Full,
             )?;
             upsert_session_timeline_entry(
                 &transaction,
@@ -306,10 +347,10 @@ impl SessionWriteQueries for DaemonDb {
             )
             .map_err(|error| db_error(format!("append checkpoint: {error}")))?;
         if inserted > 0 {
-            let entry = daemon_timeline::checkpoint_entry(
+            let entry = harness_timeline::checkpoint_entry(
                 session_id,
                 checkpoint,
-                daemon_timeline::TimelinePayloadScope::Full,
+                harness_timeline::TimelinePayloadScope::Full,
             )?;
             upsert_session_timeline_entry(
                 &transaction,
@@ -371,7 +412,11 @@ impl SessionWriteQueries for DaemonDb {
                      version = version + 1,
                      updated_at = excluded.updated_at,
                      change_seq = excluded.change_seq",
-                rusqlite::params![normalized_scope.as_ref(), utc_now(), change_seq],
+                rusqlite::params![
+                    normalized_scope.as_ref(),
+                    harness_workspace::workspace::utc_now(),
+                    change_seq
+                ],
             )
             .map_err(|error| db_error(format!("bump change: {error}")))?;
         transaction

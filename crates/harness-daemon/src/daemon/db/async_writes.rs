@@ -424,7 +424,7 @@ async fn replace_tasks(
     delete_stale_tasks(transaction, session_id, tasks).await?;
 
     for (task_id, task) in tasks {
-        let row = super::task_row::TaskRowBindings::from_task(task);
+        let row = super::TaskRowBindings::from_task(task);
         query(UPSERT_TASK_SQL)
             .bind(task_id)
             .bind(session_id)
