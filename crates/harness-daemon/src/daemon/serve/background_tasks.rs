@@ -5,11 +5,11 @@ use tokio::sync::broadcast;
 use tokio::sync::watch as tokio_watch;
 use tokio::task::JoinHandle;
 
-use crate::daemon::http::DaemonHttpAuthMode;
 use crate::daemon::http::DaemonHttpState;
 use crate::daemon::protocol::StreamEvent;
 use crate::daemon::remote_pairing_expiry_loop::spawn_remote_pairing_expiry_loop;
-use crate::daemon::websocket::{PreparedBroadcast, ReplayBuffer, run_broadcast_fanout};
+use crate::daemon::server_state::{DaemonHttpAuthMode, PreparedBroadcast, ReplayBuffer};
+use crate::daemon::websocket::run_broadcast_fanout;
 use crate::feature_flags::task_board_triage_escalation_config_from_env;
 
 #[path = "task_board_automation_loop.rs"]

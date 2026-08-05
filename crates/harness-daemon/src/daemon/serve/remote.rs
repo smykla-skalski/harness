@@ -9,16 +9,13 @@ use crate::daemon::agent_tui::AgentTuiManagerHandle;
 use crate::daemon::bridge::install_acp_probe_bridge_refresh;
 use crate::daemon::codex_controller::CodexControllerHandle;
 use crate::daemon::db_handle::{AsyncDaemonDbHandle, DaemonDbOwnedHandle};
-use crate::daemon::http::{
-    self, AsyncDaemonDbSlot, CompanionRouteConfig, CompanionRouter, DaemonHttpAuthMode,
-    DaemonHttpState,
-};
+use crate::daemon::http::{self, CompanionRouteConfig, CompanionRouter, DaemonHttpState};
 use crate::daemon::remote_acme::RemoteAcmeRuntimePlan;
 use crate::daemon::remote_acme_renewal::spawn_remote_acme_renewal_loop;
 use crate::daemon::remote_tls::{RemoteTlsConfigError, RemoteTlsConfigHandle, RemoteTlsListener};
+use crate::daemon::server_state::{AsyncDaemonDbSlot, DaemonHttpAuthMode, ReplayBuffer};
 use crate::daemon::state::{self, DaemonManifest, HostBridgeManifest};
 use crate::daemon::voice::cleanup_abandoned_sessions;
-use crate::daemon::websocket::ReplayBuffer;
 use crate::task_board::{install_prompt_catalog, resolve_prompt_catalog_from_env};
 use crate::workspace::orphan_cleanup::run_startup_sweep;
 use crate::workspace::utc_now;
@@ -324,8 +321,8 @@ fn remote_audit_bound_summary(endpoint: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use crate::daemon::http::{DaemonHttpAuthMode, RemoteRequestLimitConfig};
     use crate::daemon::serve::DaemonServeConfig;
+    use crate::daemon::server_state::{DaemonHttpAuthMode, RemoteRequestLimitConfig};
 
     use super::{
         remote_audit_bound_summary, remote_bound_event_message, validate_remote_https_config,

@@ -11,9 +11,9 @@ use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
-use crate::daemon::http::{AsyncDaemonDbSlot, DaemonHttpState, ManagedAgentMutationLocks};
+use crate::daemon::http::DaemonHttpState;
+use crate::daemon::server_state::{AsyncDaemonDbSlot, ManagedAgentMutationLocks, ReplayBuffer};
 use crate::daemon::state::{DaemonManifest, HostBridgeManifest};
-use crate::daemon::websocket::ReplayBuffer;
 use crate::task_board::{TaskBoardItem, TaskBoardStatus, TaskBoardTriageEscalationConfig};
 
 #[test]
