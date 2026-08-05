@@ -120,15 +120,17 @@ struct AppOpenAnythingSourceContractTests {
 
   @Test("Open Anything palette text honors the app font scale")
   func openAnythingPaletteRespectsFontScale() throws {
-    let panelSource = try harnessSourceFile(named: "App/OpenAnythingPaletteWindow.swift")
+    let panelSupportSource = try harnessSourceFile(
+      named: "App/OpenAnythingPaletteWindowSupport.swift"
+    )
     let paletteSource = try previewableSourceFile(named: "Views/App/OpenAnythingPaletteView.swift")
     let rowSource = try previewableSourceFile(named: "Views/App/OpenAnythingPaletteRow.swift")
     let footerSource = try previewableSourceFile(named: "Views/App/OpenAnythingPaletteFooter.swift")
 
     // The detached NSHostingView root injects the app text-size scale because
     // it does not inherit the scene environment the rest of the app receives.
-    #expect(panelSource.contains("HarnessMonitorTextSize.storageKey"))
-    #expect(panelSource.contains(".sessionFontScale(textSizeIndex:"))
+    #expect(panelSupportSource.contains("HarnessMonitorTextSize.storageKey"))
+    #expect(panelSupportSource.contains(".sessionFontScale(textSizeIndex:"))
     // Palette text uses the scaled-font modifier rather than fixed sizes.
     #expect(paletteSource.contains(".scaledFont(.title3)"))
     #expect(rowSource.contains(".scaledFont("))
@@ -152,8 +154,8 @@ struct AppOpenAnythingSourceContractTests {
 
     #expect(scenesSource.contains("installAppSceneServicesIfNeeded()"))
     #expect(scenesSource.contains("syncOpenAnythingGlobalHotKey()"))
-    #expect(scenesSource.contains("restartOpenAnythingCorpusDriver("))
     #expect(openAnythingSource.contains("func installAppSceneServicesIfNeeded()"))
+    #expect(openAnythingSource.contains("restartOpenAnythingCorpusDriver("))
     #expect(openAnythingSource.contains("appOpenAnythingCorpusDriver.start("))
     #expect(
       openAnythingSource.contains(
@@ -173,7 +175,9 @@ struct AppOpenAnythingSourceContractTests {
 
   @Test("Open Anything transparency toggle gates the palette glass")
   func openAnythingTransparencyToggleGatesGlass() throws {
-    let panelSource = try harnessSourceFile(named: "App/OpenAnythingPaletteWindow.swift")
+    let panelSupportSource = try harnessSourceFile(
+      named: "App/OpenAnythingPaletteWindowSupport.swift"
+    )
     let prefsSource = try harnessKitSourceFile(
       named: "OpenAnything/OpenAnythingPreferencesDefaults.swift"
     )
@@ -195,8 +199,12 @@ struct AppOpenAnythingSourceContractTests {
     #expect(glassSource.contains("|| !transparencyEnabled"))
     // The palette injects the flag from the stored preference, scoping the
     // toggle to the Open Anything window only.
-    #expect(panelSource.contains(".environment(\\.harnessFloatingGlassTransparencyEnabled"))
-    #expect(panelSource.contains("OpenAnythingPreferencesDefaults.transparencyEnabledKey"))
+    #expect(
+      panelSupportSource.contains(".environment(\\.harnessFloatingGlassTransparencyEnabled")
+    )
+    #expect(
+      panelSupportSource.contains("OpenAnythingPreferencesDefaults.transparencyEnabledKey")
+    )
     // Settings exposes the toggle with an accessibility identifier.
     #expect(settingsSource.contains("OpenAnythingPreferencesDefaults.transparencyEnabledKey"))
     #expect(settingsSource.contains("openAnythingTransparencyToggle"))
