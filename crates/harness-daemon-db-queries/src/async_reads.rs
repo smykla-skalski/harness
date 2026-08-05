@@ -1,10 +1,14 @@
+use std::future::Future;
+
+use harness_daemon_db_core::{AsyncDaemonDb, db_error, usize_from_i64};
+use harness_kernel::errors::CliError;
+use harness_protocol::timeline::{
+    TimelineCursor, TimelineEntry, TimelineWindowRequest, TimelineWindowResponse,
+};
+use harness_timeline::TimelinePayloadScope;
 use sqlx::query_as;
 
-use super::{
-    AsyncDaemonDb, CliError, StoredTimelineEntry, TimelineEntry, daemon_timeline, db_error,
-    usize_from_i64,
-};
-use harness_protocol::timeline::{TimelineCursor, TimelineWindowRequest, TimelineWindowResponse};
+use crate::stored_timeline_entry::StoredTimelineEntry;
 
 const TIMELINE_STATE_SQL: &str = "SELECT revision, entry_count
     FROM session_timeline_state
@@ -85,21 +89,21 @@ const TIMELINE_CURSOR_AT_OFFSET_SQL: &str = "SELECT
 
 /// Session timeline window and ACP transcript reads from the canonical
 /// async timeline ledger.
-pub(crate) trait AsyncTimelineWindowQueries: Send + Sync {
+pub trait AsyncTimelineWindowQueries: Send + Sync {
     /// # Errors
     /// Returns [`CliError`] on SQL or payload parse failures.
-    async fn load_session_timeline_window(
+    fn load_session_timeline_window(
         &self,
         session_id: &str,
         request: &TimelineWindowRequest,
-    ) -> Result<Option<TimelineWindowResponse>, CliError>;
+    ) -> impl Future<Output = Result<Option<TimelineWindowResponse>, CliError>> + Send;
 
     /// # Errors
     /// Returns [`CliError`] on SQL or payload parse failures.
-    async fn load_session_acp_transcript_entries(
+    fn load_session_acp_transcript_entries(
         &self,
         session_id: &str,
-    ) -> Result<Vec<TimelineEntry>, CliError>;
+    ) -> impl Future<Output = Result<Vec<TimelineEntry>, CliError>> + Send;
 }
 
 impl AsyncTimelineWindowQueries for AsyncDaemonDb {
@@ -169,7 +173,7 @@ impl AsyncTimelineWindowQueries for AsyncDaemonDb {
         rows.into_iter()
             .map(|row| {
                 row.into_stored_entry()
-                    .into_timeline_entry(daemon_timeline::TimelinePayloadScope::Full)
+                    .into_timeline_entry(TimelinePayloadScope::Full)
             })
             .collect()
     }
@@ -248,7 +252,7 @@ async fn load_timeline_window_entries(
     entry_count: usize,
     limit: usize,
     window_start: usize,
-    payload_scope: daemon_timeline::TimelinePayloadScope,
+    payload_scope: TimelinePayloadScope,
 ) -> Result<Vec<TimelineEntry>, CliError> {
     if let Some(after) = &request.after {
         let window_end = load_timeline_cursor_offset(db, session_id, after)
@@ -298,7 +302,7 @@ async fn load_timeline_entries_range(
     session_id: &str,
     offset: usize,
     limit: usize,
-    payload_scope: daemon_timeline::TimelinePayloadScope,
+    payload_scope: TimelinePayloadScope,
 ) -> Result<Vec<TimelineEntry>, CliError> {
     if limit == 0 {
         return Ok(Vec::new());
@@ -391,12 +395,10 @@ impl AsyncTimelineCursorRow {
     }
 }
 
-fn timeline_payload_scope(
-    request: &TimelineWindowRequest,
-) -> daemon_timeline::TimelinePayloadScope {
+fn timeline_payload_scope(request: &TimelineWindowRequest) -> TimelinePayloadScope {
     match request.scope.as_deref() {
-        Some("summary") => daemon_timeline::TimelinePayloadScope::Summary,
-        _ => daemon_timeline::TimelinePayloadScope::Full,
+        Some("summary") => TimelinePayloadScope::Summary,
+        _ => TimelinePayloadScope::Full,
     }
 }
 

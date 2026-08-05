@@ -3950,6 +3950,8 @@ dependencies = [
  "harness-daemon-session-service",
  "harness-kernel",
  "harness-protocol",
+ "harness-session",
+ "harness-timeline",
  "harness-workspace",
  "rusqlite",
  "serde_json",

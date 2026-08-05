@@ -1,4 +1,5 @@
 use super::*;
+use crate::session::types::SessionSignalStatus;
 
 #[test]
 fn derive_effective_signal_status_past_expiry_flips_pending_to_expired() {

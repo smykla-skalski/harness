@@ -1,18 +1,18 @@
 //! Single-row `task_reviews` mirror writes.
 //!
-//! Complements `rebuild.rs` (which replaces all rows for a task from the
-//! file truth on daemon start) with per-review inserts used inline by the
-//! `submit_review` mutation wrappers. Keeping these writes immediate on
-//! both the sync and async paths means a fresh daemon request surfaces
-//! in `SQLite` without needing a restart or resync.
+//! Complements `harness-daemon`'s `db::rebuild` (which replaces all rows
+//! for a task from the file truth on daemon start) with per-review inserts
+//! used inline by the `submit_review` mutation wrappers. Keeping these
+//! writes immediate on both the sync and async paths means a fresh daemon
+//! request surfaces in `SQLite` without needing a restart or resync.
 
+use std::future::Future;
+
+use harness_daemon_db_core::{AsyncDaemonDb, DaemonDb, db_error};
+use harness_kernel::errors::CliError;
+use harness_protocol::session::Review;
 use rusqlite::params;
-use sqlx::query;
-#[cfg(test)]
-use sqlx::query_scalar;
-
-use super::{AsyncDaemonDb, CliError, DaemonDb, db_error};
-use crate::session::types::Review;
+use sqlx::{query, query_scalar};
 
 const INSERT_TASK_REVIEW_SQL: &str = "INSERT OR REPLACE INTO task_reviews (\n        review_id, session_id, task_id, round,\n        reviewer_agent_id, reviewer_runtime, verdict,\n        summary, points_json, recorded_at\n    ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)";
 
@@ -32,7 +32,7 @@ fn serialize_verdict(review: &Review) -> Result<String, CliError> {
         .ok_or_else(|| db_error("serialize review verdict"))
 }
 
-pub(crate) trait SyncTaskReviewWrites {
+pub trait SyncTaskReviewWrites {
     /// # Errors
     /// Returns [`CliError`] on SQL or serialization failure.
     fn insert_task_review(
@@ -74,30 +74,32 @@ impl SyncTaskReviewWrites for DaemonDb {
     }
 }
 
-pub(crate) trait AsyncTaskReviewWrites {
+pub trait AsyncTaskReviewWrites {
     /// # Errors
     /// Returns [`CliError`] on SQL or serialization failure.
-    async fn insert_task_review(
+    fn insert_task_review(
         &self,
         session_id: &str,
         task_id: &str,
         review: &Review,
-    ) -> Result<(), CliError>;
+    ) -> impl Future<Output = Result<(), CliError>> + Send;
 
     /// # Errors
     /// Returns [`CliError`] on SQL failures.
-    #[cfg(test)]
-    async fn count_task_reviews(&self, session_id: &str, task_id: &str) -> Result<i64, CliError>;
+    fn count_task_reviews(
+        &self,
+        session_id: &str,
+        task_id: &str,
+    ) -> impl Future<Output = Result<i64, CliError>> + Send;
 
     /// # Errors
     /// Returns [`CliError`] on SQL failures. Returns [`Ok(None)`] when the
     /// task row is missing.
-    #[cfg(test)]
-    async fn fetch_task_v10_columns(
+    fn fetch_task_v10_columns(
         &self,
         session_id: &str,
         task_id: &str,
-    ) -> Result<Option<TaskV10Columns>, CliError>;
+    ) -> impl Future<Output = Result<Option<TaskV10Columns>, CliError>> + Send;
 }
 
 impl AsyncTaskReviewWrites for AsyncDaemonDb {
@@ -132,7 +134,6 @@ impl AsyncTaskReviewWrites for AsyncDaemonDb {
         Ok(())
     }
 
-    #[cfg(test)]
     async fn count_task_reviews(&self, session_id: &str, task_id: &str) -> Result<i64, CliError> {
         query_scalar::<_, i64>(
             "SELECT COUNT(*) FROM task_reviews WHERE session_id = ?1 AND task_id = ?2",
@@ -144,7 +145,6 @@ impl AsyncTaskReviewWrites for AsyncDaemonDb {
         .map_err(|error| db_error(format!("count async task_reviews: {error}")))
     }
 
-    #[cfg(test)]
     async fn fetch_task_v10_columns(
         &self,
         session_id: &str,
@@ -172,12 +172,13 @@ impl AsyncTaskReviewWrites for AsyncDaemonDb {
     }
 }
 
-/// Raw read-back of the v10 denormalized `tasks` columns. Test-only helper
-/// used by Slice 3 persistence tests to assert review mutations update each
-/// column in place on the async `SQLite` path.
-#[cfg(test)]
+/// Raw read-back of the v10 denormalized `tasks` columns. Used by
+/// `harness-daemon`'s own persistence tests to assert review mutations
+/// update each column in place on the async `SQLite` path; not `#[cfg(test)]`
+/// here since that only gates this crate's own test build, not a downstream
+/// crate's.
 #[derive(Debug, sqlx::FromRow)]
-pub(crate) struct TaskV10Columns {
+pub struct TaskV10Columns {
     pub awaiting_review_queued_at: Option<String>,
     pub awaiting_review_submitter_agent_id: Option<String>,
     pub awaiting_review_required_consensus: i64,

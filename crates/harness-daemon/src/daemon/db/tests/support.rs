@@ -8,7 +8,8 @@ pub(super) use extended_fixtures::{
 };
 
 pub(super) fn sample_signal_record(expires_at: &str) -> SessionSignalRecord {
-    use crate::agents::runtime::signal::{DeliveryConfig, SignalPayload, SignalPriority};
+    use crate::agents::runtime::signal::{DeliveryConfig, Signal, SignalPayload, SignalPriority};
+    use crate::session::types::SessionSignalStatus;
     use serde_json::json;
 
     SessionSignalRecord {
