@@ -39,7 +39,7 @@ struct OpenAnythingCorpusBuilderTests {
     let records = OpenAnythingCorpusBuilder.records(input: Self.input())
     let suggestedIDs = records.filter(\.isSuggested).map(\.id)
 
-    #expect(suggestedIDs.contains("action.newSession"))
+    #expect(!suggestedIDs.contains("action.newSession"))
     #expect(suggestedIDs.contains("action.openTaskBoard"))
     #expect(suggestedIDs.contains("action.openReviews"))
     #expect(suggestedIDs.contains("action.openDiagnostics"))

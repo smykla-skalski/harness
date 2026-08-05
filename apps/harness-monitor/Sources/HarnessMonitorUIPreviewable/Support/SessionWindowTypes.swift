@@ -56,45 +56,6 @@ public enum SessionWindowRoute: String, CaseIterable, Codable, Hashable, Identif
   }
 }
 
-public enum HarnessMonitorLaunchBehavior: String, CaseIterable, Codable, Hashable,
-  Identifiable, Sendable
-{
-  case restoreSessionWindows
-  case alwaysOpenRecent
-
-  public static let storageKey = "harness.monitor.launch-behavior"
-  public static let defaultValue: Self = .restoreSessionWindows
-  public static let closingBehaviorDescription =
-    "Command-W or the red close button removes a session window from relaunch. "
-    + "Windows left open at quit restore open; minimized session windows restore visible"
-
-  public var id: String { rawValue }
-
-  public var label: String {
-    switch self {
-    case .restoreSessionWindows: "Restore session windows"
-    case .alwaysOpenRecent: "Always show Open Recent"
-    }
-  }
-
-  public var description: String {
-    switch self {
-    case .restoreSessionWindows:
-      "Reopen session windows from system restoration when available"
-    case .alwaysOpenRecent:
-      "Open the recents window on launch even when session windows restore"
-    }
-  }
-
-  public static func resolved(rawValue: String?) -> Self {
-    Self(rawValue: rawValue ?? "") ?? defaultValue
-  }
-
-  public static func read(userDefaults: UserDefaults = .standard) -> Self {
-    resolved(rawValue: userDefaults.string(forKey: storageKey))
-  }
-}
-
 public enum OpenRecentCloseAfterPickDefaults {
   public static let storageKey = "harness.monitor.open-recent.close-after-pick"
   public static let defaultValue = true
@@ -140,42 +101,6 @@ public enum SessionPendingDecisionBannerSettings {
   ) -> Bool {
     readEnabled(userDefaults: userDefaults)
       && (!isFocusMode || readFocusModeEnabled(userDefaults: userDefaults))
-  }
-}
-
-public enum SessionWindowTabbingPreference: String, CaseIterable, Codable, Hashable,
-  Identifiable, Sendable
-{
-  case system
-  case always
-  case never
-
-  public static let storageKey = "harness.monitor.session-window.tabbing"
-  public static let defaultValue: Self = .system
-
-  public var id: String { rawValue }
-
-  public var label: String {
-    switch self {
-    case .system: "System"
-    case .always: "Always"
-    case .never: "Never"
-    }
-  }
-
-  public var description: String {
-    switch self {
-    case .system:
-      "Follow the macOS setting for opening windows as tabs"
-    case .always:
-      "Prefer native tabs for session windows"
-    case .never:
-      "Open session windows as separate windows"
-    }
-  }
-
-  public static func resolved(rawValue: String?) -> Self {
-    Self(rawValue: rawValue ?? "") ?? defaultValue
   }
 }
 

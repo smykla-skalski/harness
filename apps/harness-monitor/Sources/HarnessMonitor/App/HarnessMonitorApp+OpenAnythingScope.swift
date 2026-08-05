@@ -39,16 +39,12 @@ extension HarnessMonitorApp {
   }
 
   /// When "Scope to current window" is enabled, derive scope from the window
-  /// the palette opens against. Session windows only scope when their slug
-  /// resolves to a real session ID, avoiding wrong-session results.
+  /// the palette opens against.
   func scopeDerivedFromWindowID(_ windowID: String?) -> OpenAnythingDomain? {
     guard openAnythingScopeToWindowEnabled else { return nil }
     guard let windowID else { return nil }
     if windowID == HarnessMonitorWindowID.settings {
       return .settings
-    }
-    if openAnythingSessionID(forWindowID: windowID) != nil {
-      return .loadedSession
     }
     return nil
   }
@@ -56,8 +52,8 @@ extension HarnessMonitorApp {
   /// Soft-bias domain for the surface the palette opens from. Unlike
   /// `scopeDerivedFromWindowID`, this never filters: the model floats the
   /// returned domain's section to the top and keeps every other section
-  /// visible. The dashboard maps through its active route; settings and
-  /// session windows map to their own domains.
+  /// visible. The dashboard maps through its active route and Settings maps
+  /// to its own domain.
   func contextDomainForActiveView(_ windowID: String?) -> OpenAnythingDomain? {
     guard let windowID else { return nil }
     if windowID == HarnessMonitorWindowID.dashboard {
@@ -68,49 +64,7 @@ extension HarnessMonitorApp {
     if windowID == HarnessMonitorWindowID.settings {
       return .settings
     }
-    if windowID.hasPrefix("session-") {
-      return .loadedSession
-    }
     return nil
-  }
-
-  func openAnythingSessionID(forWindowID windowID: String?) -> String? {
-    guard openAnythingScopeToWindowEnabled, let windowID else { return nil }
-    if let selectedSessionID = appStore.selectedSessionID,
-      HarnessMonitorWindowID.sessionWindow(selectedSessionID) == windowID
-    {
-      return selectedSessionID
-    }
-    return appStore.sessions.first { session in
-      HarnessMonitorWindowID.sessionWindow(session.sessionId) == windowID
-    }?.sessionId
-  }
-
-  func prepareOpenAnythingLoadedSessionOverride(sessionID: String?) {
-    guard let sessionID else {
-      appOpenAnythingLoadedSessionOverride = nil
-      return
-    }
-    appOpenAnythingLoadedSessionOverride = OpenAnythingLoadedSessionSnapshot(
-      sessionID: sessionID,
-      agents: [],
-      tasks: [],
-      timeline: []
-    )
-    Task { @MainActor in
-      guard
-        let snapshot = await appStore.sessionWindowSnapshot(sessionID: sessionID),
-        openAnythingSessionID(forWindowID: openAnythingTargetWindowID()) == sessionID
-      else {
-        return
-      }
-      appOpenAnythingLoadedSessionOverride = OpenAnythingLoadedSessionSnapshot(
-        sessionID: sessionID,
-        agents: snapshot.detail?.agents ?? [],
-        tasks: snapshot.detail?.tasks ?? [],
-        timeline: snapshot.timeline
-      )
-    }
   }
 
   var openAnythingScopeToWindowEnabled: Bool {
@@ -126,11 +80,6 @@ extension HarnessMonitorApp {
     }
     if observer.isKey(windowID: HarnessMonitorWindowID.settings) {
       return HarnessMonitorWindowID.settings
-    }
-    if let identifier = observer.snapshot.keyWindowIdentifier,
-      identifier.hasPrefix("session-")
-    {
-      return identifier
     }
     return nil
   }

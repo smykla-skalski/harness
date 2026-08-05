@@ -186,8 +186,6 @@ extension HarnessMonitorPerfTests {
       "Perf marker should include scenario \(scenario); got \(stateText)"
     )
     XCTAssertTrue(stateText.contains("backdrop=none"))
-    XCTAssertTrue(stateText.contains("shortcutOverlays=disabled"))
-    XCTAssertTrue(stateText.contains("titleBlur=disabled"))
     XCTAssertTrue(stateText.contains("menuBarStateColors=disabled"))
   }
 

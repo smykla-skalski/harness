@@ -168,6 +168,7 @@ extension HarnessMonitorStore {
     public internal(set) var sessionSummariesByID: [String: SessionSummary] = [:]
     public internal(set) var totalSessionCount = 0
     public internal(set) var totalOpenWorkCount = 0
+    public internal(set) var totalActiveWorkCount = 0
     public internal(set) var totalBlockedCount = 0
     public internal(set) var recentSessions: [SessionSummary] = []
     public internal(set) var recentSessionIDs: [String] = []

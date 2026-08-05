@@ -22,41 +22,9 @@ extension HarnessMonitorApp {
     launchMode == .live && !isTestRun
   }
 
-  @ViewBuilder
-  func sessionWindowSceneContent(
-    token: Binding<SessionWindowToken?>
-  ) -> some View {
-    if rendersLiveSceneContent, let tokenValue = token.wrappedValue {
-      SessionWindowRootView(
-        token: tokenValue,
-        store: appStore,
-        notifications: notificationController,
-        acpAttentionState: acpAttentionState,
-        keyWindowObserver: keyWindowObserver,
-        windowCommandRouting: appWindowCommandRouting,
-        windowNavigationHistory: appWindowNavigationHistory,
-        mcpWindowCommandRegistrar: appMCPWindowCommandRegistrar,
-        sessionWindowPresenceTracker: appSessionWindowPresenceTracker,
-        initialRoute: initialSessionWindowRoute,
-        themeMode: themeModeBinding,
-        perfScenario: perfScenario,
-        perfScenarioStatus: perfScenarioStatusBinding,
-        perfScenarioFailureReason: perfScenarioFailureReasonBinding
-      )
-      .harnessTrackMCPWindow()
-      .environment(appStore)
-      .dashboardDebuggingOCRPasteCommand()
-      .dashboardReviewsTextPasteCommand()
-    } else {
-      Color.clear.accessibilityHidden(true)
-    }
-  }
-
   @ViewBuilder var dashboardWindowSceneContent: some View {
     if rendersLiveSceneContent {
       dashboardWindowContent
-        .modifier(DashboardWindowAppKitBinding())
-        .modifier(SessionWindowTabbing(role: .dashboard))
         .modifier(DashboardWindowLifecycleModifier())
         .harnessTrackMCPWindow()
         .environment(appStore)
@@ -142,16 +110,16 @@ extension HarnessMonitorApp {
         lineSelection: file?.lines
       )
       appWindowNavigationHistory.requestDashboardRoute(.reviews)
-      openWindow.openHarnessDashboardWindow(mergeIfNeeded: true, recordHistory: false)
+      openWindow.openHarnessDashboardWindow(recordHistory: false)
     case .reviews:
       appWindowNavigationHistory.requestDashboardRoute(.reviews)
-      openWindow.openHarnessDashboardWindow(mergeIfNeeded: true, recordHistory: false)
+      openWindow.openHarnessDashboardWindow(recordHistory: false)
     case .taskBoard(let itemID):
       if let itemID {
         openWindow.openHarnessDashboardTaskBoard(.item(itemID: itemID))
       } else {
         appWindowNavigationHistory.requestDashboardRoute(.taskBoard)
-        openWindow.openHarnessDashboardWindow(mergeIfNeeded: true, recordHistory: false)
+        openWindow.openHarnessDashboardWindow(recordHistory: false)
       }
     }
   }

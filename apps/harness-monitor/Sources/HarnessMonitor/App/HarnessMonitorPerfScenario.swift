@@ -102,8 +102,6 @@ enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {
     guard disablesVisualOptions else {
       return
     }
-    values[HarnessMonitorAppConfiguration.sessionShortcutOverlaysOverrideKey] = "0"
-    values[HarnessMonitorAppConfiguration.sessionTitleBlurOverrideKey] = "0"
     values[HarnessMonitorAppConfiguration.menuBarStateColorsOverrideKey] = "0"
     values["HARNESS_MONITOR_BACKDROP_MODE_OVERRIDE"] = HarnessMonitorBackdropMode.none.rawValue
   }

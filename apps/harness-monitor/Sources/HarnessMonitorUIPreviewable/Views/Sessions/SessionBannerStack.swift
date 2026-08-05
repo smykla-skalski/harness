@@ -98,7 +98,6 @@ struct SessionBannerStackMetrics: Equatable {
 
 public struct SessionBannerStack<Content: View>: View {
   let store: HarnessMonitorStore
-  let sessionID: String
   let isFocusMode: Bool
   let isLoading: Bool
   let hasSnapshot: Bool
@@ -109,7 +108,6 @@ public struct SessionBannerStack<Content: View>: View {
 
   public init(
     store: HarnessMonitorStore,
-    sessionID: String,
     isFocusMode: Bool = false,
     isLoading: Bool = false,
     hasSnapshot: Bool = true,
@@ -118,7 +116,6 @@ public struct SessionBannerStack<Content: View>: View {
     @ViewBuilder content: () -> Content
   ) {
     self.store = store
-    self.sessionID = sessionID
     self.isFocusMode = isFocusMode
     self.isLoading = isLoading
     self.hasSnapshot = hasSnapshot
@@ -155,7 +152,7 @@ public struct SessionBannerStack<Content: View>: View {
 
   public var body: some View {
     WindowBannerChrome(
-      windowID: HarnessMonitorWindowID.sessionWindow(sessionID),
+      windowID: HarnessMonitorWindowID.dashboard,
       isPresented: model.isPresented
     ) {
       content
@@ -191,7 +188,7 @@ public struct SessionBannerStack<Content: View>: View {
       ContentChromeBannerStack(
         store: store,
         contentChrome: chrome,
-        windowID: HarnessMonitorWindowID.sessionWindow(sessionID)
+        windowID: HarnessMonitorWindowID.dashboard
       )
       if model.showsLoading {
         SessionLoadingBanner()

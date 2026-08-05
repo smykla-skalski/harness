@@ -96,6 +96,10 @@ extension HarnessMonitorStore {
       catalog.totalOpenWorkCount
     }
 
+    public var totalActiveWorkCount: Int {
+      catalog.totalActiveWorkCount
+    }
+
     public var totalBlockedCount: Int {
       catalog.totalBlockedCount
     }

@@ -47,6 +47,8 @@ struct HarnessMonitorStoreProjectionPatchTests {
 
     updated.context = "Updated lane with refreshed detail"
     updated.openTaskCount = 4
+    updated.inProgressTaskCount = 3
+    updated.activeAgentCount = 0
     updated.lastActivityAt = "2026-03-28T14:30:00Z"
 
     let didChange = store.sessionIndex.applySessionSummary(makeSession(updated))
@@ -57,6 +59,7 @@ struct HarnessMonitorStoreProjectionPatchTests {
     #expect(store.sessionIndex.debugProjectionRebuildCount == initialProjectionRebuilds + 1)
     #expect(store.sessionIndex.sessionSummary(for: "updated")?.context == updated.context)
     #expect(store.totalOpenWorkCount == 5)
+    #expect(store.sessionIndex.totalActiveWorkCount == 4)
     #expect(store.recentSessions.first?.sessionId == "updated")
   }
 

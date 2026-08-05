@@ -94,30 +94,9 @@ private struct AppearanceMainSection: View {
   @AppStorage(HarnessMonitorMenuBarDefaults.stateColorVariantsEnabledKey)
   private var menuBarStateColorVariantsEnabled =
     HarnessMonitorMenuBarDefaults.stateColorVariantsEnabledDefault
-  @AppStorage(SessionWindowKeyboardShortcutOverlaySettings.storageKey)
-  private var sessionShortcutOverlaysEnabled =
-    SessionWindowKeyboardShortcutOverlaySettings.defaultValue
-  @AppStorage(HarnessMonitorSessionTitleBlurDefaults.enabledKey)
-  private var sessionTitleBlurEnabled = HarnessMonitorSessionTitleBlurDefaults.enabledDefault
-  @AppStorage(HarnessMonitorSidebarSessionRowDisplayMode.storageKey)
-  private var sidebarSessionRowDisplayModeRawValue =
-    HarnessMonitorSidebarSessionRowDisplayMode.defaultMode.rawValue
-
-  private var sidebarSessionRowDisplayMode: Binding<HarnessMonitorSidebarSessionRowDisplayMode> {
-    Binding(
-      get: {
-        HarnessMonitorSidebarSessionRowDisplayMode.resolved(
-          rawValue: sidebarSessionRowDisplayModeRawValue
-        )
-      },
-      set: { sidebarSessionRowDisplayModeRawValue = $0.rawValue }
-    )
-  }
-
   private var appearanceFooterText: String {
     let parts = [
-      "Theme mode, text size, and sidebar session rows apply to every Harness Monitor window",
-      "Session shortcut overlays and title blur control optional session-window chrome",
+      "Theme mode and text size apply throughout Harness Monitor",
       "Backdrop controls where the softened background image renders",
       "The menu bar icon can follow app state colors or stay neutral",
       "Choosing an image turns on the window backdrop if it is currently off",
@@ -144,35 +123,6 @@ private struct AppearanceMainSection: View {
       .harnessNativeFormControl()
       .accessibilityHint("Scales text throughout the application")
       .accessibilityIdentifier(HarnessMonitorAccessibility.settingsTextSizePicker)
-
-      Picker("Sidebar session rows", selection: sidebarSessionRowDisplayMode) {
-        ForEach(HarnessMonitorSidebarSessionRowDisplayMode.allCases) { mode in
-          Text(mode.label).tag(mode)
-        }
-      }
-      .harnessNativeFormControl()
-      .accessibilityHint(
-        "Switches the session sidebar between strict rows and a native-compatible dense mode"
-      )
-      .accessibilityIdentifier(
-        HarnessMonitorAccessibility.settingsSessionRowModePicker
-      )
-
-      Toggle("Session shortcut overlays", isOn: $sessionShortcutOverlaysEnabled)
-        .accessibilityHint(
-          "Shows or hides the floating keyboard shortcut hints in session windows"
-        )
-        .accessibilityIdentifier(
-          HarnessMonitorAccessibility.settingsSessionShortcutOverlaysToggle
-        )
-
-      Toggle("Session title blur", isOn: $sessionTitleBlurEnabled)
-        .accessibilityHint(
-          "Shows or hides the softened session status glow behind session window titles"
-        )
-        .accessibilityIdentifier(
-          HarnessMonitorAccessibility.settingsSessionTitleBlurToggle
-        )
 
       Picker("Backdrop", selection: $backdropModeRawValue) {
         ForEach(HarnessMonitorBackdropMode.allCases) { mode in

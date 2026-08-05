@@ -77,126 +77,74 @@ extension SessionWindowFlowTests {
     #expect(!source.contains("makeKeyAndOrderFront"))
   }
 
-  @Test("Session tabs route through SwiftUI commands plus the tabbing accessor")
-  func sessionTabsUseSwiftUISceneCommands() throws {
+  @Test("Production scenes contain only Dashboard and Settings windows")
+  func productionScenesExcludeSessionWindowsAndTabs() throws {
     let appSource = try harnessSourceFile(named: "App/HarnessMonitorApp.swift")
     let scenesSource = try harnessSourceFile(named: "App/HarnessMonitorApp+Scenes.swift")
     let sceneContentSource = try harnessSourceFile(
       named: "App/HarnessMonitorApp+SceneContent.swift")
-    let rootSource = try harnessSourceFile(named: "App/SessionWindowRootView.swift")
     let commandsSource = try harnessSourceFile(named: "Commands/WindowMenuCommands.swift")
-    let tabbingAccessorPath = harnessSourceURL(named: "App/SessionWindowTabbing.swift").path
-    let tabbingSource = try harnessSourceFile(named: "App/SessionWindowTabbing.swift")
-    let toolbarGlassSource = try previewableSourceFile(
-      named: "Support/ToolbarGlassStateMonitor.swift"
-    )
     let settingsSource =
       try previewableSourceFile(named: "Views/Settings/SettingsView.swift")
       + previewableSourceFile(named: "Views/Settings/SettingsView+SectionSwitch.swift")
-    let tabbingSupportSource = try previewableSourceFile(
-      named: "Support/SessionWindowTabbingSupport.swift"
-    )
+    let appRoot = harnessSourceURL(named: "App/HarnessMonitorApp.swift")
+      .deletingLastPathComponent()
 
-    #expect(FileManager.default.fileExists(atPath: tabbingAccessorPath))
     #expect(appSource.contains("dashboardWindowScene"))
-    #expect(appSource.contains("sessionWindowScene"))
+    #expect(appSource.contains("settingsWindowScene"))
+    #expect(!appSource.contains("sessionWindowScene"))
     #expect(scenesSource.contains("Window("))
-    #expect(scenesSource.contains("WindowGroup("))
+    #expect(!scenesSource.contains("WindowGroup("))
     #expect(scenesSource.contains("id: HarnessMonitorWindowID.dashboard"))
-    #expect(scenesSource.contains("id: HarnessMonitorWindowID.sessionScene"))
-    #expect(scenesSource.contains("for: SessionWindowToken.self"))
+    #expect(scenesSource.contains("id: HarnessMonitorWindowID.settings"))
+    #expect(!scenesSource.contains("HarnessMonitorWindowID.sessionScene"))
+    #expect(!scenesSource.contains("SessionWindowToken"))
     #expect(
       scenesSource.contains(
         ".restorationBehavior(allowsWindowRestoration ? .automatic : .disabled)"
       )
     )
     #expect(scenesSource.contains(".restorationBehavior(.disabled)"))
-    #expect(scenesSource.contains(".commandsRemoved()"))
-    #expect(sceneContentSource.contains("SessionWindowTabbing(role: .dashboard)"))
+    #expect(!sceneContentSource.contains("SessionWindowTabbing"))
     #expect(commandsSource.contains("@Environment(\\.openWindow)"))
-    #expect(commandsSource.contains("openHarnessDashboardAgent"))
+    #expect(commandsSource.contains("openHarnessDashboardWindow"))
     #expect(!commandsSource.contains("openHarnessSessionWindow"))
-    #expect(rootSource.contains("SessionWindowTabbing("))
-    #expect(rootSource.contains("role: .session"))
-    #expect(rootSource.contains("private var hostsSharedShellPresentation"))
-    #expect(rootSource.contains("HarnessMonitorConfirmationDialogModifier("))
-    #expect(rootSource.contains("HarnessMonitorSheetModifier("))
-    #expect(rootSource.contains("isEnabled: hostsSharedShellPresentation"))
-    #expect(rootSource.contains("CGSize(width: 920, height: 620)"))
-    #expect(rootSource.contains("windowToolbarBackgroundVisibility: .automatic"))
-    #expect(!rootSource.contains("windowToolbarBackgroundVisibility: .visible"))
-    #expect(!rootSource.contains("windowToolbarBackgroundVisibility: .hidden"))
-    #expect(!rootSource.contains("titlebarAppearsTransparent: true"))
-    #expect(
-      rootSource.contains(
-        "HarnessMonitorAccessibility.sessionWindowToolbarSeparatorSuppressed"
-      )
-    )
-    #expect(tabbingSource.contains("scheduleWindowTabbingApplication()"))
-    #expect(tabbingSource.contains("await Task.yield()"))
-    #expect(tabbingSource.contains("SessionWindowTabbingSupport.prepareWindowForTabbing("))
-    #expect(!tabbingSource.contains("guard window.toolbar != nil else"))
-    #expect(tabbingSource.contains("window.tab.attributedTitle"))
-    #expect(tabbingSource.contains("titlebarSeparatorStyle"))
-    #expect(tabbingSource.contains("titlebarAppearsTransparent"))
-    #expect(toolbarGlassSource.contains("let titlebarAppearsTransparent: Bool"))
-    #expect(
-      toolbarGlassSource.contains(
-        "window.titlebarAppearsTransparent = titlebarAppearsTransparent"
-      )
-    )
     #expect(settingsSource.contains("settingsToolbarSeparatorSuppressed"))
     #expect(settingsSource.contains("titlebarAppearsTransparent: true"))
     #expect(settingsSource.contains(".harnessMonitorBackgroundExtensionEffect()"))
-    #expect(tabbingSupportSource.contains("tabbingIdentifier"))
-    #expect(tabbingSupportSource.contains("shouldPreferTabbedOpen"))
-    #expect(tabbingSupportSource.contains("visibleTabTargetWindow"))
+    #expect(
+      !FileManager.default.fileExists(
+        atPath: appRoot.appendingPathComponent("SessionWindowRootView.swift").path
+      )
+    )
+    #expect(
+      !FileManager.default.fileExists(
+        atPath: appRoot.appendingPathComponent("SessionWindowTabbing.swift").path
+      )
+    )
   }
 
-  @Test("Dashboard window routing reuses the shared tab helper")
-  func dashboardWindowRoutingUsesSharedTabHelper() throws {
+  @Test("Dashboard window routing has no Session fallback")
+  func dashboardWindowRoutingHasNoSessionFallback() throws {
     let routingSource = try harnessSourceFile(
-      named: "App/HarnessMonitorApp+InitialWindowRouting.swift")
+      named: "App/HarnessMonitorApp+InitialWindowRouting.swift"
+    )
     let menuBarSource = try harnessSourceFile(named: "App/HarnessMonitorMenuBarExtra.swift")
     let windowCommandsSource = try harnessSourceFile(named: "Commands/WindowMenuCommands.swift")
-    let recentCommandsSource = try harnessSourceFile(named: "Commands/RecentSessionsCommand.swift")
-    let openActionSource = try previewableSourceFile(named: "Support/SessionWindowOpenAction.swift")
+    let openActionSource = try previewableSourceFile(
+      named: "Support/DashboardWindowOpenAction.swift"
+    )
     let unavailableSource = try previewableSourceFile(
       named: "Views/Sessions/SessionWindowView+Unavailable.swift"
     )
 
     #expect(openActionSource.contains("public func openHarnessDashboardWindow()"))
-    #expect(
-      openActionSource.contains(
-        "public func openHarnessDashboardWindow(mergeIfNeeded: Bool)"
-      )
-    )
-    #expect(
-      openActionSource.contains(
-        """
-        public func openHarnessSessionWindow(
-            sessionID: String,
-            mergeIfNeeded: Bool
-        """
-      )
-    )
-    #expect(
-      openActionSource.contains(
-        """
-        guard let sessionID, !sessionID.isEmpty else {
-              openHarnessDashboardWindow()
-        """
-      )
-    )
-    #expect(openActionSource.contains("mergeNewestTabbedWindowIfNeeded"))
+    #expect(openActionSource.contains("public func openHarnessDashboardAgent"))
+    #expect(!openActionSource.contains("openHarnessSessionWindow"))
+    #expect(!openActionSource.contains("mergeNewestTabbedWindowIfNeeded"))
     #expect(windowCommandsSource.contains("openWindow.openHarnessDashboardWindow()"))
-    #expect(recentCommandsSource.contains("openWindow.openHarnessDashboardWindow()"))
-    #expect(
-      routingSource.contains(
-        "openWindow.openHarnessDashboardWindow(mergeIfNeeded: mergeIfNeeded)"
-      )
-    )
-    #expect(routingSource.contains("openWindow.openHarnessSessionWindow(sessionID: sessionID)"))
+    #expect(routingSource.contains("openWindow.openHarnessDashboardWindow()"))
+    #expect(!routingSource.contains("openHarnessSessionWindow"))
     #expect(menuBarSource.contains("openWindow.openHarnessDashboardWindow()"))
     #expect(unavailableSource.contains("openWindow.openHarnessDashboardWindow()"))
   }
@@ -205,20 +153,13 @@ extension SessionWindowFlowTests {
   func dashboardWindowOpenAtQuitStateIsMirroredEndToEnd() throws {
     let sceneContentSource = try harnessSourceFile(
       named: "App/HarnessMonitorApp+SceneContent.swift")
-    let bindingSource = try harnessSourceFile(named: "App/DashboardWindowAppKitBinding.swift")
     let modifierSource = try harnessSourceFile(named: "App/DashboardWindowLifecycleModifier.swift")
     let trackerSource = try harnessSourceFile(named: "App/DashboardWindowLifecycleTracker.swift")
     let delegateSource = try harnessSourceFile(named: "App/HarnessMonitorAppDelegate.swift")
     let routerSource = try harnessSourceFile(named: "App/HarnessMonitorInitialWindowRouter.swift")
 
-    #expect(sceneContentSource.contains(".modifier(DashboardWindowAppKitBinding())"))
+    #expect(!sceneContentSource.contains("DashboardWindowAppKitBinding"))
     #expect(sceneContentSource.contains(".modifier(DashboardWindowLifecycleModifier())"))
-    #expect(bindingSource.contains("DashboardWindowAppKitRegistry.shared.bind(window: window)"))
-    #expect(
-      bindingSource.contains(
-        "DashboardWindowAppKitRegistry.shared.unbind(window: currentWindow)"
-      )
-    )
     #expect(modifierSource.contains("DashboardWindowLifecycleTracker.shared.markOpen()"))
     #expect(modifierSource.contains("DashboardWindowLifecycleTracker.shared.markClosed()"))
     #expect(trackerSource.contains("static let openAtQuitKey"))
@@ -232,16 +173,12 @@ extension SessionWindowFlowTests {
     #expect(routerSource.contains("DashboardWindowLifecycleTracker.restoreStateAtQuit("))
   }
 
-  @Test("Session window opts out of AppKit restoration")
-  func sessionWindowDisablesAppKitRestoration() throws {
+  @Test("Session window scene is absent from production")
+  func sessionWindowSceneIsAbsent() throws {
     let scenesSource = try harnessSourceFile(named: "App/HarnessMonitorApp+Scenes.swift")
-    let startRange = try #require(scenesSource.range(of: "var sessionWindowScene: some Scene"))
-    let endRange = try #require(scenesSource.range(of: "var settingsWindowScene: some Scene"))
-    let sessionSceneSource = String(scenesSource[startRange.lowerBound..<endRange.lowerBound])
-
-    #expect(sessionSceneSource.contains(".restorationBehavior(.disabled)"))
-    #expect(!sessionSceneSource.contains(".restorationBehavior(.automatic)"))
-    #expect(!sessionSceneSource.contains("allowsWindowRestoration"))
+    #expect(!scenesSource.contains("var sessionWindowScene"))
+    #expect(!scenesSource.contains("HarnessMonitorWindowID.sessionScene"))
+    #expect(!scenesSource.contains("SessionWindowToken"))
   }
 
   @Test("Launch and termination paths retain no Session restoration work")
@@ -283,11 +220,6 @@ extension SessionWindowFlowTests {
         "apps/harness-monitor/Sources/HarnessMonitorUIPreviewable"
       ),
     ]
-    let allowedSuffixes = Set([
-      "App/HarnessMonitorApp+InitialWindowRouting.swift",
-      "App/HarnessMonitorPerfDriver+Scenarios.swift",
-      "Support/SessionWindowOpenAction.swift",
-    ])
     var offenders: [String] = []
     for root in roots {
       let enumerator = try #require(
@@ -296,7 +228,6 @@ extension SessionWindowFlowTests {
       for case let fileURL as URL in enumerator where fileURL.pathExtension == "swift" {
         let source = try String(contentsOf: fileURL, encoding: .utf8)
         guard source.contains("openHarnessSessionWindow") else { continue }
-        guard !allowedSuffixes.contains(where: { fileURL.path.hasSuffix($0) }) else { continue }
         offenders.append(fileURL.path)
       }
     }

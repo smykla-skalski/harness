@@ -102,7 +102,6 @@ public enum OpenAnythingCorpusBuilder {
 
   private static func actionTargets() -> [OpenAnythingAction] {
     [
-      .newSession,
       .newTask,
       .attachExternalSession,
       .openDashboard,

@@ -41,6 +41,10 @@ struct PreviewHostApp: App {
         "HARNESS_SETTINGS_REPOSITORY_SCOPE_PREVIEW_DUMP",
         SettingsRepositoryTaskBoardScopePreviewRenderer.dump
       ),
+      (
+        "HARNESS_SESSION_WINDOW_REMOVAL_PREVIEW_DUMP",
+        SessionWindowRemovalPreviewRenderer.dump
+      ),
       ("HARNESS_DASHBOARD_AGENTS_PREVIEW_DUMP", DashboardAgentsPreviewRenderer.dump),
       (
         "HARNESS_DASHBOARD_AUDIT_NAVIGATION_PREVIEW_DUMP",

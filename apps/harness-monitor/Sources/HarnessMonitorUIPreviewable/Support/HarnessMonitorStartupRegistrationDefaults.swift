@@ -19,13 +19,9 @@ public enum HarnessMonitorStartupRegistrationDefaults {
         HarnessMonitorDateTimeConfiguration.defaultCustomTimeZoneIdentifier,
       HarnessMonitorAgentTuiDefaults.submitSendsEnterKey:
         HarnessMonitorAgentTuiDefaults.submitSendsEnterDefault,
-      HarnessMonitorLaunchBehavior.storageKey: HarnessMonitorLaunchBehavior.defaultValue.rawValue,
-      OpenRecentCloseAfterPickDefaults.storageKey: OpenRecentCloseAfterPickDefaults.defaultValue,
     ]
-    dict.merge(SessionPendingDecisionBannerSettings.registrationDefaults()) { _, new in new }
     dict.merge(HarnessMonitorLoggerDefaults.registrationDefaults()) { _, new in new }
     dict.merge(HarnessMonitorMenuBarDefaults.registrationDefaults()) { _, new in new }
-    dict.merge(HarnessMonitorSessionTitleBlurDefaults.registrationDefaults()) { _, new in new }
     dict.merge(HarnessMonitorVoiceSettings.registrationDefaults()) { _, new in new }
     dict.merge(HarnessMonitorMCPSettingsDefaults.registrationDefaults()) { _, new in new }
     dict.merge(HarnessMonitorToolCallAnnouncementSettings.registrationDefaults()) { _, new in

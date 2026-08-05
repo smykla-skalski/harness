@@ -18,15 +18,14 @@ final class HarnessMonitorMenuBarExtraTests: XCTestCase {
   func testSnapshotSummarizesStatusAndCounts() {
     let snapshot = makeSnapshot(
       connectionState: .online,
-      sessionCount: 3,
       pendingDecisionCount: 2,
       pendingDecisionSeverity: .warn,
       supervisorRuntimeState: .running
     )
 
     XCTAssertEqual(snapshot.connectionLabel, "Connection: Online")
-    XCTAssertEqual(snapshot.monitoringLabel, "Monitoring: Active session")
-    XCTAssertEqual(snapshot.sessionCountLabel, "Sessions: 3")
+    XCTAssertEqual(snapshot.monitoringLabel, "Monitoring: Active work")
+    XCTAssertEqual(snapshot.activeWorkCountLabel, "Active work: 1")
     XCTAssertEqual(snapshot.pendingDecisionLabel, "Decisions: 2")
     XCTAssertEqual(snapshot.supervisorLabel, "Supervisor: Running")
     XCTAssertEqual(snapshot.supervisorToggleLabel, "Disable Supervisor")
@@ -36,7 +35,6 @@ final class HarnessMonitorMenuBarExtraTests: XCTestCase {
   func testStoppedSnapshotOffersEnableSupervisor() {
     let snapshot = makeSnapshot(
       connectionState: .offline("bridge unavailable"),
-      sessionCount: 0,
       pendingDecisionCount: 0,
       pendingDecisionSeverity: nil,
       supervisorRuntimeState: .stopped
@@ -51,14 +49,12 @@ final class HarnessMonitorMenuBarExtraTests: XCTestCase {
   func testTransitionalSupervisorStatesDisableToggle() {
     let starting = makeSnapshot(
       connectionState: .connecting,
-      sessionCount: 1,
       pendingDecisionCount: 0,
       pendingDecisionSeverity: nil,
       supervisorRuntimeState: .starting
     )
     let stopping = makeSnapshot(
       connectionState: .idle,
-      sessionCount: 1,
       pendingDecisionCount: 0,
       pendingDecisionSeverity: nil,
       supervisorRuntimeState: .stopping
@@ -83,7 +79,6 @@ final class HarnessMonitorMenuBarExtraTests: XCTestCase {
     let labels = states.flatMap { state in
       makeSnapshot(
         connectionState: .offline("ignored reason"),
-        sessionCount: 42_000,
         pendingDecisionCount: 42_000,
         pendingDecisionSeverity: .critical,
         supervisorRuntimeState: state
@@ -103,7 +98,6 @@ final class HarnessMonitorMenuBarExtraTests: XCTestCase {
   func testVisibleDecisionsPublishOrangeAttentionBadgeSummary() {
     let snapshot = makeSnapshot(
       connectionState: .online,
-      sessionCount: 3,
       pendingDecisionCount: 1,
       pendingDecisionSeverity: .needsUser,
       supervisorRuntimeState: .running
@@ -119,7 +113,7 @@ final class HarnessMonitorMenuBarExtraTests: XCTestCase {
     XCTAssertEqual(
       snapshot.statusItemAccessibilitySummary,
       """
-      Connection: Online, Monitoring: Active session, Sessions: 3, Decisions: 1, \
+      Connection: Online, Monitoring: Active work, Active work: 1, Decisions: 1, \
       Attention badge: orange
       """
     )
@@ -128,7 +122,6 @@ final class HarnessMonitorMenuBarExtraTests: XCTestCase {
   func testHiddenBadgePublishesHiddenAccessibilitySummary() {
     let snapshot = makeSnapshot(
       connectionState: .idle,
-      sessionCount: 0,
       pendingDecisionCount: 0,
       pendingDecisionSeverity: nil,
       supervisorRuntimeState: .stopped
@@ -140,35 +133,37 @@ final class HarnessMonitorMenuBarExtraTests: XCTestCase {
     XCTAssertEqual(snapshot.attentionBadgeAccessibilityLabel, "Attention badge: hidden")
   }
 
-  func testIdleMonitoringPublishesTooltipAndAccessibilityState() {
+  func testIdleMonitoringPublishesWorkBasedTooltipAndAccessibilityState() {
     let snapshot = makeSnapshot(
       connectionState: .idle,
-      sessionCount: 0,
       pendingDecisionCount: 0,
       pendingDecisionSeverity: nil,
       supervisorRuntimeState: .stopped,
-      activeSessionWindowCount: 0
+      activeWorkCount: 0
     )
 
     XCTAssertTrue(snapshot.isMonitoringIdle)
-    XCTAssertEqual(snapshot.monitoringLabel, "Monitoring: No active session")
+    XCTAssertEqual(snapshot.monitoringLabel, "Monitoring: No active work")
     XCTAssertEqual(
       snapshot.statusItemHelpText,
-      "No active session - open one to monitor"
+      "No active work"
     )
     XCTAssertEqual(
-      HarnessMonitorMenuBarSnapshot.statusItemHelpText(activeSessionWindowCount: 0),
+      HarnessMonitorMenuBarSnapshot.statusItemHelpText(hasActiveWork: false),
       snapshot.statusItemHelpText
     )
     XCTAssertEqual(
-      HarnessMonitorMenuBarSnapshot.statusItemAccessibilityLabel(activeSessionWindowCount: 0),
-      "Harness Monitor: No active session - open one to monitor"
+      HarnessMonitorMenuBarSnapshot.statusItemAccessibilityLabel(
+        hasActiveWork: false,
+        pendingDecisionCount: 0
+      ),
+      "Harness Monitor: No active work"
     )
     XCTAssertEqual(
       snapshot.statusItemAccessibilitySummary,
       """
-      Connection: Idle, Monitoring: No active session, Sessions: 0, Decisions: 0, \
-      No active session - open one to monitor, Attention badge: hidden
+      Connection: Idle, Monitoring: No active work, Active work: 0, Decisions: 0, \
+      Attention badge: hidden
       """
     )
   }
@@ -176,7 +171,6 @@ final class HarnessMonitorMenuBarExtraTests: XCTestCase {
   func testCriticalDecisionUsesCriticalStatusAsset() {
     let snapshot = makeSnapshot(
       connectionState: .online,
-      sessionCount: 3,
       pendingDecisionCount: 2,
       pendingDecisionSeverity: .critical,
       supervisorRuntimeState: .running
@@ -189,7 +183,31 @@ final class HarnessMonitorMenuBarExtraTests: XCTestCase {
     XCTAssertEqual(snapshot.statusItemDisplayTitle, "Harness Monitor: 2 decisions")
   }
 
-  func testMenuBarStatusPresentationKeepsIdleAssetStable() {
+  func testAttentionRemainsVisibleWithoutActiveWork() {
+    let snapshot = makeSnapshot(
+      connectionState: .online,
+      pendingDecisionCount: 1,
+      pendingDecisionSeverity: .critical,
+      supervisorRuntimeState: .running,
+      activeWorkCount: 0
+    )
+
+    XCTAssertTrue(snapshot.isMonitoringIdle)
+    XCTAssertTrue(snapshot.showsAttentionBadge)
+    XCTAssertEqual(
+      snapshot.statusItemAssetName,
+      HarnessMonitorMenuBarSnapshot.statusItemCriticalImageName
+    )
+    XCTAssertEqual(
+      HarnessMonitorMenuBarSnapshot.statusItemAccessibilityLabel(
+        hasActiveWork: false,
+        pendingDecisionCount: 1
+      ),
+      "Harness Monitor: No active work: 1 decision"
+    )
+  }
+
+  func testMenuBarStatusPresentationUsesActiveWorkForIdleAsset() {
     let presentation = HarnessMonitorMenuBarStatusPresentation.idle
 
     XCTAssertEqual(
@@ -198,14 +216,14 @@ final class HarnessMonitorMenuBarExtraTests: XCTestCase {
     )
     XCTAssertEqual(
       presentation.statusItemAssetName(
-        activeSessionWindowCount: 0,
+        hasActiveWork: false,
         showsStateColorVariants: true
       ),
       HarnessMonitorMenuBarSnapshot.statusItemIdleImageName
     )
     XCTAssertEqual(
       presentation.statusItemAssetName(
-        activeSessionWindowCount: 1,
+        hasActiveWork: true,
         showsStateColorVariants: true
       ),
       HarnessMonitorMenuBarSnapshot.statusItemImageName
@@ -249,20 +267,18 @@ final class HarnessMonitorMenuBarExtraTests: XCTestCase {
 
   private func makeSnapshot(
     connectionState: HarnessMonitorStore.ConnectionState,
-    sessionCount: Int,
     pendingDecisionCount: Int,
     pendingDecisionSeverity: DecisionSeverity?,
     supervisorRuntimeState: HarnessMonitorStore.SupervisorRuntimeState,
-    activeSessionWindowCount: Int = 1,
+    activeWorkCount: Int = 1,
     runsWhenClosed: Bool = false
   ) -> HarnessMonitorMenuBarSnapshot {
     HarnessMonitorMenuBarSnapshot(
       connectionState: connectionState,
-      sessionCount: sessionCount,
       pendingDecisionCount: pendingDecisionCount,
       pendingDecisionSeverity: pendingDecisionSeverity,
       supervisorRuntimeState: supervisorRuntimeState,
-      activeSessionWindowCount: activeSessionWindowCount,
+      activeWorkCount: activeWorkCount,
       runsWhenClosed: runsWhenClosed
     )
   }

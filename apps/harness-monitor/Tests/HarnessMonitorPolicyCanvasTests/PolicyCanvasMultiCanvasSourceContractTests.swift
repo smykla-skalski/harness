@@ -516,16 +516,13 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
     let sessionRedirectSource = try previewableSourceFile(
       at: "Views/Sessions/SessionPolicyCanvasRedirectView.swift"
     )
-    let sessionRootSource = try appSourceFile(
-      at: "App/SessionWindowRootView.swift"
-    )
+    let sceneSource = try appSourceFile(at: "App/HarnessMonitorApp+Scenes.swift")
 
     XCTAssertTrue(sessionColumnsSource.contains("SessionPolicyCanvasRedirectView()"))
     XCTAssertFalse(sessionColumnsSource.contains("PolicyCanvasView("))
     XCTAssertTrue(sessionRedirectSource.contains("openDashboardRoute(.policyCanvas)"))
-    XCTAssertTrue(sessionRootSource.contains("\\.openDashboardRoute"))
-    XCTAssertTrue(
-      sessionRootSource.contains("windowNavigationHistory.requestDashboardRoute(route)"))
+    XCTAssertFalse(sceneSource.contains("SessionWindowRootView"))
+    XCTAssertFalse(sceneSource.contains("sessionWindowScene"))
   }
 
   func testPolicyCanvasInspectorToggleUsesSingleCommandFocus() throws {

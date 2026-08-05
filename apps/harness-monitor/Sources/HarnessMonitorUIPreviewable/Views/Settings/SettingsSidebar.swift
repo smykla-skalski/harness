@@ -2,8 +2,6 @@ import SwiftUI
 
 public enum SettingsSection: String, CaseIterable, Identifiable, Hashable, Sendable {
   case general
-  case focusMode
-  case banners
   case appearance
   case markdown
   case notifications
@@ -27,8 +25,6 @@ public enum SettingsSection: String, CaseIterable, Identifiable, Hashable, Senda
   public var title: String {
     switch self {
     case .general: "General"
-    case .focusMode: "Focus Mode"
-    case .banners: "Banners"
     case .appearance: "Appearance"
     case .markdown: "Markdown"
     case .notifications: "Notifications"
@@ -49,18 +45,11 @@ public enum SettingsSection: String, CaseIterable, Identifiable, Hashable, Senda
     }
   }
 
-  public var sidebarTitle: String {
-    switch self {
-    case .focusMode: "Focus"
-    default: title
-    }
-  }
+  public var sidebarTitle: String { title }
 
   public var systemImage: String {
     switch self {
     case .general: "gearshape"
-    case .focusMode: "moon"
-    case .banners: "megaphone"
     case .appearance: "paintbrush"
     case .markdown: "text.alignleft"
     case .notifications: "bell.badge"

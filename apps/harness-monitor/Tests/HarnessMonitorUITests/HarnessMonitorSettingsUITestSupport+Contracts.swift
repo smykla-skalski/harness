@@ -7,9 +7,6 @@ struct SettingsStateSnapshot {
   let background: String
   let textSize: String
   let controlSize: String
-  let sidebarRowMode: String
-  let shortcutOverlays: String
-  let titleBlur: String
   let menuBarStateColors: String
   let timeZoneMode: String
   let timeZone: String
@@ -20,9 +17,6 @@ struct SettingsStateSnapshot {
     background: String = "auroraVeil",
     textSize: String = "Default",
     controlSize: String = "small",
-    sidebarRowMode: String = "concise",
-    shortcutOverlays: String = "enabled",
-    titleBlur: String = "enabled",
     menuBarStateColors: String = "enabled",
     timeZoneMode: String = "local",
     timeZone: String = "local"
@@ -34,9 +28,6 @@ struct SettingsStateSnapshot {
       background: background,
       textSize: textSize,
       controlSize: controlSize,
-      sidebarRowMode: sidebarRowMode,
-      shortcutOverlays: shortcutOverlays,
-      titleBlur: titleBlur,
       menuBarStateColors: menuBarStateColors,
       timeZoneMode: timeZoneMode,
       timeZone: timeZone
@@ -49,9 +40,6 @@ struct SettingsStateSnapshot {
     background: String = "auroraVeil",
     textSize: String = "Default",
     controlSize: String = "small",
-    sidebarRowMode: String = "concise",
-    shortcutOverlays: String = "enabled",
-    titleBlur: String = "enabled",
     menuBarStateColors: String = "enabled",
     timeZoneMode: String = "local",
     timeZone: String = "local"
@@ -63,9 +51,6 @@ struct SettingsStateSnapshot {
       background: background,
       textSize: textSize,
       controlSize: controlSize,
-      sidebarRowMode: sidebarRowMode,
-      shortcutOverlays: shortcutOverlays,
-      titleBlur: titleBlur,
       menuBarStateColors: menuBarStateColors,
       timeZoneMode: timeZoneMode,
       timeZone: timeZone
@@ -78,9 +63,6 @@ struct SettingsStateSnapshot {
     background: String = "auroraVeil",
     textSize: String = "Default",
     controlSize: String = "small",
-    sidebarRowMode: String = "concise",
-    shortcutOverlays: String = "enabled",
-    titleBlur: String = "enabled",
     menuBarStateColors: String = "enabled",
     timeZoneMode: String = "local",
     timeZone: String = "local"
@@ -92,9 +74,6 @@ struct SettingsStateSnapshot {
       background: background,
       textSize: textSize,
       controlSize: controlSize,
-      sidebarRowMode: sidebarRowMode,
-      shortcutOverlays: shortcutOverlays,
-      titleBlur: titleBlur,
       menuBarStateColors: menuBarStateColors,
       timeZoneMode: timeZoneMode,
       timeZone: timeZone
@@ -106,20 +85,13 @@ extension HarnessMonitorUITestCase {
   func assertAppearanceSettingsContract(
     expectedMode: String,
     textSizeOverride: String? = nil,
-    sidebarRowModeOverride: String? = nil,
     expectedTextSize: String = "Default",
-    expectedControlSize: String = "small",
-    expectedSidebarRowMode: String = "concise"
+    expectedControlSize: String = "small"
   ) {
     var additionalEnvironment = ["HARNESS_MONITOR_THEME_MODE_OVERRIDE": expectedMode]
     if let textSizeOverride {
       additionalEnvironment[HarnessMonitorSettingsUITestKeys.textSizeOverride] = textSizeOverride
     }
-    if let sidebarRowModeOverride {
-      additionalEnvironment[HarnessMonitorSettingsUITestKeys.sidebarSessionRowDisplayModeOverride] =
-        sidebarRowModeOverride
-    }
-
     let app = launch(
       mode: "preview",
       additionalEnvironment: additionalEnvironment
@@ -162,8 +134,7 @@ extension HarnessMonitorUITestCase {
         .appearance(
           mode: expectedMode,
           textSize: expectedTextSize,
-          controlSize: expectedControlSize,
-          sidebarRowMode: expectedSidebarRowMode
+          controlSize: expectedControlSize
         )
       )
     )
@@ -294,9 +265,6 @@ extension HarnessMonitorUITestCase {
       "background=\(snapshot.background)",
       "textSize=\(snapshot.textSize)",
       "controlSize=\(snapshot.controlSize)",
-      "sidebarRowMode=\(snapshot.sidebarRowMode)",
-      "shortcutOverlays=\(snapshot.shortcutOverlays)",
-      "titleBlur=\(snapshot.titleBlur)",
       "menuBarStateColors=\(snapshot.menuBarStateColors)",
       "timeZoneMode=\(snapshot.timeZoneMode)",
       "timeZone=\(snapshot.timeZone)",

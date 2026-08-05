@@ -21,6 +21,7 @@ struct SessionSnapshotWorkerOutput: Sendable {
   let worktreeCount: Int
   let sessionCount: Int
   let openWorkCount: Int
+  let activeWorkCount: Int
   let blockedCount: Int
 }
 
@@ -277,6 +278,7 @@ extension HarnessMonitorStore {
       worktreeCount: sessionBackedWorktreeCount,
       sessionCount: filteredSessions.count,
       openWorkCount: filteredSessions.reduce(0) { $0 + $1.metrics.openTaskCount },
+      activeWorkCount: filteredSessions.reduce(0) { $0 + $1.metrics.activeWorkCount },
       blockedCount: filteredSessions.reduce(0) { $0 + $1.metrics.blockedTaskCount }
     )
   }
@@ -286,6 +288,7 @@ extension HarnessMonitorStore {
     sessionIndex.catalog.sessionSummariesByID = preparedSnapshot.sessionSummariesByID
     sessionIndex.catalog.totalSessionCount = preparedSnapshot.sessionCount
     sessionIndex.catalog.totalOpenWorkCount = preparedSnapshot.openWorkCount
+    sessionIndex.catalog.totalActiveWorkCount = preparedSnapshot.activeWorkCount
     sessionIndex.catalog.totalBlockedCount = preparedSnapshot.blockedCount
     sessionIndex.sessionIndicesByID = preparedSnapshot.sessionIndicesByID
   }
