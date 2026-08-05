@@ -1,6 +1,10 @@
-use sqlx::{query, query_as, query_scalar};
+use std::future::Future;
 
-use super::{AsyncDaemonDb, CliError, daemon_launchd, daemon_state, db_error};
+use harness_daemon_db_core::{AsyncDaemonDb, db_error};
+use harness_daemon_launchd as daemon_launchd;
+use harness_daemon_root as daemon_state;
+use harness_kernel::errors::CliError;
+use sqlx::{query, query_as, query_scalar};
 
 const DIAGNOSTICS_CACHE_SQL: &str = "SELECT value FROM diagnostics_cache WHERE key = ?1";
 const UPSERT_DIAGNOSTICS_CACHE_SQL: &str =
@@ -13,33 +17,37 @@ LIMIT ?1";
 
 /// Async mirror of `diagnostics::DaemonDbDiagnostics`, through the canonical
 /// async daemon DB.
-pub(crate) trait AsyncDiagnosticsQueries: Send + Sync {
+pub trait AsyncDiagnosticsQueries: Send + Sync {
     /// # Errors
     /// Returns [`CliError`] on write failure.
-    async fn set_diagnostics_cache(&self, key: &str, value: &str) -> Result<(), CliError>;
+    fn set_diagnostics_cache(
+        &self,
+        key: &str,
+        value: &str,
+    ) -> impl Future<Output = Result<(), CliError>> + Send;
 
     /// # Errors
     /// Returns [`CliError`] on write failure.
-    async fn cache_startup_diagnostics(&self) -> Result<(), CliError>;
+    fn cache_startup_diagnostics(&self) -> impl Future<Output = Result<(), CliError>> + Send;
 
     /// # Errors
     /// Returns [`CliError`] on query failure.
-    async fn load_cached_launch_agent_status(
+    fn load_cached_launch_agent_status(
         &self,
-    ) -> Result<Option<daemon_launchd::LaunchAgentStatus>, CliError>;
+    ) -> impl Future<Output = Result<Option<daemon_launchd::LaunchAgentStatus>, CliError>> + Send;
 
     /// # Errors
     /// Returns [`CliError`] on query failure.
-    async fn load_cached_workspace_diagnostics(
+    fn load_cached_workspace_diagnostics(
         &self,
-    ) -> Result<Option<daemon_state::DaemonDiagnostics>, CliError>;
+    ) -> impl Future<Output = Result<Option<daemon_state::DaemonDiagnostics>, CliError>> + Send;
 
     /// # Errors
     /// Returns [`CliError`] on query failure.
-    async fn load_recent_daemon_events(
+    fn load_recent_daemon_events(
         &self,
         limit: u32,
-    ) -> Result<Vec<daemon_state::DaemonAuditEvent>, CliError>;
+    ) -> impl Future<Output = Result<Vec<daemon_state::DaemonAuditEvent>, CliError>> + Send;
 }
 
 impl AsyncDiagnosticsQueries for AsyncDaemonDb {

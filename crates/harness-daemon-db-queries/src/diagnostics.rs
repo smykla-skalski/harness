@@ -1,11 +1,15 @@
-use super::{CliError, DaemonDb, daemon_launchd, daemon_state, db_error};
+use harness_daemon_db_core::{DaemonDb, db_error};
+use harness_daemon_launchd as daemon_launchd;
+use harness_daemon_root as daemon_state;
+use harness_kernel::errors::CliError;
 
 /// Diagnostics-cache persistence contract.
 ///
-/// `pub`, not `pub(crate)`: `tests/integration/daemon_perf.rs` links `harness`
-/// as an ordinary dependency and calls `cache_startup_diagnostics` directly
-/// on a seeded `DaemonDb`, the same reason several sync `db` methods stay
-/// `pub` elsewhere.
+/// `pub`: `tests/integration/daemon_perf.rs` links `harness` as an ordinary
+/// dependency and calls `cache_startup_diagnostics` directly on a seeded
+/// `DaemonDb`, the same reason several sync `db` methods stay `pub`
+/// elsewhere; being in its own crate now, every method here needs `pub` for
+/// `harness-daemon` to call it too.
 pub trait DaemonDbDiagnostics {
     /// # Errors
     /// Returns [`CliError`] on SQL failures.
@@ -115,7 +119,9 @@ impl DaemonDbDiagnostics for DaemonDb {
     }
 }
 
-pub(super) fn import_daemon_events(db: &DaemonDb) -> Result<(), CliError> {
+/// # Errors
+/// Returns [`CliError`] on SQL failures.
+pub fn import_daemon_events(db: &DaemonDb) -> Result<(), CliError> {
     let events = daemon_state::read_recent_events(1000)?;
     for event in &events {
         db.conn

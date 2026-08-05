@@ -8,15 +8,16 @@
 //! modules; `async_change_tracking.rs` imports it so the sync and async
 //! backends can never drift onto two different query texts.
 
-use super::{CliError, DaemonDb, db_error};
+use harness_daemon_db_core::{DaemonDb, db_error};
+use harness_kernel::errors::CliError;
 
-pub(crate) const LOAD_CHANGE_TRACKING_SQL: &str = "SELECT scope, change_seq
+pub const LOAD_CHANGE_TRACKING_SQL: &str = "SELECT scope, change_seq
      FROM change_tracking
      WHERE change_seq > ?1
      ORDER BY change_seq";
 
 /// The sync side of the canonical change-tracking read.
-pub(crate) trait ChangeTrackingQueries {
+pub trait ChangeTrackingQueries {
     /// Load canonical change-tracking rows newer than the provided sequence.
     ///
     /// # Errors

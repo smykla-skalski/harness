@@ -3760,6 +3760,7 @@ dependencies = [
  "harness-daemon-client",
  "harness-daemon-codex",
  "harness-daemon-db-core",
+ "harness-daemon-db-queries",
  "harness-daemon-discovery",
  "harness-daemon-launchd",
  "harness-daemon-provider-credentials",
@@ -3936,6 +3937,23 @@ dependencies = [
  "tempfile",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "harness-daemon-db-queries"
+version = "57.0.0"
+dependencies = [
+ "chrono",
+ "harness-daemon-db-core",
+ "harness-daemon-launchd",
+ "harness-daemon-root",
+ "harness-daemon-session-service",
+ "harness-kernel",
+ "harness-protocol",
+ "harness-workspace",
+ "rusqlite",
+ "serde_json",
+ "sqlx",
 ]
 
 [[package]]

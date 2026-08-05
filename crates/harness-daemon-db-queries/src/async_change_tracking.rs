@@ -1,28 +1,31 @@
+use std::future::Future;
+
+use harness_daemon_db_core::{AsyncDaemonDb, db_error};
+use harness_kernel::errors::CliError;
 use sqlx::query_as;
 
-use super::change_tracking::LOAD_CHANGE_TRACKING_SQL;
-use super::{AsyncDaemonDb, CliError, db_error};
+use crate::change_tracking::LOAD_CHANGE_TRACKING_SQL;
 
 const CURRENT_CHANGE_SEQ_SQL: &str =
     "SELECT last_seq FROM change_tracking_state WHERE singleton = 1";
 
 /// Async mirror of `change_tracking::ChangeTrackingQueries`, plus the
 /// current-sequence read, through the canonical async daemon DB.
-pub(crate) trait AsyncChangeTrackingQueries: Send + Sync {
+pub trait AsyncChangeTrackingQueries: Send + Sync {
     /// Read the current global change sequence (the singleton `last_seq`).
     ///
     /// # Errors
     /// Returns [`CliError`] on SQL failures.
-    async fn current_change_sequence(&self) -> Result<i64, CliError>;
+    fn current_change_sequence(&self) -> impl Future<Output = Result<i64, CliError>> + Send;
 
     /// Load canonical change-tracking rows newer than the provided sequence.
     ///
     /// # Errors
     /// Returns [`CliError`] on SQL failures.
-    async fn load_change_tracking_since(
+    fn load_change_tracking_since(
         &self,
         last_change_seq: i64,
-    ) -> Result<Vec<(String, i64)>, CliError>;
+    ) -> impl Future<Output = Result<Vec<(String, i64)>, CliError>> + Send;
 }
 
 impl AsyncChangeTrackingQueries for AsyncDaemonDb {
