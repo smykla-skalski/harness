@@ -1,14 +1,16 @@
+use std::path::PathBuf;
+
+use harness_daemon_db_core::{AsyncDaemonDb, db_error};
+use harness_kernel::errors::CliError;
+use harness_protocol::session::SessionState;
+use harness_session::index::DiscoveredProject;
+use harness_session::service::canonicalize_persisted_session_state;
 use tokio::task::spawn_blocking;
 
-use super::async_writes::AsyncSessionWriteQueries;
-use super::{
-    AsyncDaemonDb, CliError, DiscoveredProject, PathBuf, SessionState, daemon_index, db_error,
-};
-use crate::session::service::canonicalize_persisted_session_state;
-use crate::workspace::utc_now;
+use crate::async_writes::AsyncSessionWriteQueries;
 
 #[derive(sqlx::FromRow)]
-pub(super) struct AsyncResolvedSessionRow {
+pub struct AsyncResolvedSessionRow {
     state_json: String,
     project_id: String,
     project_name: String,
@@ -22,10 +24,13 @@ pub(super) struct AsyncResolvedSessionRow {
 }
 
 impl AsyncResolvedSessionRow {
-    pub(super) async fn into_resolved_session(
+    /// # Errors
+    /// Returns [`CliError`] when the stored state cannot be parsed, or when
+    /// canonicalization needs to persist a repaired row and that write fails.
+    pub async fn into_resolved_session(
         self,
         db: &AsyncDaemonDb,
-    ) -> Result<daemon_index::ResolvedSession, CliError> {
+    ) -> Result<harness_session::index::ResolvedSession, CliError> {
         let (resolved, canonicalized) = parse_on_blocking_stack(self).await?;
         if canonicalized {
             db.save_session_state(&resolved.project.project_id, &resolved.state)
@@ -37,7 +42,7 @@ impl AsyncResolvedSessionRow {
 
 async fn parse_on_blocking_stack(
     row: AsyncResolvedSessionRow,
-) -> Result<(daemon_index::ResolvedSession, bool), CliError> {
+) -> Result<(harness_session::index::ResolvedSession, bool), CliError> {
     spawn_blocking(move || parse_resolved_session(row))
         .await
         .map_err(|error| db_error(format!("join async session state parser: {error}")))?
@@ -45,7 +50,7 @@ async fn parse_on_blocking_stack(
 
 fn parse_resolved_session(
     row: AsyncResolvedSessionRow,
-) -> Result<(daemon_index::ResolvedSession, bool), CliError> {
+) -> Result<(harness_session::index::ResolvedSession, bool), CliError> {
     let mut state: SessionState = serde_json::from_str(&row.state_json)
         .map_err(|error| db_error(format!("parse session state: {error}")))?;
     let project = DiscoveredProject {
@@ -59,9 +64,10 @@ fn parse_resolved_session(
         is_worktree: row.is_worktree,
         worktree_name: row.worktree_name,
     };
-    let canonicalized = canonicalize_persisted_session_state(&mut state, &utc_now());
+    let canonicalized =
+        canonicalize_persisted_session_state(&mut state, &harness_workspace::workspace::utc_now());
     Ok((
-        daemon_index::ResolvedSession { project, state },
+        harness_session::index::ResolvedSession { project, state },
         canonicalized,
     ))
 }
@@ -78,7 +84,8 @@ mod tests {
     use super::*;
 
     const PARSE_STACK_CHILD_ENV: &str = "HARNESS_TEST_SESSION_PARSE_STACK_CHILD";
-    const PARSE_STACK_TEST: &str = "daemon::db::async_resolved_session::tests::session_state_deserialization_runs_on_blocking_stack";
+    const PARSE_STACK_TEST: &str =
+        "async_resolved_session::tests::session_state_deserialization_runs_on_blocking_stack";
     const CONSTRAINED_PARSE_STACK: usize = 128 * 1024;
     const STACK_PRESSURE_DEPTH: usize = 16;
 

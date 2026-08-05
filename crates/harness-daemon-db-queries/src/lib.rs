@@ -12,10 +12,14 @@
 mod activity_fold;
 mod async_agents;
 mod async_change_tracking;
+mod async_conversation;
 mod async_detail;
 mod async_diagnostics;
 mod async_reads;
+mod async_resolved_session;
+mod async_session_state;
 mod async_signal_writes;
+mod async_writes;
 mod change_tracking;
 mod conversation;
 mod diagnostics;
@@ -33,10 +37,16 @@ mod writes;
 pub use activity_fold::DaemonDbActivityFold;
 pub use async_agents::AsyncAgentResolutionQueries;
 pub use async_change_tracking::AsyncChangeTrackingQueries;
+pub use async_conversation::AsyncConversationSyncQueries;
 pub use async_detail::AsyncSignalReadQueries;
 pub use async_diagnostics::AsyncDiagnosticsQueries;
 pub use async_reads::AsyncTimelineWindowQueries;
+pub use async_resolved_session::AsyncResolvedSessionRow;
+pub use async_session_state::AsyncSessionStateQueries;
 pub use async_signal_writes::AsyncSignalIndexQueries;
+pub use async_writes::{
+    AsyncDaemonTransactions, AsyncSessionWriteQueries, sync_session_in_transaction,
+};
 pub use change_tracking::{ChangeTrackingQueries, LOAD_CHANGE_TRACKING_SQL};
 pub use conversation::{
     DaemonDbConversation, PreparedAgentTranscriptResync, PreparedConversationEventImport,

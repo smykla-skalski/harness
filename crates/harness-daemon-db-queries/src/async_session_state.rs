@@ -1,21 +1,27 @@
+use std::future::Future;
+
+use harness_daemon_db_core::{AsyncDaemonDb, db_error};
+use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_protocol::session::SessionState;
+use harness_session::storage;
 use sqlx::query_as;
 
-use super::async_writes::sync_session_in_transaction;
-use super::{AsyncDaemonDb, AsyncDaemonTransactions, CliError, SessionState, db_error};
-use crate::session::storage;
-use harness_kernel::errors::CliErrorKind;
+use crate::async_writes::{AsyncDaemonTransactions, sync_session_in_transaction};
 
 const LOAD_SESSION_STATE_SQL: &str =
     "SELECT state_json, project_id FROM sessions WHERE session_id = ?1";
 
 /// Session-state load and immediate-transaction mutate-and-save through the
 /// canonical async daemon DB.
-pub(crate) trait AsyncSessionStateQueries: Send + Sync {
+pub trait AsyncSessionStateQueries: Send + Sync {
     /// Load session state by ID, including archived sessions.
     ///
     /// # Errors
     /// Returns [`CliError`] on SQL or parse failures.
-    async fn load_session_state(&self, session_id: &str) -> Result<Option<SessionState>, CliError>;
+    fn load_session_state(
+        &self,
+        session_id: &str,
+    ) -> impl Future<Output = Result<Option<SessionState>, CliError>> + Send;
 
     /// Load, mutate, and save session state under an immediate transaction.
     ///
@@ -25,13 +31,14 @@ pub(crate) trait AsyncSessionStateQueries: Send + Sync {
     ///
     /// # Errors
     /// Returns [`CliError`] on SQL, parse, or mutation failures.
-    async fn update_session_state_immediate<F, T>(
+    fn update_session_state_immediate<F, T>(
         &self,
         session_id: &str,
         update: F,
-    ) -> Result<T, CliError>
+    ) -> impl Future<Output = Result<T, CliError>> + Send
     where
-        F: FnOnce(&mut SessionState) -> Result<T, CliError>;
+        F: FnOnce(&mut SessionState) -> Result<T, CliError> + Send,
+        T: Send;
 }
 
 impl AsyncSessionStateQueries for AsyncDaemonDb {
@@ -55,7 +62,8 @@ impl AsyncSessionStateQueries for AsyncDaemonDb {
         update: F,
     ) -> Result<T, CliError>
     where
-        F: FnOnce(&mut SessionState) -> Result<T, CliError>,
+        F: FnOnce(&mut SessionState) -> Result<T, CliError> + Send,
+        T: Send,
     {
         let mut transaction = self
             .begin_immediate_transaction("async immediate session mutation")

@@ -1,11 +1,17 @@
+use std::future::Future;
+
+use harness_daemon_db_core::{AsyncDaemonDb, db_error, i64_from_u64};
+use harness_kernel::errors::CliError;
+use harness_protocol::agent::ConversationEvent;
+use harness_session::wire::AgentToolActivitySummary;
 use sqlx::{Sqlite, Transaction, query};
 
-use super::{
-    AsyncDaemonDb, CliError, ConversationEvent, PreparedConversationEventImport,
-    StoredTimelineEntry, daemon_index, daemon_protocol, daemon_timeline, db_error,
-    extract_conversation_event_kind, i64_from_u64, prepare_agent_conversation_imports_and_activity,
-    stored_timeline_entry, utc_now,
+use crate::conversation::{
+    PreparedConversationEventImport, extract_conversation_event_kind,
+    prepare_agent_conversation_imports_and_activity,
 };
+use crate::stored_timeline_entry::StoredTimelineEntry;
+use crate::timeline::stored_timeline_entry;
 
 const DELETE_SESSION_ACTIVITY_SQL: &str = "DELETE FROM agent_activity_cache WHERE session_id = ?1";
 const UPSERT_ACTIVITY_SQL: &str = "INSERT INTO agent_activity_cache (
@@ -59,25 +65,25 @@ ON CONFLICT(session_id) DO UPDATE SET
 /// Runtime transcript cache refresh (agent activity + conversation events)
 /// through the canonical async daemon DB, without reimporting full session
 /// state through the sync daemon DB.
-pub(crate) trait AsyncConversationSyncQueries: Send + Sync {
+pub trait AsyncConversationSyncQueries: Send + Sync {
     /// # Errors
     /// Returns [`CliError`] on I/O, serialization, or SQL failures.
-    async fn sync_runtime_transcripts(
+    fn sync_runtime_transcripts(
         &self,
-        resolved: &daemon_index::ResolvedSession,
-    ) -> Result<(), CliError>;
+        resolved: &harness_session::index::ResolvedSession,
+    ) -> impl Future<Output = Result<(), CliError>> + Send;
 }
 
 impl AsyncConversationSyncQueries for AsyncDaemonDb {
     async fn sync_runtime_transcripts(
         &self,
-        resolved: &daemon_index::ResolvedSession,
+        resolved: &harness_session::index::ResolvedSession,
     ) -> Result<(), CliError> {
         let session_id = &resolved.state.session_id;
         let (activities, conversation_events) = prepare_agent_conversation_imports_and_activity(
             &resolved.state,
             |agent_id, runtime, session_key| {
-                daemon_index::load_conversation_events(
+                harness_session::index::load_conversation_events(
                     &resolved.project,
                     runtime,
                     session_key,
@@ -106,7 +112,7 @@ impl AsyncConversationSyncQueries for AsyncDaemonDb {
 async fn sync_agent_activity(
     transaction: &mut Transaction<'_, Sqlite>,
     session_id: &str,
-    activities: &[daemon_protocol::AgentToolActivitySummary],
+    activities: &[AgentToolActivitySummary],
 ) -> Result<(), CliError> {
     query(DELETE_SESSION_ACTIVITY_SQL)
         .bind(session_id)
@@ -121,7 +127,7 @@ async fn sync_agent_activity(
             .bind(session_id)
             .bind(&activity.runtime)
             .bind(json)
-            .bind(utc_now())
+            .bind(harness_workspace::workspace::utc_now())
             .execute(transaction.as_mut())
             .await
             .map_err(|error| db_error(format!("upsert async activity: {error}")))?;
@@ -195,7 +201,7 @@ async fn persist_conversation_timeline_state(
 ) -> Result<(), CliError> {
     query(UPSERT_TIMELINE_STATE_SQL)
         .bind(session_id)
-        .bind(utc_now())
+        .bind(harness_workspace::workspace::utc_now())
         .execute(transaction.as_mut())
         .await
         .map_err(|error| {
@@ -213,12 +219,12 @@ fn build_conversation_timeline_rows(
     let mut timeline_rows = Vec::new();
     for prepared in conversation_events {
         for event in &prepared.events {
-            if let Some(entry) = daemon_timeline::conversation_entry(
+            if let Some(entry) = harness_timeline::conversation_entry(
                 session_id,
                 &prepared.agent_id,
                 &prepared.runtime,
                 event,
-                daemon_timeline::TimelinePayloadScope::Full,
+                harness_timeline::TimelinePayloadScope::Full,
             )? {
                 timeline_rows.push(stored_timeline_entry(
                     "conversation",

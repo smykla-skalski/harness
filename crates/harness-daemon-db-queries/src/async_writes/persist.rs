@@ -1,11 +1,14 @@
-use super::{
-    INSERT_LOG_ENTRY_SQL, NEXT_LOG_SEQUENCE_SQL, SessionLogEntry, UPSERT_TIMELINE_ENTRY_SQL,
-    UPSERT_TIMELINE_STATE_SQL, daemon_timeline, db_error, i64_from_u64, query, query_scalar,
-    stored_timeline_entry, u64_from_i64, utc_now,
-};
-use super::{Sqlite, Transaction};
-use crate::daemon::db::StoredTimelineEntry;
+use harness_daemon_db_core::{db_error, i64_from_u64, u64_from_i64};
 use harness_kernel::errors::CliError;
+use harness_protocol::session::SessionLogEntry;
+use sqlx::{Sqlite, Transaction, query, query_scalar};
+
+use super::sql::{
+    INSERT_LOG_ENTRY_SQL, NEXT_LOG_SEQUENCE_SQL, UPSERT_TIMELINE_ENTRY_SQL,
+    UPSERT_TIMELINE_STATE_SQL,
+};
+use crate::stored_timeline_entry::StoredTimelineEntry;
+use crate::timeline::stored_timeline_entry;
 
 pub(super) async fn next_log_sequence(
     transaction: &mut Transaction<'_, Sqlite>,
@@ -48,18 +51,18 @@ pub(super) async fn persist_log_timeline(
     entry: &SessionLogEntry,
     sequence: u64,
 ) -> Result<(), CliError> {
-    let timeline_entry = daemon_timeline::log_entry_timeline_entry(
+    let timeline_entry = harness_timeline::log_entry_timeline_entry(
         &SessionLogEntry {
             sequence,
             ..entry.clone()
         },
-        daemon_timeline::TimelinePayloadScope::Full,
+        harness_timeline::TimelinePayloadScope::Full,
     )?;
     let stored = stored_timeline_entry("log", format!("log:{sequence}"), &timeline_entry)?;
     upsert_timeline_entry(transaction, &stored).await?;
     query(UPSERT_TIMELINE_STATE_SQL)
         .bind(&entry.session_id)
-        .bind(utc_now())
+        .bind(harness_workspace::workspace::utc_now())
         .execute(transaction.as_mut())
         .await
         .map_err(|error| db_error(format!("persist async timeline state: {error}")))?;

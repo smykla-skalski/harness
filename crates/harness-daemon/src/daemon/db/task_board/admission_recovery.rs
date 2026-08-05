@@ -267,8 +267,7 @@ async fn block_linked_session_task(
         CONTROL_PLANE_ACTOR_ID,
         &utc_now(),
     )?;
-    super::super::async_writes::sync_session_in_transaction(transaction, &row.project_id, &state)
-        .await?;
+    super::super::sync_session_in_transaction(transaction, &row.project_id, &state).await?;
     Ok(true)
 }
 
