@@ -28,28 +28,9 @@ extension HarnessMonitorApp {
       installAppSceneServicesIfNeeded()
       syncOpenAnythingGlobalHotKey()
     }
-    .onChange(of: appOpenAnythingLoadedSessionOverride, initial: true) { _, newValue in
-      installAppSceneServicesIfNeeded()
-      restartOpenAnythingCorpusDriver(loadedSessionOverride: newValue)
-    }
     .commands {
       mainWindowCommands
     }
-  }
-
-  var sessionWindowScene: some Scene {
-    WindowGroup(
-      id: HarnessMonitorWindowID.sessionScene,
-      for: SessionWindowToken.self
-    ) { token in
-      sessionWindowSceneContent(token: token)
-    }
-    .windowToolbarStyle(.unified)
-    .defaultSize(width: mainWindowDefaultSize.width, height: mainWindowDefaultSize.height)
-    .windowResizability(.contentMinSize)
-    .restorationBehavior(.disabled)
-    .defaultLaunchBehavior(shouldHandleInitialWindowRouting ? .suppressed : .automatic)
-    .commandsRemoved()
   }
 
   var settingsWindowScene: some Scene {
@@ -69,7 +50,6 @@ extension HarnessMonitorApp {
     ) {
       HarnessMonitorMenuBarExtraContent(
         store: appStore,
-        activeSessionWindowCount: appSessionWindowPresenceTracker.activeSessionWindowCount,
         openPolicyWorkspace: {
           appWindowNavigationHistory.requestDashboardRoute(.policyCanvas)
           openWindow(id: HarnessMonitorWindowID.dashboard)
@@ -84,35 +64,33 @@ extension HarnessMonitorApp {
   @CommandsBuilder private var mainWindowCommands: some Commands {
     HarnessMonitorMainCommandSet(
       store: appStore,
-      keyWindowObserver: keyWindowObserver,
-      windowCommandRouting: appWindowCommandRouting,
       textSizeIndex: textSizeIndex,
       increaseTextSize: increaseTextSize,
       decreaseTextSize: decreaseTextSize,
       resetTextSize: resetTextSize,
       refreshStore: refreshStore,
       presentOpenAnything: presentOpenAnythingPalette,
-      presentOpenAnythingSessions: presentOpenAnythingPaletteSessions,
       openAnythingCorpusSize: { appOpenAnythingPalette.recordCount }
     )
   }
 
   private var menuBarStatusItemImageName: String {
     appMenuBarStatusController.presentation.statusItemAssetName(
-      activeSessionWindowCount: appSessionWindowPresenceTracker.activeSessionWindowCount,
+      hasActiveWork: appStore.sessionIndex.totalActiveWorkCount > 0,
       showsStateColorVariants: menuBarStateColorVariantsEnabled
     )
   }
 
   private var menuBarStatusItemHelpText: String {
     HarnessMonitorMenuBarSnapshot.statusItemHelpText(
-      activeSessionWindowCount: appSessionWindowPresenceTracker.activeSessionWindowCount
+      hasActiveWork: appStore.sessionIndex.totalActiveWorkCount > 0
     )
   }
 
   private var menuBarStatusItemAccessibilityLabel: String {
     HarnessMonitorMenuBarSnapshot.statusItemAccessibilityLabel(
-      activeSessionWindowCount: appSessionWindowPresenceTracker.activeSessionWindowCount
+      hasActiveWork: appStore.sessionIndex.totalActiveWorkCount > 0,
+      pendingDecisionCount: appMenuBarStatusController.presentation.pendingDecisionCount
     )
   }
 

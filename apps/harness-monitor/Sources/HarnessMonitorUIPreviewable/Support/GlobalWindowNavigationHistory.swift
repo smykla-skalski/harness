@@ -56,15 +56,9 @@ public final class GlobalWindowNavigationHistory {
       }
       switch entry {
       case .dashboard:
-        openWindow.openHarnessDashboardWindow(
-          mergeIfNeeded: true,
-          recordHistory: false
-        )
+        openWindow.openHarnessDashboardWindow(recordHistory: false)
       case .session:
-        openWindow.openHarnessDashboardWindow(
-          mergeIfNeeded: true,
-          recordHistory: false
-        )
+        openWindow.openHarnessDashboardWindow(recordHistory: false)
       }
     }
   }

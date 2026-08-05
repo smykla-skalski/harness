@@ -24,17 +24,14 @@ struct HarnessMonitorApp: App {
   let acpAttentionState: AcpPermissionAttentionState
   let pendingDecisionsDockBadgeController: PendingDecisionsDockBadgeController
   let perfScenario: HarnessMonitorPerfScenario?
-  let initialSessionWindowRoute: SessionWindowRoute?
   let mobileRelayRuntime: MobileMacRelayRuntime?
   @State private var store: HarnessMonitorStore
   @State private var menuBarStatusController: HarnessMonitorMenuBarStatusController
-  @State private var sessionWindowPresenceTracker: SessionWindowPresenceTracker
   @State private var windowCommandRouting: WindowCommandRoutingState
   @State private var windowNavigationHistory: GlobalWindowNavigationHistory
   @State private var mcpWindowCommandRegistrar: HarnessMonitorMCPWindowCommandRegistrar
   @State private var openAnythingCoordinator: OpenAnythingCorpusCoordinator
   @State private var openAnythingCorpusDriver: OpenAnythingCorpusUpdateDriver
-  @State private var openAnythingLoadedSessionOverride: OpenAnythingLoadedSessionSnapshot?
   @State private var openAnythingReviews: OpenAnythingDashboardReviewRegistry
   @State private var openAnythingPaletteController: OpenAnythingPaletteWindowController
   @State private var globalHotKeyController: GlobalHotKeyController
@@ -60,9 +57,6 @@ struct HarnessMonitorApp: App {
   @AppStorage(HarnessMonitorMenuBarDefaults.stateColorVariantsEnabledKey)
   var menuBarStateColorVariantsEnabled =
     HarnessMonitorMenuBarDefaults.stateColorVariantsEnabledDefault
-  @AppStorage(HarnessMonitorLaunchBehavior.storageKey)
-  var sessionWindowLaunchModeRawValue =
-    HarnessMonitorLaunchBehavior.defaultValue.rawValue
   @AppStorage(OpenAnythingHotKeyDefaults.enabledKey)
   var globalOpenAnythingHotKeyEnabled = OpenAnythingHotKeyDefaults.enabledDefault
   @AppStorage(OpenAnythingHotKeyDefaults.descriptorKey)
@@ -126,10 +120,6 @@ struct HarnessMonitorApp: App {
     let menuBarStatusController = HarnessMonitorMenuBarStatusController()
     pendingDecisionsDockBadgeController = PendingDecisionsDockBadgeController()
     perfScenario = configuration.perfScenario
-    initialSessionWindowRoute = SessionWindowInitialRouteOverride.route(
-      values: configuration.environment.values,
-      isUITesting: configuration.isUITesting
-    )
     let store = configuration.store
     mobileRelayRuntime = Self.makeMobileRelayRuntime(
       environment: configuration.environment,
@@ -145,7 +135,6 @@ struct HarnessMonitorApp: App {
     )
     _store = State(initialValue: store)
     _menuBarStatusController = State(initialValue: menuBarStatusController)
-    _sessionWindowPresenceTracker = State(initialValue: SessionWindowPresenceTracker())
     _windowCommandRouting = State(initialValue: WindowCommandRoutingState())
     GlobalWindowNavigationHistoryRegistry.current = windowNavigationHistory
     _windowNavigationHistory = State(initialValue: windowNavigationHistory)
@@ -179,8 +168,6 @@ struct HarnessMonitorApp: App {
   static func registerLaunchDefaults() {
     UserDefaults.standard.register(defaults: [
       "NSUseAnimatedFocusRing": false,
-      SessionWindowKeyboardShortcutOverlaySettings.storageKey:
-        SessionWindowKeyboardShortcutOverlaySettings.defaultValue,
       OpenAnythingHotKeyDefaults.enabledKey: OpenAnythingHotKeyDefaults.enabledDefault,
       OpenAnythingHotKeyDefaults.descriptorKey:
         OpenAnythingHotKeyDefaults.descriptorDefault.storageValue,
@@ -226,7 +213,6 @@ struct HarnessMonitorApp: App {
 
   var body: some Scene {
     dashboardWindowScene
-    sessionWindowScene
     settingsWindowScene
     menuBarExtraScene
   }
@@ -241,10 +227,6 @@ struct HarnessMonitorApp: App {
 
   var appMenuBarStatusController: HarnessMonitorMenuBarStatusController {
     menuBarStatusController
-  }
-
-  var appSessionWindowPresenceTracker: SessionWindowPresenceTracker {
-    sessionWindowPresenceTracker
   }
 
   var appWindowCommandRouting: WindowCommandRoutingState {
@@ -269,11 +251,6 @@ struct HarnessMonitorApp: App {
 
   var appOpenAnythingCorpusDriver: OpenAnythingCorpusUpdateDriver {
     openAnythingCorpusDriver
-  }
-
-  var appOpenAnythingLoadedSessionOverride: OpenAnythingLoadedSessionSnapshot? {
-    get { openAnythingLoadedSessionOverride }
-    nonmutating set { openAnythingLoadedSessionOverride = newValue }
   }
 
   var appOpenAnythingReviews: OpenAnythingDashboardReviewRegistry {

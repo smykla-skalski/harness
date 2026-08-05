@@ -3,13 +3,8 @@ import HarnessMonitorUIPreviewable
 import SwiftUI
 
 extension HarnessMonitorApp {
-  var launchBehavior: HarnessMonitorLaunchBehavior {
-    HarnessMonitorLaunchBehavior.resolved(rawValue: sessionWindowLaunchModeRawValue)
-  }
-
   var shouldHandleInitialWindowRouting: Bool {
-    (launchMode == .live && !isTestRun)
-      || initialSessionWindowRoute != nil
+    launchMode == .live && !isTestRun
   }
 
   func installMainWindowLauncherIfNeeded() {
@@ -44,24 +39,9 @@ extension HarnessMonitorApp {
 
   @MainActor
   func routeInitialWindows() async {
-    if let initialSessionWindowRoute {
-      let sessionID = appStore.selectedSessionID ?? appStore.sessions.first?.sessionId
-      HarnessMonitorUITestTrace.record(
-        component: "app.startup",
-        event: "preview-session-route",
-        details: [
-          "route": initialSessionWindowRoute.rawValue,
-          "has_session": String(sessionID != nil),
-        ]
-      )
-      openWindow.openHarnessSessionWindow(sessionID: sessionID)
-      return
-    }
-
     let router = HarnessMonitorInitialWindowRouter(
-      launchBehavior: launchBehavior,
-      openDashboardWindow: { mergeIfNeeded in
-        openWindow.openHarnessDashboardWindow(mergeIfNeeded: mergeIfNeeded)
+      openDashboardWindow: {
+        openWindow.openHarnessDashboardWindow()
       }
     )
     router.route()

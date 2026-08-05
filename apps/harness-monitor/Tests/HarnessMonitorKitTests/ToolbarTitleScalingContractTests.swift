@@ -13,7 +13,6 @@ struct ToolbarTitleScalingContractTests {
     let sessionPresentationSource = try previewableSourceFile(
       named: "Views/Sessions/SessionWindowView+Presentation.swift"
     )
-    let sessionRootSource = try appSourceFile(named: "SessionWindowRootView.swift")
 
     #expect(!dashboardSource.contains("HarnessMonitorToolbarTitleToolbarItem("))
     #expect(sessionPresentationSource.contains("var navigationTitleText: String"))
@@ -22,7 +21,6 @@ struct ToolbarTitleScalingContractTests {
     #expect(sessionPresentationSource.contains(".navigationSubtitle(navigationSubtitleText)"))
     #expect(sessionPresentationSource.contains("projectAndWorktreeDisplayLabel(separator: \"·\")"))
     #expect(!sessionChromeSource.contains("HarnessMonitorToolbarTitleToolbarItem("))
-    #expect(!sessionRootSource.contains(".navigationTitle(windowTitle)"))
   }
 
   @Test("Session status lives only in the sidebar footer")

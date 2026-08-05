@@ -234,7 +234,6 @@ extension SessionWindowView {
   ) -> some View {
     SessionBannerStack(
       store: store,
-      sessionID: token.sessionID,
       isFocusMode: focusMode,
       isLoading: isLoading,
       hasSnapshot: snapshot != nil,

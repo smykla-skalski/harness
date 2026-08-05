@@ -14,8 +14,6 @@ private struct SettingsRetainedSources {
   let generalSource: String
   let loggingSource: String
   let actionButtonsSource: String
-  let focusModeSource: String
-  let bannersSource: String
   let appearanceSource: String
   let markdownSource: String
   let notificationsSource: String
@@ -134,8 +132,6 @@ extension SessionSwiftUISourceTests {
       generalSource: try sourceFile(at: "Views/Settings/SettingsGeneralSection.swift"),
       loggingSource: try sourceFile(at: "Views/Settings/SettingsLoggingSection.swift"),
       actionButtonsSource: try sourceFile(at: "Views/Settings/SettingsActionButtons.swift"),
-      focusModeSource: try sourceFile(at: "Views/Settings/SettingsFocusModeSection.swift"),
-      bannersSource: try sourceFile(at: "Views/Settings/SettingsBannersSection.swift"),
       appearanceSource: try sourceFile(at: "Views/Settings/SettingsAppearanceSection.swift"),
       markdownSource: try sourceFile(at: "Views/Settings/SettingsMarkdownSection.swift"),
       notificationsSource: try sourceFile(at: "Views/Settings/SettingsNotificationsSection.swift"),
@@ -192,12 +188,6 @@ extension SessionSwiftUISourceTests {
     )
     #expect(sources.source.contains("SettingsConnectionSectionRoot("))
     #expect(sources.source.contains("isActive: section == selectedSection"))
-    #expect(
-      sources.source.contains("SettingsFocusModeSection(isActive: section == selectedSection)")
-    )
-    #expect(
-      sources.source.contains("SettingsBannersSection(isActive: section == selectedSection)")
-    )
     #expect(sources.source.contains("SettingsAppearanceSection("))
     #expect(
       sources.source.contains("SettingsMarkdownSection(isActive: section == selectedSection)")
@@ -298,8 +288,6 @@ extension SessionSwiftUISourceTests {
 
   private func expectRetainedSettingsSourcesGateOnIsActive(in sources: SettingsRetainedSources) {
     for retainedSource in [
-      sources.focusModeSource,
-      sources.bannersSource,
       sources.appearanceSource,
       sources.markdownSource,
       sources.notificationsSource,

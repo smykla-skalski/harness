@@ -29,14 +29,6 @@ private struct SettingsOverlayMarkerContent: View {
   @AppStorage(HarnessMonitorBackgroundDefaults.imageKey)
   private var backgroundImageRawValue = HarnessMonitorBackgroundSelection.defaultSelection
     .storageValue
-  @AppStorage(HarnessMonitorSidebarSessionRowDisplayMode.storageKey)
-  private var sidebarSessionRowDisplayModeRawValue =
-    HarnessMonitorSidebarSessionRowDisplayMode.defaultMode.rawValue
-  @AppStorage(SessionWindowKeyboardShortcutOverlaySettings.storageKey)
-  private var sessionShortcutOverlaysEnabled =
-    SessionWindowKeyboardShortcutOverlaySettings.defaultValue
-  @AppStorage(HarnessMonitorSessionTitleBlurDefaults.enabledKey)
-  private var sessionTitleBlurEnabled = HarnessMonitorSessionTitleBlurDefaults.enabledDefault
   @AppStorage(HarnessMonitorMenuBarDefaults.stateColorVariantsEnabledKey)
   private var menuBarStateColorVariantsEnabled =
     HarnessMonitorMenuBarDefaults.stateColorVariantsEnabledDefault
@@ -58,12 +50,6 @@ private struct SettingsOverlayMarkerContent: View {
     )
   }
 
-  private var sidebarSessionRowDisplayMode: HarnessMonitorSidebarSessionRowDisplayMode {
-    HarnessMonitorSidebarSessionRowDisplayMode.resolved(
-      rawValue: sidebarSessionRowDisplayModeRawValue
-    )
-  }
-
   private var settingsStateLabel: String {
     let backgroundSelection = HarnessMonitorBackgroundSelection.decode(backgroundImageRawValue)
     return [
@@ -73,9 +59,6 @@ private struct SettingsOverlayMarkerContent: View {
       "background=\(backgroundSelection.settingsStateValue)",
       "textSize=\(HarnessMonitorTextSize.label(for: textSizeIndex))",
       "controlSize=" + "\(HarnessMonitorTextSize.controlSizeLabel(at: textSizeIndex))",
-      "sidebarRowMode=\(sidebarSessionRowDisplayMode.rawValue)",
-      "shortcutOverlays=\(boolLabel(sessionShortcutOverlaysEnabled))",
-      "titleBlur=\(boolLabel(sessionTitleBlurEnabled))",
       "menuBarStateColors=\(boolLabel(menuBarStateColorVariantsEnabled))",
       "timeZoneMode=\(dateTimeConfiguration.timeZoneMode.rawValue)",
       "timeZone=\(dateTimeConfiguration.settingsStateValue)",

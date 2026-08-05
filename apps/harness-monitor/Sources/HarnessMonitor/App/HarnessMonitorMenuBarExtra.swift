@@ -4,209 +4,6 @@ import HarnessMonitorUIPreviewable
 import Observation
 import SwiftUI
 
-struct HarnessMonitorMenuBarSnapshot: Equatable {
-  static let statusItemTitle = "Harness Monitor"
-  static let statusItemImageName = "HarnessMonitorMenuBarLighthouse"
-  static let statusItemInfoImageName = "HarnessMonitorMenuBarLighthouseInfo"
-  static let statusItemIdleImageName = statusItemInfoImageName
-  static let statusItemWarningImageName = "HarnessMonitorMenuBarLighthouseWarning"
-  static let statusItemCriticalImageName = "HarnessMonitorMenuBarLighthouseCritical"
-  static let openMonitorLabel = "Open Monitor"
-  static let openWorkspaceLabel = "Open Dashboard"
-  static let openSettingsLabel = "Settings..."
-  static let refreshLabel = "Refresh"
-  static let checkSupervisorLabel = "Check Supervisor Now"
-  static let runWhenClosedLabel = "Run When Closed"
-  static let quitLabel = "Quit Harness Monitor"
-  static let activeMonitoringLabel = "Monitoring: Active session"
-  static let idleMonitoringLabel = "Monitoring: No active session"
-  static let activeStatusItemHelp = "Monitoring active sessions"
-  static let idleStatusItemHelp = "No active session - open one to monitor"
-
-  let pendingDecisionCount: Int
-  let pendingDecisionSeverity: DecisionSeverity?
-  let isMonitoringIdle: Bool
-  let connectionLabel: String
-  let monitoringLabel: String
-  let sessionCountLabel: String
-  let pendingDecisionLabel: String
-  let supervisorLabel: String
-  let supervisorToggleLabel: String
-  let supervisorToggleDisabled: Bool
-
-  init(
-    connectionState: HarnessMonitorStore.ConnectionState,
-    sessionCount: Int,
-    pendingDecisionCount: Int,
-    pendingDecisionSeverity: DecisionSeverity?,
-    supervisorRuntimeState: HarnessMonitorStore.SupervisorRuntimeState,
-    activeSessionWindowCount: Int,
-    runsWhenClosed: Bool
-  ) {
-    self.pendingDecisionCount = pendingDecisionCount
-    self.pendingDecisionSeverity = pendingDecisionSeverity
-    isMonitoringIdle = activeSessionWindowCount <= 0
-    connectionLabel = "Connection: \(Self.connectionTitle(connectionState))"
-    monitoringLabel =
-      isMonitoringIdle
-      ? Self.idleMonitoringLabel
-      : Self.activeMonitoringLabel
-    sessionCountLabel = "Sessions: \(Self.countTitle(sessionCount))"
-    pendingDecisionLabel = "Decisions: \(Self.countTitle(pendingDecisionCount))"
-    supervisorLabel = Self.supervisorLabel(
-      supervisorRuntimeState,
-      activeSessionWindowCount: activeSessionWindowCount,
-      runsWhenClosed: runsWhenClosed
-    )
-    supervisorToggleLabel = Self.supervisorToggleTitle(supervisorRuntimeState)
-    supervisorToggleDisabled =
-      supervisorRuntimeState == .starting
-      || supervisorRuntimeState == .stopping
-  }
-
-  var showsAttentionBadge: Bool {
-    !isMonitoringIdle && pendingDecisionCount > .zero
-  }
-
-  var attentionBadgeTintLabel: String {
-    SessionAttentionBadgeStyle.tintLabel(for: pendingDecisionSeverity)
-  }
-
-  var attentionBadgeAccessibilityLabel: String {
-    guard showsAttentionBadge else {
-      return "Attention badge: hidden"
-    }
-    return "Attention badge: \(attentionBadgeTintLabel)"
-  }
-
-  var statusItemAccessibilitySummary: String {
-    let idleStatus = isMonitoringIdle ? [Self.idleStatusItemHelp] : []
-    return (Array(visibleMenuLabels.prefix(4)) + idleStatus + [attentionBadgeAccessibilityLabel])
-      .joined(separator: ", ")
-  }
-
-  var statusItemHelpText: String {
-    isMonitoringIdle ? Self.idleStatusItemHelp : Self.activeStatusItemHelp
-  }
-
-  var statusItemDisplayTitle: String {
-    guard showsAttentionBadge else {
-      return Self.statusItemTitle
-    }
-    let decisionNoun = pendingDecisionCount == 1 ? "decision" : "decisions"
-    return "\(Self.statusItemTitle): \(Self.countTitle(pendingDecisionCount)) \(decisionNoun)"
-  }
-
-  var statusItemAssetName: String {
-    guard !isMonitoringIdle else {
-      return Self.statusItemIdleImageName
-    }
-    guard showsAttentionBadge else {
-      return Self.statusItemImageName
-    }
-    switch pendingDecisionSeverity {
-    case .critical:
-      return Self.statusItemCriticalImageName
-    case .warn, .needsUser:
-      return Self.statusItemWarningImageName
-    case .none, .info:
-      return Self.statusItemInfoImageName
-    }
-  }
-
-  var visibleMenuLabels: [String] {
-    [
-      connectionLabel,
-      monitoringLabel,
-      sessionCountLabel,
-      pendingDecisionLabel,
-      supervisorLabel,
-      Self.openMonitorLabel,
-      Self.openWorkspaceLabel,
-      Self.openSettingsLabel,
-      Self.refreshLabel,
-      supervisorToggleLabel,
-      Self.checkSupervisorLabel,
-      Self.runWhenClosedLabel,
-      Self.quitLabel,
-    ]
-  }
-
-  private static func connectionTitle(
-    _ state: HarnessMonitorStore.ConnectionState
-  ) -> String {
-    switch state {
-    case .idle:
-      "Idle"
-    case .connecting:
-      "Connecting"
-    case .online:
-      "Online"
-    case .offline:
-      "Offline"
-    }
-  }
-
-  private static func supervisorTitle(
-    _ state: HarnessMonitorStore.SupervisorRuntimeState
-  ) -> String {
-    switch state {
-    case .stopped:
-      "Stopped"
-    case .starting:
-      "Starting"
-    case .running:
-      "Running"
-    case .stopping:
-      "Stopping"
-    }
-  }
-
-  private static func supervisorLabel(
-    _ state: HarnessMonitorStore.SupervisorRuntimeState,
-    activeSessionWindowCount: Int,
-    runsWhenClosed: Bool
-  ) -> String {
-    if activeSessionWindowCount == 0 && state == .running && runsWhenClosed {
-      return "Supervisor: Running in background"
-    }
-    return "Supervisor: \(supervisorTitle(state))"
-  }
-
-  private static func supervisorToggleTitle(
-    _ state: HarnessMonitorStore.SupervisorRuntimeState
-  ) -> String {
-    switch state {
-    case .stopped, .stopping:
-      "Enable Supervisor"
-    case .starting, .running:
-      "Disable Supervisor"
-    }
-  }
-
-  private static func countTitle(_ count: Int) -> String {
-    switch count {
-    case ..<0:
-      "0"
-    case 0...999:
-      String(count)
-    default:
-      "999+"
-    }
-  }
-
-  static func statusItemHelpText(activeSessionWindowCount: Int) -> String {
-    activeSessionWindowCount <= 0 ? idleStatusItemHelp : activeStatusItemHelp
-  }
-
-  static func statusItemAccessibilityLabel(activeSessionWindowCount: Int) -> String {
-    guard activeSessionWindowCount <= 0 else {
-      return statusItemTitle
-    }
-    return "\(statusItemTitle): \(idleStatusItemHelp)"
-  }
-}
-
 struct HarnessMonitorMenuBarStatusPresentation: Equatable {
   static let idle = Self(pendingDecisionCount: 0, pendingDecisionSeverity: nil)
 
@@ -228,13 +25,15 @@ struct HarnessMonitorMenuBarStatusPresentation: Equatable {
   }
 
   func statusItemAssetName(
-    activeSessionWindowCount: Int,
+    hasActiveWork: Bool,
     showsStateColorVariants: Bool
   ) -> String {
-    guard activeSessionWindowCount > 0 else {
-      return HarnessMonitorMenuBarSnapshot.statusItemIdleImageName
+    if pendingDecisionCount > .zero {
+      return statusItemAssetName(showsStateColorVariants: showsStateColorVariants)
     }
-    return statusItemAssetName(showsStateColorVariants: showsStateColorVariants)
+    return hasActiveWork
+      ? HarnessMonitorMenuBarSnapshot.statusItemImageName
+      : HarnessMonitorMenuBarSnapshot.statusItemIdleImageName
   }
 
   var statusItemAssetName: String {
@@ -275,7 +74,6 @@ final class HarnessMonitorMenuBarStatusController {
 
 struct HarnessMonitorMenuBarExtraContent: View {
   let store: HarnessMonitorStore
-  let activeSessionWindowCount: Int
   let openPolicyWorkspace: @MainActor () -> Void
   @Environment(\.openWindow)
   private var openWindow
@@ -287,11 +85,10 @@ struct HarnessMonitorMenuBarExtraContent: View {
     let toolbarSlice = store.supervisorToolbarSlice
     return HarnessMonitorMenuBarSnapshot(
       connectionState: store.connectionState,
-      sessionCount: store.sessionIndex.totalSessionCount,
       pendingDecisionCount: toolbarSlice.count,
       pendingDecisionSeverity: toolbarSlice.maxSeverity,
       supervisorRuntimeState: store.supervisorRuntimeState,
-      activeSessionWindowCount: activeSessionWindowCount,
+      activeWorkCount: store.sessionIndex.totalActiveWorkCount,
       runsWhenClosed: runWhenClosed
     )
   }
@@ -316,7 +113,7 @@ struct HarnessMonitorMenuBarExtraContent: View {
       .accessibilityIdentifier(HarnessMonitorAccessibility.menuBarConnectionStatus)
     Text(verbatim: snapshot.monitoringLabel)
       .accessibilityIdentifier("harness.menu-bar.monitoring-status")
-    Text(verbatim: snapshot.sessionCountLabel)
+    Text(verbatim: snapshot.activeWorkCountLabel)
       .accessibilityIdentifier(HarnessMonitorAccessibility.menuBarSessionStatus)
     Text(verbatim: snapshot.pendingDecisionLabel)
       .accessibilityIdentifier(HarnessMonitorAccessibility.menuBarDecisionStatus)
@@ -333,18 +130,13 @@ struct HarnessMonitorMenuBarExtraContent: View {
     }
     .disabled(!policyCenter.isAutomationEnabled)
 
-    Button("Open Policy Workspace...") {
+    Button("Open Policy Workspace") {
       openPolicyWorkspace()
       NSApplication.shared.activate(ignoringOtherApps: true)
     }
   }
 
   @ViewBuilder private var windowActions: some View {
-    Button(HarnessMonitorMenuBarSnapshot.openMonitorLabel) {
-      openAppWindow(id: HarnessMonitorWindowID.dashboard)
-    }
-    .accessibilityIdentifier(HarnessMonitorAccessibility.menuBarOpenMonitor)
-
     Button(HarnessMonitorMenuBarSnapshot.openWorkspaceLabel) {
       openAppWindow(id: HarnessMonitorWindowID.dashboard)
     }

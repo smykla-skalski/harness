@@ -193,7 +193,6 @@ public struct SettingsGeneralSection: View {
     Form {
       GeneralDateTimeSection()
       GeneralTimelineSection()
-      GeneralWindowsSection()
       SettingsOpenAnythingSection()
 
       if isFullyExpanded {
@@ -364,56 +363,6 @@ private struct GeneralTimelineSection: View {
       Text(
         "Controls whether Session cockpit timeline filters reset each time, "
           + "restore per window and session, or reopen app-wide"
-      )
-    }
-  }
-}
-
-private struct GeneralWindowsSection: View {
-  @AppStorage(HarnessMonitorLaunchBehavior.storageKey)
-  private var launchBehaviorRawValue = HarnessMonitorLaunchBehavior.defaultValue.rawValue
-  @AppStorage(OpenRecentCloseAfterPickDefaults.storageKey)
-  private var closeOpenRecentAfterPick = OpenRecentCloseAfterPickDefaults.defaultValue
-  @AppStorage(SessionWindowTabbingPreference.storageKey)
-  private var sessionWindowTabbingRawValue = SessionWindowTabbingPreference.defaultValue.rawValue
-
-  private var launchBehavior: HarnessMonitorLaunchBehavior {
-    HarnessMonitorLaunchBehavior.resolved(rawValue: launchBehaviorRawValue)
-  }
-
-  private var sessionWindowTabbingPreference: SessionWindowTabbingPreference {
-    SessionWindowTabbingPreference.resolved(rawValue: sessionWindowTabbingRawValue)
-  }
-
-  var body: some View {
-    Section {
-      Picker("Launch behavior", selection: $launchBehaviorRawValue) {
-        ForEach(HarnessMonitorLaunchBehavior.allCases) { behavior in
-          Text(behavior.label).tag(behavior.rawValue)
-        }
-      }
-      .harnessNativeFormControl()
-      .accessibilityIdentifier(HarnessMonitorAccessibility.settingsLaunchBehaviorPicker)
-
-      Toggle("Close Open Recent after picking a session", isOn: $closeOpenRecentAfterPick)
-        .accessibilityLabel("Close Open Recent after picking a session")
-        .accessibilityHint("When enabled, choosing a recent session closes the welcome window.")
-
-      Picker("Session window tabs", selection: $sessionWindowTabbingRawValue) {
-        ForEach(SessionWindowTabbingPreference.allCases) { preference in
-          Text(preference.label).tag(preference.rawValue)
-        }
-      }
-      .harnessNativeFormControl()
-      .accessibilityLabel("Session window tabs")
-      .accessibilityHint("Controls whether session windows prefer native macOS tabs.")
-    } header: {
-      Text("Windows")
-    } footer: {
-      Text(
-        "\(launchBehavior.description) "
-          + "\(HarnessMonitorLaunchBehavior.closingBehaviorDescription) "
-          + sessionWindowTabbingPreference.description
       )
     }
   }

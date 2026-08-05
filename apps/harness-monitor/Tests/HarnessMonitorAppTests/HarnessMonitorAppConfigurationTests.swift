@@ -262,7 +262,7 @@ final class HarnessMonitorAppConfigurationTests: XCTestCase {
     XCTAssertEqual(configuration.store.daemonOwnership, .managed)
   }
 
-  func testDetailPerfScenarioVisualOptionsDisabledDefaultsDisableChrome() {
+  func testDetailPerfScenarioVisualOptionsDisabledDefaultsDisableCurrentChrome() {
     let environment = HarnessMonitorEnvironment(
       values: [
         HarnessMonitorPerfScenario.environmentKey:
@@ -274,14 +274,6 @@ final class HarnessMonitorAppConfigurationTests: XCTestCase {
     let resolved = HarnessMonitorPerfScenario.decisionDetailFormVisualOptionsDisabled
       .applyingDefaults(to: environment)
 
-    XCTAssertEqual(
-      resolved.values[HarnessMonitorAppConfiguration.sessionShortcutOverlaysOverrideKey],
-      "0"
-    )
-    XCTAssertEqual(
-      resolved.values[HarnessMonitorAppConfiguration.sessionTitleBlurOverrideKey],
-      "0"
-    )
     XCTAssertEqual(
       resolved.values[HarnessMonitorAppConfiguration.menuBarStateColorsOverrideKey],
       "0"

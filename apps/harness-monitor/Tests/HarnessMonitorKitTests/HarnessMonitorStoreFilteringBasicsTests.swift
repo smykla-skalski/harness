@@ -232,6 +232,41 @@ struct HarnessMonitorStoreFilteringBasicsTests {
     #expect(store.totalOpenWorkCount == 8)
   }
 
+  @Test("Total active work count keeps agents and in-progress tasks from double counting")
+  func totalActiveWorkCount() async {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.sessions = [
+      makeSession(
+        .init(
+          sessionId: "agent-led",
+          context: "Agent led",
+          status: .active,
+          leaderId: nil,
+          observeId: nil,
+          openTaskCount: 0,
+          inProgressTaskCount: 1,
+          blockedTaskCount: 0,
+          activeAgentCount: 2
+        )
+      ),
+      makeSession(
+        .init(
+          sessionId: "task-led",
+          context: "Task led",
+          status: .active,
+          leaderId: nil,
+          observeId: nil,
+          openTaskCount: 0,
+          inProgressTaskCount: 3,
+          blockedTaskCount: 0,
+          activeAgentCount: 1
+        )
+      ),
+    ]
+    await store.waitForSessionIndexIdle()
+    #expect(store.sessionIndex.totalActiveWorkCount == 5)
+  }
+
   @Test("Total blocked count sums across all sessions")
   func totalBlockedCount() async {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())

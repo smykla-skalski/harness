@@ -3,19 +3,15 @@ import Testing
 
 @Suite("AppOpenAnything source contracts")
 struct AppOpenAnythingSourceContractTests {
-  @Test("Command-K command exists and Command-F session search remains")
-  func commandKExistsWithoutReplacingCommandF() throws {
+  @Test("Command-K remains while the Session-only palette command is absent")
+  func commandKExistsWithoutSessionOnlyVariant() throws {
     let menuSource = try harnessSourceFile(named: "Commands/OpenAnythingMenuCommands.swift")
     let commandsSource = try harnessSourceFile(named: "App/HarnessMonitorAppCommands.swift")
 
     #expect(menuSource.contains("Button(menuTitle, action: presentOpenAnything)"))
     #expect(menuSource.contains(".keyboardShortcut(\"k\", modifiers: .command)"))
-    #expect(
-      menuSource.contains(
-        "Button(\"Open Anything (Sessions)\", action: presentOpenAnythingSessions)"
-      )
-    )
-    #expect(menuSource.contains(".keyboardShortcut(\"k\", modifiers: [.command, .shift])"))
+    #expect(!menuSource.contains("Open Anything (Sessions)"))
+    #expect(!menuSource.contains("presentOpenAnythingSessions"))
     // Open Anything anchors to the File menu after `.newItem`.
     #expect(menuSource.contains("CommandGroup(after: .newItem)"))
     // Edit-menu Cmd-F session search is still owned by HarnessMonitorAppCommands.
@@ -241,22 +237,18 @@ struct AppOpenAnythingSourceContractTests {
     #expect(settingsSource.contains("recently used palette entries rank higher"))
   }
 
-  @Test("Open Anything current-window scope uses the keyed session snapshot")
-  func currentWindowScopeUsesKeyedSessionSnapshot() throws {
+  @Test("Open Anything current-window scope recognizes only Dashboard and Settings")
+  func currentWindowScopeExcludesSessionWindows() throws {
     let scopeSource = try harnessSourceFile(named: "App/HarnessMonitorApp+OpenAnythingScope.swift")
     let sceneSource = try harnessSourceFile(named: "App/HarnessMonitorApp+Scenes.swift")
     let hostSource = try harnessSourceFile(named: "App/HarnessMonitorApp+OpenAnything.swift")
 
-    #expect(scopeSource.contains("openAnythingSessionID(forWindowID:"))
-    #expect(scopeSource.contains("HarnessMonitorWindowID.sessionWindow(session.sessionId)"))
-    #expect(scopeSource.contains("appStore.sessionWindowSnapshot(sessionID: sessionID)"))
-    #expect(scopeSource.contains("appOpenAnythingLoadedSessionOverride"))
-    // A changed override has to rebuild the corpus, or the palette keeps
-    // offering the window that was loaded before.
-    #expect(sceneSource.contains(".onChange(of: appOpenAnythingLoadedSessionOverride"))
-    #expect(
-      sceneSource.contains("restartOpenAnythingCorpusDriver(loadedSessionOverride: newValue)"))
-    #expect(hostSource.contains("if let loadedSessionOverride"))
+    #expect(scopeSource.contains("windowID == HarnessMonitorWindowID.dashboard"))
+    #expect(scopeSource.contains("windowID == HarnessMonitorWindowID.settings"))
+    #expect(!scopeSource.contains("HarnessMonitorWindowID.sessionWindow"))
+    #expect(!scopeSource.contains("openAnythingSessionID"))
+    #expect(!sceneSource.contains("appOpenAnythingLoadedSessionOverride"))
+    #expect(hostSource.contains("loadedSessionOverride: nil"))
   }
 
   @Test("Open Anything timeline targets the exact Dashboard Audit event")

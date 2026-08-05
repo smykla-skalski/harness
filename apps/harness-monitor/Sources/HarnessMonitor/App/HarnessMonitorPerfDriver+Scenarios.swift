@@ -21,16 +21,8 @@ extension HarnessMonitorPerfDriver {
     store: HarnessMonitorStore,
     openWindow: OpenWindowAction
   ) async -> ScenarioResult {
-    let sessionID = PreviewFixtures.summary.sessionId
-    guard
-      await ensureSessionWindow(
-        sessionID: sessionID,
-        store: store,
-        openWindow: openWindow
-      )
-    else {
-      return .failed("session-window-timeout")
-    }
+    GlobalWindowNavigationHistoryRegistry.current?.requestDashboardRoute(.policyCanvas)
+    openWindow.openHarnessDashboardWindow(recordHistory: false)
     await settle(.milliseconds(1_400))
     return .completed
   }
@@ -63,15 +55,8 @@ extension HarnessMonitorPerfDriver {
     openWindow: OpenWindowAction
   ) async -> ScenarioResult {
     let sessionID = PreviewFixtures.summary.sessionId
-    guard
-      await ensureSessionWindow(
-        sessionID: sessionID,
-        store: store,
-        openWindow: openWindow
-      )
-    else {
-      return .failed("session-window-timeout")
-    }
+    GlobalWindowNavigationHistoryRegistry.current?.requestDashboardRoute(.audit)
+    openWindow.openHarnessDashboardWindow(recordHistory: false)
     guard await burstTimeline(sessionID: sessionID, store: store) else {
       return .failed("preview-timeline-unavailable")
     }
@@ -117,15 +102,7 @@ extension HarnessMonitorPerfDriver {
     store: HarnessMonitorStore,
     openWindow: OpenWindowAction
   ) async -> ScenarioResult {
-    guard
-      await ensureSessionWindow(
-        sessionID: PreviewFixtures.summary.sessionId,
-        store: store,
-        openWindow: openWindow
-      )
-    else {
-      return .failed("session-window-timeout")
-    }
+    openWindow.openHarnessDashboardAgent(.session(sessionID: PreviewFixtures.summary.sessionId))
     await settle(.milliseconds(1_400))
     return .completed
   }
@@ -170,15 +147,8 @@ extension HarnessMonitorPerfDriver {
     store: HarnessMonitorStore,
     openWindow: OpenWindowAction
   ) async -> ScenarioResult {
-    guard
-      await ensureSessionWindow(
-        sessionID: PreviewFixtures.summary.sessionId,
-        store: store,
-        openWindow: openWindow
-      )
-    else {
-      return .failed("session-window-timeout")
-    }
+    GlobalWindowNavigationHistoryRegistry.current?.requestDashboardRoute(.audit)
+    openWindow.openHarnessDashboardWindow(recordHistory: false)
     await settle(.milliseconds(1_000))
     return .completed
   }
@@ -187,33 +157,8 @@ extension HarnessMonitorPerfDriver {
     store: HarnessMonitorStore,
     openWindow: OpenWindowAction
   ) async -> ScenarioResult {
-    guard
-      await ensureSessionWindow(
-        sessionID: PreviewFixtures.summary.sessionId,
-        store: store,
-        openWindow: openWindow
-      )
-    else {
-      return .failed("session-window-timeout")
-    }
+    openWindow.openHarnessDashboardWindow(recordHistory: false)
     await churnToastOverlay(store: store)
-    return .completed
-  }
-
-  static func openSessionWindow(
-    sessionID: String,
-    store: HarnessMonitorStore,
-    openWindow: OpenWindowAction
-  ) async -> ScenarioResult {
-    guard
-      await ensureSessionWindow(
-        sessionID: sessionID,
-        store: store,
-        openWindow: openWindow
-      )
-    else {
-      return .failed("session-window-timeout")
-    }
     return .completed
   }
 
@@ -222,15 +167,23 @@ extension HarnessMonitorPerfDriver {
     store: HarnessMonitorStore,
     openWindow: OpenWindowAction
   ) async -> ScenarioResult {
-    store.requestSessionRoute(selection)
-    guard
-      await ensureSessionWindow(
-        sessionID: PreviewFixtures.summary.sessionId,
-        store: store,
-        openWindow: openWindow
+    switch selection {
+    case .agent(let sessionID, let agentID):
+      openWindow.openHarnessDashboardAgent(
+        .sessionAgent(
+          sessionID: sessionID ?? PreviewFixtures.summary.sessionId,
+          agentID: agentID
+        )
       )
-    else {
-      return .failed("session-window-timeout")
+    case .task(let sessionID, let taskID):
+      openWindow.openHarnessDashboardTaskBoard(
+        .loadedSessionTask(
+          sessionID: sessionID ?? PreviewFixtures.summary.sessionId,
+          taskID: taskID
+        )
+      )
+    default:
+      openWindow.openHarnessDashboardAgent(.session(sessionID: PreviewFixtures.summary.sessionId))
     }
     await settle()
     return .completed
@@ -283,7 +236,7 @@ extension HarnessMonitorPerfDriver {
       ]
     )
     store.presentingAcpPermissionBatch = batch
-    openWindow.openHarnessDecisionSession(decisionID: decisionID, store: store)
+    openWindow.openHarnessDashboardDecision(decisionID: decisionID)
     guard await waitForRoutedWorkspaceDecision(decisionID: decisionID, store: store) else {
       HarnessMonitorPerfTrace.recordScenarioEvent(
         component: "perf.permission-modal",
@@ -309,25 +262,6 @@ extension HarnessMonitorPerfDriver {
         "open_decision_count": String(store.supervisorOpenDecisions.count),
       ]
     )
-    guard
-      let sessionID =
-        store.supervisorOpenDecisions.first(where: { $0.id == decisionID })?.sessionID
-        ?? store.selectedSessionID
-    else {
-      HarnessMonitorLogger.store.error(
-        "ACP decision \(decisionID, privacy: .public) routed without a session window target"
-      )
-      await settle()
-      return .failed("missing-session-id")
-    }
-    guard await waitForSessionWindow(sessionID: sessionID, store: store) else {
-      let sid = sessionID
-      HarnessMonitorLogger.store.error(
-        "ACP \(decisionID, privacy: .public) session window timeout for \(sid, privacy: .public)"
-      )
-      await settle(.milliseconds(1_000))
-      return .failed("session-window-timeout")
-    }
     await settle()
     return .completed
   }
@@ -353,41 +287,6 @@ extension HarnessMonitorPerfDriver {
   ) -> Bool {
     let hasOpenDecision = store.supervisorOpenDecisions.contains { $0.id == decisionID }
     return store.supervisorSelectedDecisionID != decisionID || !hasOpenDecision
-  }
-
-  static func ensureSessionWindow(
-    sessionID: String,
-    store: HarnessMonitorStore,
-    openWindow: OpenWindowAction
-  ) async -> Bool {
-    if store.openSessionWindowIDsSnapshot.contains(sessionID) {
-      await settle()
-      return true
-    }
-
-    await store.prepareOpenRecentSessions()
-    await settle()
-    openWindow.openHarnessSessionWindow(sessionID: sessionID)
-    guard await waitForSessionWindow(sessionID: sessionID, store: store) else {
-      return false
-    }
-    await settle()
-    return true
-  }
-
-  static func waitForSessionWindow(
-    sessionID: String,
-    store: HarnessMonitorStore
-  ) async -> Bool {
-    let clock = ContinuousClock()
-    let deadline = clock.now.advanced(by: sessionWindowTimeout)
-    while store.openSessionWindowIDsSnapshot.contains(sessionID) == false {
-      guard clock.now < deadline else {
-        return false
-      }
-      try? await Task.sleep(for: shortDelay)
-    }
-    return true
   }
 
 }

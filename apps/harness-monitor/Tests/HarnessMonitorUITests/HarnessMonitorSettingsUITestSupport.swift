@@ -129,23 +129,6 @@ extension HarnessMonitorUITestCase {
     )
   }
 
-  func selectFocusModeSection(in app: XCUIApplication) {
-    selectSettingsSection(
-      in: app,
-      identifier: HarnessMonitorUITestAccessibility.settingsFocusModeSection,
-      expectedTitle: "Focus Mode",
-      sidebarTitle: "Focus"
-    )
-  }
-
-  func selectBannersSection(in app: XCUIApplication) {
-    selectSettingsSection(
-      in: app,
-      identifier: HarnessMonitorUITestAccessibility.settingsBannersSection,
-      expectedTitle: "Banners"
-    )
-  }
-
   func selectSettingsSection(
     in app: XCUIApplication,
     identifier: String,

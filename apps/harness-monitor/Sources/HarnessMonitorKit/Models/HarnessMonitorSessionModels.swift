@@ -104,6 +104,10 @@ public struct SessionMetrics: Codable, Equatable, Sendable {
   public let blockedTaskCount: Int
   public let completedTaskCount: Int
 
+  public var activeWorkCount: Int {
+    max(activeAgentCount, inProgressTaskCount)
+  }
+
   public init(
     agentCount: Int = 0,
     activeAgentCount: Int = 0,

@@ -135,6 +135,7 @@ extension HarnessMonitorStore.SessionIndexSlice {
     catalog.sessions = output.sessions
     catalog.totalSessionCount = output.totalSessionCount
     catalog.totalOpenWorkCount = output.totalOpenWorkCount
+    catalog.totalActiveWorkCount = output.totalActiveWorkCount
     catalog.totalBlockedCount = output.totalBlockedCount
     catalog.sessionIDs = output.sessionIDs
     catalog.sessionSummariesByID = output.sessionSummariesByID
@@ -215,6 +216,9 @@ extension HarnessMonitorStore.SessionIndexSlice {
     catalog.totalOpenWorkCount +=
       updatedSummary.metrics.openTaskCount
       - existingSummary.metrics.openTaskCount
+    catalog.totalActiveWorkCount +=
+      updatedSummary.metrics.activeWorkCount
+      - existingSummary.metrics.activeWorkCount
     catalog.totalBlockedCount +=
       updatedSummary.metrics.blockedTaskCount
       - existingSummary.metrics.blockedTaskCount

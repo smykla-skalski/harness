@@ -9,15 +9,12 @@ import SwiftUI
 /// command contributors guarantees the menu actually renders the items.
 struct OpenAnythingMenuCommands: Commands {
   let presentOpenAnything: () -> Void
-  let presentOpenAnythingSessions: () -> Void
   let openAnythingCorpusSize: () -> Int
 
   var body: some Commands {
     CommandGroup(after: .newItem) {
       Button(menuTitle, action: presentOpenAnything)
         .keyboardShortcut("k", modifiers: .command)
-      Button("Open Anything (Sessions)", action: presentOpenAnythingSessions)
-        .keyboardShortcut("k", modifiers: [.command, .shift])
     }
   }
 

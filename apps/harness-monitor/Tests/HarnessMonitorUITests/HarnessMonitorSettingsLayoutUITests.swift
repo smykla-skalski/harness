@@ -116,52 +116,6 @@ class HarnessMonitorSettingsLayoutUITests: HarnessMonitorUITestCase {
     XCTAssertLessThan(daemonLogLevel.frame.minY, supervisorLogLevel.frame.minY)
   }
 
-  func testSettingsBannersSectionShowsPendingDecisionBannerToggle() throws {
-    let app = launch(mode: "preview")
-
-    openSettings(in: app)
-    selectBannersSection(in: app)
-
-    let settingsRoot = element(in: app, identifier: Accessibility.settingsRoot)
-    let settingsPanel = frameElement(in: app, identifier: Accessibility.settingsPanel)
-    XCTAssertTrue(settingsRoot.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(settingsPanel.waitForExistence(timeout: Self.actionTimeout))
-
-    let visibilityToggle = descendantElement(
-      in: settingsRoot,
-      identifier: Accessibility.settingsPendingDecisionBannersToggle
-    )
-    let focusModeToggle = descendantElement(
-      in: settingsRoot,
-      identifier: Accessibility.settingsPendingBannersFocusModeToggle
-    )
-    XCTAssertTrue(visibilityToggle.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertFalse(focusModeToggle.exists)
-  }
-
-  func testSettingsFocusModeSectionShowsPendingDecisionBannerToggle() throws {
-    let app = launch(mode: "preview")
-
-    openSettings(in: app)
-    selectFocusModeSection(in: app)
-
-    let settingsRoot = element(in: app, identifier: Accessibility.settingsRoot)
-    let settingsPanel = frameElement(in: app, identifier: Accessibility.settingsPanel)
-    XCTAssertTrue(settingsRoot.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(settingsPanel.waitForExistence(timeout: Self.actionTimeout))
-
-    let visibilityToggle = descendantElement(
-      in: settingsRoot,
-      identifier: Accessibility.settingsPendingDecisionBannersToggle
-    )
-    let focusModeToggle = descendantElement(
-      in: settingsRoot,
-      identifier: Accessibility.settingsPendingBannersFocusModeToggle
-    )
-    XCTAssertTrue(focusModeToggle.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertFalse(visibilityToggle.exists)
-  }
-
   func testSettingsSidebarChromeMatchesNativeInsetLayout() throws {
     let app = launch(mode: "preview")
 

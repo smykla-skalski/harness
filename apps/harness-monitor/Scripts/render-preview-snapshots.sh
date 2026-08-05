@@ -20,6 +20,7 @@ Suites:
   task-board-filters
   task-board-repository-scope
   settings-repository-scope
+  session-window-removal
   secret-migration-consent
 EOF
 }
@@ -38,6 +39,7 @@ if [[ "${1:-}" == "--list" ]]; then
     task-board-filters \
     task-board-repository-scope \
     settings-repository-scope \
+    session-window-removal \
     secret-migration-consent
   exit 0
 fi
@@ -49,7 +51,7 @@ if [[ -z "$suite" ]]; then
 fi
 
 case "$suite" in
-  dashboard-agents|dashboard-audit-navigation|dashboard-diff-lab|dashboard-reviews-timeout|session-create-bridge-banner|task-board-lane-alignment|task-board-inspector|task-board-review-report|task-board-workflow-progress|task-board-filters|task-board-repository-scope|settings-repository-scope|secret-migration-consent) ;;
+  dashboard-agents|dashboard-audit-navigation|dashboard-diff-lab|dashboard-reviews-timeout|session-create-bridge-banner|task-board-lane-alignment|task-board-inspector|task-board-review-report|task-board-workflow-progress|task-board-filters|task-board-repository-scope|settings-repository-scope|session-window-removal|secret-migration-consent) ;;
   *)
     printf 'error: unknown preview suite: %s\n' "$suite" >&2
     usage >&2
@@ -179,6 +181,9 @@ case "$suite" in
     ;;
   settings-repository-scope)
     HARNESS_SETTINGS_REPOSITORY_SCOPE_PREVIEW_DUMP="$staging_directory" "$host"
+    ;;
+  session-window-removal)
+    HARNESS_SESSION_WINDOW_REMOVAL_PREVIEW_DUMP="$staging_directory" "$host"
     ;;
   secret-migration-consent)
     HARNESS_SECRET_MIGRATION_CONSENT_DUMP="$staging_directory" "$host"

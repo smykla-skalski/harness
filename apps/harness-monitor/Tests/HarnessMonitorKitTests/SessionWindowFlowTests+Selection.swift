@@ -1,6 +1,4 @@
-import AppKit
 import Foundation
-import SwiftUI
 import Testing
 
 @testable import HarnessMonitorKit
@@ -8,30 +6,6 @@ import Testing
 
 @MainActor
 extension SessionWindowFlowTests {
-  @Test("Shared tabbing preparation keeps dashboard and session windows eligible for one tab group")
-  func sharedTabbingPreparationUsesOneIdentifier() {
-    let dashboardWindow = NSWindow(
-      contentRect: .init(x: 0, y: 0, width: 320, height: 240),
-      styleMask: [.titled],
-      backing: .buffered,
-      defer: false
-    )
-    let sessionWindow = NSWindow(
-      contentRect: .init(x: 0, y: 0, width: 320, height: 240),
-      styleMask: [.titled],
-      backing: .buffered,
-      defer: false
-    )
-
-    SessionWindowTabbingSupport.prepareWindowForTabbing(dashboardWindow, preference: .always)
-    SessionWindowTabbingSupport.prepareWindowForTabbing(sessionWindow, preference: .always)
-
-    #expect(dashboardWindow.tabbingIdentifier == SessionWindowTabbingSupport.tabbingIdentifier)
-    #expect(sessionWindow.tabbingIdentifier == SessionWindowTabbingSupport.tabbingIdentifier)
-    #expect(dashboardWindow.tabbingMode == .preferred)
-    #expect(sessionWindow.tabbingMode == .preferred)
-  }
-
   @Test("Session routes expose stable sidebar order")
   func sessionRoutesExposeStableSidebarOrder() {
     #expect(

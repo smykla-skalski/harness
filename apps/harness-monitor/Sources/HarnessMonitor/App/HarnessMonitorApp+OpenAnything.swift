@@ -9,14 +9,6 @@ extension HarnessMonitorApp {
     presentOpenAnythingPaletteScoped(to: nil)
   }
 
-  /// Cmd+Shift+K opens the palette with only one domain visible so the
-  /// session-only quick switcher never collides with action or settings
-  /// results. Plumbing the scope through `present(targetWindowID:scope:)` lets
-  /// the model carry the constraint until the next dismiss.
-  func presentOpenAnythingPaletteSessions() {
-    presentOpenAnythingPaletteScoped(to: .sessions)
-  }
-
   func presentOpenAnythingPaletteScoped(to scope: OpenAnythingDomain?) {
     let controller = appOpenAnythingPaletteController
     // If the palette is already presented, Cmd+K is a toggle-off. Bail
@@ -31,9 +23,6 @@ extension HarnessMonitorApp {
     // walking NSApp.windows. That overhead added up on the hot path.
     let activeWindowID = openAnythingTargetWindowID()
     applyOpenAnythingPreferences()
-    prepareOpenAnythingLoadedSessionOverride(
-      sessionID: openAnythingSessionID(forWindowID: activeWindowID)
-    )
     let resolvedScope = scope ?? scopeDerivedFromWindowID(activeWindowID)
     let resolvedContextDomain = contextDomainForActiveView(activeWindowID)
     let restore = UserDefaults.standard.bool(
@@ -57,7 +46,7 @@ extension HarnessMonitorApp {
     openAnythingExecutorBinder.bind(openWindow: openWindow)
     syncOpenAnythingGlobalHotKey()
     restartOpenAnythingCorpusDriver(
-      loadedSessionOverride: appOpenAnythingLoadedSessionOverride
+      loadedSessionOverride: nil
     )
     appAutomationPolicyRuntimeService.start(store: appStore)
     appClipboardAutomationPolicyService.start(openWindow: openWindow)
@@ -117,7 +106,6 @@ func openAnythingRequiresDashboardPresentationHost(
   guard let targetWindowID else { return true }
   let isSharedSheetHost =
     targetWindowID == HarnessMonitorWindowID.dashboard
-    || targetWindowID.hasPrefix("session-")
   return !isSharedSheetHost || !presentationTargetCanHostSharedSheet
 }
 

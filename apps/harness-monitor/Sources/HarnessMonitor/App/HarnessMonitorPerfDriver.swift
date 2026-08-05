@@ -31,7 +31,6 @@ enum HarnessMonitorPerfDriver {
     "HARNESS_MONITOR_PERF_SETTLE_DELAY_MS", fallback: 900
   )
   static let routeTimeout = Duration.seconds(2)
-  static let sessionWindowTimeout = Duration.seconds(3)
 
   static func envMilliseconds(_ key: String, fallback: Int) -> Duration {
     guard let raw = ProcessInfo.processInfo.environment[key],
@@ -115,22 +114,12 @@ enum HarnessMonitorPerfDriver {
     case .openSessionWindow,
       .openSessionWindowVisualOptionsDisabled,
       .offlineCachedOpen:
-      return await openSessionWindow(
-        sessionID: PreviewFixtures.summary.sessionId,
-        store: store,
-        openWindow: openWindow
-      )
+      openWindow.openHarnessDashboardAgent(.session(sessionID: PreviewFixtures.summary.sessionId))
+      await settle()
+      return .completed
     case .sidebarToggleRichDetail,
       .sidebarToggleRichDetailVisualsOff:
-      guard
-        await ensureSessionWindow(
-          sessionID: PreviewFixtures.summary.sessionId,
-          store: store,
-          openWindow: openWindow
-        )
-      else {
-        return .failed("session-window-timeout")
-      }
+      openWindow.openHarnessDashboardAgent(.session(sessionID: PreviewFixtures.summary.sessionId))
       await settle(.milliseconds(2_800))
       return .completed
     case .dashboardSearchSuggestions,

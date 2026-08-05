@@ -64,7 +64,7 @@ struct SettingsDetailSwitch<MobilePairingContent: View>: View {
   @ViewBuilder
   private func sectionContent(_ section: SettingsSection) -> some View {
     switch section {
-    case .general, .focusMode, .banners, .appearance, .markdown, .notifications, .voice,
+    case .general, .appearance, .markdown, .notifications, .voice,
       .connection, .mobile:
       primarySectionContent(section)
     case .taskBoard, .repositories, .reviews, .secrets:
@@ -81,10 +81,6 @@ struct SettingsDetailSwitch<MobilePairingContent: View>: View {
     switch section {
     case .general:
       SettingsGeneralSectionRoot(store: store, isActive: section == selectedSection)
-    case .focusMode:
-      SettingsFocusModeSection(isActive: section == selectedSection)
-    case .banners:
-      SettingsBannersSection(isActive: section == selectedSection)
     case .appearance:
       SettingsAppearanceSection(
         themeMode: $themeMode,

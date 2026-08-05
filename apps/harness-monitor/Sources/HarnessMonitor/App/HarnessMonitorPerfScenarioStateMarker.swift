@@ -8,19 +8,11 @@ func perfVisualSettingsStateFields() -> [String] {
   let backdrop =
     defaults.string(forKey: HarnessMonitorBackdropDefaults.modeKey)
     ?? HarnessMonitorBackdropMode.none.rawValue
-  let shortcutOverlays = perfBoolLabel(
-    defaults.bool(forKey: SessionWindowKeyboardShortcutOverlaySettings.storageKey)
-  )
-  let titleBlur = perfBoolLabel(
-    defaults.bool(forKey: HarnessMonitorSessionTitleBlurDefaults.enabledKey)
-  )
   let menuBarStateColors = perfBoolLabel(
     defaults.bool(forKey: HarnessMonitorMenuBarDefaults.stateColorVariantsEnabledKey)
   )
   return [
     "backdrop=\(backdrop)",
-    "shortcutOverlays=\(shortcutOverlays)",
-    "titleBlur=\(titleBlur)",
     "menuBarStateColors=\(menuBarStateColors)",
   ]
 }

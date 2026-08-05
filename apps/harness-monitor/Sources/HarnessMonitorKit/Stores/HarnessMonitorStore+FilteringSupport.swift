@@ -86,6 +86,7 @@ extension HarnessMonitorStore.SessionIndexSlice {
     let sessions: [SessionSummary]
     let totalSessionCount: Int
     let totalOpenWorkCount: Int
+    let totalActiveWorkCount: Int
     let totalBlockedCount: Int
     let sessionIDs: Set<String>
     let sessionSummariesByID: [String: SessionSummary]
@@ -199,6 +200,7 @@ extension HarnessMonitorStore.SessionIndexSlice {
       sessions: sessions,
       totalSessionCount: sessions.count,
       totalOpenWorkCount: sessions.reduce(0) { $0 + $1.metrics.openTaskCount },
+      totalActiveWorkCount: sessions.reduce(0) { $0 + $1.metrics.activeWorkCount },
       totalBlockedCount: sessions.reduce(0) { $0 + $1.metrics.blockedTaskCount },
       sessionIDs: sessionIDs,
       sessionSummariesByID: Dictionary(

@@ -18,13 +18,6 @@ struct SessionWindowFlowTests {
     #expect(decoded.sessionID == "sess-alpha")
   }
 
-  @Test("Session windows use dedicated scene identifiers")
-  func sessionWindowsUseDedicatedSceneIdentifiers() {
-    #expect(HarnessMonitorWindowID.dashboard == "open-recent")
-    #expect(HarnessMonitorWindowID.sessionScene == "session")
-    #expect(HarnessMonitorWindowID.sessionWindow("sess-alpha") == "session-sess-alpha")
-  }
-
   @Test("Current schema excludes Session window restoration state")
   func currentSchemaExcludesSessionWindowRestorationState() {
     #expect(
@@ -68,19 +61,6 @@ struct SessionWindowFlowTests {
         values: ["HARNESS_MONITOR_UI_TEST_SESSION_ROUTE": "timeline"],
         isUITesting: true
       ) == .timeline
-    )
-  }
-
-  @Test("Session window tabbing preference defaults to system")
-  func sessionWindowTabbingPreferenceDefaultsToSystem() {
-    #expect(SessionWindowTabbingPreference.defaultValue == .system)
-    #expect(SessionWindowTabbingPreference.resolved(rawValue: nil) == .system)
-    #expect(SessionWindowTabbingPreference.resolved(rawValue: "system") == .system)
-    #expect(SessionWindowTabbingPreference.resolved(rawValue: "always") == .always)
-    #expect(SessionWindowTabbingPreference.resolved(rawValue: "never") == .never)
-    #expect(SessionWindowTabbingPreference.resolved(rawValue: "unknown") == .system)
-    #expect(
-      SessionWindowTabbingPreference.storageKey == "harness.monitor.session-window.tabbing"
     )
   }
 
@@ -216,49 +196,4 @@ struct SessionWindowFlowTests {
     #expect(scheduledUpdates.isEmpty)
   }
 
-  @Test("Session tab opening honors app and system tabbing preferences")
-  func sessionTabOpeningHonorsAppAndSystemPreferences() {
-    #expect(
-      !SessionWindowTabbingSupport.shouldPreferTabbedOpen(
-        preference: .never,
-        userPreference: .always,
-        targetIsFullScreen: true
-      )
-    )
-    #expect(
-      SessionWindowTabbingSupport.shouldPreferTabbedOpen(
-        preference: .always,
-        userPreference: .manual,
-        targetIsFullScreen: false
-      )
-    )
-    #expect(
-      !SessionWindowTabbingSupport.shouldPreferTabbedOpen(
-        preference: .system,
-        userPreference: .manual,
-        targetIsFullScreen: true
-      )
-    )
-    #expect(
-      SessionWindowTabbingSupport.shouldPreferTabbedOpen(
-        preference: .system,
-        userPreference: .always,
-        targetIsFullScreen: false
-      )
-    )
-    #expect(
-      !SessionWindowTabbingSupport.shouldPreferTabbedOpen(
-        preference: .system,
-        userPreference: .inFullScreen,
-        targetIsFullScreen: false
-      )
-    )
-    #expect(
-      SessionWindowTabbingSupport.shouldPreferTabbedOpen(
-        preference: .system,
-        userPreference: .inFullScreen,
-        targetIsFullScreen: true
-      )
-    )
-  }
 }
