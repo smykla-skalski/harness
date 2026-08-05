@@ -8,6 +8,7 @@ mod hooks_agents_session_boundary;
 mod hooks_and_observe;
 mod layout;
 mod run_and_create;
+mod service_http_websocket_boundary;
 mod visibility_hooks_observe;
 mod visibility_runtime;
 mod visibility_surface;
