@@ -1,6 +1,10 @@
-use sqlx::{Sqlite, Transaction, query};
+use std::future::Future;
 
-use super::{AsyncDaemonDb, CliError, SessionSignalRecord, db_error, utc_now};
+use harness_daemon_db_core::{AsyncDaemonDb, db_error};
+use harness_kernel::errors::CliError;
+use harness_protocol::session::SessionSignalRecord;
+use harness_workspace::workspace::utc_now;
+use sqlx::{Sqlite, Transaction, query};
 
 const DELETE_SIGNAL_INDEX_SQL: &str = "DELETE FROM signal_index WHERE session_id = ?1";
 const INSERT_SIGNAL_INDEX_SQL: &str = "
@@ -12,26 +16,26 @@ INSERT OR REPLACE INTO signal_index (
 
 /// Async mirror of `signals::SignalIndexQueries`'s writes, through the
 /// canonical async daemon DB.
-pub(crate) trait AsyncSignalIndexQueries: Send + Sync {
+pub trait AsyncSignalIndexQueries: Send + Sync {
     /// Replace one session's signal index from the canonical async daemon DB.
     ///
     /// # Errors
     /// Returns [`CliError`] on SQL or JSON serialization failures.
-    async fn sync_signal_index(
+    fn sync_signal_index(
         &self,
         session_id: &str,
         signals: &[SessionSignalRecord],
-    ) -> Result<(), CliError>;
+    ) -> impl Future<Output = Result<(), CliError>> + Send;
 
     /// Merge updated signal records into the existing session index.
     ///
     /// # Errors
     /// Returns [`CliError`] when loading or writing the signal index fails.
-    async fn merge_signal_records(
+    fn merge_signal_records(
         &self,
         session_id: &str,
         records: &[SessionSignalRecord],
-    ) -> Result<(), CliError>;
+    ) -> impl Future<Output = Result<(), CliError>> + Send;
 }
 
 impl AsyncSignalIndexQueries for AsyncDaemonDb {

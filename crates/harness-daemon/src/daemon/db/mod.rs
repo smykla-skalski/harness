@@ -31,8 +31,7 @@ pub(crate) use crate::workspace::{project_context_dir, project_context_id, utc_n
 pub(crate) use harness_kernel::errors::{CliError, CliErrorKind};
 
 pub(crate) use super::{
-    index as daemon_index, launchd as daemon_launchd, protocol as daemon_protocol, state,
-    state as daemon_state, timeline as daemon_timeline,
+    index as daemon_index, protocol as daemon_protocol, state, timeline as daemon_timeline,
 };
 // The session snapshot layer lives in its own crate, depended on by both
 // `service` and `db` (file-based signal reads, the activity-fold
@@ -54,14 +53,12 @@ pub(crate) use async_agent_turn_runs::{
 };
 mod async_agents;
 pub(crate) use async_agents::AsyncAgentResolutionQueries;
-mod async_change_tracking;
-pub(crate) use async_change_tracking::AsyncChangeTrackingQueries;
+pub(crate) use harness_daemon_db_queries::AsyncChangeTrackingQueries;
 mod async_conversation;
 pub(crate) use async_conversation::AsyncConversationSyncQueries;
 mod async_detail;
 pub(crate) use async_detail::AsyncSignalReadQueries;
-mod async_diagnostics;
-pub(crate) use async_diagnostics::AsyncDiagnosticsQueries;
+pub(crate) use harness_daemon_db_queries::AsyncDiagnosticsQueries;
 mod async_reads;
 pub(crate) use async_reads::AsyncTimelineWindowQueries;
 mod async_resolved_session;
@@ -71,19 +68,16 @@ mod async_session_state;
 pub(crate) use async_session_state::AsyncSessionStateQueries;
 mod async_session_summaries;
 pub(crate) use async_session_summaries::AsyncSessionSummaryQueries;
-mod async_signal_writes;
-pub(crate) use async_signal_writes::AsyncSignalIndexQueries;
+pub(crate) use harness_daemon_db_queries::AsyncSignalIndexQueries;
 mod async_writes;
 pub(crate) use async_writes::{AsyncDaemonTransactions, AsyncSessionWriteQueries};
 mod audit;
 pub(crate) use audit::AsyncAuditQueries;
-mod change_tracking;
-pub(crate) use change_tracking::ChangeTrackingQueries;
+pub(crate) use harness_daemon_db_queries::ChangeTrackingQueries;
 #[cfg(test)]
-pub(crate) use change_tracking::LOAD_CHANGE_TRACKING_SQL;
+pub(crate) use harness_daemon_db_queries::LOAD_CHANGE_TRACKING_SQL;
 pub(crate) mod conversation;
-mod diagnostics;
-pub use diagnostics::DaemonDbDiagnostics;
+pub use harness_daemon_db_queries::DaemonDbDiagnostics;
 pub(crate) mod imports;
 pub use imports::DaemonDbImports;
 pub(crate) use imports::{
@@ -182,7 +176,7 @@ pub(crate) use task_board::{
 mod session_data;
 pub use session_data::SessionCoreQueries;
 mod signals;
-pub use signals::SignalIndexQueries;
+pub use harness_daemon_db_queries::SignalIndexQueries;
 mod summaries;
 pub use summaries::SessionSummaryQueries;
 mod summary_rows;
@@ -210,17 +204,17 @@ use conversation::{
     DaemonDbConversation, clear_session_conversation_events,
     prepare_agent_conversation_imports_and_activity, prepare_runtime_transcript_resync_for_agents,
 };
-#[allow(unused_imports)]
-use diagnostics::import_daemon_events;
 pub use harness_daemon_db_core::AsyncDaemonDb;
 pub(crate) use harness_daemon_db_core::SchemaRepairHooks;
 #[cfg(test)]
 pub(crate) use harness_daemon_db_core::set_schema_init_hook;
 pub(crate) use harness_daemon_db_core::trace_async_db_operation;
+#[allow(unused_imports)]
+use harness_daemon_db_queries::derive_effective_signal_status;
+#[allow(unused_imports)]
+use harness_daemon_db_queries::import_daemon_events;
 pub(crate) use harness_policy_graph_store::NewApprovalGrant;
 pub(crate) use runtime::ensure_shared_db;
-#[allow(unused_imports)]
-use signals::derive_effective_signal_status;
 #[allow(unused_imports)]
 use timeline::{stored_timeline_entry, stored_timeline_entry_from_row};
 #[allow(unused_imports)]
