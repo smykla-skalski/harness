@@ -43,6 +43,19 @@ enum OpenAnythingRoutingStep: Equatable, Sendable {
   case revealInFinder(URL)
 }
 
+func openAnythingRoutingStepRequiresApplicationActivation(
+  _ step: OpenAnythingRoutingStep
+) -> Bool {
+  switch step {
+  case .presentNewSessionSheet, .presentNewTaskSheet, .openWindow, .openDashboard,
+    .openDashboardAgent, .openDashboardTaskBoard, .openDashboardAudit, .openSettings:
+    return true
+  case .attachExternalSession, .refresh, .refreshDiagnostics, .reconnectDaemon,
+    .copyDiagnostics, .selectDashboardReview, .openExternalURL, .revealInFinder:
+    return false
+  }
+}
+
 private enum OpenAnythingActionRoutingGroup {
   case session
   case dashboard
@@ -122,7 +135,7 @@ enum OpenAnythingRouteExecutor {
     case .newTask:
       return [.presentNewTaskSheet]
     case .attachExternalSession:
-      return [.attachExternalSession]
+      return [.openWindow(.dashboard), .attachExternalSession]
     default:
       return []
     }

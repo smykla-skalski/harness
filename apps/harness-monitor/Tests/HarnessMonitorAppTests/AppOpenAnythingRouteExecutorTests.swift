@@ -2,6 +2,7 @@ import XCTest
 
 @testable import HarnessMonitor
 @testable import HarnessMonitorKit
+@testable import HarnessMonitorUIPreviewable
 
 final class AppOpenAnythingRouteExecutorTests: XCTestCase {
   func testDashboardRouteOpensDashboardRoute() {
@@ -129,8 +130,127 @@ final class AppOpenAnythingRouteExecutorTests: XCTestCase {
   func testActionAttachExternalSessionTriggersAttach() {
     XCTAssertEqual(
       steps(for: .action(.attachExternalSession)),
-      [.attachExternalSession]
+      [.openWindow(.dashboard), .attachExternalSession]
     )
+  }
+
+  func testDashboardAndSessionWindowsHostSharedSheetsInPlace() {
+    XCTAssertFalse(
+      openAnythingRequiresDashboardPresentationHost(
+        targetWindowID: HarnessMonitorWindowID.dashboard,
+        presentationTargetCanHostSharedSheet: true
+      )
+    )
+    XCTAssertFalse(
+      openAnythingRequiresDashboardPresentationHost(
+        targetWindowID: "session-current",
+        presentationTargetCanHostSharedSheet: true
+      )
+    )
+  }
+
+  func testOffSpaceMissingAndSettingsWindowsRequireDashboardSheetHost() {
+    XCTAssertTrue(
+      openAnythingRequiresDashboardPresentationHost(
+        targetWindowID: "session-off-space",
+        presentationTargetCanHostSharedSheet: false
+      )
+    )
+    XCTAssertTrue(
+      openAnythingRequiresDashboardPresentationHost(
+        targetWindowID: nil,
+        presentationTargetCanHostSharedSheet: false
+      )
+    )
+    XCTAssertTrue(
+      openAnythingRequiresDashboardPresentationHost(
+        targetWindowID: HarnessMonitorWindowID.settings,
+        presentationTargetCanHostSharedSheet: false
+      )
+    )
+  }
+
+  func testExplicitPaletteDismissalsRelinquishPanelKey() {
+    XCTAssertTrue(openAnythingShouldRelinquishPanelKey(after: .userCanceled))
+    XCTAssertTrue(
+      openAnythingShouldRelinquishPanelKey(after: .hitExecuted(recordID: "action"))
+    )
+    XCTAssertFalse(openAnythingShouldRelinquishPanelKey(after: .windowResignedKey))
+    XCTAssertFalse(openAnythingShouldRelinquishPanelKey(after: .scenePhaseBackground))
+  }
+
+  func testExplicitDismissalsCanRestoreOriginatingWindowDirectly() {
+    XCTAssertTrue(openAnythingShouldRestorePresentationTarget(after: .userCanceled))
+    XCTAssertTrue(
+      openAnythingShouldRestorePresentationTarget(after: .hitExecuted(recordID: "action"))
+    )
+    XCTAssertFalse(openAnythingShouldRestorePresentationTarget(after: .windowResignedKey))
+    XCTAssertFalse(openAnythingShouldRestorePresentationTarget(after: .scenePhaseBackground))
+  }
+
+  func testOnlyVisibleCurrentSpaceWindowCanReceiveRestoredKeyStatus() {
+    XCTAssertTrue(
+      openAnythingCanRestorePresentationTarget(
+        isVisible: true,
+        isMiniaturized: false,
+        isOnActiveSpace: true
+      )
+    )
+    XCTAssertFalse(
+      openAnythingCanRestorePresentationTarget(
+        isVisible: true,
+        isMiniaturized: false,
+        isOnActiveSpace: false
+      )
+    )
+    XCTAssertFalse(
+      openAnythingCanRestorePresentationTarget(
+        isVisible: false,
+        isMiniaturized: false,
+        isOnActiveSpace: true
+      )
+    )
+    XCTAssertFalse(
+      openAnythingCanRestorePresentationTarget(
+        isVisible: true,
+        isMiniaturized: true,
+        isOnActiveSpace: true
+      )
+    )
+  }
+
+  func testWindowBackedStepsRequireApplicationActivation() {
+    let steps: [OpenAnythingRoutingStep] = [
+      .presentNewSessionSheet,
+      .presentNewTaskSheet,
+      .openWindow(.dashboard),
+      .openDashboard(.taskBoard),
+      .openDashboardAgent(.session(sessionID: "session-1")),
+      .openDashboardTaskBoard(.item(itemID: "task-1")),
+      .openDashboardAudit(.auditEvent(eventID: "event-1")),
+      .openSettings(rawValue: "mcp"),
+    ]
+
+    for step in steps {
+      XCTAssertTrue(openAnythingRoutingStepRequiresApplicationActivation(step), "\(step)")
+    }
+  }
+
+  func testBackgroundStepsDoNotActivateApplication() {
+    let steps: [OpenAnythingRoutingStep] = [
+      .attachExternalSession,
+      .refresh,
+      .refreshDiagnostics,
+      .reconnectDaemon,
+      .copyDiagnostics,
+      .selectDashboardReview(pullRequestID: "pr-1"),
+      .openExternalURL(URL(string: "https://example.com")!),
+      .revealInFinder(URL(fileURLWithPath: "/tmp/example")),
+    ]
+
+    for step in steps {
+      XCTAssertFalse(openAnythingRoutingStepRequiresApplicationActivation(step), "\(step)")
+    }
   }
 
   func testActionOpenDashboardOpensDashboardWindow() {

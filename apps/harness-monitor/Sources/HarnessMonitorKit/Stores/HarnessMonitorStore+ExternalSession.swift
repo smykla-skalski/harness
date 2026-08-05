@@ -2,8 +2,18 @@ import Foundation
 
 extension HarnessMonitorStore {
   /// Signals the main window to present the Attach External Session file importer.
+  /// The pending flag survives creation of a new Dashboard scene, whose view
+  /// can mount after the request counter changes.
   public func requestAttachExternalSession() {
+    hasPendingAttachSessionRequest = true
     attachSessionRequest += 1
+  }
+
+  @discardableResult
+  public func consumeAttachSessionRequest() -> Bool {
+    guard hasPendingAttachSessionRequest else { return false }
+    hasPendingAttachSessionRequest = false
+    return true
   }
 
   /// Handles the result of the Attach External Session fileImporter by probing

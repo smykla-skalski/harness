@@ -35,6 +35,7 @@ final class OpenAnythingPaletteWindowController: NSObject, NSWindowDelegate {
   private var executor: ((OpenAnythingHit) -> Void)?
   private var reviewPinToggle: ((String) -> Void)?
   private var panel: OpenAnythingFloatingPanel?
+  private weak var presentationTargetWindow: NSWindow?
   private var suppressesResignKeyDismissal = false
   private var lastMeasuredContentHeight: CGFloat?
   /// Raised while the controller is itself moving or resizing the panel so the
@@ -43,11 +44,6 @@ final class OpenAnythingPaletteWindowController: NSObject, NSWindowDelegate {
   /// persist it as the remembered origin.
   var isAdjustingFrameProgrammatically = false
 
-  /// True when the floating panel is currently the key window. The menu
-  /// presenter uses this to skip the "surface dashboard" branch on Cmd+K
-  /// when we are simply re-showing an alpha-hidden panel - opening dashboard
-  /// would resign the panel's main status and flap the toggle.
-  var isPanelKey: Bool { panel?.isKeyWindow ?? false }
   /// Re-entrancy guard so the model->panel sync and panel->model sync do not
   /// chase each other into a loop on dismiss.
   private var isClosing = false
@@ -118,6 +114,7 @@ final class OpenAnythingPaletteWindowController: NSObject, NSWindowDelegate {
   }
 
   func toggle(
+    targetWindowID: String?,
     scope: OpenAnythingDomain?,
     contextDomain: OpenAnythingDomain?,
     restoreLastQuery: Bool
@@ -125,11 +122,17 @@ final class OpenAnythingPaletteWindowController: NSObject, NSWindowDelegate {
     if model.isPresented {
       hide()
     } else {
-      show(scope: scope, contextDomain: contextDomain, restoreLastQuery: restoreLastQuery)
+      show(
+        targetWindowID: targetWindowID,
+        scope: scope,
+        contextDomain: contextDomain,
+        restoreLastQuery: restoreLastQuery
+      )
     }
   }
 
   func show(
+    targetWindowID: String? = nil,
     scope: OpenAnythingDomain?,
     contextDomain: OpenAnythingDomain?,
     restoreLastQuery: Bool
@@ -145,8 +148,9 @@ final class OpenAnythingPaletteWindowController: NSObject, NSWindowDelegate {
     }
     let panel = panel ?? buildPanel()
     self.panel = panel
+    presentationTargetWindow = resolvePresentationTargetWindow(targetWindowID: targetWindowID)
     model.present(
-      targetWindowID: nil,
+      targetWindowID: targetWindowID,
       scope: scope,
       contextDomain: contextDomain,
       restoreLastQuery: restoreLastQuery
@@ -183,6 +187,7 @@ final class OpenAnythingPaletteWindowController: NSObject, NSWindowDelegate {
     // hijacking pointer input from the windows behind it.
     panel?.alphaValue = 0
     panel?.ignoresMouseEvents = true
+    finishDismissal(reason: reason)
   }
 
   /// Called from the palette view when the model dismisses for an in-flight
@@ -194,6 +199,46 @@ final class OpenAnythingPaletteWindowController: NSObject, NSWindowDelegate {
     defer { isClosing = false }
     panel?.alphaValue = 0
     panel?.ignoresMouseEvents = true
+    finishDismissal(reason: model.lastDismissReason)
+  }
+
+  var presentationTargetCanHostSharedSheet: Bool {
+    guard let targetWindow = presentationTargetWindow else { return false }
+    return openAnythingCanRestorePresentationTarget(
+      isVisible: targetWindow.isVisible,
+      isMiniaturized: targetWindow.isMiniaturized,
+      isOnActiveSpace: targetWindow.isOnActiveSpace
+    )
+  }
+
+  private func resolvePresentationTargetWindow(targetWindowID: String?) -> NSWindow? {
+    guard let targetWindowID else { return nil }
+    return NSApp.windows.first { window in
+      guard let identifier = window.identifier?.rawValue else { return false }
+      return KeyWindowObserver.matchesWindowID(identifier, expected: targetWindowID)
+    }
+  }
+
+  private func finishDismissal(reason: OpenAnythingPaletteModel.DismissReason?) {
+    defer { presentationTargetWindow = nil }
+    guard let reason, openAnythingShouldRelinquishPanelKey(after: reason) else { return }
+    guard let panel, panel.isKeyWindow else { return }
+    if openAnythingShouldRestorePresentationTarget(after: reason),
+      let targetWindow = presentationTargetWindow,
+      openAnythingCanRestorePresentationTarget(
+        isVisible: targetWindow.isVisible,
+        isMiniaturized: targetWindow.isMiniaturized,
+        isOnActiveSpace: targetWindow.isOnActiveSpace
+      )
+    {
+      targetWindow.makeKey()
+      return
+    }
+    // Ordering out lets AppKit perform the key-window resignation. Calling
+    // `resignKey()` directly invokes an override callback without selecting a
+    // replacement key window, and restoring an off-Space origin would move the
+    // user away from the Space where they dismissed the palette.
+    panel.orderOut(nil)
   }
 
   func beginKeepingPanelOpenActivation() {
@@ -237,9 +282,10 @@ final class OpenAnythingPaletteWindowController: NSObject, NSWindowDelegate {
     // which can be occluded by full-screen content.
     // https://ardentswift.com/posts/hotkey-window/
     panel.level = .statusBar
-    // Canonical Spotlight collection behavior: float across spaces, joinable
-    // in fullscreen, transient (no Mission Control thumbnail), stationary so
-    // space switches do not move the panel, and ignored by Cmd-` cycle.
+    // Joining every Space lets the shortcut reveal this panel in place without
+    // activating a Monitor window and switching to that window's Space.
+    // Fullscreen remains joinable; Mission Control treats it as transient and
+    // stationary; Cmd-` omits it from normal window cycling.
     panel.collectionBehavior = [
       .canJoinAllSpaces, .fullScreenAuxiliary, .transient, .stationary, .ignoresCycle,
     ]
@@ -360,46 +406,5 @@ final class OpenAnythingPaletteWindowController: NSObject, NSWindowDelegate {
     withProgrammaticFrameAdjustment {
       panel.setFrame(frame, display: false, animate: false)
     }
-  }
-}
-
-/// Frame-anchored wrapper around `OpenAnythingPaletteView`. NSHostingView
-/// sizes itself to the panel's content rect, and the SwiftUI body uses
-/// `.ignoresSafeArea()` so the glass card paints edge-to-edge inside the
-/// transparent panel.
-private struct OpenAnythingPaletteContent: View {
-  let model: OpenAnythingPaletteModel
-  let execute: (OpenAnythingHit) -> Void
-  let onDismiss: () -> Void
-  let onContentSizeChange: (CGSize) -> Void
-  let beginKeepingPanelOpenActivation: () -> Void
-  let endKeepingPanelOpenActivation: () -> Void
-  let reviewPinToggle: ((String) -> Void)?
-  // The palette renders in a detached NSHostingView, so it inherits none of the
-  // scene appearance environment. Mirror the app text-size scale here so palette
-  // text honors the font-size setting and updates live when it changes.
-  @AppStorage(HarnessMonitorTextSize.storageKey)
-  private var textSizeIndex = HarnessMonitorTextSize.defaultIndex
-  // Palette-only transparency switch. Injected into the glass environment below
-  // so the floating card honors the Settings toggle while every other glass
-  // surface in the app keeps its default translucency.
-  @AppStorage(OpenAnythingPreferencesDefaults.transparencyEnabledKey)
-  private var transparencyEnabled = OpenAnythingPreferencesDefaults.transparencyEnabledDefault
-
-  var body: some View {
-    let normalizedTextSizeIndex = HarnessMonitorTextSize.normalizedIndex(textSizeIndex)
-    OpenAnythingPaletteView(
-      model: model,
-      execute: execute,
-      onDismiss: onDismiss,
-      onContentSizeChange: onContentSizeChange,
-      beginKeepingPanelOpenActivation: beginKeepingPanelOpenActivation,
-      endKeepingPanelOpenActivation: endKeepingPanelOpenActivation,
-      reviewPinToggle: reviewPinToggle
-    )
-    .environment(\.harnessTextSizeIndex, normalizedTextSizeIndex)
-    .environment(\.harnessFloatingGlassTransparencyEnabled, transparencyEnabled)
-    .sessionFontScale(textSizeIndex: normalizedTextSizeIndex)
-    .ignoresSafeArea()
   }
 }
