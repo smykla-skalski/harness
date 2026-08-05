@@ -88,7 +88,7 @@ struct DashboardAgentDetailPane: View {
   }
 
   private func standardDetail(_ agent: DashboardAgentSummary) -> some View {
-    ScrollView {
+    DashboardDecisionScrollView(store: store, decisionIDs: Set(teamDecisions.map(\.id))) {
       VStack(alignment: .leading, spacing: 20) {
         DashboardAgentDetailHeader(agent: agent)
         DashboardAgentDecisionsSection(store: store, items: teamDecisions)

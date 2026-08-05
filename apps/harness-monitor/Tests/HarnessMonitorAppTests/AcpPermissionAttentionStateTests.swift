@@ -101,6 +101,47 @@ struct AcpPermissionAttentionStateTests {
     #expect(state.canRouteToDecision("acp-permission:missing", store: store) == false)
   }
 
+  @Test("notification decision routing waits for the cold decision snapshot")
+  func notificationDecisionRoutingWaitsForDecisionSnapshot() {
+    let center = AppTestNotificationCenter()
+    let controller = HarnessMonitorUserNotificationController(
+      center: center,
+      previewSettingsSnapshot: .preview
+    )
+    controller.decisionRequestedID = "decision-1"
+    controller.decisionRequestTick = 1
+    let application = AppTestWindowApplication(
+      keyWindowIdentifier: nil,
+      keyWindowParentIdentifier: nil,
+      isActive: true,
+      isHidden: false,
+      windowStates: []
+    )
+    let state = AcpPermissionAttentionState(
+      keyWindowObserver: KeyWindowObserver(application: application),
+      notifications: controller
+    )
+    let store = HarnessMonitorStore(daemonController: PreviewDaemonController(mode: .empty))
+
+    #expect(state.takeNotificationDecisionRouteIfReady(store: store) == nil)
+    store.supervisorOpenDecisions = [
+      Decision(
+        id: "decision-1",
+        severity: .needsUser,
+        ruleID: "manual",
+        sessionID: "session-1",
+        agentID: nil,
+        taskID: nil,
+        summary: "Needs attention",
+        contextJSON: "{}",
+        suggestedActionsJSON: "[]"
+      )
+    ]
+
+    #expect(state.takeNotificationDecisionRouteIfReady(store: store) == "decision-1")
+    #expect(state.takeNotificationDecisionRouteIfReady(store: store) == nil)
+  }
+
   private func makeWorkerSnapshot(
     acpID: String,
     sessionID: String,

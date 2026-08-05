@@ -172,6 +172,7 @@ public struct DashboardWindowView: View {
       ) {
         DashboardSidebar(
           store: store,
+          history: history,
           selectedRoute: selectedRouteBinding,
           recentSessions: sessionCatalog.recentSessions,
           statusModel: dashboardStatusSummaryModel(route: route)

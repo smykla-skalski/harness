@@ -104,6 +104,29 @@ extension OpenWindowAction {
   }
 
   @MainActor
+  public func openHarnessDashboardAgent(_ target: DashboardAgentNavigationTarget) {
+    GlobalWindowNavigationHistoryRegistry.current?.requestDashboardAgent(target)
+    openHarnessDashboardWindow(mergeIfNeeded: true, recordHistory: false)
+  }
+
+  @MainActor
+  public func openHarnessDashboardTaskBoard(_ target: DashboardTaskBoardNavigationTarget) {
+    GlobalWindowNavigationHistoryRegistry.current?.requestDashboardTaskBoard(target)
+    openHarnessDashboardWindow(mergeIfNeeded: true, recordHistory: false)
+  }
+
+  @MainActor
+  public func openHarnessDashboardAudit(_ target: DashboardAuditNavigationTarget) {
+    GlobalWindowNavigationHistoryRegistry.current?.requestDashboardAudit(target)
+    openHarnessDashboardWindow(mergeIfNeeded: true, recordHistory: false)
+  }
+
+  @MainActor
+  public func openHarnessDashboardDecision(decisionID: String) {
+    openHarnessDashboardAgent(.decision(decisionID: decisionID))
+  }
+
+  @MainActor
   public func openHarnessDecisionSession(
     decisionID: String,
     store: HarnessMonitorStore

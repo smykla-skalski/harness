@@ -9,7 +9,7 @@ struct DashboardCodexAgentDetailView: View {
   let loadsAutomatically: Bool
 
   var body: some View {
-    ScrollView {
+    DashboardDecisionScrollView(store: store, decisionIDs: navigationDecisionIDs) {
       VStack(alignment: .leading, spacing: 20) {
         DashboardAgentDetailHeader(agent: agent)
         DashboardAgentDecisionsSection(store: store, items: teamDecisions)
@@ -21,6 +21,8 @@ struct DashboardCodexAgentDetailView: View {
           DashboardAcpIssues(issues: detail.issues)
           summary(detail)
           DashboardCodexApprovals(
+            store: store,
+            sessionID: agent.sessionID,
             approvals: detail.pendingApprovals,
             isBusy: state.activeAction != nil,
             onResolve: resolveApproval
@@ -49,6 +51,14 @@ struct DashboardCodexAgentDetailView: View {
       guard loadsAutomatically else { return }
       requestLoad()
     }
+  }
+
+  private var navigationDecisionIDs: Set<String> {
+    let approvalIDs =
+      state.detail?.pendingApprovals.map {
+        CodexApprovalRule.decisionID(sessionID: agent.sessionID, approvalID: $0.id)
+      } ?? []
+    return Set(teamDecisions.map(\.id) + approvalIDs)
   }
 
   private func summary(_ detail: DashboardCodexAgentDetail) -> some View {

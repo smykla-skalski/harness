@@ -60,7 +60,7 @@ struct DashboardTerminalAgentDetailView: View {
   }
 
   private func detailContent(_ detail: DashboardTerminalAgentDetail) -> some View {
-    ScrollView {
+    DashboardDecisionScrollView(store: store, decisionIDs: Set(teamDecisions.map(\.id))) {
       VStack(alignment: .leading, spacing: 20) {
         DashboardAgentDetailHeader(agent: agent)
         DashboardAgentDecisionsSection(store: store, items: teamDecisions)

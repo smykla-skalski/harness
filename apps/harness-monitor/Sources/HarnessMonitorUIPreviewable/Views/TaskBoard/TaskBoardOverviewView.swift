@@ -6,9 +6,11 @@ public struct TaskBoardOverviewView: View {
   let snapshot: TaskBoardInboxSnapshot
   let taskBoardItems: [TaskBoardItem]
   let store: HarnessMonitorStore?
+  let navigationHistory: GlobalWindowNavigationHistory?
   let orchestratorStatus: TaskBoardOrchestratorStatus?
   let evaluationSummary: TaskBoardEvaluationSummary?
   let taskBoardSessionID: String?
+  let isRouteVisible: Bool
   let contentHorizontalPadding: CGFloat
   let fillsAvailableHeight: Bool
   let showsOperationsPanel: Bool
@@ -135,13 +137,34 @@ public struct TaskBoardOverviewView: View {
 
   var liveInboxItemsValue: TaskBoardLiveInboxItems { liveInboxItems }
 
+  var searchTextValue: String { searchText }
+
+  var appliedSearchTextValue: String {
+    get { appliedSearchText }
+    nonmutating set { appliedSearchText = newValue }
+  }
+
+  var presentationGenerationValue: UInt64 {
+    get { presentationGeneration }
+    nonmutating set { presentationGeneration = newValue }
+  }
+
+  var presentationWorkerValue: TaskBoardOverviewPresentationWorker { presentationWorker }
+
+  var cachedPresentationValue: TaskBoardOverviewPresentation {
+    get { cachedPresentation }
+    nonmutating set { cachedPresentation = newValue }
+  }
+
   public init(
     snapshot: TaskBoardInboxSnapshot,
     taskBoardItems: [TaskBoardItem] = [],
     store: HarnessMonitorStore? = nil,
+    navigationHistory: GlobalWindowNavigationHistory? = nil,
     orchestratorStatus: TaskBoardOrchestratorStatus? = nil,
     evaluationSummary: TaskBoardEvaluationSummary? = nil,
     taskBoardSessionID: String? = nil,
+    isRouteVisible: Bool = true,
     contentHorizontalPadding: CGFloat = 24,
     fillsAvailableHeight: Bool = false,
     showsOperationsPanel: Bool = true,
@@ -156,9 +179,11 @@ public struct TaskBoardOverviewView: View {
     self.snapshot = snapshot
     self.taskBoardItems = taskBoardItems
     self.store = store
+    self.navigationHistory = navigationHistory
     self.orchestratorStatus = orchestratorStatus
     self.evaluationSummary = evaluationSummary
     self.taskBoardSessionID = taskBoardSessionID
+    self.isRouteVisible = isRouteVisible
     self.contentHorizontalPadding = contentHorizontalPadding
     self.fillsAvailableHeight = fillsAvailableHeight
     self.showsOperationsPanel = showsOperationsPanel
@@ -173,6 +198,11 @@ public struct TaskBoardOverviewView: View {
 
   public var body: some View {
     let presentationInput = synchronizedPresentationInput
+    let dashboardNavigationTaskID = DashboardTaskBoardNavigationTaskID(
+      requestID: navigationHistory?.pendingDashboardTaskBoardRestoreRequest?.requestID,
+      isRouteVisible: isRouteVisible,
+      presentationInput: presentationInput
+    )
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
       boardChrome
       taskBoardDetailRow { boardSection }
@@ -242,6 +272,9 @@ public struct TaskBoardOverviewView: View {
     }
     .onChange(of: taskBoardSelectionDispatcher.requestGeneration) {
       handleTaskBoardSelectionRequest(taskBoardSelectionDispatcher.latestRequest)
+    }
+    .task(id: dashboardNavigationTaskID) {
+      await applyPendingDashboardTargetIfReady()
     }
     .confirmationDialog(
       pendingLiveOperationValue?.title ?? "Run live task-board operation?",
@@ -380,40 +413,5 @@ public struct TaskBoardOverviewView: View {
       get: { laneCollapsePreferencesRawValue },
       set: { laneCollapsePreferencesRawValue = $0 }
     )
-  }
-}
-
-extension TaskBoardOverviewView {
-  /// Holds the board still until the typing stops. Clearing skips the wait: the
-  /// board someone is asking for back is the one they already had.
-  @MainActor
-  func applySearchTextWhenSettled() async {
-    // Whitespace alone is not a search, so it settles like a clear instead of
-    // making the board sit out a wait that changes nothing. The trim belongs
-    // here and not in the field's binding: stripping the space as someone
-    // types it would leave them unable to type a second word.
-    let pending = searchText.isBlank ? "" : searchText
-    if !pending.isEmpty {
-      try? await Task.sleep(for: .milliseconds(180))
-      guard !Task.isCancelled else { return }
-    }
-    if appliedSearchText != pending {
-      appliedSearchText = pending
-    }
-  }
-
-  @MainActor
-  func rebuildPresentation(input: TaskBoardOverviewPresentationInput) async {
-    guard !Task.isCancelled else { return }
-    presentationGeneration &+= 1
-    let generation = presentationGeneration
-    let presentation = await presentationWorker.compute(input: input)
-    guard !Task.isCancelled, presentationGeneration == generation else {
-      return
-    }
-    if cachedPresentation != presentation {
-      cachedPresentation = presentation
-      selectionModel.updateVisibleIDs(presentation.orderedCardIDs)
-    }
   }
 }

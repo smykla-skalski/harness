@@ -43,6 +43,10 @@ struct PreviewHostApp: App {
       ),
       ("HARNESS_DASHBOARD_AGENTS_PREVIEW_DUMP", DashboardAgentsPreviewRenderer.dump),
       (
+        "HARNESS_DASHBOARD_AUDIT_NAVIGATION_PREVIEW_DUMP",
+        DashboardAuditNavigationPreviewRenderer.dump
+      ),
+      (
         "HARNESS_DASHBOARD_REVIEWS_TIMEOUT_PREVIEW_DUMP",
         DashboardReviewsRefreshTimeoutPreviewRenderer.dump
       ),

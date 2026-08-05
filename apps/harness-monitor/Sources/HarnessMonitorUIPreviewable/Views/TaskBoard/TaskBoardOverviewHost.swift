@@ -7,12 +7,14 @@ struct TaskBoardOverviewHost: View {
 
   let scope: Scope
   let store: HarnessMonitorStore
+  let navigationHistory: GlobalWindowNavigationHistory?
   let snapshot: TaskBoardInboxSnapshot
   let taskBoardItems: [TaskBoardItem]
   let decisions: [Decision]
   let orchestratorStatus: TaskBoardOrchestratorStatus?
   let evaluationSummary: TaskBoardEvaluationSummary?
   let isActionInFlight: Bool
+  let isRouteVisible: Bool
   let showsOperationsPanel: Bool
   let isCommandFocusActive: Bool
   let operationsInspectorFocus: TaskBoardOperationsInspectorFocus?
@@ -20,24 +22,28 @@ struct TaskBoardOverviewHost: View {
   init(
     scope: Scope,
     store: HarnessMonitorStore,
+    navigationHistory: GlobalWindowNavigationHistory? = nil,
     snapshot: TaskBoardInboxSnapshot,
     taskBoardItems: [TaskBoardItem],
     decisions: [Decision],
     orchestratorStatus: TaskBoardOrchestratorStatus?,
     evaluationSummary: TaskBoardEvaluationSummary?,
     isActionInFlight: Bool,
+    isRouteVisible: Bool = true,
     showsOperationsPanel: Bool = true,
     isCommandFocusActive: Bool = true,
     operationsInspectorFocus: TaskBoardOperationsInspectorFocus? = nil
   ) {
     self.scope = scope
     self.store = store
+    self.navigationHistory = navigationHistory
     self.snapshot = snapshot
     self.taskBoardItems = taskBoardItems
     self.decisions = decisions
     self.orchestratorStatus = orchestratorStatus
     self.evaluationSummary = evaluationSummary
     self.isActionInFlight = isActionInFlight
+    self.isRouteVisible = isRouteVisible
     self.showsOperationsPanel = showsOperationsPanel
     self.isCommandFocusActive = isCommandFocusActive
     self.operationsInspectorFocus = operationsInspectorFocus
@@ -48,9 +54,11 @@ struct TaskBoardOverviewHost: View {
       snapshot: snapshot,
       taskBoardItems: taskBoardItems,
       store: store,
+      navigationHistory: navigationHistory,
       orchestratorStatus: orchestratorStatus,
       evaluationSummary: scope.isDashboard ? evaluationSummary : nil,
       taskBoardSessionID: scope.sessionID,
+      isRouteVisible: isRouteVisible,
       contentHorizontalPadding: scope.taskBoardContentHorizontalPadding,
       fillsAvailableHeight: scope.fillsAvailableHeight,
       showsOperationsPanel: scope.isDashboard && showsOperationsPanel,

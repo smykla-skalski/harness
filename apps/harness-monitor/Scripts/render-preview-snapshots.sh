@@ -9,6 +9,7 @@ Usage:
 
 Suites:
   dashboard-agents
+  dashboard-audit-navigation
   dashboard-diff-lab
   dashboard-reviews-timeout
   session-create-bridge-banner
@@ -26,6 +27,7 @@ EOF
 if [[ "${1:-}" == "--list" ]]; then
   printf '%s\n' \
     dashboard-agents \
+    dashboard-audit-navigation \
     dashboard-diff-lab \
     dashboard-reviews-timeout \
     session-create-bridge-banner \
@@ -47,7 +49,7 @@ if [[ -z "$suite" ]]; then
 fi
 
 case "$suite" in
-  dashboard-agents|dashboard-diff-lab|dashboard-reviews-timeout|session-create-bridge-banner|task-board-lane-alignment|task-board-inspector|task-board-review-report|task-board-workflow-progress|task-board-filters|task-board-repository-scope|settings-repository-scope|secret-migration-consent) ;;
+  dashboard-agents|dashboard-audit-navigation|dashboard-diff-lab|dashboard-reviews-timeout|session-create-bridge-banner|task-board-lane-alignment|task-board-inspector|task-board-review-report|task-board-workflow-progress|task-board-filters|task-board-repository-scope|settings-repository-scope|secret-migration-consent) ;;
   *)
     printf 'error: unknown preview suite: %s\n' "$suite" >&2
     usage >&2
@@ -97,6 +99,9 @@ trap cleanup EXIT
 case "$suite" in
   dashboard-agents)
     HARNESS_DASHBOARD_AGENTS_PREVIEW_DUMP="$staging_directory" "$host"
+    ;;
+  dashboard-audit-navigation)
+    HARNESS_DASHBOARD_AUDIT_NAVIGATION_PREVIEW_DUMP="$staging_directory" "$host"
     ;;
   dashboard-diff-lab)
     HARNESS_DIFF_LAB_DUMP="$staging_directory" "$host"

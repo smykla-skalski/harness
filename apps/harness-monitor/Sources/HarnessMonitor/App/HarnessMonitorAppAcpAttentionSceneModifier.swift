@@ -23,6 +23,10 @@ private struct AcpPermissionAttentionSceneModifier: ViewModifier {
     ].joined(separator: "||")
   }
 
+  private var notificationRoutingKey: String {
+    "\(notifications.decisionRequestTick):\(store.supervisorDecisionRefreshTick)"
+  }
+
   func body(content: Content) -> some View {
     content
       .overlay(alignment: .topTrailing) {
@@ -70,7 +74,7 @@ private struct AcpPermissionAttentionSceneModifier: ViewModifier {
           openWindow: openWindow
         )
       }
-      .task(id: notifications.decisionRequestTick) {
+      .task(id: notificationRoutingKey) {
         attentionState.routeNotificationRequestIfNeeded(
           store: store,
           openWindow: openWindow

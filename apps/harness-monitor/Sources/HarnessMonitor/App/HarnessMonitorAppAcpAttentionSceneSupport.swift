@@ -163,17 +163,7 @@ final class AcpPermissionAttentionState {
     store: HarnessMonitorStore,
     openWindow: OpenWindowAction
   ) {
-    guard notifications.decisionRequestTick != handledDecisionRequestTick,
-      let decisionID = notifications.decisionRequestedID
-    else {
-      return
-    }
-    guard canRouteToDecision(decisionID, store: store) else {
-      // Consume stale/unroutable notification ticks so they do not spin forever.
-      handledDecisionRequestTick = notifications.decisionRequestTick
-      return
-    }
-    handledDecisionRequestTick = notifications.decisionRequestTick
+    guard let decisionID = takeNotificationDecisionRouteIfReady(store: store) else { return }
     publishRouteEvent(
       source: "notification",
       decisionID: decisionID,
@@ -184,6 +174,15 @@ final class AcpPermissionAttentionState {
       store: store,
       openWindow: openWindow
     )
+  }
+
+  func takeNotificationDecisionRouteIfReady(store: HarnessMonitorStore) -> String? {
+    guard notifications.decisionRequestTick != handledDecisionRequestTick,
+      let decisionID = notifications.decisionRequestedID,
+      canRouteToDecision(decisionID, store: store)
+    else { return nil }
+    handledDecisionRequestTick = notifications.decisionRequestTick
+    return decisionID
   }
 
   func routePresentedBatchIfNeeded(
@@ -255,7 +254,6 @@ final class AcpPermissionAttentionState {
     openWindow: OpenWindowAction,
     activatesApp: Bool = true
   ) {
-    store.requestSessionDecisionRoute(decisionID: decisionID)
     store.supervisorSelectedDecisionID = decisionID
     store.requestPrimaryDecisionActionFocus(decisionID: decisionID)
     HarnessMonitorUITestTrace.record(
@@ -270,7 +268,7 @@ final class AcpPermissionAttentionState {
     if activatesApp {
       Self.activateHarnessMonitorApp()
     }
-    openWindow.openHarnessDecisionSession(decisionID: decisionID, store: store)
+    openWindow.openHarnessDashboardDecision(decisionID: decisionID)
   }
 
   private static func activateHarnessMonitorApp() {

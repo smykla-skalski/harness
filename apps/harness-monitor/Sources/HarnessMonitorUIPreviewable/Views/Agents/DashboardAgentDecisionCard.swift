@@ -38,6 +38,7 @@ struct DashboardAgentDecisionCard: View {
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardAgentDecisionCard(item.id))
+    .id(item.id)
     .confirmationDialog(
       "Snooze Decision",
       isPresented: $isPresentingSnooze,
@@ -84,8 +85,17 @@ struct DashboardAgentDecisionCard: View {
         .accessibilityIdentifier(
           HarnessMonitorAccessibility.dashboardAgentDecisionAction(item.id, action.id)
         )
+        .dashboardPrimaryDecisionActionFocus(
+          store: store,
+          decisionID: item.id,
+          isPrimaryAction: action.id == primaryActionID
+        )
       }
     }
+  }
+
+  private var primaryActionID: String? {
+    DashboardDecisionActionFocusPolicy.primaryActionID(in: item.suggestedActions)
   }
 
   private func perform(_ action: SuggestedAction) {

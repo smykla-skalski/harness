@@ -141,10 +141,18 @@ extension HarnessMonitorApp {
         filePath: file?.path,
         lineSelection: file?.lines
       )
-    case .reviews, .taskBoard:
-      // Route switching into reviews/taskBoard is deferred (intents-foundation Unit 2):
-      // once the deep-link router can drive `selectedRoute` + `needsMeOn` SceneStorage.
-      break
+      appWindowNavigationHistory.requestDashboardRoute(.reviews)
+      openWindow.openHarnessDashboardWindow(mergeIfNeeded: true, recordHistory: false)
+    case .reviews:
+      appWindowNavigationHistory.requestDashboardRoute(.reviews)
+      openWindow.openHarnessDashboardWindow(mergeIfNeeded: true, recordHistory: false)
+    case .taskBoard(let itemID):
+      if let itemID {
+        openWindow.openHarnessDashboardTaskBoard(.item(itemID: itemID))
+      } else {
+        appWindowNavigationHistory.requestDashboardRoute(.taskBoard)
+        openWindow.openHarnessDashboardWindow(mergeIfNeeded: true, recordHistory: false)
+      }
     }
   }
 

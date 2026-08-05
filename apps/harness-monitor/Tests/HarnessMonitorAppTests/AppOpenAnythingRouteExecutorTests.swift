@@ -18,53 +18,38 @@ final class AppOpenAnythingRouteExecutorTests: XCTestCase {
     )
   }
 
-  func testSessionHitOpensSessionWindow() {
+  func testSessionHitOpensDashboardAgent() {
     XCTAssertEqual(
       steps(for: .session(sessionID: "sess-1")),
-      [.openSessionWindow(sessionID: "sess-1")]
+      [.openDashboardAgent(.session(sessionID: "sess-1"))]
     )
   }
 
-  func testTaskBoardItemWithOwnerRoutesToSessionTask() {
+  func testTaskBoardItemWithOwnerRoutesToExactBoardItem() {
     XCTAssertEqual(
       steps(for: .taskBoardItem(id: "item-1", sessionID: "sess-1", workItemID: "task-1")),
-      [
-        .requestSessionRoute(.task(sessionID: "sess-1", taskID: "task-1")),
-        .openSessionWindow(sessionID: "sess-1"),
-      ]
+      [.openDashboardTaskBoard(.item(itemID: "item-1"))]
     )
   }
 
-  func testTaskBoardItemWithoutOwnerFallsBackToDashboardBoard() {
+  func testTaskBoardItemWithoutOwnerStillPreservesExactBoardItem() {
     XCTAssertEqual(
       steps(for: .taskBoardItem(id: "item-1", sessionID: nil, workItemID: nil)),
-      [.openDashboard(.taskBoard)]
+      [.openDashboardTaskBoard(.item(itemID: "item-1"))]
     )
   }
 
-  func testDecisionWithOwnerRoutesToSessionDecision() {
+  func testDecisionWithOwnerRoutesToDashboardDecision() {
     XCTAssertEqual(
       steps(for: .decision(id: "decision-1", sessionID: "sess-1")),
-      [
-        .requestSessionRoute(
-          .decision(
-            sessionID: "sess-1",
-            decisionID: "decision-1",
-            resetDecisionFilters: true
-          )
-        ),
-        .openSessionWindow(sessionID: "sess-1"),
-      ]
+      [.openDashboardAgent(.decision(decisionID: "decision-1"))]
     )
   }
 
-  func testDecisionWithoutOwnerFallsBackToDashboardBoard() {
+  func testDecisionWithoutOwnerStillPreservesExactDecision() {
     XCTAssertEqual(
       steps(for: .decision(id: "decision-1", sessionID: nil)),
-      [
-        .selectSupervisorDecision(id: "decision-1"),
-        .openDashboard(.taskBoard),
-      ]
+      [.openDashboardAgent(.decision(decisionID: "decision-1"))]
     )
   }
 
@@ -78,33 +63,36 @@ final class AppOpenAnythingRouteExecutorTests: XCTestCase {
     )
   }
 
-  func testLoadedSessionEntitiesRouteToOwningSession() {
+  func testLoadedSessionAgentRoutesToDashboardAgent() {
     XCTAssertEqual(
       steps(for: .loadedSession(.agent(sessionID: "sess-1", agentID: "agent-1"))),
-      [
-        .requestSessionRoute(.agent(sessionID: "sess-1", agentID: "agent-1")),
-        .openSessionWindow(sessionID: "sess-1"),
-      ]
+      [.openDashboardAgent(.sessionAgent(sessionID: "sess-1", agentID: "agent-1"))]
     )
   }
 
-  func testLoadedSessionTaskRoutesToOwningSession() {
+  func testLoadedSessionTaskRoutesToDashboardBoard() {
     XCTAssertEqual(
       steps(for: .loadedSession(.task(sessionID: "sess-1", taskID: "task-9"))),
-      [
-        .requestSessionRoute(.task(sessionID: "sess-1", taskID: "task-9")),
-        .openSessionWindow(sessionID: "sess-1"),
-      ]
+      [.openDashboardTaskBoard(.loadedSessionTask(sessionID: "sess-1", taskID: "task-9"))]
     )
   }
 
-  func testLoadedSessionTimelineOpensSession() {
+  func testLoadedSessionTimelineOpensDashboardAudit() {
+    let target = OpenAnythingLoadedSessionTimelineTarget(
+      entry: TimelineEntry(
+        entryId: "entry-1",
+        recordedAt: "2026-08-05T08:00:00Z",
+        kind: "agent.progress",
+        sessionId: "sess-1",
+        agentId: "agent-1",
+        taskId: "task-1",
+        summary: "Progress",
+        payload: .object(["message": .string("Working")])
+      )
+    )
     XCTAssertEqual(
-      steps(for: .loadedSession(.timeline(sessionID: "sess-1", entryID: "entry-1"))),
-      [
-        .requestSessionRoute(.timeline(sessionID: "sess-1", entryID: "entry-1")),
-        .openSessionWindow(sessionID: "sess-1"),
-      ]
+      steps(for: .loadedSession(.timeline(target))),
+      [.openDashboardAudit(.sessionTimeline(.init(target)))]
     )
   }
 

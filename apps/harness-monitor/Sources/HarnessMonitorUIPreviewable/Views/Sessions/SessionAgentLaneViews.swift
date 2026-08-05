@@ -300,7 +300,6 @@ struct SessionAgentListSection: View {
   }
 
   private func openNewAgent() {
-    store.requestSessionRouteCreate(.agent, sessionID: sessionID)
-    openWindow.openHarnessSessionWindow(sessionID: sessionID)
+    openWindow.openHarnessDashboardAgent(.createTerminal(sessionID: sessionID))
   }
 }

@@ -94,12 +94,13 @@ extension AgentDetailSection {
       }?.id
 
     if let decisionID = oldestOpenDecisionID ?? store.selectOldestDecision(for: agent.agentId) {
-      store.requestSessionDecisionRoute(decisionID: decisionID)
       store.supervisorSelectedDecisionID = decisionID
       store.requestPrimaryDecisionActionFocus(decisionID: decisionID)
-      openWindow.openHarnessDecisionSession(decisionID: decisionID, store: store)
+      openWindow.openHarnessDashboardDecision(decisionID: decisionID)
+    } else if let sessionID = store.selectedSessionID {
+      openWindow.openHarnessDashboardAgent(.session(sessionID: sessionID))
     } else {
-      openWindow.openHarnessSessionWindow(sessionID: store.selectedSessionID)
+      openWindow.openHarnessDashboardWindow()
     }
   }
 }

@@ -25,7 +25,7 @@ struct RecentSessionsCommand: Commands {
         } else {
           ForEach(recentSessions) { session in
             Button(session.displayTitle) {
-              openWindow.openHarnessSessionWindow(sessionID: session.sessionId)
+              openWindow.openHarnessDashboardAgent(.session(sessionID: session.sessionId))
             }
           }
           Divider()

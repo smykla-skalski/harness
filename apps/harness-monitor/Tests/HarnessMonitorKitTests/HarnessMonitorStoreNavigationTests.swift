@@ -156,7 +156,7 @@ struct HarnessMonitorStoreNavigationTests {
     #expect(updated.canGoForward == state.canGoForward)
   }
 
-  @Test("Global window history navigates between dashboard and session selections")
+  @Test("Global window history migrates session selections into Dashboard")
   func globalWindowHistoryNavigatesAcrossWindows() async throws {
     let store = try await makeNavigationStore()
     let history = GlobalWindowNavigationHistory(store: store)
@@ -177,9 +177,9 @@ struct HarnessMonitorStoreNavigationTests {
     history.finishDashboardRestoreRequest(dashboardRequest.requestID)
     history.navigateForward()
 
-    let sessionRequest = try #require(history.pendingSessionRestoreRequest)
-    #expect(sessionRequest.sessionID == "sess-a")
-    #expect(sessionRequest.selection == .route(.overview))
+    let dashboardAgentRequest = try #require(history.pendingDashboardAgentsRestoreRequest)
+    #expect(dashboardAgentRequest.target == .session(sessionID: "sess-a"))
+    #expect(history.pendingSessionRestoreRequest == nil)
     #expect(history.canGoBack)
     #expect(!history.canGoForward)
   }
@@ -211,7 +211,7 @@ struct HarnessMonitorStoreNavigationTests {
     #expect(!history.canGoForward)
   }
 
-  @Test("Global window history skips non-restorable session entries")
+  @Test("Global window history skips stale sessions and migrates live sessions")
   func globalWindowHistorySkipsStaleSessions() async throws {
     let store = try await makeNavigationStore()
     let history = GlobalWindowNavigationHistory(store: store)
@@ -223,10 +223,32 @@ struct HarnessMonitorStoreNavigationTests {
 
     history.navigateBack()
 
-    let sessionRequest = try #require(history.pendingSessionRestoreRequest)
-    #expect(sessionRequest.sessionID == "sess-a")
-    #expect(sessionRequest.selection == .route(.overview))
+    let dashboardAgentRequest = try #require(history.pendingDashboardAgentsRestoreRequest)
+    #expect(dashboardAgentRequest.target == .session(sessionID: "sess-a"))
+    #expect(history.pendingSessionRestoreRequest == nil)
     #expect(history.canGoForward)
+  }
+
+  @Test("Dashboard target requests preserve exact agent task and activity identities")
+  func dashboardTargetRequestsPreserveExactIdentities() async throws {
+    let store = try await makeNavigationStore()
+    let history = GlobalWindowNavigationHistory(store: store)
+
+    history.requestDashboardAgent(.decision(decisionID: "decision-1"))
+    #expect(
+      history.pendingDashboardAgentsRestoreRequest?.target
+        == .decision(decisionID: "decision-1")
+    )
+
+    history.requestDashboardTaskBoard(.item(itemID: "item-1"))
+    #expect(
+      history.pendingDashboardTaskBoardRestoreRequest?.target == .item(itemID: "item-1")
+    )
+    #expect(history.pendingDashboardAgentsRestoreRequest == nil)
+
+    history.requestDashboardAudit(.init(eventID: "event-1"))
+    #expect(history.pendingDashboardAuditRestoreRequest?.target?.eventID == "event-1")
+    #expect(history.pendingDashboardTaskBoardRestoreRequest == nil)
   }
 
   @Test("Global window history upgrades generic Reviews route entries in place")
@@ -319,15 +341,15 @@ struct HarnessMonitorStoreNavigationTests {
 
     let dashboardRequest = try #require(history.pendingDashboardRestoreRequest)
     let agentsRequest = try #require(history.pendingDashboardAgentsRestoreRequest)
-    #expect(dashboardRequest.selection == .agents(first))
-    #expect(agentsRequest.identity == first)
+    #expect(dashboardRequest.selection == .agents(.identity(first)))
+    #expect(agentsRequest.target == .identity(first))
     history.finishDashboardRestoreRequest(dashboardRequest.requestID)
     history.finishDashboardAgentsRestoreRequest(agentsRequest.requestID)
 
     history.navigateForward()
 
     let forwardRequest = try #require(history.pendingDashboardAgentsRestoreRequest)
-    #expect(forwardRequest.identity == second)
+    #expect(forwardRequest.target == .identity(second))
   }
 
   // MARK: - Fixtures

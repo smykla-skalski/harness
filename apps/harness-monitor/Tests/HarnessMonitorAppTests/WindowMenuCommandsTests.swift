@@ -250,7 +250,8 @@ final class WindowMenuCommandsTests: XCTestCase {
 
     XCTAssertTrue(commandSetSource.contains("RecentSessionsCommand(store: store)"))
     XCTAssertTrue(source.contains("Menu(Self.menuTitle)"))
-    XCTAssertTrue(source.contains("openWindow.openHarnessSessionWindow"))
+    XCTAssertTrue(source.contains("openWindow.openHarnessDashboardAgent"))
+    XCTAssertFalse(source.contains("openWindow.openHarnessSessionWindow"))
     XCTAssertTrue(source.contains("openWindow.openHarnessDashboardWindow()"))
     XCTAssertTrue(source.contains("Show Dashboard"))
   }

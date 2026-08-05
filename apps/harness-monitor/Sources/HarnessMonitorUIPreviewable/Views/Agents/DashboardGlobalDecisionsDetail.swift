@@ -6,7 +6,7 @@ struct DashboardGlobalDecisionsDetail: View {
   let items: [DashboardDecisionItem]
 
   var body: some View {
-    ScrollView {
+    DashboardDecisionScrollView(store: store, decisionIDs: Set(items.map(\.id))) {
       VStack(alignment: .leading, spacing: 20) {
         VStack(alignment: .leading, spacing: 10) {
           Text("Global decisions")

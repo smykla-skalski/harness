@@ -16,6 +16,9 @@ struct DashboardAgentsRouteView: View {
   @State private var isPresentingTerminalCreate = false
   @State private var isPresentingAcpCreate = false
   @State private var isPresentingCodexCreate = false
+  @State private var pendingNavigationRefreshRequestID: Int?
+  @State private var pendingDecisionNavigationReadiness: DashboardDecisionNavigationReadiness?
+  @State private var terminalCreateSessionID: String?
 
   init(
     store: HarnessMonitorStore,
@@ -47,6 +50,23 @@ struct DashboardAgentsRouteView: View {
 
   private var currentSelection: DashboardAgentsSelection? {
     DashboardAgentsSelection(rawValue: persistedSelectionRaw)
+  }
+
+  var stateValue: DashboardAgentsRouteState { state }
+
+  var persistedSelectionRawValue: String {
+    get { persistedSelectionRaw }
+    nonmutating set { persistedSelectionRaw = newValue }
+  }
+
+  var pendingNavigationRefreshRequestIDValue: Int? {
+    get { pendingNavigationRefreshRequestID }
+    nonmutating set { pendingNavigationRefreshRequestID = newValue }
+  }
+
+  var pendingDecisionNavigationReadinessValue: DashboardDecisionNavigationReadiness? {
+    get { pendingDecisionNavigationReadiness }
+    nonmutating set { pendingDecisionNavigationReadiness = newValue }
   }
 
   @ViewBuilder
@@ -119,7 +139,19 @@ struct DashboardAgentsRouteView: View {
   var body: some View {
     let resolution = store.dashboardDecisionResolution(agents: state.viewState.agents)
     VStack(spacing: 0) {
-      header(resolution)
+      DashboardAgentsRouteHeader(
+        countText: agentCountText(resolution),
+        sourceLabel: sourceLabel,
+        isLoading: state.viewState.isLoading,
+        canCreateAgent: !sessions.isEmpty,
+        createTerminalAgent: {
+          terminalCreateSessionID = nil
+          isPresentingTerminalCreate = true
+        },
+        createCodexAgent: { isPresentingCodexCreate = true },
+        createAcpAgent: { isPresentingAcpCreate = true },
+        refresh: requestManualRefresh
+      )
       Divider()
       if state.viewState.presentsAsFullWidthState(
         hasDecisionDestinations: resolution.hasDecisionDestinations
@@ -154,6 +186,18 @@ struct DashboardAgentsRouteView: View {
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardAgentsRoot)
     .onChange(of: state.viewState.agents, initial: true) {
       reconcileSelection()
+      applyPendingHistoryRestoreIfNeeded()
+    }
+    .onChange(of: state.viewState.isLoading) { _, isLoading in
+      if !isLoading {
+        applyPendingHistoryRestoreIfNeeded()
+      }
+    }
+    .onChange(of: sessions.map(\.sessionId)) {
+      applyPendingHistoryRestoreIfNeeded()
+    }
+    .onChange(of: store.lastRefreshTimings?.recordedAt) {
+      applyPendingHistoryRestoreIfNeeded()
     }
     .task(id: refreshContext) {
       guard refreshesAutomatically, isRouteVisible else { return }
@@ -173,10 +217,13 @@ struct DashboardAgentsRouteView: View {
     .task(id: history.pendingDashboardAgentsRestoreRequest?.requestID) {
       applyPendingHistoryRestoreIfNeeded()
     }
+    .onChange(of: store.supervisorDecisionRefreshTick) {
+      applyPendingHistoryRestoreIfNeeded()
+    }
     .sheet(isPresented: $isPresentingTerminalCreate) {
       DashboardTerminalAgentCreateSheet(
         store: store,
-        sessions: sessions,
+        sessions: terminalCreateSessions,
         onCreated: selectCreatedTerminalAgent,
         onStartFailed: { requestRefresh(force: true) }
       )
@@ -195,64 +242,6 @@ struct DashboardAgentsRouteView: View {
         onCreated: selectCreatedCodexAgent
       )
     }
-  }
-
-  private func header(_ resolution: DashboardDecisionResolution) -> some View {
-    HStack(spacing: 12) {
-      VStack(alignment: .leading, spacing: 2) {
-        Text("Agents")
-          .scaledFont(.title3.weight(.semibold))
-        Text(agentCountText(resolution))
-          .scaledFont(.caption)
-          .foregroundStyle(.secondary)
-      }
-      Spacer()
-      Button {
-        isPresentingTerminalCreate = true
-      } label: {
-        Label("New terminal agent", systemImage: "plus")
-      }
-      .disabled(sessions.isEmpty)
-      .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardTerminalCreateButton)
-      Button {
-        isPresentingCodexCreate = true
-      } label: {
-        Label("New Codex agent", systemImage: "plus")
-      }
-      .disabled(sessions.isEmpty)
-      .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardCodexCreateButton)
-      Button {
-        isPresentingAcpCreate = true
-      } label: {
-        Label("New ACP agent", systemImage: "plus")
-      }
-      .disabled(sessions.isEmpty)
-      if let sourceLabel {
-        Text(sourceLabel)
-          .scaledFont(.caption.weight(.medium))
-          .foregroundStyle(.secondary)
-          .padding(.horizontal, 8)
-          .padding(.vertical, 4)
-          .background(.quaternary, in: Capsule())
-      }
-      Button {
-        requestManualRefresh()
-      } label: {
-        if state.viewState.isLoading {
-          ProgressView()
-            .controlSize(.small)
-        } else {
-          Label("Refresh Agents", systemImage: "arrow.clockwise")
-            .labelStyle(.iconOnly)
-        }
-      }
-      .buttonStyle(.borderless)
-      .help("Refresh agents")
-      .accessibilityLabel("Refresh agents")
-      .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardAgentsRefreshButton)
-    }
-    .padding(.horizontal, 16)
-    .frame(minHeight: 54)
   }
 
   private func agentCountText(_ resolution: DashboardDecisionResolution) -> String {
@@ -330,7 +319,7 @@ struct DashboardAgentsRouteView: View {
     requestRefresh(force: true)
   }
 
-  private func requestRefresh(force: Bool) {
+  func requestRefresh(force: Bool) {
     guard isRouteVisible, let generation = state.beginLoad(force: force) else { return }
     let sessionsSnapshot = sessions
     HarnessMonitorAsyncWorkQueue.shared.submit(
@@ -344,6 +333,29 @@ struct DashboardAgentsRouteView: View {
         await state.finishLoad(result, generation: generation)
       }
     )
+  }
+
+  func presentTerminalCreation(sessionID: String) {
+    terminalCreateSessionID = sessionID
+    isPresentingTerminalCreate = true
+  }
+
+  var sessionCatalogIsReadyForNavigation: Bool {
+    if store.lastRefreshTimings != nil { return true }
+    switch store.sessionDataAvailability {
+    case .live:
+      return false
+    case .persisted, .unavailable:
+      return true
+    }
+  }
+
+  private var terminalCreateSessions: [SessionSummary] {
+    guard
+      let terminalCreateSessionID,
+      let preferred = sessions.first(where: { $0.sessionId == terminalCreateSessionID })
+    else { return sessions }
+    return [preferred] + sessions.filter { $0.sessionId != terminalCreateSessionID }
   }
 
   private func reconcileSelection() {
@@ -362,12 +374,6 @@ struct DashboardAgentsRouteView: View {
     }
     guard let first = agents.first else { return }
     persistedSelectionRaw = first.identity.selectionRawValue
-    history.recordDashboardAgentSelection(first.identity)
   }
 
-  private func applyPendingHistoryRestoreIfNeeded() {
-    guard let request = history.pendingDashboardAgentsRestoreRequest else { return }
-    persistedSelectionRaw = request.identity.selectionRawValue
-    history.finishDashboardAgentsRestoreRequest(request.requestID)
-  }
 }

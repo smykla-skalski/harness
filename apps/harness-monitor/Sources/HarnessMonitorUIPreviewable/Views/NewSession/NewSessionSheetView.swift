@@ -342,7 +342,7 @@ struct NewSessionSheetView: View {
     // can take focus instead of the presenting window reclaiming it.
     dismiss()
     await Task.yield()
-    openWindow.openHarnessSessionWindow(sessionID: startedSession.sessionId)
+    openWindow.openHarnessDashboardAgent(.session(sessionID: startedSession.sessionId))
   }
 
   func refreshBookmarks() async {

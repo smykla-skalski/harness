@@ -80,7 +80,7 @@ public struct OpenRecentView: View {
 
   func openSession(_ sessionID: String) {
     let shouldCloseAfterPick = closeAfterPick
-    openWindow.openHarnessSessionWindow(sessionID: sessionID)
+    openWindow.openHarnessDashboardAgent(.session(sessionID: sessionID))
     guard shouldCloseAfterPick else {
       return
     }

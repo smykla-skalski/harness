@@ -35,14 +35,15 @@ extension SessionWindowFlowTests {
     )
   }
 
-  @Test("Open Recent close-after-pick uses native SwiftUI scene routing")
+  @Test("Open Recent close-after-pick routes into Dashboard")
   func openRecentCloseAfterPickUsesCurrentWindowDismiss() throws {
     let source = try previewableSourceFile(named: "Views/Sessions/OpenRecentView.swift")
 
     #expect(!source.contains("import AppKit"))
     #expect(source.contains("@Environment(\\.dismiss)"))
     #expect(source.contains("@Environment(\\.openWindow)"))
-    #expect(source.contains("openWindow.openHarnessSessionWindow"))
+    #expect(source.contains("openWindow.openHarnessDashboardAgent"))
+    #expect(!source.contains("openWindow.openHarnessSessionWindow"))
     #expect(source.contains("await Task.yield()"))
     #expect(source.contains("dismiss()"))
     #expect(!source.contains("OpenRecentSessionLaunchHandoff"))
@@ -57,7 +58,7 @@ extension SessionWindowFlowTests {
     #expect(!source.contains("openWindow(id: HarnessMonitorWindowID.openRecent)"))
   }
 
-  @Test("New Session success dismisses first and then opens the created session window")
+  @Test("New Session success dismisses first and then routes into Dashboard")
   func newSessionSuccessUsesSwiftUIWindowRouting() throws {
     let source = try previewableSourceFile(named: "Views/NewSession/NewSessionSheetView.swift")
 
@@ -66,7 +67,7 @@ extension SessionWindowFlowTests {
     #expect(source.contains("@Environment(\\.openWindow)"))
     #expect(
       source.contains(
-        "openWindow.openHarnessSessionWindow(sessionID: startedSession.sessionId)"
+        "openWindow.openHarnessDashboardAgent(.session(sessionID: startedSession.sessionId))"
       )
     )
     #expect(source.contains("await Task.yield()"))
@@ -114,7 +115,8 @@ extension SessionWindowFlowTests {
     #expect(scenesSource.contains(".commandsRemoved()"))
     #expect(sceneContentSource.contains("SessionWindowTabbing(role: .dashboard)"))
     #expect(commandsSource.contains("@Environment(\\.openWindow)"))
-    #expect(commandsSource.contains("openHarnessSessionWindow"))
+    #expect(commandsSource.contains("openHarnessDashboardAgent"))
+    #expect(!commandsSource.contains("openHarnessSessionWindow"))
     #expect(rootSource.contains("SessionWindowTabbing("))
     #expect(rootSource.contains("role: .session"))
     #expect(rootSource.contains("private var hostsSharedShellPresentation"))
@@ -261,13 +263,33 @@ extension SessionWindowFlowTests {
     #expect(!settingsSceneSource.contains("allowsWindowRestoration ? .automatic : .disabled"))
   }
 
-  @Test("Decision routing reuses an already open session window")
-  func decisionRoutingReusesAnAlreadyOpenSessionWindow() throws {
-    let source = try previewableSourceFile(named: "Support/SessionWindowOpenAction.swift")
+  @Test("Supported navigation paths do not open Session windows")
+  func supportedNavigationPathsDoNotOpenSessionWindows() throws {
+    let roots = [
+      repoRoot().appendingPathComponent("apps/harness-monitor/Sources/HarnessMonitor"),
+      repoRoot().appendingPathComponent(
+        "apps/harness-monitor/Sources/HarnessMonitorUIPreviewable"
+      ),
+    ]
+    let allowedSuffixes = Set([
+      "App/HarnessMonitorApp+InitialWindowRouting.swift",
+      "App/HarnessMonitorPerfDriver+Scenarios.swift",
+      "Support/SessionWindowOpenAction.swift",
+    ])
+    var offenders: [String] = []
+    for root in roots {
+      let enumerator = try #require(
+        FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil)
+      )
+      for case let fileURL as URL in enumerator where fileURL.pathExtension == "swift" {
+        let source = try String(contentsOf: fileURL, encoding: .utf8)
+        guard source.contains("openHarnessSessionWindow") else { continue }
+        guard !allowedSuffixes.contains(where: { fileURL.path.hasSuffix($0) }) else { continue }
+        offenders.append(fileURL.path)
+      }
+    }
 
-    #expect(source.contains("store.openSessionWindowIDsSnapshot.contains(sessionID)"))
-    #expect(source.contains("NSApplication.shared.activate()"))
-    #expect(source.contains("openHarnessSessionWindow(sessionID: sessionID)"))
+    #expect(offenders.isEmpty)
   }
 
   @Test("Session inspector divider remains SwiftUI native")

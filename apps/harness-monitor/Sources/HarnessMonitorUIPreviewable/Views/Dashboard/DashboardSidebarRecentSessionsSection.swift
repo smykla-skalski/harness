@@ -89,6 +89,6 @@ private struct DashboardSidebarRecentSessionRow: View {
   }
 
   private func openSessionWindow() {
-    openWindow.openHarnessSessionWindow(sessionID: session.sessionId)
+    openWindow.openHarnessDashboardAgent(.session(sessionID: session.sessionId))
   }
 }

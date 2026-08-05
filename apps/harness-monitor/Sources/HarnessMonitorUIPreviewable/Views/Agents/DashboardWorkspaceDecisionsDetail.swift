@@ -8,7 +8,7 @@ struct DashboardWorkspaceDecisionsDetail: View {
   let bucket: DashboardDecisionWorkspaceBucket
 
   var body: some View {
-    ScrollView {
+    DashboardDecisionScrollView(store: store, decisionIDs: Set(bucket.items.map(\.id))) {
       VStack(alignment: .leading, spacing: 20) {
         header
         DashboardAcpSection(title: countTitle) {

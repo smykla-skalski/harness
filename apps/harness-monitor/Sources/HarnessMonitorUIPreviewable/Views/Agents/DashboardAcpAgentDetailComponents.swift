@@ -97,6 +97,7 @@ struct DashboardAcpPermissionCard: View {
   }
 
   var body: some View {
+    let actions = payload.suggestedActions()
     DashboardAcpSection(title: permissionTitle) {
       Text("This request remains pending until the daemon accepts a resolution")
         .scaledFont(.callout)
@@ -125,7 +126,7 @@ struct DashboardAcpPermissionCard: View {
       )
       HStack {
         Spacer()
-        ForEach(payload.suggestedActions()) { action in
+        ForEach(actions) { action in
           Button(
             action.title,
             role: AcpPermissionDecisionActionID.isDenyAction(action.id) ? .destructive : nil
@@ -135,9 +136,16 @@ struct DashboardAcpPermissionCard: View {
           .disabled(
             isBusy || payload.isActionDisabled(action.id, resolutionState: resolutionState)
           )
+          .dashboardPrimaryDecisionActionFocus(
+            store: store,
+            decisionID: payload.decisionID,
+            isPrimaryAction: action.id
+              == DashboardDecisionActionFocusPolicy.primaryActionID(in: actions)
+          )
         }
       }
     }
+    .id(payload.decisionID)
   }
 
   private var permissionTitle: String {
