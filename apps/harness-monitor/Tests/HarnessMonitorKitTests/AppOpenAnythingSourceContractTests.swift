@@ -31,6 +31,16 @@ struct AppOpenAnythingSourceContractTests {
     )
     let appSource = try harnessSourceFile(named: "App/HarnessMonitorApp.swift")
     let hostSource = try harnessSourceFile(named: "App/HarnessMonitorApp+OpenAnything.swift")
+    let presenterStart = try #require(
+      hostSource.range(of: "func presentOpenAnythingPaletteScoped")
+    )
+    let presenterEnd = try #require(
+      hostSource.range(
+        of: "\n}\n\nextension HarnessMonitorApp {",
+        range: presenterStart.lowerBound..<hostSource.endIndex
+      )
+    )
+    let presenterSource = String(hostSource[presenterStart.lowerBound..<presenterEnd.lowerBound])
     let sessionSource = try previewableSourceFile(named: "Views/Sessions/SessionWindowView.swift")
     let settingsSource = try previewableSourceFile(
       named: "Views/Settings/SettingsGeneralSection.swift"
@@ -86,6 +96,21 @@ struct AppOpenAnythingSourceContractTests {
     #expect(appSource.contains("OpenAnythingPaletteWindowController"))
     #expect(hostSource.contains("let controller = appOpenAnythingPaletteController"))
     #expect(hostSource.contains("controller.toggle("))
+    #expect(hostSource.contains("targetWindowID: activeWindowID"))
+    #expect(panelSource.contains("targetWindowID: targetWindowID"))
+    #expect(panelSource.contains("presentationTargetWindow"))
+    #expect(panelSource.contains("presentationTargetCanHostSharedSheet"))
+    #expect(panelSource.contains("targetWindow.makeKey()"))
+    #expect(panelSource.contains("targetWindow.isOnActiveSpace"))
+    #expect(panelSource.contains("panel.orderOut(nil)"))
+    #expect(!panelSource.contains("panel.resignKey()"))
+    // The panel joins every Space directly. Presenting it must not activate a
+    // Dashboard window, because AppKit would switch to that window's Space.
+    #expect(panelSource.contains(".canJoinAllSpaces"))
+    #expect(!presenterSource.contains("openWindow"))
+    #expect(!presenterSource.contains("activate("))
+    #expect(!presenterSource.contains("makeKeyAndOrderFront"))
+    #expect(hostSource.contains("activateHarnessIfNeeded(for: step)"))
     #expect(hostSource.contains("struct HarnessMonitorOpenAnythingExecutorBinder: ViewModifier"))
     // No other view tree mounts the palette directly.
     #expect(!sessionSource.contains("OpenAnythingPaletteView("))

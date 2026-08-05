@@ -20,9 +20,8 @@ extension HarnessMonitorApp {
   func presentOpenAnythingPaletteScoped(to scope: OpenAnythingDomain?) {
     let controller = appOpenAnythingPaletteController
     // If the palette is already presented, Cmd+K is a toggle-off. Bail
-    // immediately - recomputing window state and surfacing dashboard from
-    // here resigns the panel's key status and the resignKey callback
-    // races the toggle into a re-show.
+    // immediately so the resignKey callback cannot race the toggle into a
+    // re-show.
     if controller.model.isPresented {
       controller.hide()
       return
@@ -40,16 +39,8 @@ extension HarnessMonitorApp {
     let restore = UserDefaults.standard.bool(
       forKey: OpenAnythingPreferencesDefaults.restoreLastQueryKey
     )
-    // Surface dashboard only if no Monitor scene is key AND the palette
-    // panel is not itself key. After an alpha-hide cycle the panel stays
-    // ordered front + key, but `openAnythingTargetWindowID()` does not
-    // match it; calling `openHarnessDashboardWindow` in that state opens
-    // dashboard for no user-visible reason and slows the show pipeline.
-    if activeWindowID == nil && !controller.isPanelKey {
-      openWindow.openHarnessDashboardWindow()
-      focusDashboardWindowIfPossible()
-    }
     controller.toggle(
+      targetWindowID: activeWindowID,
       scope: resolvedScope,
       contextDomain: resolvedContextDomain,
       restoreLastQuery: restore
@@ -117,6 +108,17 @@ extension HarnessMonitorApp {
       timeline: appStore.timeline
     )
   }
+}
+
+func openAnythingRequiresDashboardPresentationHost(
+  targetWindowID: String?,
+  presentationTargetCanHostSharedSheet: Bool
+) -> Bool {
+  guard let targetWindowID else { return true }
+  let isSharedSheetHost =
+    targetWindowID == HarnessMonitorWindowID.dashboard
+    || targetWindowID.hasPrefix("session-")
+  return !isSharedSheetHost || !presentationTargetCanHostSharedSheet
 }
 
 private enum OpenAnythingAppServiceSettings {
@@ -187,7 +189,7 @@ struct HarnessMonitorOpenAnythingExecutorBinder: ViewModifier {
   }
 
   private func executeRoutingStep(_ step: OpenAnythingRoutingStep, openWindow: OpenWindowAction) {
-    guard !executePresentationStep(step) else { return }
+    guard !executePresentationStep(step, openWindow: openWindow) else { return }
     guard !executeCommandStep(step) else { return }
     switch step {
     case .openWindow(let target):
@@ -209,6 +211,7 @@ struct HarnessMonitorOpenAnythingExecutorBinder: ViewModifier {
       .revealInFinder:
       break
     }
+    activateHarnessIfNeeded(for: step)
   }
 
   private func executeCommandStep(_ step: OpenAnythingRoutingStep) -> Bool {
@@ -232,11 +235,18 @@ struct HarnessMonitorOpenAnythingExecutorBinder: ViewModifier {
     return true
   }
 
-  private func executePresentationStep(_ step: OpenAnythingRoutingStep) -> Bool {
+  private func executePresentationStep(
+    _ step: OpenAnythingRoutingStep,
+    openWindow: OpenWindowAction
+  ) -> Bool {
     switch step {
     case .presentNewSessionSheet:
+      openDashboardPresentationHostIfNeeded(openWindow: openWindow)
+      activateHarnessIfNeeded(for: step)
       store.presentedSheet = .newSession
     case .presentNewTaskSheet:
+      openDashboardPresentationHostIfNeeded(openWindow: openWindow)
+      activateHarnessIfNeeded(for: step)
       store.requestCreateTaskSheet()
     case .attachExternalSession:
       store.requestAttachExternalSession()
@@ -246,6 +256,28 @@ struct HarnessMonitorOpenAnythingExecutorBinder: ViewModifier {
       return false
     }
     return true
+  }
+
+  private func activateHarnessIfNeeded(for step: OpenAnythingRoutingStep) {
+    guard openAnythingRoutingStepRequiresApplicationActivation(step) else { return }
+    guard !NSApplication.shared.isActive else { return }
+    if #available(macOS 14.0, *) {
+      NSApplication.shared.activate()
+    } else {
+      NSApplication.shared.activate(ignoringOtherApps: true)
+    }
+  }
+
+  private func openDashboardPresentationHostIfNeeded(openWindow: OpenWindowAction) {
+    guard
+      openAnythingRequiresDashboardPresentationHost(
+        targetWindowID: controller.model.targetWindowID,
+        presentationTargetCanHostSharedSheet: controller.presentationTargetCanHostSharedSheet
+      )
+    else {
+      return
+    }
+    openWindow.openHarnessDashboardWindow()
   }
 
   private func openWindowTarget(_ target: OpenAnythingWindowTarget, openWindow: OpenWindowAction) {

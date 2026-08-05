@@ -22,8 +22,16 @@ private struct AttachExternalSessionImporter: ViewModifier {
       ) { result in
         Task { await store.handleAttachSessionPicker(result) }
       }
-      .onChange(of: store.attachSessionRequest) { _, _ in
-        showImporter = true
+      .onAppear {
+        presentImporterIfRequested()
       }
+      .onChange(of: store.attachSessionRequest) { _, _ in
+        presentImporterIfRequested()
+      }
+  }
+
+  private func presentImporterIfRequested() {
+    guard store.consumeAttachSessionRequest() else { return }
+    showImporter = true
   }
 }

@@ -1,4 +1,3 @@
-import AppKit
 import HarnessMonitorKit
 import HarnessMonitorUIPreviewable
 import SwiftUI
@@ -134,15 +133,6 @@ extension HarnessMonitorApp {
       return identifier
     }
     return nil
-  }
-
-  func focusDashboardWindowIfPossible() {
-    if #available(macOS 14.0, *) {
-      NSApplication.shared.activate()
-    } else {
-      NSApplication.shared.activate(ignoringOtherApps: true)
-    }
-    DashboardWindowAppKitRegistry.shared.window?.makeKeyAndOrderFront(nil)
   }
 }
 
