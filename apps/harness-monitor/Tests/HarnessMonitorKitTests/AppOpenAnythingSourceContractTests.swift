@@ -58,6 +58,9 @@ struct AppOpenAnythingSourceContractTests {
     #expect(panelSource.contains("panel?.alphaValue = 0"))
     #expect(panelSource.contains("panel.alphaValue = 1"))
     #expect(panelSource.contains("hide(reason: .windowResignedKey)"))
+    #expect(panelSource.contains("override func resignKey()"))
+    #expect(panelSource.contains("onResignKey?()"))
+    #expect(!panelSource.contains("override func resignMain()"))
     #expect(panelSource.contains("model.dismiss(reason: reason)"))
     // Presentation signpost must wrap the visible AppKit path, not only the
     // model state mutation, otherwise Instruments misses window positioning
@@ -199,7 +202,7 @@ struct AppOpenAnythingSourceContractTests {
     #expect(paletteSource.contains("endKeepingPanelOpenActivation()"))
     #expect(rowSource.contains("NSEvent.modifierFlags"))
     let panelSource = try harnessSourceFile(named: "App/OpenAnythingPaletteWindow.swift")
-    #expect(panelSource.contains("suppressesResignMainDismissal"))
+    #expect(panelSource.contains("suppressesResignKeyDismissal"))
     #expect(panelSource.contains("restorePanelAfterKeepingOpenActivation()"))
     #expect(settingsSource.contains("Cmd+Click keeps palette open"))
     #expect(settingsSource.contains("recently used palette entries rank higher"))
@@ -250,14 +253,13 @@ struct AppOpenAnythingSourceContractTests {
     #expect(!headerSource.contains(".accessibilityElement(children: .ignore)"))
   }
 
-  @Test("Global hot key registration failure clears enabled preference")
-  func globalHotKeyFailureClearsEnabledPreference() throws {
+  @Test("Global hot key registration failure preserves enabled preference")
+  func globalHotKeyFailurePreservesEnabledPreference() throws {
     let hotKeySource = try harnessSourceFile(named: "App/GlobalHotKeyController.swift")
 
-    #expect(hotKeySource.contains("OpenAnythingHotKeyDefaults.enabledKey"))
     #expect(hotKeySource.contains("guard installEventHandlerIfNeeded() else"))
     #expect(hotKeySource.contains("private func installEventHandlerIfNeeded() -> Bool"))
-    #expect(hotKeySource.contains("UserDefaults.standard.set(false"))
+    #expect(!hotKeySource.contains("UserDefaults.standard.set(false"))
     #expect(hotKeySource.contains("Failed to register Open Anything hot key"))
     #expect(hotKeySource.contains("Failed to install Open Anything hot key handler"))
   }

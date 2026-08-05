@@ -131,6 +131,6 @@ public struct OpenAnythingHotKeyDescriptor: Codable, Hashable, Sendable {
 public enum OpenAnythingHotKeyDefaults {
   public static let enabledKey = "harness.openAnything.globalHotKey.enabled"
   public static let descriptorKey = "harness.openAnything.globalHotKey.descriptor"
-  public static let enabledDefault = false
+  public static let enabledDefault = true
   public static let descriptorDefault = OpenAnythingHotKeyDescriptor.defaultValue
 }

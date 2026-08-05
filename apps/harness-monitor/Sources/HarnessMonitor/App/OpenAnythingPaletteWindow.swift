@@ -10,18 +10,18 @@ import os
 /// command palettes:
 /// https://cindori.com/developer/floating-panel
 final class OpenAnythingFloatingPanel: NSPanel {
-  /// Closure invoked when the panel resigns main (user clicked outside or
+  /// Closure invoked when the panel resigns key (user clicked outside or
   /// switched apps). The controller hooks this to drive `model.dismiss`.
-  var onResignMain: (() -> Void)?
+  var onResignKey: (() -> Void)?
 
   override var canBecomeKey: Bool { true }
   // Returning `true` here matters: SwiftUI focus state inside the panel only
   // promotes the TextField to first responder when both flags are true.
   override var canBecomeMain: Bool { true }
 
-  override func resignMain() {
-    super.resignMain()
-    onResignMain?()
+  override func resignKey() {
+    super.resignKey()
+    onResignKey?()
   }
 }
 
@@ -35,7 +35,7 @@ final class OpenAnythingPaletteWindowController: NSObject, NSWindowDelegate {
   private var executor: ((OpenAnythingHit) -> Void)?
   private var reviewPinToggle: ((String) -> Void)?
   private var panel: OpenAnythingFloatingPanel?
-  private var suppressesResignMainDismissal = false
+  private var suppressesResignKeyDismissal = false
   private var lastMeasuredContentHeight: CGFloat?
   /// Raised while the controller is itself moving or resizing the panel so the
   /// `NSWindow.didMoveNotification` observer does not mistake a programmatic
@@ -197,7 +197,7 @@ final class OpenAnythingPaletteWindowController: NSObject, NSWindowDelegate {
   }
 
   func beginKeepingPanelOpenActivation() {
-    suppressesResignMainDismissal = true
+    suppressesResignKeyDismissal = true
   }
 
   func endKeepingPanelOpenActivation() {
@@ -205,7 +205,7 @@ final class OpenAnythingPaletteWindowController: NSObject, NSWindowDelegate {
     Task { @MainActor [weak self] in
       await Task.yield()
       self?.restorePanelAfterKeepingOpenActivation()
-      self?.suppressesResignMainDismissal = false
+      self?.suppressesResignKeyDismissal = false
     }
   }
 
@@ -261,10 +261,10 @@ final class OpenAnythingPaletteWindowController: NSObject, NSWindowDelegate {
     // aligned with the content's actual bounds.
     panel.hasShadow = false
     panel.contentView = makeHostingView()
-    panel.onResignMain = { [weak self] in
-      guard self?.suppressesResignMainDismissal != true else { return }
-      // resignMain fires when the user clicks elsewhere in the app or
-      // switches apps. Dismiss like Spotlight.
+    panel.onResignKey = { [weak self] in
+      guard self?.suppressesResignKeyDismissal != true else { return }
+      // Key loss covers both clicks elsewhere and app deactivation, matching
+      // `hidesOnDeactivate` so model state cannot outlive panel visibility.
       self?.hide(reason: .windowResignedKey)
     }
     panel.delegate = self

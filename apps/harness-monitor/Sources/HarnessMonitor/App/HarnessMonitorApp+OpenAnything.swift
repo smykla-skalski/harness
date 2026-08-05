@@ -21,7 +21,7 @@ extension HarnessMonitorApp {
     let controller = appOpenAnythingPaletteController
     // If the palette is already presented, Cmd+K is a toggle-off. Bail
     // immediately - recomputing window state and surfacing dashboard from
-    // here resigns the panel's main status and the resignMain callback
+    // here resigns the panel's key status and the resignKey callback
     // races the toggle into a re-show.
     if controller.model.isPresented {
       controller.hide()

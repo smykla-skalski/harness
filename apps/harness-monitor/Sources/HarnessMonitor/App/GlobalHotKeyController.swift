@@ -1,5 +1,4 @@
 import Carbon
-import Foundation
 import HarnessMonitorKit
 
 @MainActor
@@ -73,7 +72,6 @@ final class GlobalHotKeyController {
     )
     if status != noErr {
       eventHandlerRef = nil
-      UserDefaults.standard.set(false, forKey: OpenAnythingHotKeyDefaults.enabledKey)
       HarnessMonitorLogger.store.warning(
         "Failed to install Open Anything hot key handler: \(status, privacy: .public)"
       )
@@ -97,7 +95,6 @@ final class GlobalHotKeyController {
     } else {
       installedDescriptor = nil
       hotKeyRef = nil
-      UserDefaults.standard.set(false, forKey: OpenAnythingHotKeyDefaults.enabledKey)
       HarnessMonitorLogger.store.warning(
         "Failed to register Open Anything hot key: \(status, privacy: .public)"
       )

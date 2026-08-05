@@ -84,6 +84,33 @@ final class AppOpenAnythingPaletteWindowTests: XCTestCase {
   }
 
   @MainActor
+  func testResigningKeyDismissesPresentedModel() async {
+    let previousAllowsAutomaticWindowTabbing = NSWindow.allowsAutomaticWindowTabbing
+    NSWindow.allowsAutomaticWindowTabbing = false
+    closeExistingPalettePanels()
+    defer {
+      closeExistingPalettePanels()
+      NSWindow.allowsAutomaticWindowTabbing = previousAllowsAutomaticWindowTabbing
+    }
+
+    let controller = await makeController()
+    controller.show(scope: nil, contextDomain: nil, restoreLastQuery: false)
+    drainMainRunLoop()
+
+    guard let panel = palettePanel else {
+      XCTFail("Expected Open Anything panel to exist")
+      return
+    }
+
+    XCTAssertTrue(controller.model.isPresented)
+    panel.resignKey()
+
+    XCTAssertFalse(controller.model.isPresented)
+    XCTAssertEqual(panel.alphaValue, 0, accuracy: 0.01)
+    XCTAssertTrue(panel.ignoresMouseEvents)
+  }
+
+  @MainActor
   private func makeController() async -> OpenAnythingPaletteWindowController {
     let model = Self.makeModel()
     await model.replaceCorpus(Self.sampleRecords)

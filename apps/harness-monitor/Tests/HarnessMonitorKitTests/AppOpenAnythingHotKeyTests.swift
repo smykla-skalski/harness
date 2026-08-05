@@ -4,9 +4,9 @@ import Testing
 
 @Suite("AppOpenAnything hot key descriptor")
 struct AppOpenAnythingHotKeyTests {
-  @Test("Global hot key is disabled by default")
-  func globalHotKeyIsDisabledByDefault() {
-    #expect(OpenAnythingHotKeyDefaults.enabledDefault == false)
+  @Test("Global hot key is enabled by default")
+  func globalHotKeyIsEnabledByDefault() {
+    #expect(OpenAnythingHotKeyDefaults.enabledDefault == true)
     #expect(OpenAnythingHotKeyDefaults.descriptorDefault == .defaultValue)
   }
 
