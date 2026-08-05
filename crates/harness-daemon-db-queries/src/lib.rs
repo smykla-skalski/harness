@@ -28,6 +28,7 @@ mod diagnostics;
 mod rebuild;
 mod review_writes;
 mod runtime;
+mod session_data;
 mod signals;
 mod stored_timeline_entry;
 mod summaries;
@@ -66,6 +67,7 @@ pub use runtime::{
     AgentTuiLiveRefreshState, RuntimeSnapshotQueries, codex_mode_as_str, codex_mode_from_str,
     codex_status_as_str, codex_status_from_str,
 };
+pub use session_data::SessionCoreQueries;
 pub use signals::{SignalIndexQueries, derive_effective_signal_status};
 pub use stored_timeline_entry::StoredTimelineEntry;
 pub use summaries::SessionSummaryQueries;

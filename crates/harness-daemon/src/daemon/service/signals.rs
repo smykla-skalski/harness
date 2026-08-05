@@ -28,7 +28,7 @@ impl SignalStorage for DaemonDbOwnedHandle {
         &self,
         session_id: &str,
     ) -> Result<Option<SessionState>, CliError> {
-        <DaemonDb as SessionCoreQueries>::load_session_state_for_mutation(&self.0, session_id)
+        <DaemonDb as SessionMutationRefresh>::load_session_state_for_mutation(&self.0, session_id)
     }
 
     fn load_session_state(&self, session_id: &str) -> Result<Option<SessionState>, CliError> {

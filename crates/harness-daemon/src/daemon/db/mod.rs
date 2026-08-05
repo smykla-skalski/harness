@@ -49,7 +49,7 @@ pub(crate) use harness_daemon_db_core::i64_from_u64;
 #[allow(unused_imports)]
 pub(crate) use harness_daemon_db_core::usize_from_i64;
 pub use harness_daemon_db_core::{DaemonDb, SCHEMA_VERSION};
-pub(crate) use harness_daemon_db_core::{canonical_db_unavailable, db_error, u64_from_i64};
+pub(crate) use harness_daemon_db_core::{canonical_db_unavailable, db_error};
 #[allow(unused_imports)]
 pub(crate) use harness_daemon_db_queries::DaemonDbActivityFold;
 mod async_agent_turn_runs;
@@ -175,7 +175,8 @@ pub(crate) use task_board::{
     status_request as remote_controller_status_request,
 };
 mod session_data;
-pub use session_data::SessionCoreQueries;
+pub use harness_daemon_db_queries::SessionCoreQueries;
+pub(crate) use session_data::SessionMutationRefresh;
 mod signals;
 pub use harness_daemon_db_queries::SessionSummaryQueries;
 pub use harness_daemon_db_queries::SignalIndexQueries;

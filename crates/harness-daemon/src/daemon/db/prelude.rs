@@ -23,7 +23,7 @@ pub(crate) use super::{
     AsyncRuntimeSnapshotQueries, AsyncSessionStateQueries, AsyncSessionSummaryQueries,
     AsyncSessionWriteQueries, AsyncSignalIndexQueries, AsyncSignalReadQueries,
     AsyncTimelineWindowQueries, DaemonDbOpen, RuntimeSnapshotQueries, SessionCoreQueries,
-    SessionSummaryQueries, SessionWriteQueries, SignalIndexQueries,
+    SessionMutationRefresh, SessionSummaryQueries, SessionWriteQueries, SignalIndexQueries,
 };
 // `ChangeTrackingQueries` (the sync counterpart) is deliberately not
 // re-exported here: every current caller outside `db/` already reaches it
