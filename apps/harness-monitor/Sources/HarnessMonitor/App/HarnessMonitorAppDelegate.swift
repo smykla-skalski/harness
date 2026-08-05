@@ -21,6 +21,7 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
   private var signalSources: [DispatchSourceSignal] = []
   private var terminationTask: Task<Void, Never>?
   private var store: HarnessMonitorStore?
+  private weak var globalHotKeyController: GlobalHotKeyController?
   private let accountObserver = CloudKitAccountChangeObserver(
     handler: CloudKitAccountChangeHandler.live()
   )
@@ -89,6 +90,10 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
       store?.updateMCPStatus(status)
     }
     store.updateMCPStatus(mcpStartupController.statusSnapshot)
+  }
+
+  func bind(globalHotKeyController: GlobalHotKeyController) {
+    self.globalHotKeyController = globalHotKeyController
   }
 
   private func disableAnimationsForUITesting() {
@@ -174,6 +179,7 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
   }
 
   func applicationDidBecomeActive(_ notification: Notification) {
+    globalHotKeyController?.retryRegistrationIfNeeded()
     let body: () -> Void = { [self] in
       guard launchMode == .live, let store else {
         return

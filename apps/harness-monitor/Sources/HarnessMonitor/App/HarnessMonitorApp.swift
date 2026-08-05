@@ -160,7 +160,8 @@ struct HarnessMonitorApp: App {
     _openAnythingPaletteController = State(
       initialValue: OpenAnythingPaletteWindowController(model: coordinator.palette)
     )
-    _globalHotKeyController = State(initialValue: GlobalHotKeyController())
+    let globalHotKeyController = GlobalHotKeyController()
+    _globalHotKeyController = State(initialValue: globalHotKeyController)
     _automationPolicyRuntimeService = State(initialValue: AutomationPolicyRuntimeService())
     _clipboardAutomationPolicyService = State(initialValue: ClipboardAutomationPolicyService())
     _settingsSelectedSection = State(
@@ -170,6 +171,7 @@ struct HarnessMonitorApp: App {
       )
     )
     delegate.bind(store: store)
+    delegate.bind(globalHotKeyController: globalHotKeyController)
     mobileRelayRuntime?.start()
   }
 

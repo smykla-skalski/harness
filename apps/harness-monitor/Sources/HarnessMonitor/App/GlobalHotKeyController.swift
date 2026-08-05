@@ -3,6 +3,17 @@ import HarnessMonitorKit
 
 @MainActor
 final class GlobalHotKeyController {
+  typealias InstallEventHandlerOperation = (
+    EventHandlerUPP,
+    UnsafeMutableRawPointer,
+    UnsafeMutablePointer<EventHandlerRef?>
+  ) -> OSStatus
+  typealias RegisterEventHotKeyOperation = (
+    OpenAnythingHotKeyDescriptor,
+    EventHotKeyID,
+    UnsafeMutablePointer<EventHotKeyRef?>
+  ) -> OSStatus
+
   // Carbon callback storage. The Carbon event handler runs on its own thread
   // and dereferences the controller via an `Unmanaged.passUnretained` pointer,
   // so the deinit cleanup must be safe to run from outside the main actor.
@@ -12,7 +23,40 @@ final class GlobalHotKeyController {
   nonisolated(unsafe) private var hotKeyRef: EventHotKeyRef?
   nonisolated(unsafe) private var eventHandlerRef: EventHandlerRef?
   private var installedDescriptor: OpenAnythingHotKeyDescriptor?
+  private var requestedDescriptor: OpenAnythingHotKeyDescriptor?
   private var onInvoke: (@MainActor @Sendable () -> Void)?
+  private let installEventHandlerOperation: InstallEventHandlerOperation
+  private let registerEventHotKeyOperation: RegisterEventHotKeyOperation
+
+  init(
+    installEventHandler: @escaping InstallEventHandlerOperation = { handler, userData, ref in
+      var eventType = EventTypeSpec(
+        eventClass: OSType(kEventClassKeyboard),
+        eventKind: UInt32(kEventHotKeyPressed)
+      )
+      return InstallEventHandler(
+        GetApplicationEventTarget(),
+        handler,
+        1,
+        &eventType,
+        userData,
+        ref
+      )
+    },
+    registerEventHotKey: @escaping RegisterEventHotKeyOperation = { descriptor, hotKeyID, ref in
+      RegisterEventHotKey(
+        descriptor.keyCode,
+        descriptor.modifiers.carbonFlags,
+        hotKeyID,
+        GetApplicationEventTarget(),
+        0,
+        ref
+      )
+    }
+  ) {
+    installEventHandlerOperation = installEventHandler
+    registerEventHotKeyOperation = registerEventHotKey
+  }
 
   deinit {
     // Tear down Carbon registrations inline to avoid leaking the event handler
@@ -37,18 +81,30 @@ final class GlobalHotKeyController {
   ) {
     self.onInvoke = onInvoke
     guard enabled, descriptor.isValid else {
+      requestedDescriptor = nil
       unregisterHotKey()
       installedDescriptor = nil
       return
     }
+    requestedDescriptor = descriptor
+    registerRequestedHotKeyIfNeeded()
+  }
+
+  func retryRegistrationIfNeeded() {
+    guard installedDescriptor == nil else { return }
+    registerRequestedHotKeyIfNeeded()
+  }
+
+  private func registerRequestedHotKeyIfNeeded() {
+    guard let requestedDescriptor else { return }
     guard installEventHandlerIfNeeded() else {
       unregisterHotKey()
       installedDescriptor = nil
       return
     }
-    guard installedDescriptor != descriptor else { return }
+    guard installedDescriptor != requestedDescriptor else { return }
     unregisterHotKey()
-    registerHotKey(descriptor)
+    registerHotKey(requestedDescriptor)
   }
 
   func handleHotKey() {
@@ -57,16 +113,9 @@ final class GlobalHotKeyController {
 
   private func installEventHandlerIfNeeded() -> Bool {
     guard eventHandlerRef == nil else { return true }
-    var eventType = EventTypeSpec(
-      eventClass: OSType(kEventClassKeyboard),
-      eventKind: UInt32(kEventHotKeyPressed)
-    )
     let userData = Unmanaged.passUnretained(self).toOpaque()
-    let status = InstallEventHandler(
-      GetApplicationEventTarget(),
+    let status = installEventHandlerOperation(
       globalOpenAnythingHotKeyHandler,
-      1,
-      &eventType,
       userData,
       &eventHandlerRef
     )
@@ -82,12 +131,9 @@ final class GlobalHotKeyController {
 
   private func registerHotKey(_ descriptor: OpenAnythingHotKeyDescriptor) {
     let hotKeyID = EventHotKeyID(signature: Self.signature, id: 1)
-    let status = RegisterEventHotKey(
-      descriptor.keyCode,
-      descriptor.modifiers.carbonFlags,
+    let status = registerEventHotKeyOperation(
+      descriptor,
       hotKeyID,
-      GetApplicationEventTarget(),
-      0,
       &hotKeyRef
     )
     if status == noErr {
