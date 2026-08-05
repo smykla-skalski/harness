@@ -15,11 +15,12 @@ use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_handle::DaemonDbOwnedHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::daemon::http::{
-    AsyncDaemonDbSlot, DaemonHttpAuthMode, DaemonHttpState, ManagedAgentMutationLocks,
-    default_remote_pairing_limiter, default_remote_pairing_status_limiter,
+    DaemonHttpState, default_remote_pairing_limiter, default_remote_pairing_status_limiter,
 };
 use crate::daemon::protocol::{CodexRunMode, CodexRunSnapshot, CodexRunStatus, StreamEvent};
-use crate::daemon::websocket::ReplayBuffer;
+use crate::daemon::server_state::{
+    AsyncDaemonDbSlot, DaemonHttpAuthMode, ManagedAgentMutationLocks, ReplayBuffer,
+};
 use crate::session::types::{CURRENT_VERSION, SessionMetrics, SessionState, SessionStatus};
 
 #[tokio::test(flavor = "multi_thread")]

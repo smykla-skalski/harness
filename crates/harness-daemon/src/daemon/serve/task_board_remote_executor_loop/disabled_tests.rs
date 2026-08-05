@@ -19,12 +19,13 @@ use crate::daemon::db::{
 };
 use crate::daemon::db_handle::{AsyncDaemonDbHandle, DaemonDbOwnedHandle};
 use crate::daemon::http::{
-    AsyncDaemonDbSlot, DaemonHttpAuthMode, DaemonHttpState, ManagedAgentMutationLocks,
-    default_remote_pairing_limiter, default_remote_pairing_status_limiter,
+    DaemonHttpState, default_remote_pairing_limiter, default_remote_pairing_status_limiter,
 };
 use crate::daemon::protocol::{CodexRunSnapshot, CodexRunStatus, StreamEvent};
+use crate::daemon::server_state::{
+    AsyncDaemonDbSlot, DaemonHttpAuthMode, ManagedAgentMutationLocks, ReplayBuffer,
+};
 use crate::daemon::state::DaemonManifest;
-use crate::daemon::websocket::ReplayBuffer;
 use crate::task_board::TaskBoardRemoteAssignmentState;
 use crate::task_board::remote_wire::wire::{RemoteOfferRequest, RemoteSourceMaterial};
 
