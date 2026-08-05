@@ -1,5 +1,5 @@
 use super::*;
-use crate::daemon::db::imports::DaemonDbImports;
+use crate::daemon::db::DaemonDbImports;
 
 #[test]
 fn reconcile_imports_new_session() {

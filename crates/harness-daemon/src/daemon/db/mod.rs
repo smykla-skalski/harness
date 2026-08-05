@@ -16,6 +16,7 @@ pub(crate) use crate::agents::runtime::event::ConversationEvent;
 pub(crate) use crate::daemon::agent_tui::{
     AgentTuiSize, AgentTuiSnapshot, AgentTuiStatus, TerminalScreenSnapshot,
 };
+#[cfg(test)]
 pub(crate) use crate::daemon::index::DiscoveredProject;
 pub(crate) use crate::daemon::protocol::CodexRunSnapshot;
 #[cfg(test)]
@@ -79,7 +80,7 @@ pub(crate) use harness_daemon_db_queries::LOAD_CHANGE_TRACKING_SQL;
 pub(crate) mod conversation;
 pub use harness_daemon_db_queries::DaemonDbDiagnostics;
 pub(crate) mod imports;
-pub use imports::DaemonDbImports;
+pub use harness_daemon_db_queries::{DaemonDbImports, ImportResult, ReconcileResult};
 pub(crate) use imports::{
     prepare_runtime_transcript_resync, prepare_session_import_from_resolved, prepare_session_resync,
 };
@@ -251,21 +252,6 @@ pub(crate) struct PreparedTaskCheckpointImport {
 pub(crate) struct PreparedRuntimeTranscriptResync {
     session_id: String,
     agents: Vec<PreparedAgentTranscriptResync>,
-}
-
-/// Summary of what was imported from file-based storage.
-#[derive(Debug, Default)]
-pub struct ImportResult {
-    pub projects: usize,
-    pub sessions: usize,
-}
-
-/// Summary of background file reconciliation.
-#[derive(Debug, Default)]
-pub struct ReconcileResult {
-    pub projects: usize,
-    pub sessions_imported: usize,
-    pub sessions_skipped: usize,
 }
 
 #[cfg(test)]
