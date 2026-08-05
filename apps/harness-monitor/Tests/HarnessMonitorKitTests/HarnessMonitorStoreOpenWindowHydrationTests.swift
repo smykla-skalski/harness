@@ -100,7 +100,7 @@ final class HarnessMonitorStoreOpenWindowHydrationTests: XCTestCase {
     XCTAssertEqual(cachedDetail?.detail.session.sessionId, session.sessionId)
   }
 
-  func testHydrationKeepsNewSessionInRestartRestorePlan() async throws {
+  func testHydrationKeepsNewSessionAvailableAfterRestart() async throws {
     let harness = try PersistenceIntegrationTestHarness()
     let existingSession = makeSession(.unhydratedActive)
     let newSession = makeSession(.freshlyCreatedActive)
@@ -115,7 +115,6 @@ final class HarnessMonitorStoreOpenWindowHydrationTests: XCTestCase {
       detailsByID: [newSession.sessionId: newDetail],
       timelinesBySessionID: [newSession.sessionId: []]
     )
-    let cacheService = SessionCacheService(modelContainer: harness.container)
     let store = HarnessMonitorStore(
       daemonController: RecordingDaemonController(client: client),
       voiceCapture: NativeVoiceCaptureService(),
@@ -128,37 +127,13 @@ final class HarnessMonitorStoreOpenWindowHydrationTests: XCTestCase {
 
     await store.ensureSessionDetailHydratedForOpenWindow(sessionID: newSession.sessionId)
     await store.flushPendingCacheWrite()
-    _ = await cacheService.replaceSessionWindowsOpenAtQuit(
-      snapshot: HarnessMonitorStore.SessionWindowQuitSnapshot(
-        sessionIDs: Set([existingSession.sessionId, newSession.sessionId]),
-        groupings: [
-          HarnessMonitorStore.SessionTabGroupSnapshot(
-            ordinal: 0,
-            sessionIDs: [existingSession.sessionId, newSession.sessionId],
-            foregroundSessionID: existingSession.sessionId
-          )
-        ]
-      )
-    )
 
     let relaunchedStore = harness.makeStore()
     await relaunchedStore.prepareOpenRecentSessions()
 
-    let restorePlan = await relaunchedStore.launchWindowRestorePlan()
-
     XCTAssertEqual(
-      restorePlan.sessionIDs,
-      [existingSession.sessionId, newSession.sessionId]
-    )
-    XCTAssertEqual(
-      restorePlan.tabGroupings,
-      [
-        HarnessMonitorStore.SessionTabGroupSnapshot(
-          ordinal: 0,
-          sessionIDs: [existingSession.sessionId, newSession.sessionId],
-          foregroundSessionID: existingSession.sessionId
-        )
-      ]
+      Set(relaunchedStore.sessions.map(\.sessionId)),
+      Set([existingSession.sessionId, newSession.sessionId])
     )
   }
 }

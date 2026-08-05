@@ -23,7 +23,6 @@ public final class HarnessMonitorStore {
   @ObservationIgnored let acpTimelineWorker = AcpTimelineWorker()
   @ObservationIgnored let acpRuntimeWorker = AcpRuntimeWorker()
   @ObservationIgnored let sessionSnapshotWorker = SessionSnapshotWorker()
-  @ObservationIgnored let launchWindowRestoreWorker = LaunchWindowRestoreWorker()
   @ObservationIgnored let sessionCacheWriteWorker = SessionCacheWriteWorker()
   @ObservationIgnored let timelineWindowWorker = TimelineWindowWorker()
   @ObservationIgnored let sessionWindowPresentationWorker = SessionWindowPresentationWorker()
@@ -36,8 +35,6 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var acpRuntimeStateGeneration: UInt64 = 0
   @ObservationIgnored var cachedNullActionHandler: NullDecisionActionHandler?
   @ObservationIgnored var openSessionWindowsByID: [ObjectIdentifier: String] = [:]
-  @ObservationIgnored var pendingSessionWindowTerminationSnapshot: Set<String>?
-  @ObservationIgnored var pendingSessionWindowQuitSnapshot: SessionWindowQuitSnapshot?
   @ObservationIgnored var isSuppressingNotificationHistoryToast = false
   @ObservationIgnored var suppressedNotificationHistoryToastIDs: Set<UUID> = []
   @ObservationIgnored var dependencyFilesViewModels: [String: ReviewFilesViewModel] = [:]

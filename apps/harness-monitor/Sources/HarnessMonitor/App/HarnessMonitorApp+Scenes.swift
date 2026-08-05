@@ -47,7 +47,7 @@ extension HarnessMonitorApp {
     .windowToolbarStyle(.unified)
     .defaultSize(width: mainWindowDefaultSize.width, height: mainWindowDefaultSize.height)
     .windowResizability(.contentMinSize)
-    .restorationBehavior(allowsWindowRestoration ? .automatic : .disabled)
+    .restorationBehavior(.disabled)
     .defaultLaunchBehavior(shouldHandleInitialWindowRouting ? .suppressed : .automatic)
     .commandsRemoved()
   }

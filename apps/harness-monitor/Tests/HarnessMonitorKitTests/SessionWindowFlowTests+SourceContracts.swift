@@ -83,8 +83,6 @@ extension SessionWindowFlowTests {
     let scenesSource = try harnessSourceFile(named: "App/HarnessMonitorApp+Scenes.swift")
     let sceneContentSource = try harnessSourceFile(
       named: "App/HarnessMonitorApp+SceneContent.swift")
-    let routerSource = try harnessSourceFile(named: "App/HarnessMonitorInitialWindowRouter.swift")
-    let replayerSource = try harnessSourceFile(named: "App/SessionWindowTabGroupReplayer.swift")
     let rootSource = try harnessSourceFile(named: "App/SessionWindowRootView.swift")
     let commandsSource = try harnessSourceFile(named: "Commands/WindowMenuCommands.swift")
     let tabbingAccessorPath = harnessSourceURL(named: "App/SessionWindowTabbing.swift").path
@@ -112,6 +110,7 @@ extension SessionWindowFlowTests {
         ".restorationBehavior(allowsWindowRestoration ? .automatic : .disabled)"
       )
     )
+    #expect(scenesSource.contains(".restorationBehavior(.disabled)"))
     #expect(scenesSource.contains(".commandsRemoved()"))
     #expect(sceneContentSource.contains("SessionWindowTabbing(role: .dashboard)"))
     #expect(commandsSource.contains("@Environment(\\.openWindow)"))
@@ -149,9 +148,6 @@ extension SessionWindowFlowTests {
     #expect(settingsSource.contains("settingsToolbarSeparatorSuppressed"))
     #expect(settingsSource.contains("titlebarAppearsTransparent: true"))
     #expect(settingsSource.contains(".harnessMonitorBackgroundExtensionEffect()"))
-    #expect(routerSource.contains("SessionWindowTabGroupReplayer.replay("))
-    #expect(replayerSource.contains("let tabReadyWindows = grouping.sessionIDs.compactMap"))
-    #expect(replayerSource.contains("isWindowTabReady"))
     #expect(tabbingSupportSource.contains("tabbingIdentifier"))
     #expect(tabbingSupportSource.contains("shouldPreferTabbedOpen"))
     #expect(tabbingSupportSource.contains("visibleTabTargetWindow"))
@@ -200,15 +196,7 @@ extension SessionWindowFlowTests {
         "openWindow.openHarnessDashboardWindow(mergeIfNeeded: mergeIfNeeded)"
       )
     )
-    #expect(
-      routingSource.contains(
-        """
-        openWindow.openHarnessSessionWindow(
-                  sessionID: sessionID,
-                  mergeIfNeeded: mergeIfNeeded
-        """
-      )
-    )
+    #expect(routingSource.contains("openWindow.openHarnessSessionWindow(sessionID: sessionID)"))
     #expect(menuBarSource.contains("openWindow.openHarnessDashboardWindow()"))
     #expect(unavailableSource.contains("openWindow.openHarnessDashboardWindow()"))
   }
@@ -234,18 +222,42 @@ extension SessionWindowFlowTests {
     #expect(modifierSource.contains("DashboardWindowLifecycleTracker.shared.markOpen()"))
     #expect(modifierSource.contains("DashboardWindowLifecycleTracker.shared.markClosed()"))
     #expect(trackerSource.contains("static let openAtQuitKey"))
-    #expect(trackerSource.contains("static let tabbedSessionIDsAtQuitKey"))
-    #expect(trackerSource.contains("static let wasForegroundTabAtQuitKey"))
     #expect(trackerSource.contains("func flushOpenAtQuit("))
-    #expect(trackerSource.contains("static func wasOpenAtQuit("))
-    #expect(trackerSource.contains("static func tabRestoreStateAtQuit("))
+    #expect(trackerSource.contains("static func restoreStateAtQuit("))
     #expect(
       delegateSource.contains(
         "DashboardWindowLifecycleTracker.shared.flushOpenAtQuit()"
       )
     )
-    #expect(routerSource.contains("DashboardWindowLifecycleTracker.wasOpenAtQuit()"))
-    #expect(routerSource.contains("DashboardWindowLifecycleTracker.tabRestoreStateAtQuit()"))
+    #expect(routerSource.contains("DashboardWindowLifecycleTracker.restoreStateAtQuit("))
+  }
+
+  @Test("Session window opts out of AppKit restoration")
+  func sessionWindowDisablesAppKitRestoration() throws {
+    let scenesSource = try harnessSourceFile(named: "App/HarnessMonitorApp+Scenes.swift")
+    let startRange = try #require(scenesSource.range(of: "var sessionWindowScene: some Scene"))
+    let endRange = try #require(scenesSource.range(of: "var settingsWindowScene: some Scene"))
+    let sessionSceneSource = String(scenesSource[startRange.lowerBound..<endRange.lowerBound])
+
+    #expect(sessionSceneSource.contains(".restorationBehavior(.disabled)"))
+    #expect(!sessionSceneSource.contains(".restorationBehavior(.automatic)"))
+    #expect(!sessionSceneSource.contains("allowsWindowRestoration"))
+  }
+
+  @Test("Launch and termination paths retain no Session restoration work")
+  func launchAndTerminationPathsRetainNoSessionRestorationWork() throws {
+    let routerSource = try harnessSourceFile(named: "App/HarnessMonitorInitialWindowRouter.swift")
+    let delegateSource = try harnessSourceFile(named: "App/HarnessMonitorAppDelegate.swift")
+    let lifecycleSource = try harnessKitSourceFile(
+      named: "Stores/HarnessMonitorStore+AppLifecycle.swift"
+    )
+
+    #expect(!routerSource.contains("openHarnessSessionWindow"))
+    #expect(!routerSource.contains("SessionWindowQuitCapture"))
+    #expect(!delegateSource.contains("SessionWindowQuitCapture"))
+    #expect(!delegateSource.contains("persistSessionWindowRestoreSnapshot"))
+    #expect(!delegateSource.contains("beginSessionWindowTerminationSnapshot"))
+    #expect(!lifecycleSource.contains("flushSessionWindowsOpenAtQuit"))
   }
 
   @Test("Settings window opts out of AppKit restoration")
