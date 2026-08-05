@@ -25,10 +25,10 @@ struct SessionWindowFlowTests {
     #expect(HarnessMonitorWindowID.sessionWindow("sess-alpha") == "session-sess-alpha")
   }
 
-  @Test("Current schema includes session window restoration state")
-  func currentSchemaIncludesSessionWindowRestorationState() {
+  @Test("Current schema excludes Session window restoration state")
+  func currentSchemaExcludesSessionWindowRestorationState() {
     #expect(
-      HarnessMonitorCurrentSchema.models.contains {
+      !HarnessMonitorCurrentSchema.models.contains {
         String(describing: $0) == "CachedSessionWindowState"
       }
     )
@@ -46,6 +46,28 @@ struct SessionWindowFlowTests {
       HarnessMonitorCurrentSchema.models.contains {
         String(describing: $0) == "AuditEventRecord"
       }
+    )
+  }
+
+  @Test("Session launch route overrides are UI-test-only")
+  func sessionLaunchRouteOverridesAreUITestOnly() {
+    #expect(
+      SessionWindowInitialRouteOverride.route(
+        values: ["HARNESS_MONITOR_INITIAL_SESSION_ROUTE": "timeline"],
+        isUITesting: false
+      ) == nil
+    )
+    #expect(
+      SessionWindowInitialRouteOverride.route(
+        values: ["HARNESS_MONITOR_UI_TEST_SESSION_ROUTE": "timeline"],
+        isUITesting: false
+      ) == nil
+    )
+    #expect(
+      SessionWindowInitialRouteOverride.route(
+        values: ["HARNESS_MONITOR_UI_TEST_SESSION_ROUTE": "timeline"],
+        isUITesting: true
+      ) == .timeline
     )
   }
 

@@ -138,6 +138,7 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
       HarnessMonitorSchemaV23.self,
       HarnessMonitorSchemaV24.self,
       HarnessMonitorSchemaV25.self,
+      HarnessMonitorSchemaV26.self,
     ]
   }
 
@@ -167,6 +168,7 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
       migrateV22toV23,
       migrateV23toV24,
       migrateV24toV25,
+      migrateV25toV26,
     ]
   }
 
@@ -363,6 +365,14 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
     fromVersion: HarnessMonitorSchemaV24.self,
     toVersion: HarnessMonitorSchemaV25.self
   )
+
+  // V26 removes the standalone Session-window restoration entity. It has no
+  // relationships to the cached session graph or user data, so lightweight
+  // migration can retire the table without rewriting unrelated rows.
+  static let migrateV25toV26 = MigrationStage.lightweight(
+    fromVersion: HarnessMonitorSchemaV25.self,
+    toVersion: HarnessMonitorSchemaV26.self
+  )
 }
 
-public typealias HarnessMonitorCurrentSchema = HarnessMonitorSchemaV25
+public typealias HarnessMonitorCurrentSchema = HarnessMonitorSchemaV26

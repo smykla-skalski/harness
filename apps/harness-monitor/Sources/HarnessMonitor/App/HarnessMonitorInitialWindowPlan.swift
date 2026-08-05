@@ -1,38 +1,29 @@
-import HarnessMonitorKit
 import HarnessMonitorUIPreviewable
 
 struct HarnessMonitorInitialWindowPlan: Equatable {
   enum Destination: Equatable {
     case none
-    case welcome
-    case sessions([String])
+    case dashboard(mergeIfNeeded: Bool)
   }
 
   let destination: Destination
-  let shouldMarkBridgeFallbackComplete: Bool
 
   static func resolve(
     launchBehavior: HarnessMonitorLaunchBehavior,
-    hasVisibleSessionWindows: Bool,
-    restorePlan: HarnessMonitorStore.LaunchWindowRestorePlan = .init()
+    dashboardRestoreState: Bool?
   ) -> Self {
     switch launchBehavior {
     case .alwaysOpenRecent:
-      return Self(destination: .welcome, shouldMarkBridgeFallbackComplete: false)
+      Self(destination: .dashboard(mergeIfNeeded: true))
     case .restoreSessionWindows:
-      guard !hasVisibleSessionWindows else {
-        return Self(destination: .none, shouldMarkBridgeFallbackComplete: false)
+      switch dashboardRestoreState {
+      case true:
+        Self(destination: .dashboard(mergeIfNeeded: false))
+      case false:
+        Self(destination: .none)
+      case nil:
+        Self(destination: .dashboard(mergeIfNeeded: true))
       }
-      if restorePlan.sessionIDs.isEmpty {
-        return Self(
-          destination: .welcome,
-          shouldMarkBridgeFallbackComplete: restorePlan.usedBridgeFallback
-        )
-      }
-      return Self(
-        destination: .sessions(restorePlan.sessionIDs),
-        shouldMarkBridgeFallbackComplete: restorePlan.usedBridgeFallback
-      )
     }
   }
 }

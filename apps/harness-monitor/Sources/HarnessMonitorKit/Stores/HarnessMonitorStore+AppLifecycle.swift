@@ -48,7 +48,6 @@ extension HarnessMonitorStore {
 
   public func prepareForTermination() async {
     connection.isPreparingForTermination = true
-    await flushSessionWindowsOpenAtQuit()
     toast.dismissAll()
     cancelPendingAppInactivitySuspend()
     stopRemoteDaemonReconnect()

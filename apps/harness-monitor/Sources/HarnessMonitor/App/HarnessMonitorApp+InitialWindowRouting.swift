@@ -58,23 +58,12 @@ extension HarnessMonitorApp {
       return
     }
 
-    let tabbingPreference = SessionWindowTabbingPreference.resolved(
-      rawValue: UserDefaults.standard.string(forKey: SessionWindowTabbingPreference.storageKey)
-    )
     let router = HarnessMonitorInitialWindowRouter(
-      store: appStore,
       launchBehavior: launchBehavior,
-      tabbingPreference: tabbingPreference,
-      openWelcomeWindow: { mergeIfNeeded in
+      openDashboardWindow: { mergeIfNeeded in
         openWindow.openHarnessDashboardWindow(mergeIfNeeded: mergeIfNeeded)
-      },
-      openSessionWindow: { sessionID, mergeIfNeeded in
-        openWindow.openHarnessSessionWindow(
-          sessionID: sessionID,
-          mergeIfNeeded: mergeIfNeeded
-        )
       }
     )
-    await router.route()
+    router.route()
   }
 }

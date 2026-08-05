@@ -71,6 +71,7 @@ struct HarnessMonitorApp: App {
 
   init() {
     HarnessMonitorPerfLaunchMetricsRecorder.bootstrap()
+    SessionWindowRestorationDefaultsMigration.run()
 
     // Rename `dashboard.dependencies.*` / `dependencies.*` / `settingsDependencies*`
     // keys to their `dashboard.reviews.*` / `reviews.*` / `settingsReviews*`

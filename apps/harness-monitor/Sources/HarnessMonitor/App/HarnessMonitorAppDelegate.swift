@@ -160,7 +160,7 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
         guard let self, self.terminationTask == nil else {
           return
         }
-        await self.persistWindowRestoreStateForAppInactivity(using: store)
+        self.persistWindowRestoreStateForAppInactivity()
         guard self.shouldSuspendLiveConnectionOnResignActive() else {
           return
         }
@@ -204,15 +204,9 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
   }
 
   func persistWindowRestoreStateForAppInactivity(
-    using store: HarnessMonitorStore,
     userDefaults: UserDefaults = .standard
-  ) async {
-    let quitSnapshot = sessionWindowQuitSnapshot(using: store)
+  ) {
     DashboardWindowLifecycleTracker.shared.flushOpenAtQuit(userDefaults: userDefaults)
-    await store.persistSessionWindowRestoreSnapshot(
-      quitSnapshot,
-      userDefaults: userDefaults
-    )
   }
 
   func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
@@ -233,8 +227,6 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
       return .terminateNow
     }
 
-    let quitSnapshot = SessionWindowQuitCapture.captureSnapshot()
-    store.beginSessionWindowTerminationSnapshot(quitSnapshot: quitSnapshot)
     DashboardWindowLifecycleTracker.shared.flushOpenAtQuit()
     terminationTask = Task { @MainActor [weak self] in
       await self?.prepareForTermination(using: store)
@@ -275,8 +267,6 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
       return
     }
 
-    let quitSnapshot = SessionWindowQuitCapture.captureSnapshot()
-    store?.beginSessionWindowTerminationSnapshot(quitSnapshot: quitSnapshot)
     DashboardWindowLifecycleTracker.shared.flushOpenAtQuit()
     terminationTask = Task { @MainActor [weak self] in
       if let self {
@@ -305,16 +295,6 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
     signal(handledSignal, SIG_DFL)
     kill(getpid(), handledSignal)
     _exit(128 + handledSignal)
-  }
-
-  private func sessionWindowQuitSnapshot(
-    using store: HarnessMonitorStore
-  ) -> HarnessMonitorStore.SessionWindowQuitSnapshot {
-    let appKitSnapshot = SessionWindowQuitCapture.captureSnapshot()
-    return HarnessMonitorStore.SessionWindowQuitSnapshot(
-      sessionIDs: appKitSnapshot.sessionIDs.union(store.openSessionWindowIDsSnapshot),
-      groupings: appKitSnapshot.groupings
-    )
   }
 
   private func shouldSuspendLiveConnectionOnResignActive() -> Bool {
