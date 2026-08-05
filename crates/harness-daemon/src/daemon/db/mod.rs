@@ -5,23 +5,28 @@
 //! such as manifests, auth tokens, lock files, and live signal/transcript
 //! artifacts.
 
+#[cfg(test)]
 pub(crate) use std::collections::BTreeMap;
 pub(crate) use std::io::{Error as IoError, ErrorKind};
-pub(crate) use std::path::PathBuf;
 pub(crate) use std::sync::{Arc, Mutex, OnceLock};
 
 pub(crate) use rusqlite::{Connection, OptionalExtension, types::Type};
 
+#[cfg(test)]
 pub(crate) use crate::agents::runtime::event::ConversationEvent;
 pub(crate) use crate::daemon::agent_tui::{
     AgentTuiSize, AgentTuiSnapshot, AgentTuiStatus, TerminalScreenSnapshot,
 };
 pub(crate) use crate::daemon::index::DiscoveredProject;
 pub(crate) use crate::daemon::protocol::{CodexRunMode, CodexRunSnapshot, CodexRunStatus};
+#[cfg(test)]
+pub(crate) use crate::session::types::AgentRegistration;
 #[allow(unused_imports)]
 pub(crate) use crate::session::types::SessionStatus;
+#[cfg(test)]
+pub(crate) use crate::session::types::WorkItem;
 pub(crate) use crate::session::types::{
-    AgentRegistration, SessionLogEntry, SessionSignalRecord, SessionState, TaskCheckpoint, WorkItem,
+    SessionLogEntry, SessionSignalRecord, SessionState, TaskCheckpoint,
 };
 #[allow(unused_imports)]
 pub(crate) use crate::workspace::project_context_id;
@@ -38,12 +43,12 @@ pub(crate) use harness_daemon_snapshot as daemon_snapshot;
 
 pub(crate) use harness_daemon_db_core::audit_event_retention;
 pub(crate) use harness_daemon_db_core::audit_event_retention_async;
+#[cfg(test)]
+pub(crate) use harness_daemon_db_core::i64_from_u64;
 #[allow(unused_imports)]
 pub(crate) use harness_daemon_db_core::usize_from_i64;
 pub use harness_daemon_db_core::{DaemonDb, SCHEMA_VERSION};
-pub(crate) use harness_daemon_db_core::{
-    canonical_db_unavailable, db_error, i64_from_u64, u64_from_i64,
-};
+pub(crate) use harness_daemon_db_core::{canonical_db_unavailable, db_error, u64_from_i64};
 #[allow(unused_imports)]
 pub(crate) use harness_daemon_db_queries::DaemonDbActivityFold;
 mod async_agent_turn_runs;
@@ -52,22 +57,21 @@ pub(crate) use async_agent_turn_runs::{
 };
 pub(crate) use harness_daemon_db_queries::AsyncAgentResolutionQueries;
 pub(crate) use harness_daemon_db_queries::AsyncChangeTrackingQueries;
-mod async_conversation;
-pub(crate) use async_conversation::AsyncConversationSyncQueries;
+pub(crate) use harness_daemon_db_queries::AsyncConversationSyncQueries;
 pub(crate) use harness_daemon_db_queries::AsyncDiagnosticsQueries;
+pub(crate) use harness_daemon_db_queries::AsyncResolvedSessionRow;
 pub(crate) use harness_daemon_db_queries::AsyncSignalReadQueries;
 pub(crate) use harness_daemon_db_queries::AsyncTimelineWindowQueries;
+#[cfg(test)]
 pub(crate) use harness_daemon_db_queries::StoredTimelineEntry;
-mod async_resolved_session;
 mod async_runtime;
 pub(crate) use async_runtime::AsyncRuntimeSnapshotQueries;
-mod async_session_state;
-pub(crate) use async_session_state::AsyncSessionStateQueries;
+pub(crate) use harness_daemon_db_queries::AsyncSessionStateQueries;
 mod async_session_summaries;
 pub(crate) use async_session_summaries::AsyncSessionSummaryQueries;
 pub(crate) use harness_daemon_db_queries::AsyncSignalIndexQueries;
-mod async_writes;
-pub(crate) use async_writes::{AsyncDaemonTransactions, AsyncSessionWriteQueries};
+pub(crate) use harness_daemon_db_queries::sync_session_in_transaction;
+pub(crate) use harness_daemon_db_queries::{AsyncDaemonTransactions, AsyncSessionWriteQueries};
 mod audit;
 pub(crate) use audit::AsyncAuditQueries;
 pub(crate) use harness_daemon_db_queries::ChangeTrackingQueries;
@@ -196,7 +200,6 @@ pub(crate) use harness_daemon_db_core::SchemaRepairHooks;
 pub(crate) use harness_daemon_db_core::set_schema_init_hook;
 pub(crate) use harness_daemon_db_core::trace_async_db_operation;
 pub(crate) use harness_daemon_db_queries::DaemonDbConversation;
-pub(crate) use harness_daemon_db_queries::TaskRowBindings;
 #[allow(unused_imports)]
 use harness_daemon_db_queries::derive_effective_signal_status;
 #[allow(unused_imports)]
@@ -205,9 +208,9 @@ pub(crate) use harness_daemon_db_queries::extract_conversation_event_kind;
 pub(crate) use harness_daemon_db_queries::extract_transition_kind;
 #[allow(unused_imports)]
 use harness_daemon_db_queries::import_daemon_events;
-pub(crate) use harness_daemon_db_queries::normalize_change_scope;
 #[allow(unused_imports)]
 pub(crate) use harness_daemon_db_queries::parse_session_status_db_label;
+#[cfg(test)]
 pub(crate) use harness_daemon_db_queries::session_status_db_label;
 pub(crate) use harness_daemon_db_queries::{
     PreparedAgentTranscriptResync, PreparedConversationEventImport,

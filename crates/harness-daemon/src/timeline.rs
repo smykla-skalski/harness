@@ -16,6 +16,5 @@ pub use harness_timeline::*;
     reason = "narrows public items back to pub(crate) for harness-daemon-internal callers only"
 )]
 pub(crate) use harness_timeline::{
-    TimelinePayloadScope, checkpoint_entry, conversation_entry, log_entry_timeline_entry,
-    session_timeline_from_resolved_with_db_scope, session_timeline_with_scope,
+    TimelinePayloadScope, session_timeline_from_resolved_with_db_scope, session_timeline_with_scope,
 };

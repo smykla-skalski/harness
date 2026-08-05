@@ -11,8 +11,10 @@ use harness_daemon_db_queries::{
     build_session_summary_from_state, parse_session_status_db_label, session_summary_is_legacy,
 };
 
-use super::async_writes::AsyncSessionWriteQueries;
-use super::{AsyncDaemonDb, CliError, DiscoveredProject, SessionState, daemon_protocol, db_error};
+use super::{
+    AsyncDaemonDb, AsyncSessionWriteQueries, CliError, DiscoveredProject, SessionState,
+    daemon_protocol, db_error,
+};
 use crate::session::service::canonicalize_persisted_session_state;
 use crate::workspace::utc_now;
 

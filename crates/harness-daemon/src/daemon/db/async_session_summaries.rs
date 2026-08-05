@@ -1,9 +1,9 @@
 use sqlx::query_as;
 
-use super::async_resolved_session::AsyncResolvedSessionRow;
 use super::summary_rows::AsyncSessionSummaryRow;
 use super::{
-    AsyncDaemonDb, CliError, daemon_index, daemon_protocol, db_error, trace_async_db_operation,
+    AsyncDaemonDb, AsyncResolvedSessionRow, CliError, daemon_index, daemon_protocol, db_error,
+    trace_async_db_operation,
 };
 use crate::session::storage;
 use crate::telemetry::record_daemon_db_pool_state;
@@ -62,7 +62,7 @@ const RESOLVE_SESSION_SQL: &str = "SELECT
    )";
 
 /// Session summary and resolution reads that canonicalize a legacy-shaped
-/// row via [`AsyncSessionWriteQueries::save_session_state`](super::async_writes::AsyncSessionWriteQueries::save_session_state)
+/// row via [`AsyncSessionWriteQueries::save_session_state`](super::AsyncSessionWriteQueries::save_session_state)
 /// when one turns up, so this stays a `db`-external extension trait rather
 /// than an inherent [`AsyncDaemonDb`] method the way the rest of the pool's
 /// clean read paths do.

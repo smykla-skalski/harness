@@ -1,3 +1,14 @@
+use std::collections::BTreeMap;
+use std::future::Future;
+
+use harness_daemon_db_core::{AsyncDaemonDb, db_error, i64_from_u64};
+use harness_kernel::errors::CliError;
+use harness_protocol::session::{
+    AgentRegistration, ManagedAgentKind, SessionLogEntry, SessionState, TaskCheckpoint, WorkItem,
+};
+use harness_session::index::DiscoveredProject;
+use harness_session::service::{agent_status_db_label, canonicalize_persisted_session_state};
+use harness_session::storage;
 use sqlx::{QueryBuilder, Sqlite, Transaction, query, query_scalar};
 
 mod persist;
@@ -9,30 +20,23 @@ use self::persist::{
 use self::sql::{
     ADVANCE_CHANGE_SEQUENCE_SQL, CURRENT_CHANGE_SEQUENCE_SQL, DELETE_SESSION_AGENTS_SQL,
     DELETE_SESSION_ROW_SQL, DELETE_SESSION_TASKS_SQL, ENSURE_SESSION_TIMELINE_STATE_SQL,
-    INSERT_CHECKPOINT_SQL, INSERT_LOG_ENTRY_SQL, MARK_SESSION_ACTIVE_SQL, NEXT_LOG_SEQUENCE_SQL,
-    UPSERT_AGENT_SQL, UPSERT_CHANGE_SQL, UPSERT_PROJECT_SQL, UPSERT_SESSION_SQL, UPSERT_TASK_SQL,
-    UPSERT_TIMELINE_ENTRY_SQL, UPSERT_TIMELINE_STATE_SQL,
+    INSERT_CHECKPOINT_SQL, MARK_SESSION_ACTIVE_SQL, UPSERT_AGENT_SQL, UPSERT_CHANGE_SQL,
+    UPSERT_PROJECT_SQL, UPSERT_SESSION_SQL, UPSERT_TASK_SQL, UPSERT_TIMELINE_STATE_SQL,
 };
-use super::{
-    AgentRegistration, AsyncDaemonDb, BTreeMap, CliError, DiscoveredProject, SessionLogEntry,
-    SessionState, TaskCheckpoint, WorkItem, daemon_timeline, db_error, extract_transition_kind,
-    i64_from_u64, normalize_change_scope, session_status_db_label, stored_timeline_entry,
-    u64_from_i64, utc_now,
-};
-use crate::session::service::{agent_status_db_label, canonicalize_persisted_session_state};
-use crate::session::storage;
-use crate::session::types::ManagedAgentKind;
+use crate::task_row::TaskRowBindings;
+use crate::timeline::stored_timeline_entry;
+use crate::writes::{extract_transition_kind, normalize_change_scope, session_status_db_label};
 
 /// Transaction handle for the canonical async daemon DB. Split out of
 /// `AsyncSessionWriteQueries` since every other async `db` file that opens a
 /// transaction needs only this one method, not the session-write surface.
-pub(crate) trait AsyncDaemonTransactions: Send + Sync {
+pub trait AsyncDaemonTransactions: Send + Sync {
     /// # Errors
     /// Returns [`CliError`] when the transaction cannot be started.
-    async fn begin_immediate_transaction(
+    fn begin_immediate_transaction(
         &self,
         context: &str,
-    ) -> Result<Transaction<'_, Sqlite>, CliError>;
+    ) -> impl Future<Output = Result<Transaction<'_, Sqlite>, CliError>> + Send;
 }
 
 impl AsyncDaemonTransactions for AsyncDaemonDb {
@@ -50,51 +54,60 @@ impl AsyncDaemonTransactions for AsyncDaemonDb {
 /// Async mirror of `writes::SessionWriteQueries`: session and project
 /// writes, log/checkpoint appends, and the global change-tracking counter,
 /// through the canonical async daemon DB.
-pub(crate) trait AsyncSessionWriteQueries: Send + Sync {
+pub trait AsyncSessionWriteQueries: Send + Sync {
     /// # Errors
     /// Returns [`CliError`] on SQL failures.
-    async fn sync_project(&self, project: &DiscoveredProject) -> Result<(), CliError>;
+    fn sync_project(
+        &self,
+        project: &DiscoveredProject,
+    ) -> impl Future<Output = Result<(), CliError>> + Send;
 
     /// # Errors
     /// Returns [`CliError`] on SQL failures.
-    async fn save_session_state(
+    fn save_session_state(
         &self,
         project_id: &str,
         state: &SessionState,
-    ) -> Result<(), CliError>;
+    ) -> impl Future<Output = Result<(), CliError>> + Send;
 
     /// # Errors
     /// Returns [`CliError`] on SQL failures.
-    async fn create_session_record(
+    fn create_session_record(
         &self,
         project_id: &str,
         state: &SessionState,
-    ) -> Result<(), CliError>;
+    ) -> impl Future<Output = Result<(), CliError>> + Send;
 
     /// # Errors
     /// Returns [`CliError`] on SQL failures.
-    async fn append_log_entry(&self, entry: &SessionLogEntry) -> Result<(), CliError>;
+    fn append_log_entry(
+        &self,
+        entry: &SessionLogEntry,
+    ) -> impl Future<Output = Result<(), CliError>> + Send;
 
     /// # Errors
     /// Returns [`CliError`] on SQL failures.
-    async fn append_checkpoint(
+    fn append_checkpoint(
         &self,
         session_id: &str,
         checkpoint: &TaskCheckpoint,
-    ) -> Result<(), CliError>;
+    ) -> impl Future<Output = Result<(), CliError>> + Send;
 
     /// # Errors
     /// Returns [`CliError`] on SQL failures.
-    async fn delete_session_row(&self, session_id: &str) -> Result<bool, CliError>;
+    fn delete_session_row(
+        &self,
+        session_id: &str,
+    ) -> impl Future<Output = Result<bool, CliError>> + Send;
 
     /// # Errors
     /// Returns [`CliError`] on SQL failures.
-    async fn bump_change(&self, scope: &str) -> Result<(), CliError>;
+    fn bump_change(&self, scope: &str) -> impl Future<Output = Result<(), CliError>> + Send;
 }
 
 impl AsyncSessionWriteQueries for AsyncDaemonDb {
     async fn sync_project(&self, project: &DiscoveredProject) -> Result<(), CliError> {
-        let now = utc_now();
+        let now = harness_workspace::workspace::utc_now();
         query(UPSERT_PROJECT_SQL)
             .bind(&project.project_id)
             .bind(&project.name)
@@ -191,10 +204,10 @@ impl AsyncSessionWriteQueries for AsyncDaemonDb {
             .map_err(|error| db_error(format!("append async checkpoint: {error}")))?
             .rows_affected();
         if inserted > 0 {
-            let entry = daemon_timeline::checkpoint_entry(
+            let entry = harness_timeline::checkpoint_entry(
                 session_id,
                 checkpoint,
-                daemon_timeline::TimelinePayloadScope::Full,
+                harness_timeline::TimelinePayloadScope::Full,
             )?;
             let stored = stored_timeline_entry(
                 "checkpoint",
@@ -204,7 +217,7 @@ impl AsyncSessionWriteQueries for AsyncDaemonDb {
             upsert_timeline_entry(&mut transaction, &stored).await?;
             query(UPSERT_TIMELINE_STATE_SQL)
                 .bind(session_id)
-                .bind(utc_now())
+                .bind(harness_workspace::workspace::utc_now())
                 .execute(transaction.as_mut())
                 .await
                 .map_err(|error| {
@@ -243,7 +256,7 @@ impl AsyncSessionWriteQueries for AsyncDaemonDb {
             .map_err(|error| db_error(format!("read async change sequence: {error}")))?;
         query(UPSERT_CHANGE_SQL)
             .bind(normalized_scope.as_ref())
-            .bind(utc_now())
+            .bind(harness_workspace::workspace::utc_now())
             .bind(change_seq)
             .execute(transaction.as_mut())
             .await
@@ -270,12 +283,14 @@ async fn sync_session(
     Ok(())
 }
 
-pub(in crate::daemon::db) async fn sync_session_in_transaction(
+/// # Errors
+/// Returns [`CliError`] on SQL failures.
+pub async fn sync_session_in_transaction(
     transaction: &mut Transaction<'_, Sqlite>,
     project_id: &str,
     state: &SessionState,
 ) -> Result<(), CliError> {
-    let now = utc_now();
+    let now = harness_workspace::workspace::utc_now();
     // canonicalize_persisted_session_state requires &mut, and callers hold a
     // shared reference, so we clone to avoid mutating the caller's state.
     let mut canonical_state = state.clone();
@@ -424,7 +439,7 @@ async fn replace_tasks(
     delete_stale_tasks(transaction, session_id, tasks).await?;
 
     for (task_id, task) in tasks {
-        let row = super::TaskRowBindings::from_task(task);
+        let row = TaskRowBindings::from_task(task);
         query(UPSERT_TASK_SQL)
             .bind(task_id)
             .bind(session_id)
