@@ -89,3 +89,33 @@ fn repair_rebuilds_a_dropped_index() {
         assert_eq!(restored, 1, "repair left {index} missing");
     }
 }
+
+#[test]
+fn repair_restores_durable_workspace_objects() {
+    let db = DaemonDb::open_in_memory().expect("open current database");
+    db.connection()
+        .execute_batch(
+            "DROP TRIGGER agent_workspace_queue_session_insert;
+             DROP INDEX idx_agent_workspaces_project;
+             DROP TABLE agent_workspace_reconciliation;",
+        )
+        .expect("drop durable workspace objects");
+
+    repair_current_schema_shape(db.connection(), SCHEMA_VERSION).expect("repair schema shape");
+
+    assert_schema_object_exists(&db, "table", "agent_workspace_reconciliation");
+    assert_schema_object_exists(&db, "index", "idx_agent_workspaces_project");
+    assert_schema_object_exists(&db, "trigger", "agent_workspace_queue_session_insert");
+}
+
+fn assert_schema_object_exists(db: &DaemonDb, object_type: &str, name: &str) {
+    let restored: i64 = db
+        .connection()
+        .query_row(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = ?1 AND name = ?2",
+            [object_type, name],
+            |row| row.get(0),
+        )
+        .unwrap_or_else(|error| panic!("inspect {object_type} {name}: {error}"));
+    assert_eq!(restored, 1, "repair left {object_type} {name} missing");
+}
