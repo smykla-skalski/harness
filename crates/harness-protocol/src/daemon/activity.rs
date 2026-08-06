@@ -104,6 +104,7 @@ pub struct AgentWorkspaceMemberActivityResponse {
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct AgentWorkspaceSignalSendRequest {
     pub actor: String,
+    pub idempotency_key: String,
     pub command: String,
     pub message: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]

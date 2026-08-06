@@ -115,6 +115,7 @@ async fn assert_workspace_signal_round_trip(
     assert_unavailable_signal_cancellation(project, fixture).await;
     let request = AgentWorkspaceSignalSendRequest {
         actor: "test".into(),
+        idempotency_key: "round-trip-1".into(),
         command: "continue".into(),
         message: "Continue from durable workspace state".into(),
         action_hint: None,
@@ -166,6 +167,13 @@ async fn assert_workspace_signal_round_trip(
     )
     .await;
     assert_durable_acknowledgment(&sent.signal.signal_id, fixture).await;
+    assert_repeated_action_uses_a_new_operation(
+        fixture,
+        &request,
+        &sent.signal.signal_id,
+        &signal_dir,
+    )
+    .await;
     assert_failed_delivery_is_deferred(
         &fixture.db,
         fixture.session_id,
@@ -173,6 +181,45 @@ async fn assert_workspace_signal_round_trip(
         &fixture.member_id,
     )
     .await;
+}
+
+async fn assert_repeated_action_uses_a_new_operation(
+    fixture: &WorkspaceActivityFixture,
+    request: &AgentWorkspaceSignalSendRequest,
+    original_signal_id: &str,
+    signal_dir: &std::path::Path,
+) {
+    let repeated = send_agent_workspace_signal_async(
+        &fixture.db,
+        &fixture.workspace_id,
+        &fixture.member_id,
+        &AgentWorkspaceSignalSendRequest {
+            idempotency_key: "round-trip-2".into(),
+            ..request.clone()
+        },
+        WakeDispatch::none(),
+    )
+    .await
+    .expect("send the same action as a distinct operation");
+    assert_ne!(repeated.signal.signal_id, original_signal_id);
+    let repeated_pending = runtime::signal::read_pending_signals(&signal_dir)
+        .expect("read intentionally repeated durable signal");
+    assert!(
+        repeated_pending
+            .iter()
+            .any(|signal| signal.signal_id == repeated.signal.signal_id)
+    );
+    cancel_agent_workspace_signal_async(
+        &fixture.db,
+        &fixture.workspace_id,
+        &fixture.member_id,
+        &repeated.signal.signal_id,
+        &AgentWorkspaceSignalCancelRequest {
+            actor: "test".into(),
+        },
+    )
+    .await
+    .expect("cancel intentionally repeated durable signal");
 }
 
 async fn assert_unavailable_signal_cancellation(
@@ -185,6 +232,7 @@ async fn assert_unavailable_signal_cancellation(
         &fixture.member_id,
         &AgentWorkspaceSignalSendRequest {
             actor: "test".into(),
+            idempotency_key: "cancel-unavailable-1".into(),
             command: "cancel-unavailable".into(),
             message: "cancel while the runtime is unavailable".into(),
             action_hint: None,
@@ -248,6 +296,7 @@ async fn assert_pending_signal_cancellation(
         &fixture.member_id,
         &AgentWorkspaceSignalSendRequest {
             actor: "test".into(),
+            idempotency_key: "cancel-1".into(),
             command: "cancel".into(),
             message: "cancel this durable signal".into(),
             action_hint: None,
@@ -361,6 +410,7 @@ async fn assert_failed_delivery_is_deferred(
         member_id,
         &AgentWorkspaceSignalSendRequest {
             actor: "test".into(),
+            idempotency_key: "failed-delivery-1".into(),
             command: "fail-delivery".into(),
             message: "exercise failed runtime delivery".into(),
             action_hint: None,

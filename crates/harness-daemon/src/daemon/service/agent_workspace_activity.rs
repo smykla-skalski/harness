@@ -72,7 +72,7 @@ pub(crate) async fn send_agent_workspace_signal_async(
         .load_agent_workspace_signal_target(&daemon_id, workspace_id, member_id)
         .await?;
     let now = harness_workspace::workspace::utc_now();
-    let signal = harness_session::service::build_signal(
+    let mut signal = harness_session::service::build_signal(
         &request.actor,
         request.command.trim(),
         request.message.trim(),
@@ -81,6 +81,10 @@ pub(crate) async fn send_agent_workspace_signal_async(
         member_id,
         &now,
     );
+    signal.delivery.idempotency_key = Some(format!(
+        "{workspace_id}:{member_id}:{}",
+        request.idempotency_key.trim()
+    ));
     let insertion = db
         .insert_agent_workspace_signal(
             &daemon_id,
@@ -439,6 +443,12 @@ fn wake_managed_agent(
 }
 
 fn validate_signal_request(request: &AgentWorkspaceSignalSendRequest) -> Result<(), CliError> {
+    if request.idempotency_key.trim().is_empty() {
+        return Err(CliErrorKind::workflow_io("signal idempotency key is empty").into());
+    }
+    if request.idempotency_key.trim().len() > 256 {
+        return Err(CliErrorKind::workflow_io("signal idempotency key is too long").into());
+    }
     if request.command.trim().is_empty() {
         return Err(CliErrorKind::workflow_io("signal command is empty").into());
     }
