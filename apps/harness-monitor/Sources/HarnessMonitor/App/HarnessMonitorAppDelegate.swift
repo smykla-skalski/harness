@@ -60,6 +60,11 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
 
   func applicationDidFinishLaunching(_ notification: Notification) {
     _ = notification
+    // The scene-driven registration can run before the process finishes
+    // wiring its window server connection and fail transiently. Retrying
+    // here covers a login-item launch that never activates the app, where
+    // the applicationDidBecomeActive retry would never fire.
+    globalHotKeyController?.retryRegistrationIfNeeded()
     // MCP startup spins up background HTTP/IPC tasks that bind sandboxed
     // services - those abort under the preview shell and the user-facing
     // symptom is "Harness Monitor crashed" in the canvas.

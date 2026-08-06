@@ -297,6 +297,28 @@ struct AppOpenAnythingSourceContractTests {
     #expect(hotKeySource.contains("Failed to install Open Anything hot key handler"))
   }
 
+  @Test("Global hot key registers on the event dispatcher target")
+  func globalHotKeyRegistersOnEventDispatcherTarget() throws {
+    let hotKeySource = try harnessSourceFile(named: "App/GlobalHotKeyController.swift")
+    let delegateSource = try harnessSourceFile(named: "App/HarnessMonitorAppDelegate.swift")
+
+    // Hot keys registered against the application event target are delivered
+    // only while the app is active, so the shortcut silently dies whenever
+    // another app is frontmost - the palette must open from anywhere, with
+    // no Monitor window key or even open. Both the handler install and the
+    // registration stay on the event dispatcher target, matching
+    // KeyboardShortcuts, HotKey, and MASShortcut.
+    #expect(hotKeySource.contains("GetEventDispatcherTarget()"))
+    #expect(!hotKeySource.contains("GetApplicationEventTarget()"))
+    // Registration is retried at launch completion and app activation so a
+    // transiently failed scene-driven attempt still lands.
+    let didFinishRange = try #require(
+      delegateSource.range(of: "func applicationDidFinishLaunching")
+    )
+    let didFinishTail = String(delegateSource[didFinishRange.lowerBound...])
+    #expect(didFinishTail.contains("retryRegistrationIfNeeded()"))
+  }
+
   @Test("Session AppSearchHost remains native toolbar search")
   func sessionAppSearchHostRemainsNativeToolbarSearch() throws {
     let hostSource = try previewableSourceFile(named: "Views/Search/AppSearchHost.swift")
