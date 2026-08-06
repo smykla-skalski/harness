@@ -18,6 +18,7 @@ This is the repo-level contract for agents working in `harness`. Direct system, 
 | Harness Monitor macOS app | `apps/harness-monitor/AGENTS.md` |
 | Monitor previewable SwiftUI layer | `apps/harness-monitor/Sources/HarnessMonitorUIPreviewable/AGENTS.md` |
 | Monitor preview authoring and shell-rendered snapshots | `docs/agent-guides/monitor-previews.md` |
+| Legacy Session workspace collisions and migration safety | `docs/agents/legacy-workspace-collision-handling.md` |
 | Runtime config layering | `docs/agents/runtime-config-layering.md` |
 
 ## Command execution
