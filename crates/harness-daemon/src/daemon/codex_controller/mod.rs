@@ -15,6 +15,7 @@ mod orchestration;
 mod orchestration_registration;
 mod queued_run;
 mod rpc;
+mod storage_port;
 mod transcript;
 mod turn_lifecycle;
 mod turn_source;
