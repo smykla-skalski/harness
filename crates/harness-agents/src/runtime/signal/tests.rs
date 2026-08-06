@@ -137,6 +137,45 @@ fn concurrent_acknowledgments_preserve_the_first_writer() {
 }
 
 #[test]
+fn concurrent_equivalent_acknowledgments_preserve_the_first_timestamp() {
+    use std::sync::{Arc, Barrier};
+    use std::thread;
+
+    let tmp = tempfile::tempdir().unwrap();
+    let signal_dir = tmp.path().join("signals");
+    write_signal_file(&signal_dir, &sample_signal()).unwrap();
+    let barrier = Arc::new(Barrier::new(2));
+    let attempts = ["2026-03-28T12:00:03Z", "2026-03-28T12:00:04Z"].map(|timestamp| {
+        let signal_dir = signal_dir.clone();
+        let barrier = Arc::clone(&barrier);
+        thread::spawn(move || {
+            let acknowledgment = SignalAck {
+                signal_id: "sig-test-001".into(),
+                acknowledged_at: timestamp.into(),
+                result: AckResult::Rejected,
+                agent: "codex".into(),
+                session_id: "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
+                details: Some("cancelled".into()),
+            };
+            barrier.wait();
+            acknowledge_signal(&signal_dir, &acknowledgment)
+        })
+    });
+
+    assert!(
+        attempts
+            .into_iter()
+            .all(|attempt| attempt.join().unwrap().is_ok())
+    );
+    let acknowledgments = read_acknowledgments(&signal_dir).unwrap();
+    assert_eq!(acknowledgments.len(), 1);
+    assert!(
+        ["2026-03-28T12:00:03Z", "2026-03-28T12:00:04Z"]
+            .contains(&acknowledgments[0].acknowledged_at.as_str())
+    );
+}
+
+#[test]
 fn read_acknowledgments_ignores_acknowledged_signal_payloads() {
     let tmp = tempfile::tempdir().unwrap();
     let signal_dir = tmp.path().join("signals");

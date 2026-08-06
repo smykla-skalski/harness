@@ -236,7 +236,6 @@ fn ensure_existing_ack_matches(path: &Path, requested: &SignalAck) -> Result<(),
 
 fn acknowledgments_match(left: &SignalAck, right: &SignalAck) -> bool {
     left.signal_id == right.signal_id
-        && left.acknowledged_at == right.acknowledged_at
         && left.result == right.result
         && left.agent == right.agent
         && left.session_id == right.session_id
