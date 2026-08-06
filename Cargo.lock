@@ -3689,6 +3689,7 @@ dependencies = [
  "harness-daemon",
  "harness-daemon-client",
  "harness-daemon-discovery",
+ "harness-daemon-managed-agents",
  "harness-daemon-root",
  "harness-daemon-state",
  "harness-hook",
@@ -3701,7 +3702,6 @@ dependencies = [
  "libc",
  "nix 0.31.3",
  "notify",
- "portable-pty",
  "regex",
  "serde",
  "serde_json",
@@ -3717,7 +3717,6 @@ dependencies = [
  "utoipa",
  "uuid",
  "uzers",
- "vt100",
 ]
 
 [[package]]
@@ -4001,10 +4000,19 @@ dependencies = [
 name = "harness-daemon-managed-agents"
 version = "57.0.0"
 dependencies = [
+ "fs-err",
+ "harness-agents",
  "harness-daemon-db-queries",
+ "harness-hook",
  "harness-kernel",
  "harness-protocol",
  "harness-task-board",
+ "harness-workspace",
+ "portable-pty",
+ "serde",
+ "tokio",
+ "tracing",
+ "vt100",
 ]
 
 [[package]]

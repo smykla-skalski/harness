@@ -9,29 +9,34 @@ use std::time::{Duration, Instant};
 use portable_pty::{Child, ExitStatus, MasterPty, native_pty_system};
 use tokio::sync::broadcast;
 
-use crate::workspace::utc_now;
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_workspace::workspace::utc_now;
 
-use super::model::{
+use crate::model::{
     AgentTuiLaunchProfile, AgentTuiSize, AgentTuiSizeExt, AgentTuiSnapshot, AgentTuiSpawnSpec,
     AgentTuiStatus,
 };
-use super::readiness::{ReadinessSignal, new_readiness_signal, spawn_reader_thread};
-use super::screen::{TerminalScreenParser, TerminalScreenSnapshot};
-use super::spawn::command_builder;
-use super::support::{Shared, lock, persist_transcript};
-use super::{AgentTuiInput, AgentTuiInputSequence};
+use crate::readiness::{ReadinessSignal, new_readiness_signal, spawn_reader_thread};
+use crate::screen::{TerminalScreenParser, TerminalScreenSnapshot};
+use crate::spawn::command_builder;
+use crate::support::{Shared, lock, persist_transcript};
+use crate::{AgentTuiInput, AgentTuiInputSequence};
 
-pub(crate) struct AgentTuiSnapshotContext<'a> {
-    pub(crate) session_id: &'a str,
-    pub(crate) agent_id: &'a str,
-    pub(crate) tui_id: &'a str,
-    pub(crate) profile: &'a AgentTuiLaunchProfile,
-    pub(crate) project_dir: &'a Path,
-    pub(crate) transcript_path: &'a Path,
+pub struct AgentTuiSnapshotContext<'a> {
+    pub session_id: &'a str,
+    pub agent_id: &'a str,
+    pub tui_id: &'a str,
+    pub profile: &'a AgentTuiLaunchProfile,
+    pub project_dir: &'a Path,
+    pub transcript_path: &'a Path,
 }
 
-pub(crate) fn snapshot_from_process(
+/// Build a snapshot from a live process's current screen and transcript.
+///
+/// # Errors
+/// Returns a workflow I/O error when the process's internal state is poisoned
+/// or when persisting the transcript fails.
+pub fn snapshot_from_process(
     context: &AgentTuiSnapshotContext<'_>,
     process: &AgentTuiProcess,
     status: AgentTuiStatus,
@@ -58,9 +63,9 @@ pub(crate) fn snapshot_from_process(
     })
 }
 
-pub(crate) struct AgentTuiAttachState {
-    pub(crate) initial_bytes: Vec<u8>,
-    pub(crate) broadcast_rx: broadcast::Receiver<Vec<u8>>,
+pub struct AgentTuiAttachState {
+    pub initial_bytes: Vec<u8>,
+    pub broadcast_rx: broadcast::Receiver<Vec<u8>>,
 }
 
 enum QueuedAgentTuiInput {
@@ -81,14 +86,14 @@ enum QueuedAgentTuiInputPoll {
 }
 
 #[derive(Clone)]
-pub(crate) struct AgentTuiInputWorker {
+pub struct AgentTuiInputWorker {
     sender: Sender<QueuedAgentTuiInput>,
     stop_flag: Arc<AtomicBool>,
     process: Arc<AgentTuiProcess>,
 }
 
 impl AgentTuiInputWorker {
-    pub(crate) fn spawn(process: Arc<AgentTuiProcess>, stop_flag: Arc<AtomicBool>) -> Self {
+    pub fn spawn(process: Arc<AgentTuiProcess>, stop_flag: Arc<AtomicBool>) -> Self {
         let (sender, receiver) = mpsc::channel();
         let worker = Self {
             sender,
@@ -106,7 +111,7 @@ impl AgentTuiInputWorker {
     /// # Errors
     /// Returns a session-not-active or transport error when the process has
     /// already stopped, the queue is unavailable, or the replay fails.
-    pub(crate) fn send_input(&self, input: &AgentTuiInput) -> Result<(), CliError> {
+    pub fn send_input(&self, input: &AgentTuiInput) -> Result<(), CliError> {
         self.ensure_accepting_input()?;
         let (completion_tx, completion_rx) = mpsc::sync_channel(1);
         self.sender
@@ -131,10 +136,7 @@ impl AgentTuiInputWorker {
     /// # Errors
     /// Returns a session-not-active or transport error when the process has
     /// already stopped, the queue is unavailable, or replay fails.
-    pub(crate) fn enqueue_sequence(
-        &self,
-        sequence: &AgentTuiInputSequence,
-    ) -> Result<(), CliError> {
+    pub fn enqueue_sequence(&self, sequence: &AgentTuiInputSequence) -> Result<(), CliError> {
         self.ensure_accepting_input()?;
         let (completion_tx, completion_rx) = mpsc::sync_channel(1);
         self.sender
@@ -387,7 +389,11 @@ impl AgentTuiProcess {
         Ok(lock(&self.transcript, "terminal agent transcript")?.clone())
     }
 
-    pub(crate) fn attach_state(&self) -> Result<AgentTuiAttachState, CliError> {
+    /// Snapshot the current screen state and subscribe to future output.
+    ///
+    /// # Errors
+    /// Returns a workflow I/O error when internal state is poisoned.
+    pub fn attach_state(&self) -> Result<AgentTuiAttachState, CliError> {
         let broadcast_rx = self.broadcast_rx.resubscribe();
         let initial_bytes = lock(&self.screen, "terminal agent screen parser")?.state_formatted();
         Ok(AgentTuiAttachState {
@@ -480,8 +486,8 @@ impl AgentTuiProcess {
         guard.ready
     }
 
-    #[cfg(any(feature = "bridge-runtime", feature = "daemon-runtime"))]
-    pub(crate) fn readiness_signal(&self) -> ReadinessSignal {
+    #[must_use]
+    pub fn readiness_signal(&self) -> ReadinessSignal {
         Arc::clone(&self.readiness)
     }
 }

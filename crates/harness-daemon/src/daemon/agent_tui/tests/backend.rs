@@ -1,4 +1,5 @@
-use crate::daemon::agent_tui::model::AgentTuiSizeExt;
+use harness_daemon_managed_agents::AgentTuiSizeExt;
+
 use crate::daemon::agent_tui::{
     AgentTuiInput, AgentTuiInputRequest, AgentTuiInputSequence, AgentTuiInputSequenceStep,
     AgentTuiKey, AgentTuiLaunchProfile, AgentTuiSize, TerminalScreenParser,

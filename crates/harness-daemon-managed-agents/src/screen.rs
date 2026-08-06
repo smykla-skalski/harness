@@ -1,6 +1,6 @@
 pub use harness_protocol::managed_agents::tui::TerminalScreenSnapshot;
 
-use super::model::AgentTuiSize;
+use crate::model::AgentTuiSize;
 
 /// Strip leading lines that are empty or contain only whitespace.
 ///

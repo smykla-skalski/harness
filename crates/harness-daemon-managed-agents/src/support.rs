@@ -1,19 +1,26 @@
-use std::io::Write as _;
-use std::path::Path;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use harness_kernel::errors::{CliError, CliErrorKind};
 
-pub(super) type Shared<T> = Arc<Mutex<T>>;
+pub type Shared<T> = Arc<Mutex<T>>;
 
-pub(super) fn lock<'a, T>(mutex: &'a Mutex<T>, name: &str) -> Result<MutexGuard<'a, T>, CliError> {
+/// Lock a mutex, mapping a poison error to a workflow I/O `CliError`.
+///
+/// # Errors
+/// Returns a workflow I/O error when the mutex is poisoned.
+pub fn lock<'a, T>(mutex: &'a Mutex<T>, name: &str) -> Result<MutexGuard<'a, T>, CliError> {
     mutex
         .lock()
         .map_err(|error| CliErrorKind::workflow_io(format!("{name} lock poisoned: {error}")).into())
 }
 
-pub(super) fn persist_transcript(
-    path: &Path,
+/// Persist newly captured transcript bytes without rewriting the full file.
+///
+/// # Errors
+/// Returns a workflow I/O error when creating the parent directory or
+/// writing the transcript fails.
+pub fn persist_transcript(
+    path: &std::path::Path,
     transcript: &[u8],
     persisted_len: &mut usize,
 ) -> Result<(), CliError> {
@@ -22,11 +29,31 @@ pub(super) fn persist_transcript(
             CliErrorKind::workflow_io(format!("create terminal agent transcript dir: {error}"))
         })?;
     }
-    if transcript.len() < *persisted_len || *persisted_len == 0 || !path.exists() {
+
+    if transcript.len() < *persisted_len {
         fs_err::write(path, transcript).map_err(|error| {
             CliErrorKind::workflow_io(format!("write terminal agent transcript: {error}"))
         })?;
-    } else if transcript.len() > *persisted_len {
+        *persisted_len = transcript.len();
+        return Ok(());
+    }
+
+    if transcript.len() == *persisted_len {
+        if *persisted_len == 0 && !path.exists() {
+            fs_err::write(path, transcript).map_err(|error| {
+                CliErrorKind::workflow_io(format!("write terminal agent transcript: {error}"))
+            })?;
+        }
+        return Ok(());
+    }
+
+    if *persisted_len == 0 || !path.exists() {
+        fs_err::write(path, transcript).map_err(|error| {
+            CliErrorKind::workflow_io(format!("write terminal agent transcript: {error}"))
+        })?;
+    } else {
+        use std::io::Write;
+
         let mut file = fs_err::OpenOptions::new()
             .append(true)
             .create(true)
@@ -38,11 +65,8 @@ pub(super) fn persist_transcript(
             .map_err(|error| {
                 CliErrorKind::workflow_io(format!("append terminal agent transcript: {error}"))
             })?;
-    } else if transcript.is_empty() && !path.exists() {
-        fs_err::write(path, transcript).map_err(|error| {
-            CliErrorKind::workflow_io(format!("write terminal agent transcript: {error}"))
-        })?;
     }
+
     *persisted_len = transcript.len();
     Ok(())
 }

@@ -19,7 +19,10 @@ pub fn sandboxed_from_env() -> bool {
 // `#[path]`-mirrored copy below can only ever satisfy the default
 // `bridge-runtime` build. `discovery`, `protocol`, and `state` need no such
 // swap: none of their code is gated on `daemon-runtime` in a way this crate
-// can't already satisfy on its own.
+// can't already satisfy on its own. `agent_tui`'s `bridge-runtime` branch is
+// a re-export too, over `harness-daemon-managed-agents` rather than a
+// `#[path]` mirror: the portable terminal-agent PTY runtime lives in that
+// crate now, shared by both build modes instead of duplicated.
 #[cfg(not(feature = "daemon-runtime"))]
 #[path = "../../../../crates/harness-daemon/src/daemon/agent_acp/mod.rs"]
 pub mod agent_acp;

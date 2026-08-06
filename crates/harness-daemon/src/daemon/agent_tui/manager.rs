@@ -6,9 +6,9 @@ use std::time::Duration;
 use tokio::runtime::Handle;
 use tokio::sync::broadcast;
 
-use super::process::{AgentTuiInputWorker, AgentTuiProcess};
 use crate::daemon::db_handle::{AsyncDaemonDbHandle, DaemonDbOwnedHandle};
 use crate::daemon::protocol::StreamEvent;
+use harness_daemon_managed_agents::{AgentTuiInputWorker, AgentTuiProcess};
 
 #[derive(Clone)]
 pub(crate) struct ActiveAgentTui {

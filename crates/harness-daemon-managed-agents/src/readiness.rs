@@ -4,15 +4,15 @@ use std::thread::{self, JoinHandle};
 
 use tokio::sync::broadcast;
 
-use super::screen::TerminalScreenParser;
-use super::support::Shared;
+use crate::screen::TerminalScreenParser;
+use crate::support::Shared;
 
-pub(crate) struct ReadinessState {
+pub struct ReadinessState {
     pub(crate) ready: bool,
     pub(crate) closed: bool,
 }
 
-pub(crate) type ReadinessSignal = Arc<(Mutex<ReadinessState>, Condvar)>;
+pub type ReadinessSignal = Arc<(Mutex<ReadinessState>, Condvar)>;
 
 pub(crate) fn new_readiness_signal() -> ReadinessSignal {
     Arc::new((
@@ -41,7 +41,7 @@ fn check_readiness_pattern(
     false
 }
 
-pub(crate) fn signal_readiness_ready(readiness: &ReadinessSignal) {
+pub fn signal_readiness_ready(readiness: &ReadinessSignal) {
     if let Ok(mut state) = readiness.0.lock() {
         state.ready = true;
     }

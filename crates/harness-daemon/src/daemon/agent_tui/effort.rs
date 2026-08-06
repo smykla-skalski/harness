@@ -5,7 +5,7 @@ use crate::agents::runtime::models;
 use crate::agents::runtime::runtime_for_name;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
-use super::model::AgentTuiLaunchProfile;
+use harness_daemon_managed_agents::AgentTuiLaunchProfile;
 
 /// Validate the requested effort level against the selected model's allowed
 /// values and inject the runtime's effort flag and level into the launch
