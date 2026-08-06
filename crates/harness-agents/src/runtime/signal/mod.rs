@@ -1,12 +1,11 @@
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::process;
 use std::string::ToString;
-use std::sync::atomic::{AtomicU64, Ordering};
 
 use serde::de::DeserializeOwned;
 
+use harness_infra::persistence::flock::{FlockErrorContext, with_exclusive_flock};
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_kernel::io::{validate_safe_segment, write_text};
 
@@ -160,6 +159,7 @@ struct AckPaths {
     acknowledged_dir: PathBuf,
     signal_file: PathBuf,
     ack_file: PathBuf,
+    ack_lock_file: PathBuf,
     acknowledged_signal_file: PathBuf,
 }
 
@@ -170,6 +170,7 @@ impl AckPaths {
             acknowledged_dir: acknowledged_dir.clone(),
             signal_file: pending_dir(signal_dir).join(signal_json_name(signal_id)?),
             ack_file: acknowledged_dir.join(signal_ack_name(signal_id)?),
+            ack_lock_file: acknowledged_dir.join(format!("{signal_id}.ack.lock")),
             acknowledged_signal_file: acknowledged_dir.join(signal_json_name(signal_id)?),
         })
     }
@@ -190,40 +191,24 @@ pub fn acknowledge_signal(signal_dir: &Path, ack: &SignalAck) -> Result<(), CliE
     move_acknowledged_signal(&paths.signal_file, &paths.acknowledged_signal_file)
 }
 
-static ACK_TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
-
 fn write_ack_once(paths: &AckPaths, ack: &SignalAck, ack_json: &str) -> Result<(), CliError> {
-    let sequence = ACK_TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
-    let temporary = paths
-        .acknowledged_dir
-        .join(format!(".signal-ack-{}-{sequence}.tmp", process::id()));
-    write_text(&temporary, ack_json)?;
-    let link_result = fs::hard_link(&temporary, &paths.ack_file);
-    fs::remove_file(&temporary).map_err(|error| {
-        CliErrorKind::workflow_io(format!(
-            "clean signal acknowledgment temp file '{}': {error}",
-            temporary.display()
-        ))
-    })?;
-    resolve_ack_link_result(link_result, paths, ack)
-}
-
-fn resolve_ack_link_result(
-    link_result: Result<(), io::Error>,
-    paths: &AckPaths,
-    ack: &SignalAck,
-) -> Result<(), CliError> {
-    match link_result {
-        Ok(()) => Ok(()),
-        Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {
-            ensure_existing_ack_matches(&paths.ack_file, ack)
-        }
-        Err(error) => Err(CliErrorKind::workflow_io(format!(
-            "commit signal acknowledgment '{}': {error}",
-            paths.ack_file.display()
-        ))
-        .into()),
-    }
+    with_exclusive_flock(
+        &paths.ack_lock_file,
+        FlockErrorContext::new("signal acknowledgment"),
+        || {
+            let exists = paths.ack_file.try_exists().map_err(|error| {
+                CliErrorKind::workflow_io(format!(
+                    "inspect signal acknowledgment '{}': {error}",
+                    paths.ack_file.display()
+                ))
+            })?;
+            if exists {
+                ensure_existing_ack_matches(&paths.ack_file, ack)
+            } else {
+                write_text(&paths.ack_file, ack_json)
+            }
+        },
+    )
 }
 
 fn ensure_existing_ack_matches(path: &Path, requested: &SignalAck) -> Result<(), CliError> {

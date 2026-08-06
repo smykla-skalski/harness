@@ -91,6 +91,49 @@ fn acknowledge_signal_preserves_the_first_acknowledgment() {
 }
 
 #[test]
+fn concurrent_acknowledgments_preserve_the_first_writer() {
+    use std::sync::{Arc, Barrier};
+    use std::thread;
+
+    let tmp = tempfile::tempdir().unwrap();
+    let signal_dir = tmp.path().join("signals");
+    write_signal_file(&signal_dir, &sample_signal()).unwrap();
+    let accepted = SignalAck {
+        signal_id: "sig-test-001".into(),
+        acknowledged_at: "2026-03-28T12:00:03Z".into(),
+        result: AckResult::Accepted,
+        agent: "codex".into(),
+        session_id: "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
+        details: None,
+    };
+    let rejected = SignalAck {
+        result: AckResult::Rejected,
+        details: Some("cancelled".into()),
+        ..accepted.clone()
+    };
+    let barrier = Arc::new(Barrier::new(2));
+    let attempts = [accepted, rejected].map(|acknowledgment| {
+        let signal_dir = signal_dir.clone();
+        let barrier = Arc::clone(&barrier);
+        thread::spawn(move || {
+            barrier.wait();
+            let result = acknowledge_signal(&signal_dir, &acknowledgment);
+            (acknowledgment.result, result)
+        })
+    });
+    let results = attempts.map(|attempt| attempt.join().unwrap());
+
+    assert_eq!(results.iter().filter(|(_, result)| result.is_ok()).count(), 1);
+    let winner = results
+        .iter()
+        .find_map(|(result, outcome)| outcome.is_ok().then_some(*result))
+        .expect("one acknowledgment wins");
+    let acknowledgments = read_acknowledgments(&signal_dir).unwrap();
+    assert_eq!(acknowledgments.len(), 1);
+    assert_eq!(acknowledgments[0].result, winner);
+}
+
+#[test]
 fn read_acknowledgments_ignores_acknowledged_signal_payloads() {
     let tmp = tempfile::tempdir().unwrap();
     let signal_dir = tmp.path().join("signals");
