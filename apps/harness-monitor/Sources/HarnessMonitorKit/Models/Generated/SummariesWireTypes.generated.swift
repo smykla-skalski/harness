@@ -804,6 +804,185 @@ public struct StreamEventWire: Codable, Equatable, Sendable {
   }
 }
 
+public enum AgentWorkspaceOrchestrationAuthority: String, Codable, Equatable, Sendable, CaseIterable, Identifiable {
+  case noOwner = "no_owner"
+  case legacySession = "legacy_session"
+  case workspace = "workspace"
+
+  public var id: String { rawValue }
+}
+
+public enum AgentWorkspaceAvailability: String, Codable, Equatable, Sendable, CaseIterable, Identifiable {
+  case available = "available"
+  case missingWorktree = "missing_worktree"
+
+  public var id: String { rawValue }
+}
+
+public enum AgentWorkspaceConflictKind: String, Codable, Equatable, Sendable, CaseIterable, Identifiable {
+  case activeOwnerCollision = "active_owner_collision"
+  case malformedCandidate = "malformed_candidate"
+  case sourceDisagreement = "source_disagreement"
+
+  public var id: String { rawValue }
+}
+
+public struct AgentWorkspaceProvenance: Codable, Equatable, Sendable {
+  public var daemonId: String
+  public var projectScopeId: String
+  public var checkoutId: String
+  public var sourceProjectId: String
+  public var legacySessionIds: [String]
+  public var selectedLegacySessionId: String?
+  public var manifestDigest: String
+
+  public init(
+    daemonId: String,
+    projectScopeId: String,
+    checkoutId: String,
+    sourceProjectId: String,
+    legacySessionIds: [String] = [],
+    selectedLegacySessionId: String? = nil,
+    manifestDigest: String
+  ) {
+    self.daemonId = daemonId
+    self.projectScopeId = projectScopeId
+    self.checkoutId = checkoutId
+    self.sourceProjectId = sourceProjectId
+    self.legacySessionIds = legacySessionIds
+    self.selectedLegacySessionId = selectedLegacySessionId
+    self.manifestDigest = manifestDigest
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    daemonId = try container.decode(String.self, forKey: .daemonId)
+    projectScopeId = try container.decode(String.self, forKey: .projectScopeId)
+    checkoutId = try container.decode(String.self, forKey: .checkoutId)
+    sourceProjectId = try container.decode(String.self, forKey: .sourceProjectId)
+    legacySessionIds = try container.decodeIfPresent([String].self, forKey: .legacySessionIds) ?? []
+    selectedLegacySessionId = try container.decodeIfPresent(String.self, forKey: .selectedLegacySessionId)
+    manifestDigest = try container.decode(String.self, forKey: .manifestDigest)
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case daemonId = "daemon_id"
+    case projectScopeId = "project_scope_id"
+    case checkoutId = "checkout_id"
+    case sourceProjectId = "source_project_id"
+    case legacySessionIds = "legacy_session_ids"
+    case selectedLegacySessionId = "selected_legacy_session_id"
+    case manifestDigest = "manifest_digest"
+  }
+}
+
+public struct AgentWorkspaceSummary: Codable, Equatable, Sendable {
+  public var workspaceId: String
+  public var projectName: String
+  public var checkoutName: String
+  public var checkoutRoot: String?
+  public var contextRoot: String
+  public var isWorktree: Bool
+  public var worktreeName: String?
+  public var availability: AgentWorkspaceAvailability
+  public var orchestrationAuthority: AgentWorkspaceOrchestrationAuthority
+  public var provenance: AgentWorkspaceProvenance
+  public var createdAt: String
+  public var updatedAt: String
+
+  public init(
+    workspaceId: String,
+    projectName: String,
+    checkoutName: String,
+    checkoutRoot: String? = nil,
+    contextRoot: String,
+    isWorktree: Bool,
+    worktreeName: String? = nil,
+    availability: AgentWorkspaceAvailability,
+    orchestrationAuthority: AgentWorkspaceOrchestrationAuthority,
+    provenance: AgentWorkspaceProvenance,
+    createdAt: String,
+    updatedAt: String
+  ) {
+    self.workspaceId = workspaceId
+    self.projectName = projectName
+    self.checkoutName = checkoutName
+    self.checkoutRoot = checkoutRoot
+    self.contextRoot = contextRoot
+    self.isWorktree = isWorktree
+    self.worktreeName = worktreeName
+    self.availability = availability
+    self.orchestrationAuthority = orchestrationAuthority
+    self.provenance = provenance
+    self.createdAt = createdAt
+    self.updatedAt = updatedAt
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case workspaceId = "workspace_id"
+    case projectName = "project_name"
+    case checkoutName = "checkout_name"
+    case checkoutRoot = "checkout_root"
+    case contextRoot = "context_root"
+    case isWorktree = "is_worktree"
+    case worktreeName = "worktree_name"
+    case availability
+    case orchestrationAuthority = "orchestration_authority"
+    case provenance
+    case createdAt = "created_at"
+    case updatedAt = "updated_at"
+  }
+}
+
+public struct AgentWorkspaceConflict: Codable, Equatable, Sendable {
+  public var daemonId: String
+  public var projectScopeId: String
+  public var checkoutId: String
+  public var kind: AgentWorkspaceConflictKind
+  public var legacySessionIds: [String]
+  public var detail: String
+
+  public init(
+    daemonId: String,
+    projectScopeId: String,
+    checkoutId: String,
+    kind: AgentWorkspaceConflictKind,
+    legacySessionIds: [String],
+    detail: String
+  ) {
+    self.daemonId = daemonId
+    self.projectScopeId = projectScopeId
+    self.checkoutId = checkoutId
+    self.kind = kind
+    self.legacySessionIds = legacySessionIds
+    self.detail = detail
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case daemonId = "daemon_id"
+    case projectScopeId = "project_scope_id"
+    case checkoutId = "checkout_id"
+    case kind
+    case legacySessionIds = "legacy_session_ids"
+    case detail
+  }
+}
+
+public struct AgentWorkspaceListResponse: Codable, Equatable, Sendable {
+  public var workspaces: [AgentWorkspaceSummary]
+  public var conflicts: [AgentWorkspaceConflict]
+
+  public init(workspaces: [AgentWorkspaceSummary] = [], conflicts: [AgentWorkspaceConflict] = []) {
+    self.workspaces = workspaces
+    self.conflicts = conflicts
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case workspaces
+    case conflicts
+  }
+}
+
 public struct HealthResponseWire: Codable, Equatable, Sendable {
   public var status: String
   public var version: String

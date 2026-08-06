@@ -12,6 +12,7 @@ enum WebSocketRPCMethod: String, CaseIterable, Equatable, Sendable {
   case daemonLogLevel = "daemon.log_level"
   case daemonSetLogLevel = "daemon.set_log_level"
   case projects = "projects"
+  case agentWorkspaces = "agent_workspaces"
   case sessions = "sessions"
   case runtimeSessionResolve = "runtime_session.resolve"
   case runtimesProbe = "runtimes.probe"

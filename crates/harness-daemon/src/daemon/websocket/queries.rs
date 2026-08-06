@@ -87,6 +87,9 @@ async fn dispatch_daemon_inventory_query(
 ) -> Option<WsResponse> {
     match request.method.as_str() {
         ws_methods::PROJECTS => Some(dispatch_projects_query(&request.id, state).await),
+        ws_methods::AGENT_WORKSPACES => {
+            Some(dispatch_agent_workspaces_query(&request.id, state).await)
+        }
         ws_methods::SESSIONS => Some(dispatch_sessions_query(&request.id, state).await),
         ws_methods::RUNTIME_SESSION_RESOLVE => {
             Some(dispatch_runtime_session_resolve_query(request, state).await)
@@ -181,6 +184,14 @@ fn dispatch_runtimes_probe_query(request_id: &str) -> WsResponse {
 async fn dispatch_projects_query(request_id: &str, state: &DaemonHttpState) -> WsResponse {
     let result = match require_async_db(state, "projects") {
         Ok(async_db) => service::list_projects_async(Some(async_db)).await,
+        Err(error) => Err(error),
+    };
+    dispatch_query_result(request_id, result)
+}
+
+async fn dispatch_agent_workspaces_query(request_id: &str, state: &DaemonHttpState) -> WsResponse {
+    let result = match require_async_db(state, "agent workspaces") {
+        Ok(async_db) => service::list_agent_workspaces_async(async_db).await,
         Err(error) => Err(error),
     };
     dispatch_query_result(request_id, result)

@@ -236,6 +236,13 @@ pub(crate) async fn initialize_startup_state(
         let db = open_and_publish_db(db_slot)?;
         initialize_async_db(async_db_slot).await?;
         if let Some(async_db) = async_db_slot.get() {
+            let agent_workspaces = service::list_agent_workspaces_async(async_db).await?;
+            if !agent_workspaces.conflicts.is_empty() {
+                tracing::warn!(
+                    conflict_count = agent_workspaces.conflicts.len(),
+                    "agent workspace reconciliation kept legacy ownership"
+                );
+            }
             task_board_migration::migrate_task_board(async_db).await?;
             reattribute_task_board_items(async_db).await;
             policy_bootstrap::bootstrap_policy_storage(async_db).await?;

@@ -2471,6 +2471,16 @@ const SUMMARIES_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/M
 /// health/readiness/control/log-level cluster - clean structs over primitives -
 /// as the first bottom-up slice; the rest migrate as their dependencies do.
 const SUMMARIES_EMIT_ONLY: &[&str] = &[
+    // Durable agent-workspace identity and reconciliation provenance. These have
+    // no hand-written Swift mirrors, so clients adopt the generated names
+    // directly instead of carrying a temporary Wire suffix.
+    "AgentWorkspaceOrchestrationAuthority",
+    "AgentWorkspaceAvailability",
+    "AgentWorkspaceConflictKind",
+    "AgentWorkspaceProvenance",
+    "AgentWorkspaceSummary",
+    "AgentWorkspaceConflict",
+    "AgentWorkspaceListResponse",
     "HealthResponse",
     "DaemonControlResponse",
     "LogLevelResponse",

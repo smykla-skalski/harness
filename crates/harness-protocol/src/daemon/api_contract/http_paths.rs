@@ -10,6 +10,7 @@ pub const DAEMON_STOP: &str = "/v1/daemon/stop";
 pub const BRIDGE_RECONFIGURE: &str = "/v1/bridge/reconfigure";
 pub const DAEMON_LOG_LEVEL: &str = "/v1/daemon/log-level";
 pub const PROJECTS: &str = "/v1/projects";
+pub const AGENT_WORKSPACES: &str = "/v1/agent-workspaces";
 pub const RUNTIME_SESSION_RESOLVE: &str = "/v1/runtime-sessions/resolve";
 pub const RUNTIMES_PROBE: &str = "/v1/runtimes/probe";
 pub const WS: &str = "/v1/ws";

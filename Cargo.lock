@@ -3955,6 +3955,7 @@ dependencies = [
  "harness-session",
  "harness-task-board",
  "harness-telemetry",
+ "harness-testkit",
  "harness-timeline",
  "harness-workspace",
  "hex",
@@ -3963,6 +3964,7 @@ dependencies = [
  "serde_json",
  "sha2 0.11.0",
  "sqlx",
+ "tempfile",
  "tokio",
  "tracing",
 ]
