@@ -188,7 +188,7 @@ pub(crate) async fn cancel_agent_workspace_signal_async(
         acknowledged_at: Some(acknowledged_at.clone()),
     };
     let target = match db
-        .load_agent_workspace_signal_target(&daemon_id, workspace_id, member_id)
+        .load_agent_workspace_signal_cleanup_target(&daemon_id, workspace_id, member_id)
         .await
     {
         Ok(target) => target,

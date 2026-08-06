@@ -26,6 +26,23 @@ pub(super) async fn load_signal_target(
     workspace_id: &str,
     member_id: &str,
 ) -> Result<AgentWorkspaceSignalTarget, CliError> {
+    load_signal_target_with_policy(transaction, workspace_id, member_id, true).await
+}
+
+pub(super) async fn load_signal_cleanup_target(
+    transaction: &mut Transaction<'_, Sqlite>,
+    workspace_id: &str,
+    member_id: &str,
+) -> Result<AgentWorkspaceSignalTarget, CliError> {
+    load_signal_target_with_policy(transaction, workspace_id, member_id, false).await
+}
+
+async fn load_signal_target_with_policy(
+    transaction: &mut Transaction<'_, Sqlite>,
+    workspace_id: &str,
+    member_id: &str,
+    require_addressable: bool,
+) -> Result<AgentWorkspaceSignalTarget, CliError> {
     let row = query_as::<_, SignalTargetRow>(
         "SELECT member.workspace_id, member.member_id, member.runtime_kind AS runtime,
                 member.managed_agent_kind, member.managed_agent_id,
@@ -35,23 +52,30 @@ pub(super) async fn load_signal_target(
          FROM agent_workspace_members member
          JOIN agent_workspaces workspace ON workspace.workspace_id = member.workspace_id
          WHERE member.workspace_id = ?1 AND member.member_id = ?2
-           AND member.membership_status IN ('joined', 'pending_registration')
            AND (
-               member.runtime_lifecycle IN ('running', 'recoverable')
+               ?3 = 0
                OR (
-                   member.runtime_lifecycle = 'unavailable'
-                   AND member.liveness_status IN ('active', 'idle', 'awaiting_review')
+                   member.membership_status IN ('joined', 'pending_registration')
+                   AND (
+                       member.runtime_lifecycle IN ('running', 'recoverable')
+                       OR (
+                           member.runtime_lifecycle = 'unavailable'
+                           AND member.liveness_status IN ('active', 'idle', 'awaiting_review')
+                       )
+                   )
                )
            )",
     )
     .bind(workspace_id)
     .bind(member_id)
+    .bind(require_addressable)
     .fetch_optional(transaction.as_mut())
     .await
     .map_err(|error| db_error(format!("load durable signal target: {error}")))?
     .ok_or_else(|| {
+        let qualifier = if require_addressable { "active " } else { "" };
         db_error(format!(
-            "active durable agent member '{member_id}' was not found in workspace '{workspace_id}'"
+            "{qualifier}durable agent member '{member_id}' was not found in workspace '{workspace_id}'"
         ))
     })?;
     let managed_agent_kind = row.managed_agent_kind.ok_or_else(|| {

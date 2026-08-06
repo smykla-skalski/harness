@@ -50,6 +50,17 @@ pub trait AsyncAgentWorkspaceActivityQueries: Send + Sync {
         member_id: &str,
     ) -> impl Future<Output = Result<AgentWorkspaceSignalTarget, CliError>> + Send;
 
+    /// Resolve persisted runtime coordinates for cleanup without requiring current addressability.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when the scope or persisted runtime identity is invalid.
+    fn load_agent_workspace_signal_cleanup_target(
+        &self,
+        daemon_id: &str,
+        workspace_id: &str,
+        member_id: &str,
+    ) -> impl Future<Output = Result<AgentWorkspaceSignalTarget, CliError>> + Send;
+
     /// Persist a workspace-owned signal before runtime delivery.
     ///
     /// # Errors
@@ -117,6 +128,21 @@ impl AsyncAgentWorkspaceActivityQueries for AsyncDaemonDb {
         reconcile::reconcile_one(&mut transaction, workspace_id).await?;
         let target = signals::load_signal_target(&mut transaction, workspace_id, member_id).await?;
         commit_activity_transaction(transaction, "signal target read").await?;
+        Ok(target)
+    }
+
+    async fn load_agent_workspace_signal_cleanup_target(
+        &self,
+        daemon_id: &str,
+        workspace_id: &str,
+        member_id: &str,
+    ) -> Result<AgentWorkspaceSignalTarget, CliError> {
+        let mut transaction = begin_activity_transaction(self, "signal cleanup target read").await?;
+        ensure_workspace_scope(&mut transaction, daemon_id, workspace_id).await?;
+        reconcile::reconcile_one(&mut transaction, workspace_id).await?;
+        let target =
+            signals::load_signal_cleanup_target(&mut transaction, workspace_id, member_id).await?;
+        commit_activity_transaction(transaction, "signal cleanup target read").await?;
         Ok(target)
     }
 

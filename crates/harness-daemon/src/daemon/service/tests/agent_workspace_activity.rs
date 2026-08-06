@@ -112,6 +112,7 @@ async fn assert_workspace_signal_round_trip(
     fixture: &WorkspaceActivityFixture,
 ) {
     assert_pending_signal_cancellation(project, fixture).await;
+    assert_unavailable_signal_cancellation(project, fixture).await;
     let sent = send_agent_workspace_signal_async(
         &fixture.db,
         &fixture.workspace_id,
@@ -161,6 +162,69 @@ async fn assert_workspace_signal_round_trip(
         &fixture.member_id,
     )
     .await;
+}
+
+async fn assert_unavailable_signal_cancellation(
+    project: &std::path::Path,
+    fixture: &WorkspaceActivityFixture,
+) {
+    let sent = send_agent_workspace_signal_async(
+        &fixture.db,
+        &fixture.workspace_id,
+        &fixture.member_id,
+        &AgentWorkspaceSignalSendRequest {
+            actor: "test".into(),
+            command: "cancel-unavailable".into(),
+            message: "cancel while the runtime is unavailable".into(),
+            action_hint: None,
+        },
+        WakeDispatch::none(),
+    )
+    .await
+    .expect("send durable signal before runtime becomes unavailable");
+    sqlx::query(
+        "UPDATE agent_workspace_members
+         SET runtime_lifecycle = 'unavailable', liveness_status = 'disconnected'
+         WHERE workspace_id = ?1 AND member_id = ?2",
+    )
+    .bind(&fixture.workspace_id)
+    .bind(&fixture.member_id)
+    .execute(fixture.db.pool())
+    .await
+    .expect("make durable member unavailable");
+
+    let cancelled = cancel_agent_workspace_signal_async(
+        &fixture.db,
+        &fixture.workspace_id,
+        &fixture.member_id,
+        &sent.signal.signal_id,
+        &AgentWorkspaceSignalCancelRequest {
+            actor: "test".into(),
+        },
+    )
+    .await
+    .expect("cancel signal through persisted runtime coordinates");
+    let runtime = runtime::runtime_for_name("codex").expect("Codex runtime");
+    let signal_dir = runtime.signal_dir(project, "workspace-activity-worker");
+    let pending = runtime::signal::read_pending_signals(&signal_dir)
+        .expect("read runtime queue after unavailable cancellation");
+    assert_eq!(cancelled.status, SessionSignalStatus::Rejected);
+    assert!(
+        pending
+            .iter()
+            .all(|signal| signal.signal_id != sent.signal.signal_id)
+    );
+
+    sqlx::query(
+        "UPDATE agent_workspace_members
+         SET runtime_lifecycle = 'unavailable', liveness_status = 'active'
+         WHERE workspace_id = ?1 AND member_id = ?2",
+    )
+    .bind(&fixture.workspace_id)
+    .bind(&fixture.member_id)
+    .execute(fixture.db.pool())
+    .await
+    .expect("restore durable member addressability");
 }
 
 async fn assert_pending_signal_cancellation(
