@@ -26,6 +26,7 @@ serde_json = "1.0.149"
 sha2 = "0.11.0"
 sqlx = { version = "0.9.0-alpha.1", default-features = false, features = ["sqlite", "sqlite-bundled", "runtime-tokio", "tls-rustls-ring", "migrate", "macros", "chrono", "uuid", "json"] }
 tokio = { version = "1.50.0", features = ["rt-multi-thread"] }
+tracing = "0.1.44"
 
 [dev-dependencies]
 # Superset of the `[dependencies]` entry above: adds the `test-support`

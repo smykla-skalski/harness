@@ -1,21 +1,22 @@
 //! Adapts [`DaemonDb`] to `harness_timeline`'s [`TimelineDbSource`] contract.
 //!
-//! `TimelineDbSource` and `DaemonDb` are both defined outside `harness-daemon`
-//! once `DaemonDb` moves into its own crate for #1231, so `harness-daemon`
-//! can no longer implement the trait directly for the type (Rust's orphan
-//! rule needs one of the two to be local). This newtype wrapper is local to
-//! `harness-daemon`, so implementing the foreign trait for it has no such
-//! problem; it delegates to the session/conversation extension traits that
-//! must stay in this crate.
+//! `TimelineDbSource` (owned by `harness-timeline`) and `DaemonDb` (owned by
+//! `harness-daemon-db-core`) are both foreign to this crate, so implementing
+//! the trait directly for the struct would trip Rust's orphan rule. This
+//! newtype wrapper is local here, so implementing the foreign trait for it
+//! has no such problem; it delegates to the session/conversation query
+//! traits this crate already owns.
 
-use crate::agents::runtime::event::ConversationEvent;
-use crate::daemon::db::DaemonDbConversation;
-use crate::daemon::db::{DaemonDb, SessionCoreQueries};
-use crate::session::types::{SessionLogEntry, TaskCheckpoint};
+use harness_daemon_db_core::DaemonDb;
 use harness_kernel::errors::CliError;
+use harness_protocol::agent::ConversationEvent;
+use harness_protocol::session::{SessionLogEntry, TaskCheckpoint};
 use harness_timeline::TimelineDbSource;
 
-pub(crate) struct DaemonDbTimelineHandle<'a>(pub(crate) &'a DaemonDb);
+use crate::conversation::DaemonDbConversation;
+use crate::session_data::SessionCoreQueries;
+
+pub struct DaemonDbTimelineHandle<'a>(pub &'a DaemonDb);
 
 impl TimelineDbSource for DaemonDbTimelineHandle<'_> {
     fn load_session_log(&self, session_id: &str) -> Result<Vec<SessionLogEntry>, CliError> {

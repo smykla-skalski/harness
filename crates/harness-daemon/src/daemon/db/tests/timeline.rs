@@ -1,7 +1,6 @@
 use super::*;
 use crate::daemon::db::DaemonDbConversation;
-use crate::daemon::db::timeline::DaemonDbTimeline;
-use crate::daemon::db_timeline_source::DaemonDbTimelineHandle;
+use crate::daemon::db::{DaemonDbTimeline, DaemonDbTimelineHandle};
 
 /// Regression coverage for the `TimelineDbSource` seam `harness_timeline`
 /// reads through instead of depending on `DaemonDb` directly: builds a

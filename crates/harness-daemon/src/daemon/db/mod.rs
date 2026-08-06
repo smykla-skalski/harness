@@ -35,9 +35,9 @@ pub(crate) use crate::workspace::project_context_id;
 pub(crate) use crate::workspace::utc_now;
 pub(crate) use harness_kernel::errors::{CliError, CliErrorKind};
 
-pub(crate) use super::{
-    index as daemon_index, protocol as daemon_protocol, state, timeline as daemon_timeline,
-};
+#[cfg(test)]
+pub(crate) use super::timeline as daemon_timeline;
+pub(crate) use super::{index as daemon_index, protocol as daemon_protocol, state};
 // The session snapshot layer lives in its own crate, depended on by both
 // `service` and `db` (file-based signal reads, the activity-fold
 // accumulator); this alias keeps every call site below unchanged.
@@ -63,8 +63,6 @@ pub(crate) use harness_daemon_db_queries::AsyncConversationSyncQueries;
 pub(crate) use harness_daemon_db_queries::AsyncDiagnosticsQueries;
 pub(crate) use harness_daemon_db_queries::AsyncSignalReadQueries;
 pub(crate) use harness_daemon_db_queries::AsyncTimelineWindowQueries;
-#[cfg(test)]
-pub(crate) use harness_daemon_db_queries::StoredTimelineEntry;
 mod async_runtime;
 pub(crate) use async_runtime::AsyncRuntimeSnapshotQueries;
 pub(crate) use harness_daemon_db_queries::AsyncSessionStateQueries;
@@ -179,9 +177,9 @@ pub use harness_daemon_db_queries::SessionCoreQueries;
 pub(crate) use session_data::SessionMutationRefresh;
 mod signals;
 pub use harness_daemon_db_queries::SessionSummaryQueries;
-pub use harness_daemon_db_queries::SignalIndexQueries;
-pub(crate) mod timeline;
 pub use harness_daemon_db_queries::SessionWriteQueries;
+pub use harness_daemon_db_queries::SignalIndexQueries;
+pub use harness_daemon_db_queries::{DaemonDbTimeline, DaemonDbTimelineHandle};
 pub(crate) mod prelude;
 
 #[cfg(test)]

@@ -4,7 +4,7 @@ use harness_daemon_db_queries::{
 };
 
 use super::DaemonDbConversation;
-use super::timeline::DaemonDbTimeline;
+use super::DaemonDbTimeline;
 use super::{
     CliError, DaemonDb, PreparedRuntimeTranscriptResync, PreparedSessionResync,
     PreparedTaskCheckpointImport, TaskReviewRebuild, clear_session_conversation_events,
