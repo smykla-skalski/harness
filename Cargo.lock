@@ -3763,6 +3763,7 @@ dependencies = [
  "harness-daemon-db-queries",
  "harness-daemon-discovery",
  "harness-daemon-launchd",
+ "harness-daemon-managed-agents",
  "harness-daemon-provider-credentials",
  "harness-daemon-session-service",
  "harness-daemon-snapshot",
@@ -3992,6 +3993,16 @@ dependencies = [
  "tracing",
  "utoipa",
  "uzers",
+]
+
+[[package]]
+name = "harness-daemon-managed-agents"
+version = "57.0.0"
+dependencies = [
+ "harness-daemon-db-queries",
+ "harness-kernel",
+ "harness-protocol",
+ "harness-task-board",
 ]
 
 [[package]]

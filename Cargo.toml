@@ -15,6 +15,7 @@ members = [
   "crates/harness-daemon-db-queries",
   "crates/harness-daemon-discovery",
   "crates/harness-daemon-launchd",
+  "crates/harness-daemon-managed-agents",
   "crates/harness-daemon-provider-credentials",
   "crates/harness-daemon-remote-cli",
   "crates/harness-daemon-root",
