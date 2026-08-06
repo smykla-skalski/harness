@@ -150,7 +150,9 @@ final class GlobalHotKeyController {
     )
     if status == noErr {
       installedDescriptor = descriptor
-      HarnessMonitorLogger.store.info(
+      // notice, not info: info entries are memory-only in unified logging and
+      // are gone by the time anyone debugs "the shortcut does nothing".
+      HarnessMonitorLogger.store.notice(
         "Registered Open Anything hot key: \(descriptor.displayText, privacy: .public)"
       )
     } else {
