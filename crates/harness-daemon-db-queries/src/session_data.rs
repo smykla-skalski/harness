@@ -1,9 +1,15 @@
+use std::path::Path;
+
 use harness_daemon_db_core::{DaemonDb, db_error, u64_from_i64};
 use harness_kernel::errors::CliError;
 use harness_protocol::session::{SessionLogEntry, SessionState, TaskCheckpoint};
+use harness_session::index as daemon_index;
 use harness_session::service::canonicalize_persisted_session_state;
 use harness_session::storage as session_storage;
 
+use crate::imports::{
+    DaemonDbSessionResync, prepare_session_import_from_resolved, prepare_session_resync,
+};
 use crate::writes::SessionWriteQueries;
 
 /// Session-core reads and writes: state load/save, log entries, task
@@ -12,12 +18,6 @@ use crate::writes::SessionWriteQueries;
 /// `pub`, not `pub(crate)`: `tests/integration` links `harness` as an
 /// ordinary dependency and calls several of these directly on a seeded
 /// `DaemonDb`, the same reason several sync `db` traits stay `pub` elsewhere.
-///
-/// `load_session_state_for_mutation` stays out of this trait: it needs
-/// `harness-daemon`'s file-backed resync helpers (`imports.rs`), not yet
-/// extracted, so it lives on a small `harness-daemon`-local remnant trait
-/// (`SessionMutationRefresh`) that calls back into this one for the plain
-/// state load.
 pub trait SessionCoreQueries {
     /// Load session state by ID.
     ///
@@ -103,6 +103,16 @@ pub trait SessionCoreQueries {
     /// # Errors
     /// Returns [`CliError`] if the project is not found or on SQL failures.
     fn ensure_project_for_dir(&self, project_dir: &str) -> Result<String, CliError>;
+
+    /// Load session state by ID for an in-place mutation, first repairing it
+    /// from file-backed state if the database copy is missing or stale.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL, discovery, or parse failures.
+    fn load_session_state_for_mutation(
+        &self,
+        session_id: &str,
+    ) -> Result<Option<SessionState>, CliError>;
 }
 
 impl SessionCoreQueries for DaemonDb {
@@ -306,4 +316,47 @@ impl SessionCoreQueries for DaemonDb {
             Err(error) => Err(db_error(format!("ensure_project_for_dir: {error}"))),
         }
     }
+
+    fn load_session_state_for_mutation(
+        &self,
+        session_id: &str,
+    ) -> Result<Option<SessionState>, CliError> {
+        session_storage::validate_session_id(session_id)?;
+        refresh_session_state_for_mutation(self, session_id)?;
+        self.load_session_state(session_id)
+    }
+}
+
+fn refresh_session_state_for_mutation(db: &DaemonDb, session_id: &str) -> Result<(), CliError> {
+    let db_version = db.session_state_version(session_id)?;
+    let Some(db_version) = db_version else {
+        let prepared = match prepare_session_resync(session_id) {
+            Ok(prepared) => Some(prepared),
+            Err(error) if error.code() == "KSRCLI090" => None,
+            Err(error) => return Err(error),
+        };
+        if let Some(prepared) = prepared {
+            db.apply_prepared_session_resync(&prepared)?;
+        }
+        return Ok(());
+    };
+    let Some(project_dir) = db.project_dir_for_session(session_id)? else {
+        return Ok(());
+    };
+    let project_dir = Path::new(&project_dir);
+    let layout = session_storage::layout_from_project_dir(project_dir, session_id)?;
+    let Some(file_state) = session_storage::load_state(&layout)? else {
+        return Ok(());
+    };
+    let file_version = i64::try_from(file_state.state_version).unwrap_or(i64::MAX);
+    if db_version >= file_version {
+        return Ok(());
+    }
+    let resolved = daemon_index::ResolvedSession {
+        project: daemon_index::discovered_project_for_checkout(project_dir),
+        state: file_state,
+    };
+    let prepared = prepare_session_import_from_resolved(&resolved)?;
+    db.apply_prepared_session_resync(&prepared)?;
+    Ok(())
 }

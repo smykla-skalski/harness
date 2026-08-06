@@ -1,7 +1,7 @@
 use super::*;
 use crate::daemon::db::DaemonDbConversation;
+use crate::daemon::db::DaemonDbSessionResync;
 use crate::daemon::db::DaemonDbTimeline;
-use crate::daemon::db::imports::DaemonDbSessionResync;
 
 #[test]
 fn prepare_runtime_transcript_resync_only_loads_matching_agent() {

@@ -2,7 +2,7 @@ use harness_daemon_watch::{AsyncWatchStorage, WatchStorage};
 use harness_kernel::errors::CliError;
 use harness_protocol::daemon::task_board::automation_snapshot::TaskBoardAutomationSnapshot;
 
-use crate::daemon::db::imports::DaemonDbSessionResync;
+use crate::daemon::db::DaemonDbSessionResync;
 use crate::daemon::db::task_board::prelude::TaskBoardAutomationSchedulerQueries;
 use crate::daemon::db::{
     AsyncChangeTrackingQueries, AsyncDaemonDb, ChangeTrackingQueries,

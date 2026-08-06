@@ -1,4 +1,4 @@
-use crate::daemon::db::imports::DaemonDbSessionResync;
+use crate::daemon::db::DaemonDbSessionResync;
 use std::sync::{Arc, Mutex};
 
 use tokio::task::spawn_blocking;
