@@ -1,17 +1,24 @@
 use std::time::Instant;
 
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::HeaderMap;
 use axum::response::Response;
 
 use crate::daemon::protocol::http_paths;
 use crate::daemon::protocol::{ManagedAgentListResponse, ManagedAgentSnapshotSchema};
+use harness_protocol::session::ManagedAgentKind;
+use serde::Deserialize;
 
 use super::super::DaemonHttpState;
 use super::super::auth::require_auth;
 use super::super::openapi::DaemonErrorBody;
 use super::super::response::{extract_request_id, timed_json};
 use super::{managed_agent_list_response_async, managed_agent_snapshot_async};
+
+#[derive(Debug, Default, Deserialize)]
+pub(crate) struct ManagedAgentDetailQuery {
+    managed_agent_kind: Option<ManagedAgentKind>,
+}
 
 #[utoipa::path(
     get,
@@ -53,6 +60,7 @@ pub(crate) async fn get_managed_agents(
     description = "Fetch the current snapshot of a managed agent by its identifier",
     params(
         ("managed_agent_id" = String, Path, description = "Managed agent identifier"),
+        ("managed_agent_kind" = Option<ManagedAgentKind>, Query, description = "Runtime family that qualifies identifiers shared by multiple managers"),
     ),
     responses(
         (status = 200, description = "Managed agent snapshot", body = ManagedAgentSnapshotSchema),
@@ -61,6 +69,7 @@ pub(crate) async fn get_managed_agents(
 )]
 pub(crate) async fn get_managed_agent(
     Path(managed_agent_id): Path<String>,
+    Query(query): Query<ManagedAgentDetailQuery>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
 ) -> Response {
@@ -74,6 +83,6 @@ pub(crate) async fn get_managed_agent(
         http_paths::MANAGED_AGENT_DETAIL,
         &request_id,
         start,
-        managed_agent_snapshot_async(&state, &managed_agent_id).await,
+        managed_agent_snapshot_async(&state, &managed_agent_id, query.managed_agent_kind).await,
     )
 }

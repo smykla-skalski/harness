@@ -1,18 +1,21 @@
-use crate::daemon::http::DaemonHttpState;
+use crate::daemon::http::{DaemonHttpState, require_async_db};
 use crate::daemon::protocol::{
     AgentRemoveRequest, LeaderTransferRequest, ObserveSessionRequest, RoleChangeRequest,
     SessionEndRequest, SignalCancelRequest, SignalSendRequest, TaskArbitrateRequest,
     TaskAssignRequest, TaskCheckpointRequest, TaskClaimReviewRequest, TaskCreateRequest,
     TaskDeleteRequest, TaskDropRequest, TaskQueuePolicyRequest, TaskRespondReviewRequest,
     TaskSubmitForReviewRequest, TaskSubmitReviewRequest, TaskUpdateRequest, WsRequest, WsResponse,
+    bind_control_plane_actor_value,
 };
 use crate::daemon::service;
 
+use super::super::frames::error_response;
 use super::super::mutations::{
     dispatch_mutation_prefer_async, dispatch_mutation_with_agent_prefer_async,
     dispatch_mutation_with_task_prefer_async,
-    dispatch_mutation_with_task_preserving_actor_prefer_async,
+    dispatch_mutation_with_task_preserving_actor_prefer_async, dispatch_query_result,
 };
+use super::super::params::extract_string_param;
 
 mod improver_apply;
 
@@ -243,6 +246,35 @@ pub(super) async fn dispatch_agent_remove(
         },
     )
     .await
+}
+
+pub(super) async fn dispatch_agent_workspace_member_remove(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> WsResponse {
+    let Some(workspace_id) = extract_string_param(&request.params, "workspace_id") else {
+        return error_response(&request.id, "MISSING_PARAM", "missing workspace_id");
+    };
+    let Some(member_id) = extract_string_param(&request.params, "member_id") else {
+        return error_response(&request.id, "MISSING_PARAM", "missing member_id");
+    };
+    let mut params = request.params.clone();
+    bind_control_plane_actor_value(&mut params);
+    if let Err(error) = serde_json::from_value::<AgentRemoveRequest>(params) {
+        return error_response(
+            &request.id,
+            "INVALID_PARAMS",
+            &format!("failed to parse request params: {error}"),
+        );
+    }
+    let mut result = match require_async_db(state, "agent workspace member removal") {
+        Ok(db) => service::remove_agent_workspace_member_async(db, &workspace_id, &member_id).await,
+        Err(error) => Err(error),
+    };
+    if let Ok(response) = &mut result {
+        crate::daemon::http::hydrate_agent_workspace_team_runtime(state, response).await;
+    }
+    dispatch_query_result(&request.id, result)
 }
 
 pub(super) async fn dispatch_leader_transfer(

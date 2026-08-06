@@ -10,6 +10,8 @@ pub const DAEMON_LOG_LEVEL: &str = "daemon.log_level";
 pub const DAEMON_SET_LOG_LEVEL: &str = "daemon.set_log_level";
 pub const PROJECTS: &str = "projects";
 pub const AGENT_WORKSPACES: &str = "agent_workspaces";
+pub const AGENT_WORKSPACE_TEAM: &str = "agent_workspace.team";
+pub const AGENT_WORKSPACE_MEMBER_REMOVE: &str = "agent_workspace.member.remove";
 pub const SESSIONS: &str = "sessions";
 pub const RUNTIME_SESSION_RESOLVE: &str = "runtime_session.resolve";
 pub const RUNTIMES_PROBE: &str = "runtimes.probe";
@@ -216,6 +218,8 @@ pub const ALL: &[&str] = &[
     DAEMON_SET_LOG_LEVEL,
     PROJECTS,
     AGENT_WORKSPACES,
+    AGENT_WORKSPACE_TEAM,
+    AGENT_WORKSPACE_MEMBER_REMOVE,
     SESSIONS,
     RUNTIME_SESSION_RESOLVE,
     RUNTIMES_PROBE,

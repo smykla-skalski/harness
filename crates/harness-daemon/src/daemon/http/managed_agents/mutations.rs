@@ -20,8 +20,8 @@ use super::super::auth::{authorize_control_request, require_auth};
 use super::super::openapi::DaemonErrorBody;
 use super::super::response::{extract_request_id, timed_json};
 use super::{
-    ensure_codex_agent, ensure_terminal_agent_async, run_acp_agent_blocking,
-    run_codex_agent_blocking, run_terminal_agent_blocking,
+    ensure_codex_agent, ensure_terminal_agent_async, run_codex_agent_blocking,
+    run_terminal_agent_blocking,
 };
 
 #[utoipa::path(
@@ -218,78 +218,6 @@ pub(super) async fn post_terminal_agent_resize(
     timed_json(
         "POST",
         http_paths::MANAGED_AGENT_RESIZE,
-        &request_id,
-        start,
-        result,
-    )
-}
-
-#[utoipa::path(
-    post,
-    path = "/v1/managed-agents/{managed_agent_id}/stop",
-    tag = "managed-agents",
-    description = "Stop a managed agent, probing the Codex, ACP, and terminal agent managers in turn to locate which backend owns the given identifier",
-    params(
-        ("managed_agent_id" = String, Path, description = "Managed agent identifier"),
-    ),
-    responses(
-        (status = 200, description = "Managed agent snapshot after stop", body = ManagedAgentSnapshotSchema),
-        (status = 400, description = "Request error", body = DaemonErrorBody),
-    ),
-)]
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "managed-agent stop probes codex, ACP, then terminal managers explicitly"
-)]
-pub(super) async fn post_terminal_agent_stop(
-    Path(managed_agent_id): Path<String>,
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-) -> Response {
-    let start = Instant::now();
-    let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
-        return *response;
-    }
-    let result = match state.codex_controller.session_id_for_run(&managed_agent_id) {
-        Ok(session_id) => {
-            let agent_id = managed_agent_id.clone();
-            with_managed_agent_lock(&state, &session_id, &managed_agent_id, || {
-                run_codex_agent_blocking(&state, "stop", move |controller| {
-                    controller.stop(&agent_id).map(ManagedAgentSnapshot::Codex)
-                })
-            })
-            .await
-        }
-        Err(error) if error.code() == "KSRCLI090" => {
-            if let Ok(snapshot) = state.acp_agent_manager.get(&managed_agent_id) {
-                let session_id = snapshot.session_id;
-                let agent_id = managed_agent_id.clone();
-                with_managed_agent_lock(&state, &session_id, &managed_agent_id, || {
-                    run_acp_agent_blocking(&state, "stop", move |manager| {
-                        manager.stop(&agent_id).map(ManagedAgentSnapshot::Acp)
-                    })
-                })
-                .await
-            } else {
-                match ensure_terminal_agent_async(&state, &managed_agent_id).await {
-                    Ok(()) => {
-                        let agent_id = managed_agent_id.clone();
-                        run_terminal_agent_blocking(&state, "stop", move |manager| {
-                            manager.stop(&agent_id)
-                        })
-                        .await
-                        .map(ManagedAgentSnapshot::Terminal)
-                    }
-                    Err(error) => Err(error),
-                }
-            }
-        }
-        Err(error) => Err(error),
-    };
-    timed_json(
-        "POST",
-        http_paths::MANAGED_AGENT_STOP,
         &request_id,
         start,
         result,

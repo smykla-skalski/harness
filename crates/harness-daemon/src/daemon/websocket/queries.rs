@@ -1,5 +1,4 @@
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
 
 use tokio::sync::broadcast;
 
@@ -19,12 +18,18 @@ use harness_kernel::errors::CliError;
 use harness_protocol::timeline::TimelineWindowRequest;
 
 use super::config::build_config_payload;
-use super::connection::ConnectionState;
 use super::frames::error_response;
 use super::mutations::{dispatch_query, dispatch_query_result};
 use super::params::{
     extract_cursor_param, extract_i64_param, extract_managed_agent_id, extract_session_id,
     extract_string_param, extract_u64_param,
+};
+
+mod subscriptions;
+
+pub(crate) use subscriptions::{
+    handle_session_subscribe, handle_session_unsubscribe, handle_stream_subscribe,
+    handle_stream_unsubscribe,
 };
 
 #[cfg(test)]
@@ -89,6 +94,9 @@ async fn dispatch_daemon_inventory_query(
         ws_methods::PROJECTS => Some(dispatch_projects_query(&request.id, state).await),
         ws_methods::AGENT_WORKSPACES => {
             Some(dispatch_agent_workspaces_query(&request.id, state).await)
+        }
+        ws_methods::AGENT_WORKSPACE_TEAM => {
+            Some(dispatch_agent_workspace_team_query(request, state).await)
         }
         ws_methods::SESSIONS => Some(dispatch_sessions_query(&request.id, state).await),
         ws_methods::RUNTIME_SESSION_RESOLVE => {
@@ -195,6 +203,23 @@ async fn dispatch_agent_workspaces_query(request_id: &str, state: &DaemonHttpSta
         Err(error) => Err(error),
     };
     dispatch_query_result(request_id, result)
+}
+
+async fn dispatch_agent_workspace_team_query(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> WsResponse {
+    let Some(workspace_id) = extract_string_param(&request.params, "workspace_id") else {
+        return error_response(&request.id, "MISSING_PARAM", "missing workspace_id");
+    };
+    let mut result = match require_async_db(state, "agent workspace team") {
+        Ok(async_db) => service::get_agent_workspace_team_async(async_db, &workspace_id).await,
+        Err(error) => Err(error),
+    };
+    if let Ok(response) = &mut result {
+        crate::daemon::http::hydrate_agent_workspace_team_runtime(state, response).await;
+    }
+    dispatch_query_result(&request.id, result)
 }
 
 async fn dispatch_sessions_query(request_id: &str, state: &DaemonHttpState) -> WsResponse {
@@ -319,10 +344,23 @@ async fn dispatch_managed_agent_detail_query(
     let Some(agent_id) = extract_managed_agent_id(&request.params) else {
         return error_response(&request.id, "MISSING_PARAM", "missing managed_agent_id");
     };
+    let requested_kind = match request.params.get("managed_agent_kind") {
+        Some(value) => match serde_json::from_value(value.clone()) {
+            Ok(kind) => Some(kind),
+            Err(error) => {
+                return error_response(
+                    &request.id,
+                    "INVALID_PARAMS",
+                    &format!("invalid managed_agent_kind: {error}"),
+                );
+            }
+        },
+        None => None,
+    };
 
     dispatch_query_result(
         &request.id,
-        managed_agent_snapshot_async(state, &agent_id).await,
+        managed_agent_snapshot_async(state, &agent_id, requested_kind).await,
     )
 }
 
@@ -443,75 +481,6 @@ fn schedule_extensions_push(
         service::broadcast_session_extensions_async(&sender, &session_id, Some(async_db.as_ref()))
             .await;
     });
-}
-
-pub(crate) async fn handle_session_subscribe(
-    request: &WsRequest,
-    state: &DaemonHttpState,
-    connection: &Arc<Mutex<ConnectionState>>,
-) -> WsResponse {
-    let Some(session_id) = extract_session_id(&request.params) else {
-        return error_response(&request.id, "MISSING_PARAM", "missing session_id");
-    };
-
-    {
-        let mut state = connection.lock().expect("connection lock");
-        state.session_subscriptions.insert(session_id.clone());
-    }
-
-    match require_async_db(state, "session subscribe snapshot") {
-        Ok(async_db) => {
-            service::broadcast_session_snapshot_async(&state.sender, &session_id, Some(async_db))
-                .await;
-            super::frames::ok_response(&request.id, serde_json::json!({ "ok": true }))
-        }
-        Err(error) => dispatch_query_result(&request.id, Err::<serde_json::Value, _>(error)),
-    }
-}
-
-pub(crate) fn handle_session_unsubscribe(
-    request: &WsRequest,
-    connection: &Arc<Mutex<ConnectionState>>,
-) -> WsResponse {
-    let Some(session_id) = extract_session_id(&request.params) else {
-        return error_response(&request.id, "MISSING_PARAM", "missing session_id");
-    };
-
-    {
-        let mut state = connection.lock().expect("connection lock");
-        state.session_subscriptions.remove(&session_id);
-    }
-
-    super::frames::ok_response(&request.id, serde_json::json!({ "ok": true }))
-}
-
-pub(crate) async fn handle_stream_subscribe(
-    request: &WsRequest,
-    state: &DaemonHttpState,
-    connection: &Arc<Mutex<ConnectionState>>,
-) -> WsResponse {
-    {
-        let mut state = connection.lock().expect("connection lock");
-        state.global_subscription = true;
-    }
-    match require_async_db(state, "stream subscribe snapshot") {
-        Ok(async_db) => {
-            service::broadcast_sessions_updated_async(&state.sender, Some(async_db)).await;
-            super::frames::ok_response(&request.id, serde_json::json!({ "ok": true }))
-        }
-        Err(error) => dispatch_query_result(&request.id, Err::<serde_json::Value, _>(error)),
-    }
-}
-
-pub(crate) fn handle_stream_unsubscribe(
-    request: &WsRequest,
-    connection: &Arc<Mutex<ConnectionState>>,
-) -> WsResponse {
-    {
-        let mut state = connection.lock().expect("connection lock");
-        state.global_subscription = false;
-    }
-    super::frames::ok_response(&request.id, serde_json::json!({ "ok": true }))
 }
 
 #[cfg(test)]

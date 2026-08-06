@@ -1,7 +1,7 @@
 use std::time::Instant;
 
 use axum::Json;
-use axum::extract::State;
+use axum::extract::{Path, State};
 use axum::http::HeaderMap;
 use axum::response::Response;
 use axum::routing::get;
@@ -10,22 +10,22 @@ use utoipa_axum::routes;
 
 use axum::extract::Query;
 
-use crate::daemon::protocol::{RuntimeSessionResolutionResponse, http_paths};
+use crate::daemon::protocol::{AgentRemoveRequest, RuntimeSessionResolutionResponse, http_paths};
 use crate::daemon::remote_diagnostics::project_diagnostics_report;
 use crate::daemon::remote_viewer::is_remote_viewer;
 use crate::daemon::service;
 use harness_daemon_acp_probe::cached_probe_snapshot;
 use harness_kernel::errors::CliErrorKind;
 use harness_protocol::daemon::summaries::{
-    AgentWorkspaceListResponse, DaemonTelemetryRequest, DaemonTelemetryResponse, HealthResponse,
-    ReadinessResponse,
+    AgentWorkspaceListResponse, AgentWorkspaceTeamResponse, DaemonTelemetryRequest,
+    DaemonTelemetryResponse, HealthResponse, ReadinessResponse,
 };
 use harness_protocol::daemon::{HeadlessReadinessReport, HeadlessReadinessRequest};
 
 use super::openapi::DaemonErrorBody;
 use crate::daemon::protocol::{DaemonDiagnosticsReport, ProjectSummary};
 
-use super::auth::{authenticated_remote_client, require_auth};
+use super::auth::{authenticated_remote_client, authorize_control_request, require_auth};
 use super::response::{extract_request_id, timed_json};
 use super::stream::stream_global;
 use super::{DaemonHttpState, require_async_db};
@@ -68,6 +68,8 @@ fn discovery_routes() -> OpenApiRouter<DaemonHttpState> {
     OpenApiRouter::new()
         .routes(routes!(get_projects))
         .routes(routes!(get_agent_workspaces))
+        .routes(routes!(get_agent_workspace_team))
+        .routes(routes!(post_agent_workspace_member_remove))
         .routes(routes!(get_runtime_session_resolution))
         .routes(routes!(control::get_runtimes_probe))
         .route(http_paths::WS, get(ws_upgrade_handler))
@@ -361,6 +363,85 @@ pub(super) async fn get_agent_workspaces(
     timed_json(
         "GET",
         http_paths::AGENT_WORKSPACES,
+        &request_id,
+        start,
+        result,
+    )
+}
+
+#[utoipa::path(
+    get,
+    path = "/v1/agent-workspaces/{workspace_id}/team",
+    tag = "daemon",
+    description = "Return the verified workspace-owned agent team and reconciliation blockers",
+    params(("workspace_id" = String, Path, description = "Durable workspace identifier")),
+    responses(
+        (status = 200, description = "Verified durable agent team", body = AgentWorkspaceTeamResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+)]
+pub(super) async fn get_agent_workspace_team(
+    headers: HeaderMap,
+    Path(workspace_id): Path<String>,
+    State(state): State<DaemonHttpState>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    let mut result = match require_async_db(&state, "agent workspace team") {
+        Ok(async_db) => service::get_agent_workspace_team_async(async_db, &workspace_id).await,
+        Err(error) => Err(error),
+    };
+    if let Ok(response) = &mut result {
+        super::managed_agents::hydrate_agent_workspace_team_runtime(&state, response).await;
+    }
+    timed_json(
+        "GET",
+        http_paths::AGENT_WORKSPACE_TEAM,
+        &request_id,
+        start,
+        result,
+    )
+}
+
+#[utoipa::path(
+    post,
+    path = "/v1/agent-workspaces/{workspace_id}/members/{member_id}/remove",
+    tag = "agents",
+    description = "Remove durable workspace membership without stopping the member runtime",
+    params(
+        ("workspace_id" = String, Path, description = "Durable workspace identifier"),
+        ("member_id" = String, Path, description = "Workspace-owned member identifier"),
+    ),
+    request_body = AgentRemoveRequest,
+    responses(
+        (status = 200, description = "Updated durable agent team", body = AgentWorkspaceTeamResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+)]
+pub(super) async fn post_agent_workspace_member_remove(
+    headers: HeaderMap,
+    Path((workspace_id, member_id)): Path<(String, String)>,
+    State(state): State<DaemonHttpState>,
+    Json(mut request): Json<AgentRemoveRequest>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = authorize_control_request(&headers, &state, &mut request) {
+        return *response;
+    }
+    let mut result = match require_async_db(&state, "agent workspace member removal") {
+        Ok(db) => service::remove_agent_workspace_member_async(db, &workspace_id, &member_id).await,
+        Err(error) => Err(error),
+    };
+    if let Ok(response) = &mut result {
+        super::managed_agents::hydrate_agent_workspace_team_runtime(&state, response).await;
+    }
+    timed_json(
+        "POST",
+        http_paths::AGENT_WORKSPACE_MEMBER_REMOVE,
         &request_id,
         start,
         result,

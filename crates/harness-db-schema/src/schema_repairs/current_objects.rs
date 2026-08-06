@@ -54,6 +54,10 @@ const CURRENT_SCHEMA_TABLES: &[&str] = &[
     "agent_workspace_legacy_sessions",
     "agent_workspace_reconciliation",
     "agent_workspace_reconcile_queue",
+    "agent_workspace_teams",
+    "agent_workspace_members",
+    "agent_workspace_member_provenance",
+    "agent_workspace_member_operations",
 ];
 
 const CURRENT_SCHEMA_POLICY_COLUMNS: &[(&str, &str)] = &[
@@ -112,6 +116,20 @@ const CURRENT_SCHEMA_TRIGGERS: &[&str] = &[
     "agent_workspace_queue_session_update",
     "agent_workspace_queue_session_delete",
     "agent_workspace_queue_project_update",
+    "agent_workspace_team_source_agent_insert",
+    "agent_workspace_team_source_agent_update",
+    "agent_workspace_team_source_agent_delete",
+    "agent_workspace_team_source_session_update",
+    "agent_workspace_team_source_tui_insert",
+    "agent_workspace_team_source_tui_update",
+    "agent_workspace_team_source_tui_delete",
+    "agent_workspace_team_source_codex_insert",
+    "agent_workspace_team_source_codex_update",
+    "agent_workspace_team_source_codex_delete",
+    "agent_workspace_team_source_provenance_insert",
+    "agent_workspace_team_source_provenance_update",
+    "agent_workspace_team_source_provenance_delete",
+    "agent_workspace_team_detach_session",
 ];
 
 const CURRENT_SCHEMA_INDEXES: &[&str] = &[
@@ -120,6 +138,13 @@ const CURRENT_SCHEMA_INDEXES: &[&str] = &[
     "idx_agent_workspaces_project",
     "idx_agent_workspace_selected_session",
     "idx_agent_workspace_reconciliation_idempotency",
+    "idx_agent_workspace_member_managed_identity",
+    "idx_agent_workspace_member_managed_lookup",
+    "idx_agent_workspace_member_source",
+    "idx_agent_workspace_member_provenance_member",
+    "idx_agent_workspace_member_provenance_source",
+    "idx_agent_workspace_legacy_sessions_session",
+    "idx_agent_workspace_member_operations_member",
 ];
 
 const CURRENT_SCHEMA_REMOTE_ACME_COLUMNS: &[(&str, &str)] = &[

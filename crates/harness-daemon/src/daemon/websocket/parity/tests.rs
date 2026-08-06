@@ -228,6 +228,7 @@ async fn dispatch_managed_agent_stop_cancels_stale_codex_run_without_detail_reco
         method: "managed_agent.stop".into(),
         params: json!({
             "managed_agent_id": "codex-stale",
+            "managed_agent_kind": "codex",
         }),
         trace_context: None,
     };

@@ -108,6 +108,24 @@ fn repair_restores_durable_workspace_objects() {
     assert_schema_object_exists(&db, "trigger", "agent_workspace_queue_session_insert");
 }
 
+#[test]
+fn repair_restores_durable_team_objects() {
+    let db = DaemonDb::open_in_memory().expect("open current database");
+    db.connection()
+        .execute_batch(
+            "DROP TRIGGER agent_workspace_team_source_tui_delete;
+             DROP INDEX idx_agent_workspace_member_operations_member;
+             DROP TABLE agent_workspace_member_operations;",
+        )
+        .expect("drop durable team objects");
+
+    repair_current_schema_shape(db.connection(), SCHEMA_VERSION).expect("repair schema shape");
+
+    assert_schema_object_exists(&db, "table", "agent_workspace_member_operations");
+    assert_schema_object_exists(&db, "index", "idx_agent_workspace_member_operations_member");
+    assert_schema_object_exists(&db, "trigger", "agent_workspace_team_source_tui_delete");
+}
+
 fn assert_schema_object_exists(db: &DaemonDb, object_type: &str, name: &str) {
     let restored: i64 = db
         .connection()

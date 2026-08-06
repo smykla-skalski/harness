@@ -98,3 +98,4 @@ pub mod schema_v60;
 pub mod schema_v61;
 pub mod schema_v62;
 pub mod schema_v63;
+pub mod schema_v64;

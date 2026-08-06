@@ -123,6 +123,22 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Get,
+        path: http_paths::AGENT_WORKSPACE_TEAM,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::AGENT_WORKSPACE_TEAM,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
+        path: http_paths::AGENT_WORKSPACE_MEMBER_REMOVE,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::AGENT_WORKSPACE_MEMBER_REMOVE,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Get,
         path: http_paths::RUNTIME_SESSION_RESOLVE,
         parity: HttpRouteParity::Rpc {
             ws_method: ws_methods::RUNTIME_SESSION_RESOLVE,

@@ -80,6 +80,150 @@
         "x-websocket-method": "agent_workspaces"
       }
     },
+    "/v1/agent-workspaces/{workspace_id}/members/{member_id}/remove": {
+      "post": {
+        "tags": [
+          "agents"
+        ],
+        "description": "Remove durable workspace membership without stopping the member runtime",
+        "operationId": "post_agent_workspace_member_remove",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "Durable workspace identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "member_id",
+            "in": "path",
+            "description": "Workspace-owned member identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentRemoveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Updated durable agent team",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentWorkspaceTeamResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "agent_workspace.member.remove"
+      }
+    },
+    "/v1/agent-workspaces/{workspace_id}/team": {
+      "get": {
+        "tags": [
+          "daemon"
+        ],
+        "description": "Return the verified workspace-owned agent team and reconciliation blockers",
+        "operationId": "get_agent_workspace_team",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "Durable workspace identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Verified durable agent team",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentWorkspaceTeamResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "agent_workspace.team"
+      }
+    },
     "/v1/audit/events": {
       "get": {
         "tags": [
@@ -1009,6 +1153,15 @@
             "required": true,
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "managed_agent_kind",
+            "in": "query",
+            "description": "Runtime family that qualifies identifiers shared by multiple managers",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ManagedAgentKind"
             }
           }
         ],
@@ -1992,8 +2145,8 @@
         "tags": [
           "managed-agents"
         ],
-        "description": "Stop a managed agent, probing the Codex, ACP, and terminal agent managers in turn to locate which backend owns the given identifier",
-        "operationId": "post_terminal_agent_stop",
+        "description": "Stop the single managed runtime owning an identifier and reject ambiguous cross-family identifiers",
+        "operationId": "post_managed_agent_stop",
         "parameters": [
           {
             "name": "managed_agent_id",
@@ -2002,6 +2155,15 @@
             "required": true,
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "managed_agent_kind",
+            "in": "query",
+            "description": "Runtime family that qualifies identifiers shared by multiple managers",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ManagedAgentKind"
             }
           }
         ],
@@ -15966,6 +16128,204 @@
           }
         }
       },
+      "AgentWorkspaceLivenessStatus": {
+        "type": "string",
+        "enum": [
+          "active",
+          "idle",
+          "awaiting_review",
+          "disconnected",
+          "removed",
+          "unknown"
+        ]
+      },
+      "AgentWorkspaceManagedIdentity": {
+        "type": "object",
+        "required": [
+          "kind",
+          "managed_agent_id"
+        ],
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/ManagedAgentKind"
+          },
+          "managed_agent_id": {
+            "type": "string"
+          }
+        }
+      },
+      "AgentWorkspaceMemberOperationKind": {
+        "type": "string",
+        "enum": [
+          "runtime_stop",
+          "membership_remove"
+        ]
+      },
+      "AgentWorkspaceMemberOperationOutcome": {
+        "type": "string",
+        "enum": [
+          "succeeded",
+          "failed"
+        ]
+      },
+      "AgentWorkspaceMemberOperationResult": {
+        "type": "object",
+        "required": [
+          "operation_id",
+          "kind",
+          "outcome",
+          "before_state",
+          "after_state",
+          "recorded_at"
+        ],
+        "properties": {
+          "after_state": {
+            "type": "string"
+          },
+          "before_state": {
+            "type": "string"
+          },
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "$ref": "#/components/schemas/AgentWorkspaceMemberOperationKind"
+          },
+          "operation_id": {
+            "type": "string"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/AgentWorkspaceMemberOperationOutcome"
+          },
+          "recorded_at": {
+            "type": "string"
+          }
+        }
+      },
+      "AgentWorkspaceMemberProvenance": {
+        "type": "object",
+        "properties": {
+          "legacy_agent_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "legacy_session_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "AgentWorkspaceMemberSummary": {
+        "type": "object",
+        "required": [
+          "member_id",
+          "runtime_kind",
+          "display_name",
+          "membership_status",
+          "liveness_status",
+          "runtime_lifecycle",
+          "runtime_evidence",
+          "updated_at"
+        ],
+        "properties": {
+          "assignment_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "joined_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "last_activity_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "liveness_status": {
+            "$ref": "#/components/schemas/AgentWorkspaceLivenessStatus"
+          },
+          "managed_identity": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AgentWorkspaceManagedIdentity"
+              }
+            ]
+          },
+          "member_id": {
+            "type": "string"
+          },
+          "membership_status": {
+            "$ref": "#/components/schemas/AgentWorkspaceMembershipStatus"
+          },
+          "provenance": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentWorkspaceMemberProvenance"
+            }
+          },
+          "recent_operations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentWorkspaceMemberOperationResult"
+            }
+          },
+          "role": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SessionRole"
+              }
+            ]
+          },
+          "runtime_evidence": {
+            "type": "string"
+          },
+          "runtime_kind": {
+            "type": "string"
+          },
+          "runtime_lifecycle": {
+            "$ref": "#/components/schemas/AgentWorkspaceRuntimeLifecycle"
+          },
+          "runtime_session_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        }
+      },
+      "AgentWorkspaceMembershipStatus": {
+        "type": "string",
+        "enum": [
+          "pending_registration",
+          "joined",
+          "removed",
+          "historical"
+        ]
+      },
       "AgentWorkspaceOrchestrationAuthority": {
         "type": "string",
         "description": "Which store currently owns orchestration mutations for a durable workspace.\n\nWorkspace identity is already durable when this is `LegacySession`; only the\nstill-unmigrated orchestration domains continue to use the selected Session.",
@@ -16014,6 +16374,16 @@
             "type": "string"
           }
         }
+      },
+      "AgentWorkspaceRuntimeLifecycle": {
+        "type": "string",
+        "enum": [
+          "running",
+          "recoverable",
+          "completed",
+          "failed",
+          "unavailable"
+        ]
       },
       "AgentWorkspaceSummary": {
         "type": "object",
@@ -16072,6 +16442,109 @@
               "string",
               "null"
             ]
+          }
+        }
+      },
+      "AgentWorkspaceTeamAuthority": {
+        "type": "string",
+        "description": "Which store owns agent-team mutations for one durable workspace.",
+        "enum": [
+          "legacy_session",
+          "workspace"
+        ]
+      },
+      "AgentWorkspaceTeamConflict": {
+        "type": "object",
+        "required": [
+          "kind",
+          "detail"
+        ],
+        "properties": {
+          "detail": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/AgentWorkspaceTeamConflictKind"
+          },
+          "legacy_session_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "managed_identity": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AgentWorkspaceManagedIdentity"
+              }
+            ]
+          }
+        }
+      },
+      "AgentWorkspaceTeamConflictKind": {
+        "type": "string",
+        "enum": [
+          "identity_collision",
+          "malformed_source",
+          "source_disagreement"
+        ]
+      },
+      "AgentWorkspaceTeamResponse": {
+        "type": "object",
+        "properties": {
+          "conflicts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentWorkspaceTeamConflict"
+            }
+          },
+          "team": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AgentWorkspaceTeamSummary"
+              }
+            ]
+          }
+        }
+      },
+      "AgentWorkspaceTeamSummary": {
+        "type": "object",
+        "required": [
+          "workspace_id",
+          "authority",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "authority": {
+            "$ref": "#/components/schemas/AgentWorkspaceTeamAuthority"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "leader_member_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentWorkspaceMemberSummary"
+            }
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "workspace_id": {
+            "type": "string"
           }
         }
       },

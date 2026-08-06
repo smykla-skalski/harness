@@ -10,6 +10,7 @@
 //! which is a different problem than this crate solves.
 
 mod activity_fold;
+mod agent_workspace_teams;
 mod agent_workspaces;
 mod async_agents;
 mod async_change_tracking;
@@ -45,6 +46,10 @@ mod timeline_store;
 mod writes;
 
 pub use activity_fold::DaemonDbActivityFold;
+pub use agent_workspace_teams::{
+    AsyncAgentWorkspaceTeamOperationPreflightQueries, AsyncAgentWorkspaceTeamOperationQueries,
+    AsyncAgentWorkspaceTeamQueries,
+};
 pub use agent_workspaces::AsyncAgentWorkspaceQueries;
 pub use async_agents::AsyncAgentResolutionQueries;
 pub use async_change_tracking::AsyncChangeTrackingQueries;

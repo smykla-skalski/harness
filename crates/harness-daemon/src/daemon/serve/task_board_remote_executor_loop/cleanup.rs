@@ -135,13 +135,17 @@ pub(super) async fn cleanup_unstarted_executor_provisioning(
         workspace.exists().then_some(workspace.as_path()),
     )
     .await?;
-    let cleanup_origin = origin.clone();
-    spawn_blocking(move || destroy_executor_session(&cleanup_origin, &layout))
-        .await
-        .map_err(|error| workflow_io(format!("join remote provisioning cleanup: {error}")))??;
     if had_session_row {
-        db.delete_session_row(&authority.identity.session_id)
-            .await?;
+        crate::daemon::service::delete_session_with_artifact_cleanup_async(
+            db,
+            &authority.identity.session_id,
+            move |_| destroy_executor_session(&origin, &layout),
+        )
+        .await?;
+    } else {
+        spawn_blocking(move || destroy_executor_session(&origin, &layout))
+            .await
+            .map_err(|error| workflow_io(format!("join remote provisioning cleanup: {error}")))??;
     }
     Ok(true)
 }
@@ -260,11 +264,12 @@ async fn cleanup_executor_session(
             .as_deref()
             .ok_or_else(|| concurrent("remote executor cleanup has no frozen checkout path"))?,
     );
-    let layout_for_worker = layout.clone();
-    spawn_blocking(move || destroy_executor_session(&origin, &layout_for_worker))
-        .await
-        .map_err(|error| workflow_io(format!("join remote executor cleanup: {error}")))??;
-    db.delete_session_row(&identity.session_id).await?;
+    crate::daemon::service::delete_session_with_artifact_cleanup_async(
+        db,
+        &identity.session_id,
+        move |_| destroy_executor_session(&origin, &layout),
+    )
+    .await?;
     Ok(())
 }
 

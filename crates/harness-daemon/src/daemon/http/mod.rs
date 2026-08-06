@@ -77,9 +77,10 @@ pub use companion::{
 };
 pub(crate) use managed_agents::{
     acp_inspect_response, acp_transcript_response, ensure_acp_agent, ensure_acp_enabled,
-    ensure_codex_agent, ensure_terminal_agent_async, managed_agent_list_response_async,
-    managed_agent_snapshot_async, run_acp_agent_blocking, run_codex_agent_blocking,
-    run_terminal_agent_blocking,
+    ensure_codex_agent, ensure_terminal_agent_async, hydrate_agent_workspace_team_runtime,
+    locate_managed_agent_kind, managed_agent_list_response_async, managed_agent_snapshot_async,
+    record_runtime_stop_result, run_acp_agent_blocking, run_codex_agent_blocking,
+    run_terminal_agent_blocking, stop_managed_agent,
 };
 pub(crate) use remote_limits::prepare_remote_websocket_upgrade;
 pub(crate) use response::{error_status_and_body, extract_request_id};

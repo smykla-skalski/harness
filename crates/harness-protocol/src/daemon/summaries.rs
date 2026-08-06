@@ -6,6 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::session::{ManagedAgentKind, SessionRole};
 use crate::timeline::TimelineEntry;
 
 /// Which store currently owns orchestration mutations for a durable workspace.
@@ -83,6 +84,150 @@ pub struct AgentWorkspaceConflict {
 pub struct AgentWorkspaceListResponse {
     pub workspaces: Vec<AgentWorkspaceSummary>,
     pub conflicts: Vec<AgentWorkspaceConflict>,
+}
+
+/// Which store owns agent-team mutations for one durable workspace.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentWorkspaceTeamAuthority {
+    LegacySession,
+    Workspace,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentWorkspaceMembershipStatus {
+    PendingRegistration,
+    Joined,
+    Removed,
+    Historical,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentWorkspaceLivenessStatus {
+    Active,
+    Idle,
+    AwaitingReview,
+    Disconnected,
+    Removed,
+    Unknown,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentWorkspaceRuntimeLifecycle {
+    Running,
+    Recoverable,
+    Completed,
+    Failed,
+    Unavailable,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct AgentWorkspaceManagedIdentity {
+    pub kind: ManagedAgentKind,
+    pub managed_agent_id: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentWorkspaceMemberOperationKind {
+    RuntimeStop,
+    MembershipRemove,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentWorkspaceMemberOperationOutcome {
+    Succeeded,
+    Failed,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct AgentWorkspaceMemberOperationResult {
+    pub operation_id: String,
+    pub kind: AgentWorkspaceMemberOperationKind,
+    pub outcome: AgentWorkspaceMemberOperationOutcome,
+    pub before_state: String,
+    pub after_state: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>,
+    pub recorded_at: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct AgentWorkspaceMemberProvenance {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub legacy_session_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub legacy_agent_id: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct AgentWorkspaceMemberSummary {
+    pub member_id: String,
+    pub runtime_kind: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub managed_identity: Option<AgentWorkspaceManagedIdentity>,
+    pub display_name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub role: Option<SessionRole>,
+    pub membership_status: AgentWorkspaceMembershipStatus,
+    pub liveness_status: AgentWorkspaceLivenessStatus,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub runtime_session_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub assignment_id: Option<String>,
+    pub runtime_lifecycle: AgentWorkspaceRuntimeLifecycle,
+    pub runtime_evidence: String,
+    #[serde(default)]
+    pub provenance: Vec<AgentWorkspaceMemberProvenance>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub joined_at: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_activity_at: Option<String>,
+    #[serde(default)]
+    pub recent_operations: Vec<AgentWorkspaceMemberOperationResult>,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct AgentWorkspaceTeamSummary {
+    pub workspace_id: String,
+    pub authority: AgentWorkspaceTeamAuthority,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub leader_member_id: Option<String>,
+    #[serde(default)]
+    pub members: Vec<AgentWorkspaceMemberSummary>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentWorkspaceTeamConflictKind {
+    IdentityCollision,
+    MalformedSource,
+    SourceDisagreement,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct AgentWorkspaceTeamConflict {
+    pub kind: AgentWorkspaceTeamConflictKind,
+    #[serde(default)]
+    pub legacy_session_ids: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub managed_identity: Option<AgentWorkspaceManagedIdentity>,
+    pub detail: String,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct AgentWorkspaceTeamResponse {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub team: Option<AgentWorkspaceTeamSummary>,
+    #[serde(default)]
+    pub conflicts: Vec<AgentWorkspaceTeamConflict>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]

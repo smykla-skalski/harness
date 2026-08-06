@@ -27,13 +27,13 @@ use super::super::queries::{
 use super::super::reviews::dispatch_reviews_method;
 use super::super::task_board::dispatch_task_board_method;
 use super::mutation_handlers::{
-    dispatch_agent_change_role, dispatch_agent_remove, dispatch_improver_apply,
-    dispatch_leader_transfer, dispatch_session_end, dispatch_session_observe,
-    dispatch_signal_cancel, dispatch_signal_send, dispatch_task_arbitrate, dispatch_task_assign,
-    dispatch_task_checkpoint, dispatch_task_claim_review, dispatch_task_create,
-    dispatch_task_delete, dispatch_task_drop, dispatch_task_queue_policy,
-    dispatch_task_respond_review, dispatch_task_submit_for_review, dispatch_task_submit_review,
-    dispatch_task_update,
+    dispatch_agent_change_role, dispatch_agent_remove, dispatch_agent_workspace_member_remove,
+    dispatch_improver_apply, dispatch_leader_transfer, dispatch_session_end,
+    dispatch_session_observe, dispatch_signal_cancel, dispatch_signal_send,
+    dispatch_task_arbitrate, dispatch_task_assign, dispatch_task_checkpoint,
+    dispatch_task_claim_review, dispatch_task_create, dispatch_task_delete, dispatch_task_drop,
+    dispatch_task_queue_policy, dispatch_task_respond_review, dispatch_task_submit_for_review,
+    dispatch_task_submit_review, dispatch_task_update,
 };
 use super::remote_viewer_projection_required;
 
@@ -134,6 +134,7 @@ async fn dispatch_read_method(
             | ws_methods::DAEMON_LOG_LEVEL
             | ws_methods::PROJECTS
             | ws_methods::AGENT_WORKSPACES
+            | ws_methods::AGENT_WORKSPACE_TEAM
             | ws_methods::SESSIONS
             | ws_methods::RUNTIME_SESSION_RESOLVE
             | ws_methods::RUNTIMES_PROBE
@@ -242,6 +243,9 @@ async fn dispatch_agent_mutation(
     match request.method.as_str() {
         ws_methods::AGENT_CHANGE_ROLE => Some(dispatch_agent_change_role(request, state).await),
         ws_methods::AGENT_REMOVE => Some(dispatch_agent_remove(request, state).await),
+        ws_methods::AGENT_WORKSPACE_MEMBER_REMOVE => {
+            Some(dispatch_agent_workspace_member_remove(request, state).await)
+        }
         _ => None,
     }
 }

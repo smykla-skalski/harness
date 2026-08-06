@@ -1,4 +1,5 @@
 use super::{CliError, Path, SessionState, agents_service};
+use harness_kernel::errors::CliErrorKind;
 
 /// Start a new session, writing directly to `SQLite` when a DB is available.
 /// Creates a per-session linked checkout and records the state file under the
@@ -178,7 +179,10 @@ pub fn delete_session_direct(
     session_id: &str,
     db: Option<&crate::daemon::db_handle::DaemonDbOwnedHandle>,
 ) -> Result<bool, CliError> {
-    harness_daemon_session_service::delete_session(session_id, db)
+    let Some(db) = db else {
+        return Err(CliErrorKind::workflow_io("delete requires a daemon database").into());
+    };
+    super::agent_workspaces::delete_session_with_durable_team(db, session_id)
 }
 
 /// Async variant of [`delete_session_direct`].
@@ -189,5 +193,10 @@ pub(crate) async fn delete_session_direct_async(
     session_id: &str,
     async_db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
 ) -> Result<bool, CliError> {
-    harness_daemon_session_service::delete_session_async(session_id, async_db).await
+    super::agent_workspaces::delete_session_with_artifact_cleanup_async(
+        async_db,
+        session_id,
+        |state| harness_daemon_session_service::destroy_session_artifacts(&state),
+    )
+    .await
 }

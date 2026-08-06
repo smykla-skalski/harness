@@ -88,6 +88,9 @@ async fn migration_effect_observed(
     if migration_version == 64 {
         return table_exists(pool, "agent_workspaces").await;
     }
+    if migration_version == 65 {
+        return table_exists(pool, "agent_workspace_teams").await;
+    }
     let Some((table, column)) = migration_effect_column(migration_version) else {
         return Ok(false);
     };
@@ -209,6 +212,8 @@ const fn migration_floor_version(migration_version: i64) -> u64 {
         63 => 62,
         // v63 adds durable agent workspaces and their reconciliation journal.
         64 => 63,
+        // v64 adds workspace-owned agent teams and runtime operation results.
+        65 => 64,
         _ => u64::MAX,
     }
 }

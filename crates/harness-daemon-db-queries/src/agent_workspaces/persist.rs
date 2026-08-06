@@ -14,6 +14,7 @@ use sqlx::{FromRow, Sqlite, Transaction, query, query_as};
 use super::preflight::{
     AGENT_WORKSPACE_MIGRATION_VERSION, OwnerlessUpdate, PreflightResult, WorkspacePlan,
 };
+use super::provenance::persist_workspace_provenance;
 use super::retire::{clear_reconcile_queue, retire_deleted_legacy_correlations};
 use super::shadow::plan_shadow_digest;
 
@@ -120,33 +121,7 @@ async fn persist_plan(
     .await
     .map_err(|error| db_error(format!("persist durable agent workspace: {error}")))?;
 
-    query("DELETE FROM agent_workspace_legacy_sessions WHERE workspace_id = ?1")
-        .bind(&plan.workspace_id)
-        .execute(transaction.as_mut())
-        .await
-        .map_err(|error| db_error(format!("replace workspace provenance: {error}")))?;
-    for candidate in &plan.candidates {
-        query(
-            "INSERT INTO agent_workspace_legacy_sessions (
-                workspace_id, session_id, lifecycle, checkout_availability,
-                liveness_evidence, effective_activity_at, session_updated_at,
-                session_created_at, source_digest, is_selected
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
-        )
-        .bind(&plan.workspace_id)
-        .bind(&candidate.session_id)
-        .bind(candidate.lifecycle.as_str())
-        .bind(availability_label(candidate.availability))
-        .bind(&candidate.liveness_evidence)
-        .bind(&candidate.effective_activity_at)
-        .bind(&candidate.updated_at)
-        .bind(&candidate.created_at)
-        .bind(&candidate.source_digest)
-        .bind(candidate.session_id == plan.selected_session_id)
-        .execute(transaction.as_mut())
-        .await
-        .map_err(|error| db_error(format!("persist workspace Session provenance: {error}")))?;
-    }
+    persist_workspace_provenance(transaction, plan).await?;
     persist_ready_journal(transaction, plan, now).await
 }
 
@@ -444,7 +419,7 @@ impl StoredWorkspaceRow {
     }
 }
 
-const fn availability_label(availability: AgentWorkspaceAvailability) -> &'static str {
+pub(super) const fn availability_label(availability: AgentWorkspaceAvailability) -> &'static str {
     match availability {
         AgentWorkspaceAvailability::Available => "available",
         AgentWorkspaceAvailability::MissingWorktree => "missing_worktree",

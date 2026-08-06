@@ -11,6 +11,9 @@ pub const BRIDGE_RECONFIGURE: &str = "/v1/bridge/reconfigure";
 pub const DAEMON_LOG_LEVEL: &str = "/v1/daemon/log-level";
 pub const PROJECTS: &str = "/v1/projects";
 pub const AGENT_WORKSPACES: &str = "/v1/agent-workspaces";
+pub const AGENT_WORKSPACE_TEAM: &str = "/v1/agent-workspaces/{workspace_id}/team";
+pub const AGENT_WORKSPACE_MEMBER_REMOVE: &str =
+    "/v1/agent-workspaces/{workspace_id}/members/{member_id}/remove";
 pub const RUNTIME_SESSION_RESOLVE: &str = "/v1/runtime-sessions/resolve";
 pub const RUNTIMES_PROBE: &str = "/v1/runtimes/probe";
 pub const WS: &str = "/v1/ws";
