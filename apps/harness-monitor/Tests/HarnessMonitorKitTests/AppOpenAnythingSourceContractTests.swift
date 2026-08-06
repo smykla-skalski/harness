@@ -103,6 +103,12 @@ struct AppOpenAnythingSourceContractTests {
     // The panel joins every Space directly. Presenting it must not activate a
     // Dashboard window, because AppKit would switch to that window's Space.
     #expect(panelSource.contains(".canJoinAllSpaces"))
+    // AppKit keeps `hidesOnDeactivate` windows offscreen while their app is
+    // inactive, and the global shortcut's main job is opening the palette
+    // from another app - the flag would order the panel back out before it
+    // ever became visible. resignKey handles click-away dismissal instead.
+    #expect(panelSource.contains("panel.hidesOnDeactivate = false"))
+    #expect(!panelSource.contains("hidesOnDeactivate = true"))
     #expect(!presenterSource.contains("openWindow"))
     #expect(!presenterSource.contains("activate("))
     #expect(!presenterSource.contains("makeKeyAndOrderFront"))
