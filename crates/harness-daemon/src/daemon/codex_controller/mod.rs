@@ -11,6 +11,7 @@ mod handle_orchestration;
 mod handle_orchestration_lifecycle;
 mod handle_preflight;
 mod handle_storage;
+mod host_capability_port;
 mod orchestration;
 mod orchestration_registration;
 mod queued_run;
@@ -30,4 +31,5 @@ mod tests;
 
 pub use dependency_fixer::CodexDependencyFixLauncher;
 pub use handle::CodexControllerHandle;
+pub use host_capability_port::HostBridgeCapability;
 pub use turn_lifecycle::CodexAgentTurnRuntime;
