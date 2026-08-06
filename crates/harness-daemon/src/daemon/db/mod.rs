@@ -24,13 +24,13 @@ pub(crate) use crate::daemon::protocol::{CodexRunMode, CodexRunStatus};
 #[cfg(test)]
 pub(crate) use crate::session::types::AgentRegistration;
 pub(crate) use crate::session::types::SessionState;
-#[allow(unused_imports)]
+#[cfg(test)]
 pub(crate) use crate::session::types::SessionStatus;
 #[cfg(test)]
 pub(crate) use crate::session::types::WorkItem;
 #[cfg(test)]
 pub(crate) use crate::session::types::{SessionLogEntry, SessionSignalRecord, TaskCheckpoint};
-#[allow(unused_imports)]
+#[cfg(test)]
 pub(crate) use crate::workspace::project_context_id;
 pub(crate) use crate::workspace::utc_now;
 pub(crate) use harness_kernel::errors::{CliError, CliErrorKind};
@@ -48,11 +48,9 @@ pub(crate) use harness_daemon_db_core::audit_event_retention;
 pub(crate) use harness_daemon_db_core::audit_event_retention_async;
 #[cfg(test)]
 pub(crate) use harness_daemon_db_core::i64_from_u64;
-#[allow(unused_imports)]
-pub(crate) use harness_daemon_db_core::usize_from_i64;
 pub use harness_daemon_db_core::{DaemonDb, SCHEMA_VERSION};
 pub(crate) use harness_daemon_db_core::{canonical_db_unavailable, db_error};
-#[allow(unused_imports)]
+#[cfg(test)]
 pub(crate) use harness_daemon_db_queries::DaemonDbActivityFold;
 mod async_agent_turn_runs;
 pub(crate) use async_agent_turn_runs::{
@@ -197,31 +195,19 @@ pub(crate) use harness_daemon_db_core::SchemaRepairHooks;
 pub(crate) use harness_daemon_db_core::set_schema_init_hook;
 pub(crate) use harness_daemon_db_queries::AgentTuiLiveRefreshState;
 pub(crate) use harness_daemon_db_queries::DaemonDbConversation;
-#[allow(unused_imports)]
+#[cfg(test)]
 use harness_daemon_db_queries::derive_effective_signal_status;
-#[allow(unused_imports)]
+#[cfg(test)]
 pub(crate) use harness_daemon_db_queries::extract_conversation_event_kind;
-#[allow(unused_imports)]
+#[cfg(test)]
 pub(crate) use harness_daemon_db_queries::extract_transition_kind;
-#[allow(unused_imports)]
-use harness_daemon_db_queries::import_daemon_events;
-#[allow(unused_imports)]
-pub(crate) use harness_daemon_db_queries::parse_session_status_db_label;
 #[cfg(test)]
 pub(crate) use harness_daemon_db_queries::session_status_db_label;
-#[allow(unused_imports)]
-use harness_daemon_db_queries::{
-    bump_session_timeline_state, replace_all_session_timeline_entries,
-    replace_session_timeline_entries_for_prefix, upsert_session_timeline_entry,
-    upsert_session_timeline_entry_row,
-};
-#[allow(unused_imports)]
+#[cfg(test)]
 use harness_daemon_db_queries::{
     clear_session_conversation_events, prepare_agent_conversation_imports_and_activity,
     prepare_runtime_transcript_resync_for_agents,
 };
-#[allow(unused_imports)]
-use harness_daemon_db_queries::{stored_timeline_entry, stored_timeline_entry_from_row};
 pub(crate) use harness_policy_graph_store::NewApprovalGrant;
 pub(crate) use runtime::ensure_shared_db;
 
