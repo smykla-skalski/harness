@@ -123,7 +123,10 @@ fn concurrent_acknowledgments_preserve_the_first_writer() {
     });
     let results = attempts.map(|attempt| attempt.join().unwrap());
 
-    assert_eq!(results.iter().filter(|(_, result)| result.is_ok()).count(), 1);
+    assert_eq!(
+        results.iter().filter(|(_, result)| result.is_ok()).count(),
+        1
+    );
     let winner = results
         .iter()
         .find_map(|(result, outcome)| outcome.is_ok().then_some(*result))
