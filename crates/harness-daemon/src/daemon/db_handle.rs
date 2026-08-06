@@ -10,8 +10,9 @@
 //! trait directly for them. These wrappers are local to `harness-daemon`, so
 //! implementing a foreign trait for one has no such problem; every impl
 //! delegates to the session/task-board/watch extension traits that must stay
-//! in this crate. Mirrors `daemon::db_timeline_source::DaemonDbTimelineHandle`'s
-//! existing shape for `TimelineDbSource`.
+//! in this crate. Mirrors `harness_daemon_db_queries::DaemonDbTimelineHandle`'s
+//! shape for `TimelineDbSource` - that one lives in the sibling crate instead,
+//! since none of its delegated-to traits are harness-daemon-local anymore.
 
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
 

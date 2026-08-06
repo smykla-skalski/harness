@@ -16,7 +16,7 @@ use std::path::Path;
 
 use harness_kernel::errors::CliError;
 
-use crate::daemon::db::timeline::DaemonDbTimeline;
+use crate::daemon::db::DaemonDbTimeline;
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb, SchemaRepairHooks, SessionWriteQueries};
 
 /// Opens a [`DaemonDb`] with its session-write/timeline repair hooks

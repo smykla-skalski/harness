@@ -12,7 +12,7 @@ use harness_session::wire::AgentToolActivitySummary;
 // for #1231, so this trait and `DaemonDb` are both foreign here now; the
 // local `DaemonDbOwnedHandle` newtype (`crate::daemon::db_handle`) is what
 // implements it instead, the same orphan-rule workaround
-// `daemon::db_timeline_source::DaemonDbTimelineHandle` already uses for
+// `harness_daemon_db_queries::DaemonDbTimelineHandle` uses for
 // `TimelineDbSource`.
 impl harness_daemon_snapshot::ConversationQueries
     for crate::daemon::db_handle::DaemonDbOwnedHandle

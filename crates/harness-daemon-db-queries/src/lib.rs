@@ -25,6 +25,7 @@ mod async_writes;
 mod audit;
 mod change_tracking;
 mod conversation;
+mod db_timeline_source;
 mod diagnostics;
 mod imports;
 mod pull_request_actions;
@@ -64,6 +65,7 @@ pub use conversation::{
     clear_session_conversation_events, extract_conversation_event_kind,
     prepare_agent_conversation_imports_and_activity, prepare_runtime_transcript_resync_for_agents,
 };
+pub use db_timeline_source::DaemonDbTimelineHandle;
 pub use diagnostics::{DaemonDbDiagnostics, import_daemon_events};
 pub use imports::{DaemonDbImports, ImportResult, ReconcileResult, session_state_import_required};
 pub use pull_request_actions::AsyncPullRequestActionQueries;
@@ -85,7 +87,7 @@ pub use summary_rows::{
 pub use task_row::TaskRowBindings;
 pub use task_writes::replace_tasks;
 pub use timeline::{
-    SessionTimelineStateRow, cursor_from_timeline_entry, stored_timeline_entry,
+    DaemonDbTimeline, SessionTimelineStateRow, cursor_from_timeline_entry, stored_timeline_entry,
     stored_timeline_entry_for_rebuild, stored_timeline_entry_from_row,
 };
 pub use timeline_store::{

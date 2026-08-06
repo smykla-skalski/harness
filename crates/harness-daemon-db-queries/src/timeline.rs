@@ -1,24 +1,30 @@
-//! Pure `StoredTimelineEntry` construction helpers, split out from
-//! `harness-daemon`'s `db::timeline` trait file rather than moved wholesale:
-//! `DaemonDbTimeline::rebuild_session_timeline_from_resolved` (and its
-//! `backfill_*` callers) constructs `db_timeline_source::DaemonDbTimelineHandle`,
-//! a `harness-daemon`-local orphan-rule wrapper that itself needs
-//! `session_data::SessionCoreQueries` - still `harness-daemon`-local, not yet
-//! extracted. That one method (and the trait it lives on) has to stay behind
-//! until `session_data.rs` moves too; these functions have no such dependency
-//! and move cleanly on their own.
+//! `DaemonDbTimeline` and its `StoredTimelineEntry` construction helpers.
+//!
+//! `DaemonDbTimeline`'s test-only query methods are declared unconditionally
+//! here rather than behind `#[cfg(test)]`: that gate only activates for this
+//! crate's own test build, not for `harness-daemon`'s, and `harness-daemon`'s
+//! own `#[cfg(test)]` code calls them. Same reasoning as
+//! [`SessionTimelineStateRow`] below.
 
-use harness_daemon_db_core::db_error;
+use harness_daemon_db_core::{DaemonDb, db_error, usize_from_i64};
 use harness_kernel::errors::CliError;
-use harness_protocol::timeline::{TimelineCursor, TimelineEntry};
+use harness_protocol::timeline::{
+    TimelineCursor, TimelineEntry, TimelineWindowRequest, TimelineWindowResponse,
+};
+use harness_session::index::ResolvedSession;
+use harness_timeline::{TimelinePayloadScope, session_timeline_from_resolved_with_db_scope};
+use rusqlite::OptionalExtension;
 
+use crate::db_timeline_source::DaemonDbTimelineHandle;
 use crate::stored_timeline_entry::StoredTimelineEntry;
+use crate::summaries::SessionSummaryQueries;
+use crate::timeline_store::replace_all_session_timeline_entries;
 
 /// Row shape of a session's cached timeline-summary state
 /// (`session_timeline_state`). Used only by `harness-daemon`'s own
-/// `#[cfg(test)]` `DaemonDbTimeline` methods, which stayed behind (see this
-/// module's own doc comment) - not `#[cfg(test)]` here, since that gate would
-/// only activate for this crate's own test build, not a downstream crate's.
+/// `#[cfg(test)]` `DaemonDbTimeline` callers - not `#[cfg(test)]` here, since
+/// that gate would only activate for this crate's own test build, not a
+/// downstream crate's.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SessionTimelineStateRow {
     pub session_id: String,
@@ -123,5 +129,341 @@ pub fn cursor_from_timeline_entry(entry: &TimelineEntry) -> TimelineCursor {
     TimelineCursor {
         recorded_at: entry.recorded_at.clone(),
         entry_id: entry.entry_id.clone(),
+    }
+}
+
+pub trait DaemonDbTimeline {
+    /// # Errors
+    /// Returns [`CliError`] when the session's timeline state cannot be read.
+    fn load_session_timeline_window(
+        &self,
+        session_id: &str,
+        request: &TimelineWindowRequest,
+    ) -> Result<Option<TimelineWindowResponse>, CliError>;
+
+    /// Rebuild the canonical timeline ledger from the current resolved session.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when timeline materialization or SQL writes fail.
+    fn rebuild_session_timeline_from_resolved(
+        &self,
+        resolved: &ResolvedSession,
+    ) -> Result<(), CliError>;
+
+    /// Rebuild the timeline ledger for every session by replaying legacy sources
+    /// (`session_log`, `conversation_events`, `task_checkpoints`, `signal_index`).
+    ///
+    /// Sessions whose state cannot be parsed are logged and skipped - failing the
+    /// whole backfill because of one bad row would block the migration.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when the session list cannot be enumerated.
+    fn backfill_legacy_timelines(&self) -> Result<(), CliError>;
+
+    /// # Errors
+    /// Returns [`CliError`] when the session list cannot be enumerated.
+    fn list_backfillable_session_ids(&self) -> Result<Vec<String>, CliError>;
+
+    fn backfill_session_timeline(&self, session_id: &str);
+
+    /// # Errors
+    /// Returns [`CliError`] on SQL failure.
+    fn load_session_timeline_state(
+        &self,
+        session_id: &str,
+    ) -> Result<Option<SessionTimelineStateRow>, CliError>;
+
+    /// # Errors
+    /// Returns [`CliError`] on SQL failure.
+    fn load_timeline_cursor_offset(
+        &self,
+        session_id: &str,
+        cursor: &TimelineCursor,
+    ) -> Result<Option<usize>, CliError>;
+
+    /// # Errors
+    /// Returns [`CliError`] on SQL failure.
+    fn load_timeline_entries_range(
+        &self,
+        session_id: &str,
+        offset: usize,
+        limit: usize,
+    ) -> Result<Vec<StoredTimelineEntry>, CliError>;
+
+    /// # Errors
+    /// Returns [`CliError`] on SQL failure.
+    fn load_timeline_cursor_at_offset(
+        &self,
+        session_id: &str,
+        offset: Option<usize>,
+    ) -> Result<Option<TimelineCursor>, CliError>;
+}
+
+impl DaemonDbTimeline for DaemonDb {
+    fn load_session_timeline_window(
+        &self,
+        session_id: &str,
+        request: &TimelineWindowRequest,
+    ) -> Result<Option<TimelineWindowResponse>, CliError> {
+        let Some(state) = self.load_session_timeline_state(session_id)? else {
+            return Ok(None);
+        };
+
+        let payload_scope = match request.scope.as_deref() {
+            Some("summary") => TimelinePayloadScope::Summary,
+            _ => TimelinePayloadScope::Full,
+        };
+        let limit = request.limit.unwrap_or(state.entry_count).max(1);
+        let latest_window_end = state.entry_count.min(limit);
+
+        if request.known_revision == Some(state.revision)
+            && request.before.is_none()
+            && request.after.is_none()
+        {
+            return Ok(Some(TimelineWindowResponse {
+                revision: state.revision,
+                total_count: state.entry_count,
+                window_start: 0,
+                window_end: latest_window_end,
+                has_older: latest_window_end < state.entry_count,
+                has_newer: false,
+                oldest_cursor: self
+                    .load_timeline_cursor_at_offset(session_id, latest_window_end.checked_sub(1))?,
+                newest_cursor: self.load_timeline_cursor_at_offset(session_id, Some(0))?,
+                entries: None,
+                unchanged: true,
+            }));
+        }
+
+        let window_start = if let Some(before) = &request.before {
+            self.load_timeline_cursor_offset(session_id, before)?
+                .map_or(state.entry_count, |offset| offset.saturating_add(1))
+        } else if let Some(after) = &request.after {
+            self.load_timeline_cursor_offset(session_id, after)?
+                .unwrap_or(0)
+                .saturating_sub(limit)
+        } else {
+            0
+        };
+        let window_rows = if let Some(after) = &request.after {
+            let window_end = self
+                .load_timeline_cursor_offset(session_id, after)?
+                .unwrap_or(0);
+            let window_start = window_end.saturating_sub(limit);
+            self.load_timeline_entries_range(session_id, window_start, window_end - window_start)?
+        } else {
+            self.load_timeline_entries_range(
+                session_id,
+                window_start,
+                state.entry_count.saturating_sub(window_start).min(limit),
+            )?
+        };
+        let entries = window_rows
+            .into_iter()
+            .map(|row| row.into_timeline_entry(payload_scope))
+            .collect::<Result<Vec<_>, _>>()?;
+        let window_end = window_start + entries.len();
+
+        Ok(Some(TimelineWindowResponse {
+            revision: state.revision,
+            total_count: state.entry_count,
+            window_start,
+            window_end,
+            has_older: window_end < state.entry_count,
+            has_newer: window_start > 0,
+            oldest_cursor: entries.last().map(cursor_from_timeline_entry),
+            newest_cursor: entries.first().map(cursor_from_timeline_entry),
+            entries: Some(entries),
+            unchanged: false,
+        }))
+    }
+
+    fn rebuild_session_timeline_from_resolved(
+        &self,
+        resolved: &ResolvedSession,
+    ) -> Result<(), CliError> {
+        let entries = session_timeline_from_resolved_with_db_scope(
+            resolved,
+            &DaemonDbTimelineHandle(self),
+            TimelinePayloadScope::Full,
+        )?;
+        let stored_entries = entries
+            .iter()
+            .map(stored_timeline_entry_for_rebuild)
+            .collect::<Result<Vec<_>, _>>()?;
+        replace_all_session_timeline_entries(
+            &self.conn,
+            &resolved.state.session_id,
+            &stored_entries,
+        )
+    }
+
+    fn backfill_legacy_timelines(&self) -> Result<(), CliError> {
+        for session_id in self.list_backfillable_session_ids()? {
+            self.backfill_session_timeline(&session_id);
+        }
+        Ok(())
+    }
+
+    fn list_backfillable_session_ids(&self) -> Result<Vec<String>, CliError> {
+        let mut statement = self
+            .conn
+            .prepare("SELECT session_id FROM sessions")
+            .map_err(|error| db_error(format!("prepare backfill session list: {error}")))?;
+        let rows = statement
+            .query_map([], |row| row.get::<_, String>(0))
+            .map_err(|error| db_error(format!("query backfill session list: {error}")))?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(|error| db_error(format!("read backfill session list: {error}")))
+    }
+
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+    )]
+    fn backfill_session_timeline(&self, session_id: &str) {
+        let resolved = match self.resolve_session(session_id) {
+            Ok(Some(resolved)) => resolved,
+            Ok(None) => {
+                tracing::warn!(
+                    session_id = %session_id,
+                    "timeline backfill skipped: session could not be resolved"
+                );
+                return;
+            }
+            Err(error) => {
+                tracing::warn!(
+                    session_id = %session_id,
+                    %error,
+                    "timeline backfill skipped: session state could not be parsed"
+                );
+                return;
+            }
+        };
+        if let Err(error) = self.rebuild_session_timeline_from_resolved(&resolved) {
+            tracing::warn!(
+                session_id = %session_id,
+                %error,
+                "timeline backfill failed for session; leaving ledger empty"
+            );
+        }
+    }
+
+    fn load_session_timeline_state(
+        &self,
+        session_id: &str,
+    ) -> Result<Option<SessionTimelineStateRow>, CliError> {
+        self.conn
+            .query_row(
+                "SELECT session_id, revision, entry_count, newest_recorded_at,
+                        oldest_recorded_at, integrity_hash, updated_at
+                 FROM session_timeline_state
+                 WHERE session_id = ?1",
+                [session_id],
+                |row| {
+                    Ok(SessionTimelineStateRow {
+                        session_id: row.get(0)?,
+                        revision: row.get(1)?,
+                        entry_count: row.get::<_, i64>(2).map(usize_from_i64)?,
+                        newest_recorded_at: row.get(3)?,
+                        oldest_recorded_at: row.get(4)?,
+                        integrity_hash: row.get(5)?,
+                        updated_at: row.get(6)?,
+                    })
+                },
+            )
+            .optional()
+            .map_err(|error| db_error(format!("load session timeline state: {error}")))
+    }
+
+    fn load_timeline_cursor_offset(
+        &self,
+        session_id: &str,
+        cursor: &TimelineCursor,
+    ) -> Result<Option<usize>, CliError> {
+        let exists = self
+            .conn
+            .query_row(
+                "SELECT 1
+                 FROM session_timeline_entries
+                 WHERE session_id = ?1
+                   AND sort_recorded_at = ?2
+                   AND sort_tiebreaker = ?3",
+                rusqlite::params![session_id, cursor.recorded_at, cursor.entry_id],
+                |_| Ok(()),
+            )
+            .optional()
+            .map_err(|error| db_error(format!("check timeline cursor: {error}")))?;
+        if exists.is_none() {
+            return Ok(None);
+        }
+
+        self.conn
+            .query_row(
+                "SELECT COUNT(*)
+                 FROM session_timeline_entries
+                 WHERE session_id = ?1
+                   AND (
+                       sort_recorded_at > ?2
+                       OR (sort_recorded_at = ?2 AND sort_tiebreaker > ?3)
+                   )",
+                rusqlite::params![session_id, cursor.recorded_at, cursor.entry_id],
+                |row| row.get::<_, i64>(0).map(usize_from_i64),
+            )
+            .map(Some)
+            .map_err(|error| db_error(format!("load timeline cursor offset: {error}")))
+    }
+
+    fn load_timeline_entries_range(
+        &self,
+        session_id: &str,
+        offset: usize,
+        limit: usize,
+    ) -> Result<Vec<StoredTimelineEntry>, CliError> {
+        if limit == 0 {
+            return Ok(Vec::new());
+        }
+
+        let mut statement = self
+            .conn
+            .prepare(
+                "SELECT session_id, entry_id, source_kind, source_key, recorded_at, kind,
+                        agent_id, task_id, summary, payload_json, sort_recorded_at, sort_tiebreaker
+                 FROM session_timeline_entries
+                 WHERE session_id = ?1
+                 ORDER BY sort_recorded_at DESC, sort_tiebreaker DESC
+                 LIMIT ?2 OFFSET ?3",
+            )
+            .map_err(|error| db_error(format!("prepare timeline range: {error}")))?;
+        let rows = statement
+            .query_map(
+                rusqlite::params![
+                    session_id,
+                    i64::try_from(limit).unwrap_or(i64::MAX),
+                    i64::try_from(offset).unwrap_or(i64::MAX)
+                ],
+                stored_timeline_entry_from_row,
+            )
+            .map_err(|error| db_error(format!("query timeline range: {error}")))?;
+
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(|error| db_error(format!("read timeline range row: {error}")))
+    }
+
+    fn load_timeline_cursor_at_offset(
+        &self,
+        session_id: &str,
+        offset: Option<usize>,
+    ) -> Result<Option<TimelineCursor>, CliError> {
+        let Some(offset) = offset else {
+            return Ok(None);
+        };
+        self.load_timeline_entries_range(session_id, offset, 1)
+            .map(|mut entries| {
+                entries.pop().map(|entry| TimelineCursor {
+                    recorded_at: entry.recorded_at,
+                    entry_id: entry.entry_id,
+                })
+            })
     }
 }
