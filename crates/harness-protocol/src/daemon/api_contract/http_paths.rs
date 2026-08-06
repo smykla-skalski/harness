@@ -14,6 +14,15 @@ pub const AGENT_WORKSPACES: &str = "/v1/agent-workspaces";
 pub const AGENT_WORKSPACE_TEAM: &str = "/v1/agent-workspaces/{workspace_id}/team";
 pub const AGENT_WORKSPACE_MEMBER_REMOVE: &str =
     "/v1/agent-workspaces/{workspace_id}/members/{member_id}/remove";
+pub const AGENT_WORKSPACE_ACTIVITY: &str = "/v1/agent-workspaces/{workspace_id}/activity";
+pub const AGENT_WORKSPACE_MEMBER_ACTIVITY: &str =
+    "/v1/agent-workspaces/{workspace_id}/members/{member_id}/activity";
+pub const AGENT_WORKSPACE_SIGNAL_SEND: &str =
+    "/v1/agent-workspaces/{workspace_id}/members/{member_id}/signals";
+pub const AGENT_WORKSPACE_SIGNAL_ACK: &str =
+    "/v1/agent-workspaces/{workspace_id}/members/{member_id}/signals/{signal_id}/ack";
+pub const AGENT_WORKSPACE_SIGNAL_CANCEL: &str =
+    "/v1/agent-workspaces/{workspace_id}/members/{member_id}/signals/{signal_id}/cancel";
 pub const RUNTIME_SESSION_RESOLVE: &str = "/v1/runtime-sessions/resolve";
 pub const RUNTIMES_PROBE: &str = "/v1/runtimes/probe";
 pub const WS: &str = "/v1/ws";

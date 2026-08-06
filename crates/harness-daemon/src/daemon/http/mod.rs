@@ -35,6 +35,7 @@ use crate::daemon::service::{
 use crate::telemetry::{apply_parent_context_from_headers, current_trace_id, with_active_baggage};
 use harness_kernel::errors::{CliError, CliErrorKind};
 
+mod agent_workspace_activity;
 mod agents;
 mod audit;
 mod auth;

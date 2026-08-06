@@ -166,6 +166,7 @@ use crate::daemon::db;
 use crate::daemon::protocol;
 
 mod adopt;
+mod agent_workspace_activity;
 mod agent_workspaces;
 mod dependency_approval_merge;
 mod dependency_check_wait;
@@ -244,6 +245,11 @@ pub(crate) mod workspace_checkout;
 pub use crate::reviews::fetch_review_avatar;
 pub use adopt::adopt_session_record;
 pub(crate) use adopt::adopt_session_record_async;
+pub(crate) use agent_workspace_activity::{
+    acknowledge_agent_workspace_signal_async, cancel_agent_workspace_signal_async,
+    get_agent_workspace_activity_async, get_agent_workspace_member_activity_async,
+    send_agent_workspace_signal_async,
+};
 pub(crate) use agent_workspaces::{
     delete_session_with_artifact_cleanup_async, get_agent_workspace_team_async,
     list_agent_workspaces_async, prepare_agent_workspace_membership_operation_async,

@@ -5,6 +5,7 @@ use harness_protocol::daemon::summaries::{
 };
 use harness_protocol::session::ManagedAgentKind;
 use harness_protocol::session::SessionState;
+use harness_protocol::timeline::TimelineWindowRequest;
 use rusqlite::{OptionalExtension, TransactionBehavior};
 use sqlx::{query, query_as, query_scalar};
 
@@ -431,6 +432,12 @@ async fn reconcile_session_deletion_source(
             ))
             .into());
         }
+        db.load_agent_workspace_activity(
+            daemon_id,
+            &workspace_id,
+            &TimelineWindowRequest::default(),
+        )
+        .await?;
     }
     Ok(())
 }

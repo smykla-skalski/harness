@@ -1,7 +1,9 @@
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::process;
 use std::string::ToString;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use serde::de::DeserializeOwned;
 
@@ -184,8 +186,76 @@ pub fn acknowledge_signal(signal_dir: &Path, ack: &SignalAck) -> Result<(), CliE
 
     let ack_json = serde_json::to_string_pretty(ack)
         .map_err(|error| CliErrorKind::workflow_serialize(format!("ack: {error}")))?;
-    write_text(&paths.ack_file, &ack_json)?;
+    write_ack_once(&paths, ack, &ack_json)?;
     move_acknowledged_signal(&paths.signal_file, &paths.acknowledged_signal_file)
+}
+
+static ACK_TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
+
+fn write_ack_once(paths: &AckPaths, ack: &SignalAck, ack_json: &str) -> Result<(), CliError> {
+    let sequence = ACK_TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+    let temporary = paths
+        .acknowledged_dir
+        .join(format!(".signal-ack-{}-{sequence}.tmp", process::id()));
+    write_text(&temporary, ack_json)?;
+    let link_result = fs::hard_link(&temporary, &paths.ack_file);
+    fs::remove_file(&temporary).map_err(|error| {
+        CliErrorKind::workflow_io(format!(
+            "clean signal acknowledgment temp file '{}': {error}",
+            temporary.display()
+        ))
+    })?;
+    resolve_ack_link_result(link_result, paths, ack)
+}
+
+fn resolve_ack_link_result(
+    link_result: Result<(), io::Error>,
+    paths: &AckPaths,
+    ack: &SignalAck,
+) -> Result<(), CliError> {
+    match link_result {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {
+            ensure_existing_ack_matches(&paths.ack_file, ack)
+        }
+        Err(error) => Err(CliErrorKind::workflow_io(format!(
+            "commit signal acknowledgment '{}': {error}",
+            paths.ack_file.display()
+        ))
+        .into()),
+    }
+}
+
+fn ensure_existing_ack_matches(path: &Path, requested: &SignalAck) -> Result<(), CliError> {
+    let existing_json = fs::read_to_string(path).map_err(|error| {
+        CliErrorKind::workflow_io(format!(
+            "read existing signal acknowledgment '{}': {error}",
+            path.display()
+        ))
+    })?;
+    let existing: SignalAck = serde_json::from_str(&existing_json).map_err(|error| {
+        CliErrorKind::workflow_serialize(format!(
+            "existing signal acknowledgment '{}': {error}",
+            path.display()
+        ))
+    })?;
+    if acknowledgments_match(&existing, requested) {
+        return Ok(());
+    }
+    Err(CliErrorKind::session_agent_conflict(format!(
+        "signal '{}' already has a different runtime acknowledgment",
+        requested.signal_id
+    ))
+    .into())
+}
+
+fn acknowledgments_match(left: &SignalAck, right: &SignalAck) -> bool {
+    left.signal_id == right.signal_id
+        && left.acknowledged_at == right.acknowledged_at
+        && left.result == right.result
+        && left.agent == right.agent
+        && left.session_id == right.session_id
+        && left.details == right.details
 }
 
 fn move_acknowledged_signal(

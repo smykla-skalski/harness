@@ -57,6 +57,7 @@ pub(crate) use async_agent_turn_runs::{
     AgentTurnRunSnapshot, AgentTurnRunStatus, AsyncAgentTurnRunQueries,
 };
 pub(crate) use harness_daemon_db_queries::AsyncAgentResolutionQueries;
+pub(crate) use harness_daemon_db_queries::AsyncAgentWorkspaceActivityQueries;
 pub(crate) use harness_daemon_db_queries::AsyncAgentWorkspaceQueries;
 pub(crate) use harness_daemon_db_queries::AsyncAgentWorkspaceTeamOperationPreflightQueries;
 pub(crate) use harness_daemon_db_queries::AsyncAgentWorkspaceTeamOperationQueries;

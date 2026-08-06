@@ -62,6 +62,35 @@ fn acknowledge_moves_signal() {
 }
 
 #[test]
+fn acknowledge_signal_preserves_the_first_acknowledgment() {
+    let tmp = tempfile::tempdir().unwrap();
+    let signal_dir = tmp.path().join("signals");
+    write_signal_file(&signal_dir, &sample_signal()).unwrap();
+    let accepted = SignalAck {
+        signal_id: "sig-test-001".into(),
+        acknowledged_at: "2026-03-28T12:00:03Z".into(),
+        result: AckResult::Accepted,
+        agent: "codex".into(),
+        session_id: "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
+        details: None,
+    };
+    acknowledge_signal(&signal_dir, &accepted).unwrap();
+    acknowledge_signal(&signal_dir, &accepted).expect("identical retry must be idempotent");
+    let rejected = SignalAck {
+        result: AckResult::Rejected,
+        details: Some("cancelled".into()),
+        ..accepted
+    };
+
+    acknowledge_signal(&signal_dir, &rejected)
+        .expect_err("a later acknowledgment must not overwrite the first");
+
+    let acknowledgments = read_acknowledgments(&signal_dir).unwrap();
+    assert_eq!(acknowledgments.len(), 1);
+    assert_eq!(acknowledgments[0].result, AckResult::Accepted);
+}
+
+#[test]
 fn read_acknowledgments_ignores_acknowledged_signal_payloads() {
     let tmp = tempfile::tempdir().unwrap();
     let signal_dir = tmp.path().join("signals");

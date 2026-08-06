@@ -117,6 +117,9 @@ pub mod api_contract;
 /// one definition instead of `db` reaching back into the daemon for it.
 pub mod audit;
 
+/// Workspace-owned activity, transcript, timeline, and signal contracts.
+pub mod activity;
+
 /// Voice-session wire types (start/stop a session, stream audio chunks and
 /// transcript updates), relocated from `harness-daemon`'s
 /// `daemon::protocol::voice`. Pure data with no daemon-only dependency.

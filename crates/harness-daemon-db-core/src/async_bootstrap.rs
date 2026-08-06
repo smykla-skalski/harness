@@ -97,6 +97,9 @@ async fn migration_effect_observed(
     if migration_version == 70 {
         return column_exists(pool, "task_board_dispatch_intents", "workspace_id").await;
     }
+    if migration_version == 71 {
+        return table_exists(pool, "agent_workspace_activity_state").await;
+    }
     let Some((table, column)) = migration_effect_column(migration_version) else {
         return Ok(false);
     };
@@ -227,6 +230,8 @@ const fn migration_floor_version(migration_version: i64) -> u64 {
         // column per table it reaches, so the repair chain can skip whichever
         // parts a database already has.
         66..=70 => 65,
+        // v66 adds workspace-owned signals, transcripts, activity, and timeline history.
+        71 => 66,
         _ => u64::MAX,
     }
 }

@@ -10,6 +10,8 @@ use sqlx::{query, query_scalar};
 use super::{AsyncAgentWorkspaceTeamOperationQueries, AsyncAgentWorkspaceTeamQueries};
 use crate::AsyncAgentWorkspaceQueries;
 
+mod activity;
+mod activity_streams;
 mod deletion_safety;
 mod operation_precedence;
 mod operation_scope;

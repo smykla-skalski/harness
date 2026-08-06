@@ -18,14 +18,14 @@
 //! what makes the glob import unambiguous.
 
 pub(crate) use super::{
-    AsyncAgentResolutionQueries, AsyncAgentTurnRunQueries, AsyncAgentWorkspaceQueries,
-    AsyncAgentWorkspaceTeamOperationPreflightQueries, AsyncAgentWorkspaceTeamOperationQueries,
-    AsyncAgentWorkspaceTeamQueries, AsyncChangeTrackingQueries, AsyncConversationSyncQueries,
-    AsyncDaemonTransactions, AsyncDiagnosticsQueries, AsyncRuntimeSnapshotQueries,
-    AsyncSessionStateQueries, AsyncSessionSummaryQueries, AsyncSessionWriteQueries,
-    AsyncSignalIndexQueries, AsyncSignalReadQueries, AsyncTimelineWindowQueries, DaemonDbOpen,
-    RuntimeSnapshotQueries, SessionCoreQueries, SessionSummaryQueries, SessionWriteQueries,
-    SignalIndexQueries,
+    AsyncAgentResolutionQueries, AsyncAgentTurnRunQueries, AsyncAgentWorkspaceActivityQueries,
+    AsyncAgentWorkspaceQueries, AsyncAgentWorkspaceTeamOperationPreflightQueries,
+    AsyncAgentWorkspaceTeamOperationQueries, AsyncAgentWorkspaceTeamQueries,
+    AsyncChangeTrackingQueries, AsyncConversationSyncQueries, AsyncDaemonTransactions,
+    AsyncDiagnosticsQueries, AsyncRuntimeSnapshotQueries, AsyncSessionStateQueries,
+    AsyncSessionSummaryQueries, AsyncSessionWriteQueries, AsyncSignalIndexQueries,
+    AsyncSignalReadQueries, AsyncTimelineWindowQueries, DaemonDbOpen, RuntimeSnapshotQueries,
+    SessionCoreQueries, SessionSummaryQueries, SessionWriteQueries, SignalIndexQueries,
 };
 // `ChangeTrackingQueries` (the sync counterpart) is deliberately not
 // re-exported here: every current caller outside `db/` already reaches it

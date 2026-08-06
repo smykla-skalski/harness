@@ -17,8 +17,13 @@ use super::super::mutations::{
 };
 use super::super::params::extract_string_param;
 
+mod agent_workspace_signals;
 mod improver_apply;
 
+pub(super) use agent_workspace_signals::{
+    dispatch_agent_workspace_signal_ack, dispatch_agent_workspace_signal_cancel,
+    dispatch_agent_workspace_signal_send,
+};
 pub(super) use improver_apply::dispatch_improver_apply;
 
 pub(super) async fn dispatch_task_create(
