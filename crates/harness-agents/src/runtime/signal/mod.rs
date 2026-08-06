@@ -256,7 +256,11 @@ fn ensure_existing_ack_matches(path: &Path, requested: &SignalAck) -> Result<Sig
     .into())
 }
 
-fn acknowledgments_match(left: &SignalAck, right: &SignalAck) -> bool {
+/// Return whether two acknowledgments represent the same terminal decision.
+///
+/// The first writer owns the timestamp, so equivalent retries may carry a different one.
+#[must_use]
+pub fn acknowledgments_match(left: &SignalAck, right: &SignalAck) -> bool {
     left.signal_id == right.signal_id
         && left.result == right.result
         && left.agent == right.agent
