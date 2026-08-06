@@ -11,11 +11,13 @@ mod config;
 mod config_migration;
 mod identity;
 mod migration;
+mod wake_event;
 
 #[cfg(test)]
 mod tests;
 
 pub use harness_daemon_root::*;
+pub use wake_event::{WakeEventLevel, record_wake_event};
 
 pub use identity::{
     DAEMON_HOST_FINGERPRINT_ENV, DAEMON_NAME_ENV, DaemonIdentity, ensure_daemon_identity,
