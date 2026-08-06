@@ -103,6 +103,12 @@ struct AppOpenAnythingSourceContractTests {
     // The panel joins every Space directly. Presenting it must not activate a
     // Dashboard window, because AppKit would switch to that window's Space.
     #expect(panelSource.contains(".canJoinAllSpaces"))
+    // AppKit keeps `hidesOnDeactivate` windows offscreen while their app is
+    // inactive, and the global shortcut's main job is opening the palette
+    // from another app - the flag would order the panel back out before it
+    // ever became visible. resignKey handles click-away dismissal instead.
+    #expect(panelSource.contains("panel.hidesOnDeactivate = false"))
+    #expect(!panelSource.contains("hidesOnDeactivate = true"))
     #expect(!presenterSource.contains("openWindow"))
     #expect(!presenterSource.contains("activate("))
     #expect(!presenterSource.contains("makeKeyAndOrderFront"))
@@ -295,6 +301,28 @@ struct AppOpenAnythingSourceContractTests {
     #expect(!hotKeySource.contains("UserDefaults.standard.set(false"))
     #expect(hotKeySource.contains("Failed to register Open Anything hot key"))
     #expect(hotKeySource.contains("Failed to install Open Anything hot key handler"))
+  }
+
+  @Test("Global hot key registers on the event dispatcher target")
+  func globalHotKeyRegistersOnEventDispatcherTarget() throws {
+    let hotKeySource = try harnessSourceFile(named: "App/GlobalHotKeyController.swift")
+    let delegateSource = try harnessSourceFile(named: "App/HarnessMonitorAppDelegate.swift")
+
+    // Hot keys registered against the application event target are delivered
+    // only while the app is active, so the shortcut silently dies whenever
+    // another app is frontmost - the palette must open from anywhere, with
+    // no Monitor window key or even open. Both the handler install and the
+    // registration stay on the event dispatcher target, matching
+    // KeyboardShortcuts, HotKey, and MASShortcut.
+    #expect(hotKeySource.contains("GetEventDispatcherTarget()"))
+    #expect(!hotKeySource.contains("GetApplicationEventTarget()"))
+    // Registration is retried at launch completion and app activation so a
+    // transiently failed scene-driven attempt still lands.
+    let didFinishRange = try #require(
+      delegateSource.range(of: "func applicationDidFinishLaunching")
+    )
+    let didFinishTail = String(delegateSource[didFinishRange.lowerBound...])
+    #expect(didFinishTail.contains("retryRegistrationIfNeeded()"))
   }
 
   @Test("Session AppSearchHost remains native toolbar search")

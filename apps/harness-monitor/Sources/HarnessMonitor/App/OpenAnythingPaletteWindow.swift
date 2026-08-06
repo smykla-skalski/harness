@@ -163,13 +163,13 @@ final class OpenAnythingPaletteWindowController: NSObject, NSWindowDelegate {
     // its frame.
     panel.ignoresMouseEvents = false
     if panel.isVisible {
-      // Pre-warmed / not yet dismissed via app-deactivate: panel is still
-      // ordered front, just at alpha 0. A bare `makeKey` skips the slow
-      // `orderFront` activation pipeline AND the Tahoe show animation.
+      // Pre-warmed / alpha-hidden: panel is still ordered front, just at
+      // alpha 0. A bare `makeKey` skips the slow `orderFront` activation
+      // pipeline AND the Tahoe show animation.
       panel.makeKey()
     } else {
-      // `hidesOnDeactivate = true` removed us from screen on app deactivate.
-      // Fall back to the full activation path on the next show.
+      // An Escape/execute dismissal ordered the panel out (see
+      // `finishDismissal`). Fall back to the full activation path.
       panel.makeKeyAndOrderFront(nil)
     }
   }
@@ -290,8 +290,13 @@ final class OpenAnythingPaletteWindowController: NSObject, NSWindowDelegate {
       .canJoinAllSpaces, .fullScreenAuxiliary, .transient, .stationary, .ignoresCycle,
     ]
     panel.isMovableByWindowBackground = true
-    // Spotlight-style auto-hide when the user clicks away or app deactivates.
-    panel.hidesOnDeactivate = true
+    // MUST stay false: AppKit keeps `hidesOnDeactivate` windows offscreen the
+    // whole time their app is inactive, and the global shortcut's main job is
+    // opening this panel while another app is frontmost - with the flag on,
+    // AppKit orders the panel straight back out and the resignKey callback
+    // dismisses the palette before it ever becomes visible. Click-away and
+    // app-switch dismissal are already covered by `onResignKey`.
+    panel.hidesOnDeactivate = false
     // `.utilityWindow` adds a fade-in/out which read as a "delay" before
     // the palette appears. Command palettes are expected to feel instant.
     panel.animationBehavior = .none
@@ -309,8 +314,8 @@ final class OpenAnythingPaletteWindowController: NSObject, NSWindowDelegate {
     panel.contentView = makeHostingView()
     panel.onResignKey = { [weak self] in
       guard self?.suppressesResignKeyDismissal != true else { return }
-      // Key loss covers both clicks elsewhere and app deactivation, matching
-      // `hidesOnDeactivate` so model state cannot outlive panel visibility.
+      // Key loss covers both clicks elsewhere and app deactivation, so model
+      // state cannot outlive panel visibility.
       self?.hide(reason: .windowResignedKey)
     }
     panel.delegate = self

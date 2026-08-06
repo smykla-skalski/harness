@@ -28,14 +28,23 @@ final class GlobalHotKeyController {
   private let installEventHandlerOperation: InstallEventHandlerOperation
   private let registerEventHotKeyOperation: RegisterEventHotKeyOperation
 
+  // Both Carbon calls MUST use GetEventDispatcherTarget(). Hot keys bound to
+  // the application event target are delivered only while the app is active,
+  // which reads as "the global shortcut works only when a Monitor window is
+  // focused" and silently kills the palette for a backgrounded menu-bar
+  // workflow. The dispatcher target receives hot key events regardless of
+  // activation, matching KeyboardShortcuts, HotKey, and MASShortcut.
   init(
     installEventHandler: @escaping InstallEventHandlerOperation = { handler, userData, ref in
+      guard let dispatcher = GetEventDispatcherTarget() else {
+        return OSStatus(eventInternalErr)
+      }
       var eventType = EventTypeSpec(
         eventClass: OSType(kEventClassKeyboard),
         eventKind: UInt32(kEventHotKeyPressed)
       )
       return InstallEventHandler(
-        GetApplicationEventTarget(),
+        dispatcher,
         handler,
         1,
         &eventType,
@@ -44,11 +53,14 @@ final class GlobalHotKeyController {
       )
     },
     registerEventHotKey: @escaping RegisterEventHotKeyOperation = { descriptor, hotKeyID, ref in
-      RegisterEventHotKey(
+      guard let dispatcher = GetEventDispatcherTarget() else {
+        return OSStatus(eventInternalErr)
+      }
+      return RegisterEventHotKey(
         descriptor.keyCode,
         descriptor.modifiers.carbonFlags,
         hotKeyID,
-        GetApplicationEventTarget(),
+        dispatcher,
         0,
         ref
       )
@@ -138,6 +150,11 @@ final class GlobalHotKeyController {
     )
     if status == noErr {
       installedDescriptor = descriptor
+      // notice, not info: info entries are memory-only in unified logging and
+      // are gone by the time anyone debugs "the shortcut does nothing".
+      HarnessMonitorLogger.store.notice(
+        "Registered Open Anything hot key: \(descriptor.displayText, privacy: .public)"
+      )
     } else {
       installedDescriptor = nil
       hotKeyRef = nil

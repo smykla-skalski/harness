@@ -73,6 +73,33 @@ final class GlobalHotKeyControllerTests: XCTestCase {
   }
 
   @MainActor
+  func testLaunchCompletionRetriesFailedRegistration() {
+    var registrationAttempts = 0
+    let controller = GlobalHotKeyController(
+      installEventHandler: { _, _, _ in noErr },
+      registerEventHotKey: { _, _, _ in
+        registrationAttempts += 1
+        return registrationAttempts == 1 ? OSStatus(-1) : noErr
+      }
+    )
+    controller.configure(
+      enabled: true,
+      descriptor: .defaultValue,
+      onInvoke: {}
+    )
+
+    XCTAssertEqual(registrationAttempts, 1)
+
+    let delegate = HarnessMonitorAppDelegate()
+    delegate.bind(globalHotKeyController: controller)
+    delegate.applicationDidFinishLaunching(
+      Notification(name: NSApplication.didFinishLaunchingNotification)
+    )
+
+    XCTAssertEqual(registrationAttempts, 2)
+  }
+
+  @MainActor
   func testDisabledShortcutDoesNotRetryFailedRegistration() {
     var registrationAttempts = 0
     let controller = GlobalHotKeyController(
