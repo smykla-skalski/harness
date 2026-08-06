@@ -73,7 +73,7 @@ pub(crate) use harness_daemon_db_queries::AsyncSignalIndexQueries;
 pub(crate) use harness_daemon_db_queries::sync_session_in_transaction;
 pub(crate) use harness_daemon_db_queries::{AsyncDaemonTransactions, AsyncSessionWriteQueries};
 mod audit;
-pub(crate) use audit::AsyncAuditQueries;
+pub(crate) use harness_daemon_db_queries::AsyncAuditQueries;
 pub(crate) use harness_daemon_db_queries::ChangeTrackingQueries;
 #[cfg(test)]
 pub(crate) use harness_daemon_db_queries::LOAD_CHANGE_TRACKING_SQL;
@@ -85,9 +85,8 @@ pub(crate) use imports::{
     prepare_runtime_transcript_resync, prepare_session_import_from_resolved, prepare_session_resync,
 };
 mod policy_graph_connection;
-mod pull_request_actions;
+pub(crate) use harness_daemon_db_queries::AsyncPullRequestActionQueries;
 pub(crate) use harness_daemon_db_queries::TaskReviewRebuild;
-pub(crate) use pull_request_actions::AsyncPullRequestActionQueries;
 pub(crate) mod remote_acme;
 pub(crate) mod remote_identity;
 pub(crate) mod remote_pairing_revoke;

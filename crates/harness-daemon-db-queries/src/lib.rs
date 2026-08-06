@@ -22,10 +22,12 @@ mod async_session_summaries;
 mod async_signal_writes;
 mod async_summary_rows;
 mod async_writes;
+mod audit;
 mod change_tracking;
 mod conversation;
 mod diagnostics;
 mod imports;
+mod pull_request_actions;
 mod rebuild;
 mod review_writes;
 mod runtime;
@@ -55,6 +57,7 @@ pub use async_summary_rows::AsyncSessionSummaryRow;
 pub use async_writes::{
     AsyncDaemonTransactions, AsyncSessionWriteQueries, sync_session_in_transaction,
 };
+pub use audit::AsyncAuditQueries;
 pub use change_tracking::{ChangeTrackingQueries, LOAD_CHANGE_TRACKING_SQL};
 pub use conversation::{
     DaemonDbConversation, PreparedAgentTranscriptResync, PreparedConversationEventImport,
@@ -63,6 +66,7 @@ pub use conversation::{
 };
 pub use diagnostics::{DaemonDbDiagnostics, import_daemon_events};
 pub use imports::{DaemonDbImports, ImportResult, ReconcileResult, session_state_import_required};
+pub use pull_request_actions::AsyncPullRequestActionQueries;
 pub use rebuild::TaskReviewRebuild;
 pub use review_writes::{AsyncTaskReviewWrites, SyncTaskReviewWrites, TaskV10Columns};
 pub use runtime::{

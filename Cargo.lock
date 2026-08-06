@@ -3952,6 +3952,7 @@ dependencies = [
  "harness-kernel",
  "harness-protocol",
  "harness-session",
+ "harness-task-board",
  "harness-telemetry",
  "harness-timeline",
  "harness-workspace",
