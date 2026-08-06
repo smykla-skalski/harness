@@ -14,7 +14,9 @@ mod reconcile;
 mod signals;
 mod types;
 
-pub use types::{AgentWorkspaceSignalAcknowledgment, AgentWorkspaceSignalTarget};
+pub use types::{
+    AgentWorkspaceSignalAcknowledgment, AgentWorkspaceSignalInsertion, AgentWorkspaceSignalTarget,
+};
 
 pub trait AsyncAgentWorkspaceActivityQueries: Send + Sync {
     /// Reconcile legacy observation sources and return a workspace-owned timeline window.
@@ -72,7 +74,7 @@ pub trait AsyncAgentWorkspaceActivityQueries: Send + Sync {
         member_id: &str,
         runtime: &str,
         signal: &harness_protocol::agent::Signal,
-    ) -> impl Future<Output = Result<AgentWorkspaceSignalRecord, CliError>> + Send;
+    ) -> impl Future<Output = Result<AgentWorkspaceSignalInsertion, CliError>> + Send;
 
     /// Record one durable signal acknowledgment.
     ///
@@ -137,7 +139,8 @@ impl AsyncAgentWorkspaceActivityQueries for AsyncDaemonDb {
         workspace_id: &str,
         member_id: &str,
     ) -> Result<AgentWorkspaceSignalTarget, CliError> {
-        let mut transaction = begin_activity_transaction(self, "signal cleanup target read").await?;
+        let mut transaction =
+            begin_activity_transaction(self, "signal cleanup target read").await?;
         ensure_workspace_scope(&mut transaction, daemon_id, workspace_id).await?;
         reconcile::reconcile_one(&mut transaction, workspace_id).await?;
         let target =
@@ -153,14 +156,14 @@ impl AsyncAgentWorkspaceActivityQueries for AsyncDaemonDb {
         member_id: &str,
         runtime: &str,
         signal: &harness_protocol::agent::Signal,
-    ) -> Result<AgentWorkspaceSignalRecord, CliError> {
+    ) -> Result<AgentWorkspaceSignalInsertion, CliError> {
         let mut transaction = begin_activity_transaction(self, "signal insert").await?;
         ensure_workspace_scope(&mut transaction, daemon_id, workspace_id).await?;
-        let record =
+        let insertion =
             signals::insert_signal(&mut transaction, workspace_id, member_id, runtime, signal)
                 .await?;
         commit_activity_transaction(transaction, "signal insert").await?;
-        Ok(record)
+        Ok(insertion)
     }
 
     async fn acknowledge_agent_workspace_signal(

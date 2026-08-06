@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS agent_workspace_signals (
     workspace_id      TEXT NOT NULL,
     member_id         TEXT NOT NULL,
     signal_id         TEXT NOT NULL,
+    idempotency_key   TEXT,
     runtime           TEXT NOT NULL,
     status            TEXT NOT NULL CHECK (status IN (
                           'pending', 'delivered', 'rejected', 'deferred', 'expired'
@@ -50,6 +51,9 @@ CREATE INDEX IF NOT EXISTS idx_agent_workspace_signals_member
     ON agent_workspace_signals(workspace_id, member_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_agent_workspace_signals_source
     ON agent_workspace_signals(source_session_id, source_agent_id, workspace_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_workspace_signals_native_idempotency
+    ON agent_workspace_signals(workspace_id, member_id, idempotency_key)
+    WHERE idempotency_key IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS agent_workspace_conversation_events (
     workspace_id      TEXT NOT NULL,

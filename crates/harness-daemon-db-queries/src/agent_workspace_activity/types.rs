@@ -1,4 +1,5 @@
 use harness_protocol::agent::AckResult;
+use harness_protocol::daemon::activity::AgentWorkspaceSignalRecord;
 
 #[derive(Debug, Clone)]
 pub struct AgentWorkspaceSignalAcknowledgment {
@@ -19,4 +20,10 @@ pub struct AgentWorkspaceSignalTarget {
     pub project_dir: String,
     pub source_session_id: Option<String>,
     pub source_agent_id: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct AgentWorkspaceSignalInsertion {
+    pub record: AgentWorkspaceSignalRecord,
+    pub inserted: bool,
 }

@@ -81,7 +81,7 @@ pub(crate) async fn send_agent_workspace_signal_async(
         member_id,
         &now,
     );
-    let record = db
+    let insertion = db
         .insert_agent_workspace_signal(
             &daemon_id,
             workspace_id,
@@ -90,6 +90,10 @@ pub(crate) async fn send_agent_workspace_signal_async(
             &signal,
         )
         .await?;
+    if !insertion.inserted {
+        return Ok(insertion.record);
+    }
+    let record = insertion.record;
     if let Err(delivery_error) = write_runtime_signal(&target, &signal).await {
         record_failed_signal_delivery(
             db,

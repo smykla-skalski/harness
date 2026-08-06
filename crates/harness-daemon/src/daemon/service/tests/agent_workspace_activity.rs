@@ -113,21 +113,32 @@ async fn assert_workspace_signal_round_trip(
 ) {
     assert_pending_signal_cancellation(project, fixture).await;
     assert_unavailable_signal_cancellation(project, fixture).await;
+    let request = AgentWorkspaceSignalSendRequest {
+        actor: "test".into(),
+        command: "continue".into(),
+        message: "Continue from durable workspace state".into(),
+        action_hint: None,
+    };
     let sent = send_agent_workspace_signal_async(
         &fixture.db,
         &fixture.workspace_id,
         &fixture.member_id,
-        &AgentWorkspaceSignalSendRequest {
-            actor: "test".into(),
-            command: "continue".into(),
-            message: "Continue from durable workspace state".into(),
-            action_hint: None,
-        },
+        &request,
         WakeDispatch::none(),
     )
     .await
     .expect("send durable workspace signal");
+    let retried = send_agent_workspace_signal_async(
+        &fixture.db,
+        &fixture.workspace_id,
+        &fixture.member_id,
+        &request,
+        WakeDispatch::none(),
+    )
+    .await
+    .expect("retry durable workspace signal after response loss");
     assert_eq!(sent.status, SessionSignalStatus::Pending);
+    assert_eq!(retried.signal.signal_id, sent.signal.signal_id);
     let agent_runtime = runtime::runtime_for_name("codex").expect("Codex runtime");
     let signal_dir = agent_runtime.signal_dir(project, "workspace-activity-worker");
     let pending =

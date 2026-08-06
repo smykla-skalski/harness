@@ -6,7 +6,7 @@ use sha2::{Digest, Sha256};
 use sqlx::{FromRow, Sqlite, Transaction, query, query_as};
 
 use super::reads::load_signal_record;
-use super::types::AgentWorkspaceSignalTarget;
+use super::types::{AgentWorkspaceSignalInsertion, AgentWorkspaceSignalTarget};
 
 #[derive(Debug, FromRow)]
 struct SignalTargetRow {
@@ -107,23 +107,30 @@ pub(super) async fn insert_signal(
     member_id: &str,
     runtime: &str,
     signal: &Signal,
-) -> Result<AgentWorkspaceSignalRecord, CliError> {
+) -> Result<AgentWorkspaceSignalInsertion, CliError> {
+    let idempotency_key = signal
+        .delivery
+        .idempotency_key
+        .as_deref()
+        .filter(|key| !key.trim().is_empty())
+        .ok_or_else(|| db_error("durable agent signal is missing its idempotency key"))?;
     let signal_json = serde_json::to_string(signal)
         .map_err(|error| db_error(format!("serialize durable signal: {error}")))?;
     let source_digest = digest(&signal_json);
     let now = harness_workspace::workspace::utc_now();
     let inserted = query(
         "INSERT INTO agent_workspace_signals (
-            workspace_id, member_id, signal_id, runtime, status, signal_json,
+            workspace_id, member_id, signal_id, idempotency_key, runtime, status, signal_json,
             ack_json, origin_kind, source_session_id, source_agent_id,
             source_digest, created_at, updated_at
-         ) VALUES (?1, ?2, ?3, ?4, 'pending', ?5, NULL, 'native',
-                   NULL, NULL, ?6, ?7, ?7)
-         ON CONFLICT(workspace_id, signal_id) DO NOTHING",
+         ) VALUES (?1, ?2, ?3, ?4, ?5, 'pending', ?6, NULL, 'native',
+                   NULL, NULL, ?7, ?8, ?8)
+         ON CONFLICT DO NOTHING",
     )
     .bind(workspace_id)
     .bind(member_id)
     .bind(&signal.signal_id)
+    .bind(idempotency_key)
     .bind(runtime)
     .bind(&signal_json)
     .bind(&source_digest)
@@ -139,7 +146,8 @@ pub(super) async fn insert_signal(
             member_id,
             runtime,
             &signal.signal_id,
-            &source_digest,
+            idempotency_key,
+            signal,
         )
         .await;
     }
@@ -160,7 +168,12 @@ pub(super) async fn insert_signal(
     )
     .await?;
     refresh_timeline_state(transaction, workspace_id).await?;
-    load_signal_record(transaction, workspace_id, member_id, &signal.signal_id).await
+    let record =
+        load_signal_record(transaction, workspace_id, member_id, &signal.signal_id).await?;
+    Ok(AgentWorkspaceSignalInsertion {
+        record,
+        inserted: true,
+    })
 }
 
 pub(super) async fn acknowledge_signal(
@@ -323,33 +336,62 @@ async fn load_idempotent_signal(
     member_id: &str,
     runtime: &str,
     signal_id: &str,
-    source_digest: &str,
-) -> Result<AgentWorkspaceSignalRecord, CliError> {
-    let identity = query_as::<_, (String, String, String, String)>(
-        "SELECT member_id, runtime, origin_kind, source_digest
+    idempotency_key: &str,
+    requested: &Signal,
+) -> Result<AgentWorkspaceSignalInsertion, CliError> {
+    let identity = query_as::<_, (String, String, String, String, String)>(
+        "SELECT signal_id, member_id, runtime, origin_kind, signal_json
          FROM agent_workspace_signals
-         WHERE workspace_id = ?1 AND signal_id = ?2",
+         WHERE workspace_id = ?1
+           AND (signal_id = ?2 OR (member_id = ?3 AND idempotency_key = ?4))
+         ORDER BY CASE WHEN signal_id = ?2 THEN 0 ELSE 1 END
+         LIMIT 1",
     )
     .bind(workspace_id)
     .bind(signal_id)
+    .bind(member_id)
+    .bind(idempotency_key)
     .fetch_optional(transaction.as_mut())
     .await
     .map_err(|error| db_error(format!("load duplicate durable agent signal: {error}")))?;
-    let is_same = identity.is_some_and(
-        |(stored_member_id, stored_runtime, origin_kind, stored_digest)| {
-            stored_member_id == member_id
-                && stored_runtime == runtime
-                && origin_kind == "native"
-                && (stored_digest == source_digest
-                    || stored_digest.starts_with(&format!("{source_digest}:")))
-        },
-    );
-    if !is_same {
+    let Some((stored_signal_id, stored_member_id, stored_runtime, origin_kind, signal_json)) =
+        identity
+    else {
         return Err(db_error(format!(
-            "durable signal id '{signal_id}' is already used by a different record"
+            "durable signal idempotency conflict for '{idempotency_key}' has no stored record"
+        )));
+    };
+    let stored = serde_json::from_str::<Signal>(&signal_json)
+        .map_err(|error| db_error(format!("parse duplicate durable agent signal: {error}")))?;
+    if stored_member_id != member_id
+        || stored_runtime != runtime
+        || origin_kind != "native"
+        || !same_signal_intent(&stored, requested)
+    {
+        return Err(db_error(format!(
+            "durable signal idempotency key '{idempotency_key}' is already used by a different request"
         )));
     }
-    load_signal_record(transaction, workspace_id, member_id, signal_id).await
+    let record =
+        load_signal_record(transaction, workspace_id, member_id, &stored_signal_id).await?;
+    Ok(AgentWorkspaceSignalInsertion {
+        record,
+        inserted: false,
+    })
+}
+
+fn same_signal_intent(stored: &Signal, requested: &Signal) -> bool {
+    stored.version == requested.version
+        && stored.source_agent == requested.source_agent
+        && stored.command == requested.command
+        && stored.priority == requested.priority
+        && stored.payload.message == requested.payload.message
+        && stored.payload.action_hint == requested.payload.action_hint
+        && stored.payload.related_files == requested.payload.related_files
+        && stored.payload.metadata == requested.payload.metadata
+        && stored.delivery.max_retries == requested.delivery.max_retries
+        && stored.delivery.retry_count == requested.delivery.retry_count
+        && stored.delivery.idempotency_key == requested.delivery.idempotency_key
 }
 
 const fn acknowledgment_label(result: AckResult) -> &'static str {

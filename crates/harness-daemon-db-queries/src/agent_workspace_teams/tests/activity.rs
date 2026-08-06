@@ -209,14 +209,17 @@ async fn native_signal_and_ack_use_workspace_member_ownership() {
         .insert_agent_workspace_signal(DAEMON_ID, &workspace_id, &member_id, "codex", &signal)
         .await
         .expect("insert native durable signal");
-    assert_eq!(inserted.member_id, member_id);
-    assert!(inserted.legacy_session_id.is_none());
+    assert!(inserted.inserted);
+    assert_eq!(inserted.record.member_id, member_id);
+    assert!(inserted.record.legacy_session_id.is_none());
     let revision_after_insert = timeline_revision(&fixture, &workspace_id).await;
-    fixture
+    let retried = fixture
         .db
         .insert_agent_workspace_signal(DAEMON_ID, &workspace_id, &member_id, "codex", &signal)
         .await
         .expect("repeat native durable signal insert");
+    assert!(!retried.inserted);
+    assert_eq!(retried.record.signal.signal_id, signal.signal_id);
     assert_eq!(
         timeline_revision(&fixture, &workspace_id).await,
         revision_after_insert,
@@ -369,11 +372,12 @@ async fn assert_signal_acknowledgment_is_idempotent(
         revision_after_ack,
         "an idempotent acknowledgment retry must not advance the timeline revision"
     );
-    fixture
+    let retried = fixture
         .db
         .insert_agent_workspace_signal(DAEMON_ID, workspace_id, member_id, "codex", signal)
         .await
         .expect("repeat acknowledged durable signal insert");
+    assert!(!retried.inserted);
     assert_eq!(
         timeline_revision(fixture, workspace_id).await,
         revision_after_ack,
