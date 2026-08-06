@@ -99,6 +99,19 @@ pub trait AgentRuntime: Send + Sync {
         signal: &Signal,
     ) -> Result<PathBuf, CliError>;
 
+    /// Repair a missing pending file without reviving an acknowledged signal.
+    ///
+    /// # Errors
+    /// Returns `CliError` on filesystem failures.
+    fn ensure_signal(
+        &self,
+        project_dir: &Path,
+        session_id: &str,
+        signal: &Signal,
+    ) -> Result<signal::SignalFileState, CliError> {
+        signal::ensure_signal_file(&self.signal_dir(project_dir, session_id), signal)
+    }
+
     /// Check for and consume pending acknowledgment files.
     ///
     /// # Errors

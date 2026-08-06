@@ -9,6 +9,8 @@ use crate::daemon::db::prelude::*;
 use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 
+mod recovery;
+
 #[test]
 fn workspace_signal_delivery_and_runtime_ack_do_not_require_a_session_route() {
     with_temp_project(|project| {
@@ -343,6 +345,10 @@ async fn assert_pending_signal_cancellation(
         .find(|acknowledgment| acknowledgment.signal_id == sent.signal.signal_id)
         .expect("runtime cancellation acknowledgment");
     assert_eq!(acknowledgment.result, AckResult::Rejected);
+    assert_eq!(
+        acknowledgment.acknowledged_at,
+        first_acknowledgment.acknowledged_at
+    );
 }
 
 async fn assert_durable_acknowledgment(signal_id: &str, fixture: &WorkspaceActivityFixture) {

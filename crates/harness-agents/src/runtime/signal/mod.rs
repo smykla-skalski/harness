@@ -9,9 +9,12 @@ use harness_infra::persistence::flock::{FlockErrorContext, with_exclusive_flock}
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_kernel::io::{validate_safe_segment, write_text};
 
+mod delivery;
+
 #[cfg(test)]
 mod tests;
 
+pub use delivery::{SignalFileState, ensure_signal_file};
 pub use harness_protocol::agent::{
     AckResult, DeliveryConfig, Signal, SignalAck, SignalPayload, SignalPriority,
     signal_matches_session,
@@ -181,17 +184,30 @@ impl AckPaths {
 /// # Errors
 /// Returns `CliError` on filesystem failures.
 pub fn acknowledge_signal(signal_dir: &Path, ack: &SignalAck) -> Result<(), CliError> {
+    acknowledge_signal_once(signal_dir, ack).map(|_| ())
+}
+
+/// Acknowledge a signal and return the first equivalent acknowledgment stored.
+///
+/// # Errors
+/// Returns `CliError` on filesystem failures or a conflicting acknowledgment.
+pub fn acknowledge_signal_once(signal_dir: &Path, ack: &SignalAck) -> Result<SignalAck, CliError> {
     let paths = AckPaths::new(signal_dir, &ack.signal_id)?;
     fs::create_dir_all(&paths.acknowledged_dir)
         .map_err(|error| CliErrorKind::workflow_io(format!("create ack dir: {error}")))?;
 
     let ack_json = serde_json::to_string_pretty(ack)
         .map_err(|error| CliErrorKind::workflow_serialize(format!("ack: {error}")))?;
-    write_ack_once(&paths, ack, &ack_json)?;
-    move_acknowledged_signal(&paths.signal_file, &paths.acknowledged_signal_file)
+    let acknowledgment = write_ack_once(&paths, ack, &ack_json)?;
+    move_acknowledged_signal(&paths.signal_file, &paths.acknowledged_signal_file)?;
+    Ok(acknowledgment)
 }
 
-fn write_ack_once(paths: &AckPaths, ack: &SignalAck, ack_json: &str) -> Result<(), CliError> {
+fn write_ack_once(
+    paths: &AckPaths,
+    ack: &SignalAck,
+    ack_json: &str,
+) -> Result<SignalAck, CliError> {
     with_exclusive_flock(
         &paths.ack_lock_file,
         FlockErrorContext::new("signal acknowledgment"),
@@ -205,27 +221,33 @@ fn write_ack_once(paths: &AckPaths, ack: &SignalAck, ack_json: &str) -> Result<(
             if exists {
                 ensure_existing_ack_matches(&paths.ack_file, ack)
             } else {
-                write_text(&paths.ack_file, ack_json)
+                write_text(&paths.ack_file, ack_json)?;
+                Ok(ack.clone())
             }
         },
     )
 }
 
-fn ensure_existing_ack_matches(path: &Path, requested: &SignalAck) -> Result<(), CliError> {
+fn read_acknowledgment(path: &Path) -> Result<SignalAck, CliError> {
     let existing_json = fs::read_to_string(path).map_err(|error| {
         CliErrorKind::workflow_io(format!(
             "read existing signal acknowledgment '{}': {error}",
             path.display()
         ))
     })?;
-    let existing: SignalAck = serde_json::from_str(&existing_json).map_err(|error| {
+    serde_json::from_str(&existing_json).map_err(|error| {
         CliErrorKind::workflow_serialize(format!(
             "existing signal acknowledgment '{}': {error}",
             path.display()
         ))
-    })?;
+        .into()
+    })
+}
+
+fn ensure_existing_ack_matches(path: &Path, requested: &SignalAck) -> Result<SignalAck, CliError> {
+    let existing = read_acknowledgment(path)?;
     if acknowledgments_match(&existing, requested) {
-        return Ok(());
+        return Ok(existing);
     }
     Err(CliErrorKind::session_agent_conflict(format!(
         "signal '{}' already has a different runtime acknowledgment",

@@ -1,7 +1,9 @@
 use std::path::PathBuf;
 
 use harness_agents::runtime;
-use harness_agents::runtime::signal::{AckResult, Signal, SignalAck, acknowledge_signal};
+use harness_agents::runtime::signal::{
+    AckResult, Signal, SignalAck, SignalFileState, acknowledge_signal_once,
+};
 use harness_daemon_db_queries::{AgentWorkspaceSignalAcknowledgment, AgentWorkspaceSignalTarget};
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_protocol::daemon::activity::{
@@ -81,9 +83,11 @@ pub(crate) async fn send_agent_workspace_signal_async(
         member_id,
         &now,
     );
-    signal.delivery.idempotency_key = Some(format!(
-        "{workspace_id}:{member_id}:{}",
-        request.idempotency_key.trim()
+    signal.delivery.idempotency_key = Some(scoped_signal_idempotency_key(
+        workspace_id,
+        member_id,
+        &request.actor,
+        &request.idempotency_key,
     ));
     let insertion = db
         .insert_agent_workspace_signal(
@@ -94,24 +98,36 @@ pub(crate) async fn send_agent_workspace_signal_async(
             &signal,
         )
         .await?;
-    if !insertion.inserted {
+    if !insertion.inserted && insertion.record.acknowledgment.is_some() {
         return Ok(insertion.record);
     }
     let record = insertion.record;
-    if let Err(delivery_error) = write_runtime_signal(&target, &signal).await {
-        record_failed_signal_delivery(
-            db,
-            &daemon_id,
-            workspace_id,
-            member_id,
-            &signal.signal_id,
-            &delivery_error,
-        )
-        .await?;
-        return Err(delivery_error);
+    let runtime_state = match write_runtime_signal(&target, &record.signal).await {
+        Ok(state) => state,
+        Err(delivery_error) => {
+            record_failed_signal_delivery(
+                db,
+                &daemon_id,
+                workspace_id,
+                member_id,
+                &record.signal.signal_id,
+                &delivery_error,
+            )
+            .await?;
+            return Err(delivery_error);
+        }
+    };
+    match runtime_state {
+        SignalFileState::Created => {
+            wake_managed_agent(&target, &record.signal, dispatch);
+            Ok(record)
+        }
+        SignalFileState::Pending => Ok(record),
+        SignalFileState::Acknowledged(acknowledgment) => {
+            persist_runtime_acknowledgment(db, &daemon_id, workspace_id, member_id, &acknowledgment)
+                .await
+        }
     }
-    wake_managed_agent(&target, &signal, dispatch);
-    Ok(record)
 }
 
 /// Record an acknowledgment addressed by workspace and durable member.
@@ -212,7 +228,7 @@ pub(crate) async fn cancel_agent_workspace_signal_async(
                 .await;
         }
     };
-    write_runtime_acknowledgment(
+    let runtime_acknowledgment = write_runtime_acknowledgment(
         &target,
         &SignalAck {
             signal_id: signal_id.to_string(),
@@ -224,8 +240,35 @@ pub(crate) async fn cancel_agent_workspace_signal_async(
         },
     )
     .await?;
-    db.acknowledge_agent_workspace_signal(&daemon_id, workspace_id, member_id, &acknowledgment)
-        .await
+    persist_runtime_acknowledgment(
+        db,
+        &daemon_id,
+        workspace_id,
+        member_id,
+        &runtime_acknowledgment,
+    )
+    .await
+}
+
+async fn persist_runtime_acknowledgment(
+    db: &AsyncDaemonDbHandle,
+    daemon_id: &str,
+    workspace_id: &str,
+    member_id: &str,
+    acknowledgment: &SignalAck,
+) -> Result<AgentWorkspaceSignalRecord, CliError> {
+    db.acknowledge_agent_workspace_signal(
+        daemon_id,
+        workspace_id,
+        member_id,
+        &AgentWorkspaceSignalAcknowledgment {
+            signal_id: acknowledgment.signal_id.clone(),
+            result: acknowledgment.result,
+            details: acknowledgment.details.clone(),
+            acknowledged_at: Some(acknowledgment.acknowledged_at.clone()),
+        },
+    )
+    .await
 }
 
 async fn record_failed_signal_delivery(
@@ -341,7 +384,7 @@ async fn prepare_activity_scope(db: &AsyncDaemonDbHandle) -> Result<String, CliE
 async fn write_runtime_signal(
     target: &AgentWorkspaceSignalTarget,
     signal: &Signal,
-) -> Result<(), CliError> {
+) -> Result<SignalFileState, CliError> {
     let runtime = runtime::runtime_for_name(&target.runtime).ok_or_else(|| {
         CliErrorKind::session_agent_conflict(format!(
             "unknown runtime '{}' for durable member '{}'",
@@ -355,9 +398,7 @@ async fn write_runtime_signal(
         .unwrap_or_else(|| target.workspace_id.clone());
     let signal = signal.clone();
     tokio::task::spawn_blocking(move || {
-        runtime
-            .write_signal(&project_dir, &signal_session_id, &signal)
-            .map(|_| ())
+        runtime.ensure_signal(&project_dir, &signal_session_id, &signal)
     })
     .await
     .map_err(|error| CliErrorKind::workflow_io(format!("join durable signal write: {error}")))?
@@ -366,7 +407,7 @@ async fn write_runtime_signal(
 async fn write_runtime_acknowledgment(
     target: &AgentWorkspaceSignalTarget,
     acknowledgment: &SignalAck,
-) -> Result<(), CliError> {
+) -> Result<SignalAck, CliError> {
     let runtime = runtime::runtime_for_name(&target.runtime).ok_or_else(|| {
         CliErrorKind::session_agent_conflict(format!(
             "unknown runtime '{}' for durable member '{}'",
@@ -382,11 +423,25 @@ async fn write_runtime_acknowledgment(
         &signal_session_id,
     );
     let acknowledgment = acknowledgment.clone();
-    tokio::task::spawn_blocking(move || acknowledge_signal(&signal_dir, &acknowledgment))
+    tokio::task::spawn_blocking(move || acknowledge_signal_once(&signal_dir, &acknowledgment))
         .await
         .map_err(|error| {
             CliErrorKind::workflow_io(format!("join durable signal cancellation: {error}"))
         })?
+}
+
+fn scoped_signal_idempotency_key(
+    workspace_id: &str,
+    member_id: &str,
+    actor: &str,
+    idempotency_key: &str,
+) -> String {
+    let actor = actor.trim();
+    format!(
+        "{workspace_id}:{member_id}:{}:{actor}:{}",
+        actor.len(),
+        idempotency_key.trim()
+    )
 }
 
 fn wake_managed_agent(

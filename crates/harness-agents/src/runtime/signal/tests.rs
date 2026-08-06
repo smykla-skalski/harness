@@ -158,21 +158,50 @@ fn concurrent_equivalent_acknowledgments_preserve_the_first_timestamp() {
                 details: Some("cancelled".into()),
             };
             barrier.wait();
-            acknowledge_signal(&signal_dir, &acknowledgment)
+            acknowledge_signal_once(&signal_dir, &acknowledgment)
         })
     });
 
-    assert!(
-        attempts
-            .into_iter()
-            .all(|attempt| attempt.join().unwrap().is_ok())
-    );
+    let results = attempts.map(|attempt| attempt.join().unwrap().unwrap());
+    assert_eq!(results[0].acknowledged_at, results[1].acknowledged_at);
     let acknowledgments = read_acknowledgments(&signal_dir).unwrap();
     assert_eq!(acknowledgments.len(), 1);
-    assert!(
-        ["2026-03-28T12:00:03Z", "2026-03-28T12:00:04Z"]
-            .contains(&acknowledgments[0].acknowledged_at.as_str())
+    assert_eq!(
+        acknowledgments[0].acknowledged_at,
+        results[0].acknowledged_at
     );
+}
+
+#[test]
+fn ensure_signal_file_repairs_missing_delivery_without_reviving_acknowledged_signal() {
+    let tmp = tempfile::tempdir().unwrap();
+    let signal_dir = tmp.path().join("signals");
+    let signal = sample_signal();
+
+    assert!(matches!(
+        ensure_signal_file(&signal_dir, &signal).unwrap(),
+        SignalFileState::Created
+    ));
+    assert!(matches!(
+        ensure_signal_file(&signal_dir, &signal).unwrap(),
+        SignalFileState::Pending
+    ));
+    let acknowledgment = SignalAck {
+        signal_id: signal.signal_id.clone(),
+        acknowledged_at: "2026-03-28T12:00:03Z".into(),
+        result: AckResult::Accepted,
+        agent: "codex".into(),
+        session_id: "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
+        details: None,
+    };
+    acknowledge_signal(&signal_dir, &acknowledgment).unwrap();
+
+    let SignalFileState::Acknowledged(stored) = ensure_signal_file(&signal_dir, &signal).unwrap()
+    else {
+        panic!("acknowledged signal must not be recreated")
+    };
+    assert_eq!(stored.acknowledged_at, acknowledgment.acknowledged_at);
+    assert!(read_pending_signals(&signal_dir).unwrap().is_empty());
 }
 
 #[test]
