@@ -56,6 +56,7 @@ pub(super) async fn load_activity_window(
     workspace_id: &str,
     request: &TimelineWindowRequest,
 ) -> Result<AgentWorkspaceActivityWindowResponse, CliError> {
+    crate::timeline::validate_timeline_window_request(request)?;
     let (revision, count) = query_as::<_, (i64, i64)>(
         "SELECT revision, entry_count FROM agent_workspace_timeline_state
          WHERE workspace_id = ?1",

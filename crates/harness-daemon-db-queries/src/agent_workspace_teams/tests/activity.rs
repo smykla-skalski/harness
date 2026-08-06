@@ -129,6 +129,44 @@ async fn session_deletion_rejects_unmapped_observation_records() {
 }
 
 #[tokio::test]
+async fn conflicting_activity_cursors_are_rejected() {
+    let fixture = Fixture::new().await;
+    let workspace_id = fixture
+        .seed_workspace("project-conflicting-cursors", "session-conflicting-cursors")
+        .await;
+    fixture
+        .seed_agent(
+            "session-conflicting-cursors",
+            "agent-conflicting-cursors",
+            "acp",
+            "acp-conflicting-cursors",
+            "runtime-conflicting-cursors",
+        )
+        .await;
+    reconcile_member(&fixture, &workspace_id).await;
+    let cursor = TimelineCursor {
+        recorded_at: NOW.to_string(),
+        entry_id: "entry-conflicting-cursors".to_string(),
+    };
+
+    let error = fixture
+        .db
+        .load_agent_workspace_activity(
+            DAEMON_ID,
+            &workspace_id,
+            &TimelineWindowRequest {
+                before: Some(cursor.clone()),
+                after: Some(cursor),
+                ..TimelineWindowRequest::default()
+            },
+        )
+        .await
+        .expect_err("conflicting activity cursors must fail");
+
+    assert!(error.to_string().contains("both before and after cursors"));
+}
+
+#[tokio::test]
 async fn native_signal_and_ack_use_workspace_member_ownership() {
     let fixture = Fixture::new().await;
     let workspace_id = fixture

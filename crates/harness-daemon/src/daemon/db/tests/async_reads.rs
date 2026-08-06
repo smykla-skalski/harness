@@ -1,4 +1,5 @@
 use crate::daemon::db::DaemonDbConversation;
+use harness_protocol::timeline::TimelineCursor;
 use serde_json::json;
 use tempfile::tempdir;
 
@@ -91,6 +92,40 @@ async fn load_session_timeline_window_reports_unchanged_known_revision() {
     assert!(response.entries.is_none());
     assert_eq!(response.revision, 1);
     assert_eq!(response.total_count, 1);
+}
+
+#[tokio::test]
+async fn load_session_timeline_window_rejects_conflicting_cursors() {
+    let tmp = tempdir().expect("tempdir");
+    let db_path = tmp.path().join("harness.db");
+    let sync_db = DaemonDb::open(&db_path).expect("open sync daemon db");
+    let project = sample_project();
+    sync_db.sync_project(&project).expect("sync project");
+    sync_db
+        .save_session_state(&project.project_id, &sample_session_state())
+        .expect("save session state");
+    drop(sync_db);
+    let async_db = AsyncDaemonDb::connect(&db_path)
+        .await
+        .expect("open async daemon db");
+    let cursor = TimelineCursor {
+        recorded_at: "2026-08-06T10:00:00Z".into(),
+        entry_id: "entry-conflicting-cursors".into(),
+    };
+
+    let error = async_db
+        .load_session_timeline_window(
+            "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
+            &TimelineWindowRequest {
+                before: Some(cursor.clone()),
+                after: Some(cursor),
+                ..TimelineWindowRequest::default()
+            },
+        )
+        .await
+        .expect_err("conflicting async timeline cursors must fail");
+
+    assert!(error.to_string().contains("both before and after cursors"));
 }
 
 #[tokio::test]

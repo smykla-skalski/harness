@@ -112,6 +112,7 @@ impl AsyncTimelineWindowQueries for AsyncDaemonDb {
         session_id: &str,
         request: &TimelineWindowRequest,
     ) -> Result<Option<TimelineWindowResponse>, CliError> {
+        crate::timeline::validate_timeline_window_request(request)?;
         let Some(state) = load_session_timeline_state(self, session_id).await? else {
             return Ok(None);
         };
