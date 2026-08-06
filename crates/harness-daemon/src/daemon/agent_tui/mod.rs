@@ -9,6 +9,8 @@ use std::time::Duration;
 #[cfg(feature = "daemon-runtime")]
 mod effort;
 #[cfg(feature = "daemon-runtime")]
+mod kill_switch_port;
+#[cfg(feature = "daemon-runtime")]
 mod manager;
 #[cfg(feature = "daemon-runtime")]
 mod manager_control;
@@ -26,6 +28,8 @@ mod readiness;
 mod screen;
 #[cfg(any(feature = "bridge-runtime", feature = "daemon-runtime"))]
 mod spawn;
+#[cfg(feature = "daemon-runtime")]
+mod storage_port;
 #[cfg(any(feature = "bridge-runtime", feature = "daemon-runtime"))]
 mod support;
 #[cfg(all(test, feature = "daemon-runtime"))]
