@@ -29,7 +29,8 @@ use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::daemon::remote_pairing::{RemotePairingRateLimiter, RemotePairingStatusRateLimiter};
 use crate::daemon::server_state;
 use crate::daemon::service::{
-    WakeDispatch, register_task_board_working_copy_progress_sender, run_task_board_working_copy_gc,
+    CodexWake, WakeDispatch, register_task_board_working_copy_progress_sender,
+    run_task_board_working_copy_gc,
 };
 use crate::telemetry::{apply_parent_context_from_headers, current_trace_id, with_active_baggage};
 use harness_kernel::errors::{CliError, CliErrorKind};
@@ -213,7 +214,7 @@ impl DaemonHttpState {
     #[must_use]
     pub(crate) fn wake_dispatch(&self) -> WakeDispatch<'_> {
         WakeDispatch::new(Some(&self.agent_tui_manager), Some(&self.acp_agent_manager))
-            .with_codex(Some(&self.codex_controller))
+            .with_codex(Some(&self.codex_controller as &dyn CodexWake))
     }
 }
 
