@@ -388,7 +388,7 @@ pub use task_board_working_copies::{
     obtain_task_board_working_copy, register_task_board_working_copy_progress_sender,
     run_task_board_working_copy_gc,
 };
-pub use wake_route::WakeDispatch;
+pub use wake_route::{CodexWake, WakeDispatch};
 pub(crate) use wake_route::{WakeEventLevel, record_wake_event};
 
 pub(crate) use headless_readiness::{

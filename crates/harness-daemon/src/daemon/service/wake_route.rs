@@ -13,8 +13,34 @@ use std::fmt;
 use super::signals::managed_tui_id_for_registration;
 use super::{AcpAgentManagerHandle, AgentRegistration, AgentTuiManagerHandle, session_service};
 use crate::daemon::codex_controller::CodexControllerHandle;
+use crate::daemon::protocol::{CodexRunSnapshot, CodexSteerRequest};
 use crate::daemon::state::append_event_best_effort;
 use crate::session::types::{ManagedAgentKind, ManagedAgentRef};
+use harness_kernel::errors::CliError;
+
+/// Narrow wake-time interface a Codex-backed run needs from its controller.
+/// Kept local (not the concrete `CodexControllerHandle`) so wake routing does
+/// not depend on the controller's full surface - mirrors
+/// `harness_daemon_session_service::SignalWake`'s role for the TUI route.
+pub trait CodexWake: Send + Sync {
+    /// # Errors
+    /// Returns [`CliError`] when the run cannot be steered.
+    fn steer(
+        &self,
+        run_id: &str,
+        request: &CodexSteerRequest,
+    ) -> Result<CodexRunSnapshot, CliError>;
+}
+
+impl CodexWake for CodexControllerHandle {
+    fn steer(
+        &self,
+        run_id: &str,
+        request: &CodexSteerRequest,
+    ) -> Result<CodexRunSnapshot, CliError> {
+        Self::steer(self, run_id, request)
+    }
+}
 
 /// Severity of a single ACP wake-decision telemetry record.
 #[derive(Clone, Copy)]
@@ -89,7 +115,7 @@ pub(crate) fn record_wake_event(
 pub struct WakeDispatch<'a> {
     pub agent_tui: Option<&'a AgentTuiManagerHandle>,
     pub acp_agent: Option<&'a AcpAgentManagerHandle>,
-    pub codex: Option<&'a CodexControllerHandle>,
+    pub codex: Option<&'a dyn CodexWake>,
 }
 
 impl<'a> WakeDispatch<'a> {
@@ -106,7 +132,7 @@ impl<'a> WakeDispatch<'a> {
     }
 
     #[must_use]
-    pub fn with_codex(mut self, codex: Option<&'a CodexControllerHandle>) -> Self {
+    pub fn with_codex(mut self, codex: Option<&'a dyn CodexWake>) -> Self {
         self.codex = codex;
         self
     }
@@ -135,7 +161,7 @@ pub(crate) enum WakeRoute<'a> {
     },
     Codex {
         run_id: &'a str,
-        controller: &'a CodexControllerHandle,
+        controller: &'a dyn CodexWake,
     },
     None {
         reason: NoneReason,
@@ -247,10 +273,7 @@ fn acp_route<'a>(
     }
 }
 
-fn codex_route<'a>(
-    run_id: &'a str,
-    codex_controller: Option<&'a CodexControllerHandle>,
-) -> WakeRoute<'a> {
+fn codex_route<'a>(run_id: &'a str, codex_controller: Option<&'a dyn CodexWake>) -> WakeRoute<'a> {
     match codex_controller {
         Some(controller) => WakeRoute::Codex { run_id, controller },
         None => WakeRoute::None {
@@ -286,7 +309,7 @@ pub(crate) fn log_wake_attempt(
 
 #[cfg(test)]
 mod tests {
-    use super::{NoneReason, WakeDispatch, WakeRoute, wake_route_for_registration};
+    use super::{CodexWake, NoneReason, WakeDispatch, WakeRoute, wake_route_for_registration};
     use crate::agents::kind::{AcpAgentId, RuntimeKind};
     use crate::agents::runtime::RuntimeCapabilities;
     use crate::daemon::service::signals::managed_tui_id_for_registration;
@@ -435,7 +458,7 @@ mod tests {
         let codex = codex_handle();
         let route = wake_route_for_registration(
             Some(&reg),
-            WakeDispatch::new(None, None).with_codex(Some(&codex)),
+            WakeDispatch::new(None, None).with_codex(Some(&codex as &dyn CodexWake)),
         );
         match route {
             WakeRoute::Codex { run_id, .. } => assert_eq!(run_id, "codex-7"),
