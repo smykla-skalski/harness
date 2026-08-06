@@ -17,7 +17,8 @@ use crate::daemon::service;
 use harness_daemon_acp_probe::cached_probe_snapshot;
 use harness_kernel::errors::CliErrorKind;
 use harness_protocol::daemon::summaries::{
-    DaemonTelemetryRequest, DaemonTelemetryResponse, HealthResponse, ReadinessResponse,
+    AgentWorkspaceListResponse, DaemonTelemetryRequest, DaemonTelemetryResponse, HealthResponse,
+    ReadinessResponse,
 };
 use harness_protocol::daemon::{HeadlessReadinessReport, HeadlessReadinessRequest};
 
@@ -66,6 +67,7 @@ fn daemon_control_routes() -> OpenApiRouter<DaemonHttpState> {
 fn discovery_routes() -> OpenApiRouter<DaemonHttpState> {
     OpenApiRouter::new()
         .routes(routes!(get_projects))
+        .routes(routes!(get_agent_workspaces))
         .routes(routes!(get_runtime_session_resolution))
         .routes(routes!(control::get_runtimes_probe))
         .route(http_paths::WS, get(ws_upgrade_handler))
@@ -331,4 +333,36 @@ pub(super) async fn get_projects(
         Err(error) => Err(error),
     };
     timed_json("GET", http_paths::PROJECTS, &request_id, start, result)
+}
+
+#[utoipa::path(
+    get,
+    path = "/v1/agent-workspaces",
+    tag = "daemon",
+    description = "List durable agent workspaces, retained legacy provenance, and collision blockers",
+    responses(
+        (status = 200, description = "Verified durable workspaces and blockers", body = AgentWorkspaceListResponse),
+        (status = 400, description = "Request error", body = DaemonErrorBody),
+    ),
+)]
+pub(super) async fn get_agent_workspaces(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    let result = match require_async_db(&state, "agent workspaces") {
+        Ok(async_db) => service::list_agent_workspaces_async(async_db).await,
+        Err(error) => Err(error),
+    };
+    timed_json(
+        "GET",
+        http_paths::AGENT_WORKSPACES,
+        &request_id,
+        start,
+        result,
+    )
 }

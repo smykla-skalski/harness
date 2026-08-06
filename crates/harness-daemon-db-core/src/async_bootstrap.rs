@@ -85,6 +85,9 @@ async fn migration_effect_observed(
     if migration_version == 63 {
         return table_exists(pool, "task_board_ai_review_report_order").await;
     }
+    if migration_version == 64 {
+        return table_exists(pool, "agent_workspaces").await;
+    }
     let Some((table, column)) = migration_effect_column(migration_version) else {
         return Ok(false);
     };
@@ -204,6 +207,8 @@ const fn migration_floor_version(migration_version: i64) -> u64 {
         60..=62 => 61,
         // v62 adds the append-order ledger for retained AI review reports.
         63 => 62,
+        // v63 adds durable agent workspaces and their reconciliation journal.
+        64 => 63,
         _ => u64::MAX,
     }
 }

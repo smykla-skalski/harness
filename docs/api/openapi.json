@@ -30,6 +30,56 @@
     }
   ],
   "paths": {
+    "/v1/agent-workspaces": {
+      "get": {
+        "tags": [
+          "daemon"
+        ],
+        "description": "List durable agent workspaces, retained legacy provenance, and collision blockers",
+        "operationId": "get_agent_workspaces",
+        "responses": {
+          "200": {
+            "description": "Verified durable workspaces and blockers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentWorkspaceListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "agent_workspaces"
+      }
+    },
     "/v1/audit/events": {
       "get": {
         "tags": [
@@ -15844,6 +15894,186 @@
           "execution",
           "cancellation"
         ]
+      },
+      "AgentWorkspaceAvailability": {
+        "type": "string",
+        "enum": [
+          "available",
+          "missing_worktree"
+        ]
+      },
+      "AgentWorkspaceConflict": {
+        "type": "object",
+        "description": "A collision or malformed source that kept legacy ownership authoritative.",
+        "required": [
+          "daemon_id",
+          "project_scope_id",
+          "checkout_id",
+          "kind",
+          "legacy_session_ids",
+          "detail"
+        ],
+        "properties": {
+          "checkout_id": {
+            "type": "string"
+          },
+          "daemon_id": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/AgentWorkspaceConflictKind"
+          },
+          "legacy_session_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "project_scope_id": {
+            "type": "string"
+          }
+        }
+      },
+      "AgentWorkspaceConflictKind": {
+        "type": "string",
+        "enum": [
+          "active_owner_collision",
+          "malformed_candidate",
+          "source_disagreement"
+        ]
+      },
+      "AgentWorkspaceListResponse": {
+        "type": "object",
+        "required": [
+          "workspaces",
+          "conflicts"
+        ],
+        "properties": {
+          "conflicts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentWorkspaceConflict"
+            }
+          },
+          "workspaces": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentWorkspaceSummary"
+            }
+          }
+        }
+      },
+      "AgentWorkspaceOrchestrationAuthority": {
+        "type": "string",
+        "description": "Which store currently owns orchestration mutations for a durable workspace.\n\nWorkspace identity is already durable when this is `LegacySession`; only the\nstill-unmigrated orchestration domains continue to use the selected Session.",
+        "enum": [
+          "no_owner",
+          "legacy_session",
+          "workspace"
+        ]
+      },
+      "AgentWorkspaceProvenance": {
+        "type": "object",
+        "description": "Provenance retained beside the durable workspace identity.",
+        "required": [
+          "daemon_id",
+          "project_scope_id",
+          "checkout_id",
+          "source_project_id",
+          "manifest_digest"
+        ],
+        "properties": {
+          "checkout_id": {
+            "type": "string"
+          },
+          "daemon_id": {
+            "type": "string"
+          },
+          "legacy_session_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "manifest_digest": {
+            "type": "string"
+          },
+          "project_scope_id": {
+            "type": "string"
+          },
+          "selected_legacy_session_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_project_id": {
+            "type": "string"
+          }
+        }
+      },
+      "AgentWorkspaceSummary": {
+        "type": "object",
+        "description": "Durable agent workspace exposed to clients independently of Session identity.",
+        "required": [
+          "workspace_id",
+          "project_name",
+          "checkout_name",
+          "context_root",
+          "is_worktree",
+          "availability",
+          "orchestration_authority",
+          "provenance",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "availability": {
+            "$ref": "#/components/schemas/AgentWorkspaceAvailability"
+          },
+          "checkout_name": {
+            "type": "string"
+          },
+          "checkout_root": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "context_root": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "is_worktree": {
+            "type": "boolean"
+          },
+          "orchestration_authority": {
+            "$ref": "#/components/schemas/AgentWorkspaceOrchestrationAuthority"
+          },
+          "project_name": {
+            "type": "string"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/AgentWorkspaceProvenance"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "workspace_id": {
+            "type": "string"
+          },
+          "worktree_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
       },
       "ArbitrationOutcome": {
         "type": "object",

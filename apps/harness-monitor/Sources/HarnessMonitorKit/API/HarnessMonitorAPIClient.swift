@@ -75,6 +75,10 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
     return wire.map(ProjectSummary.init(wire:))
   }
 
+  public func agentWorkspaces() async throws -> AgentWorkspaceListResponse {
+    try await get("/v1/agent-workspaces", decoder: PolicyWireCoding.decoder)
+  }
+
   public func sessions() async throws -> [SessionSummary] {
     let wire: [SessionSummaryWire] = try await get(
       "/v1/sessions", decoder: PolicyWireCoding.decoder

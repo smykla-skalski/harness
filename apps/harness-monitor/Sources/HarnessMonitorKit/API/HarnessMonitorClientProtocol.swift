@@ -16,6 +16,7 @@ public protocol HarnessMonitorClientProtocol: HarnessMonitorTaskBoardClientProto
     request: HostBridgeReconfigureRequest
   ) async throws -> BridgeStatusReport
   func projects() async throws -> [ProjectSummary]
+  func agentWorkspaces() async throws -> AgentWorkspaceListResponse
   func sessions() async throws -> [SessionSummary]
   func sessionDetail(id: String, scope: String?) async throws -> SessionDetail
   func timelineWindow(sessionID: String, request: TimelineWindowRequest) async throws

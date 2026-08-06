@@ -133,6 +133,7 @@ async fn dispatch_read_method(
             | ws_methods::DAEMON_STOP
             | ws_methods::DAEMON_LOG_LEVEL
             | ws_methods::PROJECTS
+            | ws_methods::AGENT_WORKSPACES
             | ws_methods::SESSIONS
             | ws_methods::RUNTIME_SESSION_RESOLVE
             | ws_methods::RUNTIMES_PROBE

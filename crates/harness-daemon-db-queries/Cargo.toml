@@ -34,6 +34,8 @@ tracing = "0.1.44"
 # `DaemonDb::open_in_memory_with_hooks`, matching harness-daemon's own
 # dev-dependency override of the same crate.
 harness-daemon-db-core = { path = "../harness-daemon-db-core", version = "57.0.0", features = ["test-support"] }
+harness-testkit = { path = "../../testkit" }
+tempfile = "=3.27.0"
 
 # Matches harness-daemon-db-core's lint set: this code was extracted from
 # harness-daemon's own `db` module, which itself carries only the lighter

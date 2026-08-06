@@ -115,6 +115,14 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Get,
+        path: http_paths::AGENT_WORKSPACES,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::AGENT_WORKSPACES,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Get,
         path: http_paths::RUNTIME_SESSION_RESOLVE,
         parity: HttpRouteParity::Rpc {
             ws_method: ws_methods::RUNTIME_SESSION_RESOLVE,

@@ -8,6 +8,83 @@ use serde::{Deserialize, Serialize};
 
 use crate::timeline::TimelineEntry;
 
+/// Which store currently owns orchestration mutations for a durable workspace.
+///
+/// Workspace identity is already durable when this is `LegacySession`; only the
+/// still-unmigrated orchestration domains continue to use the selected Session.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentWorkspaceOrchestrationAuthority {
+    NoOwner,
+    LegacySession,
+    Workspace,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentWorkspaceAvailability {
+    Available,
+    MissingWorktree,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentWorkspaceConflictKind {
+    ActiveOwnerCollision,
+    MalformedCandidate,
+    SourceDisagreement,
+}
+
+/// Provenance retained beside the durable workspace identity.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct AgentWorkspaceProvenance {
+    pub daemon_id: String,
+    pub project_scope_id: String,
+    pub checkout_id: String,
+    pub source_project_id: String,
+    #[serde(default)]
+    pub legacy_session_ids: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selected_legacy_session_id: Option<String>,
+    pub manifest_digest: String,
+}
+
+/// Durable agent workspace exposed to clients independently of Session identity.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct AgentWorkspaceSummary {
+    pub workspace_id: String,
+    pub project_name: String,
+    pub checkout_name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub checkout_root: Option<String>,
+    pub context_root: String,
+    pub is_worktree: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub worktree_name: Option<String>,
+    pub availability: AgentWorkspaceAvailability,
+    pub orchestration_authority: AgentWorkspaceOrchestrationAuthority,
+    pub provenance: AgentWorkspaceProvenance,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// A collision or malformed source that kept legacy ownership authoritative.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct AgentWorkspaceConflict {
+    pub daemon_id: String,
+    pub project_scope_id: String,
+    pub checkout_id: String,
+    pub kind: AgentWorkspaceConflictKind,
+    pub legacy_session_ids: Vec<String>,
+    pub detail: String,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct AgentWorkspaceListResponse {
+    pub workspaces: Vec<AgentWorkspaceSummary>,
+    pub conflicts: Vec<AgentWorkspaceConflict>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct HealthResponse {
     pub status: String,

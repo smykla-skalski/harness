@@ -207,6 +207,11 @@ extension WebSocketTransport {
     return wire.map(ProjectSummary.init(wire:))
   }
 
+  public func agentWorkspaces() async throws -> AgentWorkspaceListResponse {
+    let value = try await rpc(method: .agentWorkspaces)
+    return try decodePolicyWire(value)
+  }
+
   public func sessions() async throws -> [SessionSummary] {
     let value = try await rpc(method: .sessions)
     let wire: [SessionSummaryWire] = try decodePolicyWire(value)

@@ -404,42 +404,4 @@ struct AppOpenAnythingSourceContractTests {
     #expect(hostSource.contains("copyMonitorDiagnostics()"))
   }
 
-  private func harnessSourceFile(named relativePath: String) throws -> String {
-    try String(contentsOf: harnessSourceURL(named: relativePath), encoding: .utf8)
-  }
-
-  private func harnessKitSourceFile(named relativePath: String) throws -> String {
-    try String(contentsOf: harnessKitSourceURL(named: relativePath), encoding: .utf8)
-  }
-
-  private func previewableSourceFile(named relativePath: String) throws -> String {
-    try String(contentsOf: previewableSourceURL(named: relativePath), encoding: .utf8)
-  }
-
-  private func harnessSourceURL(named relativePath: String) -> URL {
-    repoRoot()
-      .appendingPathComponent("apps/harness-monitor/Sources/HarnessMonitor")
-      .appendingPathComponent(relativePath)
-  }
-
-  private func harnessKitSourceURL(named relativePath: String) -> URL {
-    repoRoot()
-      .appendingPathComponent("apps/harness-monitor/Sources/HarnessMonitorKit")
-      .appendingPathComponent(relativePath)
-  }
-
-  private func previewableSourceURL(named relativePath: String) -> URL {
-    repoRoot()
-      .appendingPathComponent("apps/harness-monitor/Sources/HarnessMonitorUIPreviewable")
-      .appendingPathComponent(relativePath)
-  }
-
-  private func repoRoot() -> URL {
-    URL(fileURLWithPath: #filePath)
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-  }
 }

@@ -167,6 +167,7 @@ use crate::daemon::db;
 use crate::daemon::protocol;
 
 mod adopt;
+mod agent_workspaces;
 mod dependency_approval_merge;
 mod dependency_check_wait;
 #[cfg(test)]
@@ -243,6 +244,7 @@ mod wake_route;
 pub use crate::reviews::fetch_review_avatar;
 pub use adopt::adopt_session_record;
 pub(crate) use adopt::adopt_session_record_async;
+pub(crate) use agent_workspaces::list_agent_workspaces_async;
 pub use dependency_check_wait::spawn_dependency_check_wait;
 pub use direct::{
     delete_session_direct, disconnect_agent_direct, join_session_direct, record_signal_ack_direct,
