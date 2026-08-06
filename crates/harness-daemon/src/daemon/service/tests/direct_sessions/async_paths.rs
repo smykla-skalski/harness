@@ -1,5 +1,5 @@
 use super::super::*;
-use crate::daemon::db::AsyncSessionSummaryQueries;
+use crate::daemon::db::prelude::*;
 use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 
@@ -69,8 +69,141 @@ fn remove_agent_async_direct_sends_abort_signal() {
                 assert_eq!(detail.signals[0].agent_id, worker_id);
                 assert_eq!(detail.signals[0].signal.command, "abort");
                 assert_eq!(detail.signals[0].status, SessionSignalStatus::Pending);
+                let durable_result = sqlx::query_as::<_, (String, String)>(
+                    "SELECT member.membership_status, operation.outcome
+                     FROM agent_workspace_member_provenance provenance
+                     JOIN agent_workspace_members member
+                       ON member.workspace_id = provenance.workspace_id
+                      AND member.member_id = provenance.member_id
+                     JOIN agent_workspace_member_operations operation
+                       ON operation.workspace_id = member.workspace_id
+                      AND operation.member_id = member.member_id
+                     WHERE provenance.source_session_id = ?1
+                       AND provenance.source_agent_id = ?2
+                     ORDER BY operation.operation_sequence DESC
+                     LIMIT 1",
+                )
+                .bind("b008af80-54bd-5d3d-aef2-a6cd524b8684")
+                .bind(&worker_id)
+                .fetch_one(async_db.pool())
+                .await
+                .expect("load preflighted durable membership removal");
+                assert_eq!(durable_result.0, "removed");
+                assert_eq!(durable_result.1, "succeeded");
             });
         });
+    });
+}
+
+#[test]
+fn remove_agent_async_records_committed_removal_when_finalization_fails() {
+    with_temp_project(|project| {
+        temp_env::with_var(
+            "CODEX_SESSION_ID",
+            Some("async-remove-mirror-worker"),
+            || {
+                let runtime = tokio::runtime::Runtime::new().expect("runtime");
+                runtime.block_on(async {
+                    let db_path = project
+                        .parent()
+                        .expect("project parent")
+                        .join("daemon.sqlite");
+                    let async_db = crate::daemon::db::AsyncDaemonDb::connect(&db_path)
+                        .await
+                        .expect("open async daemon db");
+                    let async_db = AsyncDaemonDbHandle(async_db);
+                    let session_id = "c28400e3-15ec-54b3-a96b-35a19efef0eb";
+                    let state = start_direct_session_async(
+                        &async_db,
+                        project,
+                        session_id,
+                        "async remove mirror failure",
+                        "async remove mirror failure",
+                        None,
+                    )
+                    .await;
+                    let leader_id = state.leader_id.clone().expect("leader id");
+                    let joined = join_session_direct_async(
+                        session_id,
+                        &crate::daemon::protocol::SessionJoinRequest {
+                            runtime: "codex".into(),
+                            role: SessionRole::Worker,
+                            fallback_role: None,
+                            capabilities: vec![],
+                            name: None,
+                            project_dir: project.to_string_lossy().into(),
+                            persona: None,
+                        },
+                        &async_db,
+                    )
+                    .await
+                    .expect("join session");
+                    let worker_id = joined
+                        .agents
+                        .keys()
+                        .find(|agent_id| agent_id.starts_with("codex-"))
+                        .expect("worker id")
+                        .clone();
+                    let daemon_id = crate::daemon::state::ensure_daemon_identity()
+                        .expect("ensure daemon identity")
+                        .daemon_id;
+                    let workspace_id = async_db
+                        .reconcile_agent_workspaces(&daemon_id)
+                        .await
+                        .expect("reconcile workspace")
+                        .workspaces[0]
+                        .workspace_id
+                        .clone();
+                    async_db
+                        .reconcile_agent_workspace_team(&daemon_id, &workspace_id)
+                        .await
+                        .expect("create durable team");
+                    sqlx::query(
+                        "CREATE TRIGGER fail_post_removal_log
+                     BEFORE INSERT ON session_log
+                     BEGIN
+                         SELECT RAISE(ABORT, 'forced post-removal log failure');
+                     END",
+                    )
+                    .execute(async_db.pool())
+                    .await
+                    .expect("install post-removal failure");
+                    let error = remove_agent_async(
+                        session_id,
+                        &worker_id,
+                        &AgentRemoveRequest { actor: leader_id },
+                        &async_db,
+                    )
+                    .await
+                    .expect_err("post-removal log must fail after the membership change commits");
+                    assert!(
+                        error.message().contains("forced post-removal log failure"),
+                        "unexpected post-removal failure: {}",
+                        error.message()
+                    );
+
+                    let recorded = sqlx::query_as::<_, (String, String, String, String)>(
+                        "SELECT member.membership_status, operation.outcome,
+                            operation.before_state, operation.after_state
+                     FROM agent_workspace_members member
+                     JOIN agent_workspace_member_operations operation
+                       ON operation.workspace_id = member.workspace_id
+                      AND operation.member_id = member.member_id
+                     WHERE member.workspace_id = ?1
+                     ORDER BY operation.operation_sequence DESC
+                     LIMIT 1",
+                    )
+                    .bind(&workspace_id)
+                    .fetch_one(async_db.pool())
+                    .await
+                    .expect("load committed membership removal result");
+                    assert_eq!(recorded.0, "removed");
+                    assert_eq!(recorded.1, "succeeded");
+                    assert_eq!(recorded.2, "joined");
+                    assert_eq!(recorded.3, "removed");
+                });
+            },
+        );
     });
 }
 

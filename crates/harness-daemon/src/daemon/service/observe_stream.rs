@@ -8,15 +8,18 @@ use super::resolved_events::{
     sessions_updated_delta_removed_event_async,
 };
 use super::{
-    CliError, CliErrorKind, ObserveSessionRequest, ReadyEventPayload, Serialize, SessionDetail,
-    SessionUpdatedPayload, SessionsUpdatedPayload, StreamEvent, Value, apply_issue_tasks_to_db,
-    broadcast, effective_project_dir, list_projects, list_projects_async, list_sessions,
-    list_sessions_async, observe_actor_id, session_detail, session_detail_core,
-    session_detail_core_async, session_detail_from_daemon_db, session_extensions,
-    session_extensions_async, session_not_found, session_observe, start_daemon_observe_loop,
-    utc_now,
+    CliError, ObserveSessionRequest, ReadyEventPayload, SessionDetail, SessionUpdatedPayload,
+    SessionsUpdatedPayload, StreamEvent, apply_issue_tasks_to_db, broadcast, effective_project_dir,
+    list_projects, list_projects_async, list_sessions, list_sessions_async, observe_actor_id,
+    session_detail, session_detail_core, session_detail_core_async, session_detail_from_daemon_db,
+    session_extensions, session_extensions_async, session_not_found, session_observe,
+    start_daemon_observe_loop, utc_now,
 };
 use crate::daemon::db::prelude::*;
+
+mod events;
+
+pub(crate) use events::{broadcast_event, stream_event};
 
 /// Start or refresh the daemon-owned session observation loop.
 ///
@@ -441,84 +444,4 @@ async fn broadcast_changed_session_snapshot_async(
         "session_extensions",
         Some(session_id),
     );
-}
-
-pub(crate) fn stream_event<T: Serialize>(
-    event: &str,
-    session_id: Option<&str>,
-    payload: T,
-) -> Result<StreamEvent, CliError> {
-    Ok(StreamEvent {
-        event: event.to_string(),
-        recorded_at: utc_now(),
-        session_id: session_id.map(ToString::to_string),
-        payload: serialize_event_payload(payload, event)?,
-    })
-}
-
-pub(crate) fn serialize_event_payload<T: Serialize>(
-    payload: T,
-    event: &str,
-) -> Result<Value, CliError> {
-    serde_json::to_value(payload).map_err(|error| {
-        CliErrorKind::workflow_io(format!("serialize daemon push '{event}': {error}")).into()
-    })
-}
-
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "tracing macro expansion; tokio-rs/tracing#553"
-)]
-pub(crate) fn broadcast_event(
-    sender: &broadcast::Sender<StreamEvent>,
-    event: Result<StreamEvent, CliError>,
-    event_name: &str,
-    session_id: Option<&str>,
-) {
-    match event {
-        Ok(payload) => {
-            let receiver_count = sender.receiver_count();
-            let _ = sender.send(payload);
-            tracing::debug!(
-                event = event_name,
-                session_id = session_id.unwrap_or("-"),
-                receiver_count,
-                "broadcast event sent"
-            );
-        }
-        Err(error) => {
-            warn_broadcast_failure(&error.to_string(), event_name, session_id.unwrap_or("-"));
-        }
-    }
-}
-
-/// Emit a warning for a failed broadcast event.
-///
-/// Uses `tracing::Event::dispatch` directly because the `tracing::warn!`
-/// macro expansion generates cognitive complexity 8 in clippy's analysis,
-/// which exceeds the pedantic threshold of 7. See tokio-rs/tracing#553.
-pub(crate) fn warn_broadcast_failure(error_message: &str, event_name: &str, session: &str) {
-    use tracing::callsite::DefaultCallsite;
-    use tracing::field::{FieldSet, Value};
-    use tracing::metadata::Kind;
-    use tracing::{Event, Level, Metadata, callsite::Identifier};
-
-    static FIELDS: &[&str] = &["message"];
-    static CALLSITE: DefaultCallsite = DefaultCallsite::new(&META);
-    static META: Metadata<'static> = Metadata::new(
-        "warn",
-        "harness::daemon::service",
-        Level::WARN,
-        Some(file!()),
-        Some(line!()),
-        Some(module_path!()),
-        FieldSet::new(FIELDS, Identifier(&CALLSITE)),
-        Kind::EVENT,
-    );
-
-    let message = format!(
-        "failed to build daemon push event '{event_name}': {error_message} (session={session})"
-    );
-    let values: &[Option<&dyn Value>] = &[Some(&message.as_str())];
-    Event::dispatch(&META, &META.fields().value_set_all(values));
 }

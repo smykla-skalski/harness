@@ -1,10 +1,12 @@
 use std::future::Future;
 
 use crate::daemon::http::{
-    ensure_acp_enabled, ensure_terminal_agent_async, run_acp_agent_blocking,
-    run_codex_agent_blocking, run_terminal_agent_blocking,
+    ensure_acp_enabled, ensure_terminal_agent_async, locate_managed_agent_kind,
+    record_runtime_stop_result, run_acp_agent_blocking, run_codex_agent_blocking,
+    run_terminal_agent_blocking, stop_managed_agent,
 };
 use harness_kernel::errors::CliError;
+use harness_protocol::session::ManagedAgentKind;
 
 use super::{
     AcpAgentStartRequest, AcpPermissionDecision, CodexApprovalDecisionRequest, CodexRunRequest,
@@ -227,7 +229,20 @@ pub(crate) async fn dispatch_managed_agent_stop(
     let Some(agent_id) = extract_managed_agent_id(&request.params) else {
         return error_response(&request.id, "MISSING_PARAM", "missing managed_agent_id");
     };
-    let result = stop_any_managed_agent(state, &agent_id).await;
+    let requested_kind = match request.params.get("managed_agent_kind") {
+        Some(value) => match serde_json::from_value::<ManagedAgentKind>(value.clone()) {
+            Ok(kind) => Some(kind),
+            Err(error) => {
+                return error_response(
+                    &request.id,
+                    "INVALID_PARAMS",
+                    &format!("invalid managed_agent_kind: {error}"),
+                );
+            }
+        },
+        None => None,
+    };
+    let result = stop_any_managed_agent(state, &agent_id, requested_kind).await;
     dispatch_managed_agent_response(request, state, result).await
 }
 
@@ -361,18 +376,8 @@ pub(crate) async fn dispatch_managed_agent_stop_acp(
     let Some(agent_id) = extract_managed_agent_id(&request.params) else {
         return error_response(&request.id, "MISSING_PARAM", "missing managed_agent_id");
     };
-    let result = match acp_session_id(state, &agent_id) {
-        Ok(session_id) => {
-            let stop_agent_id = agent_id.clone();
-            with_managed_agent_lock(state, &session_id, &agent_id, || {
-                run_acp_agent_blocking(state, "ws stop", move |manager| {
-                    manager.stop(&stop_agent_id).map(ManagedAgentSnapshot::Acp)
-                })
-            })
-            .await
-        }
-        Err(error) => Err(error),
-    };
+    let attempt = stop_managed_agent(state, ManagedAgentKind::Acp, &agent_id).await;
+    let result = record_runtime_stop_result(state, ManagedAgentKind::Acp, &agent_id, attempt).await;
     dispatch_managed_agent_response(request, state, result).await
 }
 
@@ -466,74 +471,14 @@ where
 async fn stop_any_managed_agent(
     state: &DaemonHttpState,
     agent_id: &str,
+    requested_kind: Option<ManagedAgentKind>,
 ) -> Result<ManagedAgentSnapshot, CliError> {
-    match state.codex_controller.session_id_for_run(agent_id) {
-        Ok(session_id) => stop_codex_managed_agent(state, &session_id, agent_id).await,
-        Err(error) if error.code() == "KSRCLI090" => {
-            stop_provider_managed_agent(state, agent_id).await
-        }
-        Err(error) => Err(error),
-    }
-}
-
-async fn stop_provider_managed_agent(
-    state: &DaemonHttpState,
-    agent_id: &str,
-) -> Result<ManagedAgentSnapshot, CliError> {
-    if let Ok(session_id) = state
-        .acp_agent_manager
-        .get(agent_id)
-        .map(|snapshot| snapshot.session_id)
-    {
-        return stop_acp_managed_agent(state, &session_id, agent_id).await;
-    }
-    let session_id = terminal_session_id(state, agent_id).await?;
-    stop_terminal_managed_agent(state, &session_id, agent_id).await
-}
-
-async fn stop_codex_managed_agent(
-    state: &DaemonHttpState,
-    session_id: &str,
-    agent_id: &str,
-) -> Result<ManagedAgentSnapshot, CliError> {
-    let stop_agent_id = agent_id.to_string();
-    with_managed_agent_lock(state, session_id, agent_id, || {
-        run_codex_agent_blocking(state, "ws stop", move |controller| {
-            controller
-                .stop(&stop_agent_id)
-                .map(ManagedAgentSnapshot::Codex)
-        })
-    })
-    .await
-}
-
-async fn stop_acp_managed_agent(
-    state: &DaemonHttpState,
-    session_id: &str,
-    agent_id: &str,
-) -> Result<ManagedAgentSnapshot, CliError> {
-    let stop_agent_id = agent_id.to_string();
-    with_managed_agent_lock(state, session_id, agent_id, || {
-        run_acp_agent_blocking(state, "ws stop", move |manager| {
-            manager.stop(&stop_agent_id).map(ManagedAgentSnapshot::Acp)
-        })
-    })
-    .await
-}
-
-async fn stop_terminal_managed_agent(
-    state: &DaemonHttpState,
-    session_id: &str,
-    agent_id: &str,
-) -> Result<ManagedAgentSnapshot, CliError> {
-    let _guard = state
-        .managed_agent_mutation_locks
-        .lock(session_id, agent_id)
-        .await;
-    let agent_id = agent_id.to_string();
-    run_terminal_agent_blocking(state, "ws stop", move |manager| manager.stop(&agent_id))
-        .await
-        .map(ManagedAgentSnapshot::Terminal)
+    let kind = match requested_kind {
+        Some(kind) => kind,
+        None => locate_managed_agent_kind(state, agent_id).await?,
+    };
+    let attempt = stop_managed_agent(state, kind, agent_id).await;
+    record_runtime_stop_result(state, kind, agent_id, attempt).await
 }
 
 async fn terminal_session_id(state: &DaemonHttpState, agent_id: &str) -> Result<String, CliError> {

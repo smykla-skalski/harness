@@ -5,8 +5,9 @@ use axum::http::HeaderMap;
 use axum::response::Response;
 use serde::Deserialize;
 
-use crate::daemon::protocol::{ManagedAgentSnapshot, http_paths};
+use crate::daemon::protocol::http_paths;
 use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_protocol::session::ManagedAgentKind;
 
 use crate::daemon::protocol::ManagedAgentSnapshotSchema;
 
@@ -14,7 +15,7 @@ use super::super::DaemonHttpState;
 use super::super::auth::require_auth;
 use super::super::openapi::DaemonErrorBody;
 use super::super::response::{extract_request_id, timed_json};
-use super::{ensure_acp_agent, ensure_acp_enabled, run_acp_agent_blocking};
+use super::{ensure_acp_agent, ensure_acp_enabled, stop_managed_agent};
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -47,7 +48,7 @@ pub(super) async fn delete_acp_agent(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let result = match (|| -> Result<String, CliError> {
+    let result = match (|| -> Result<(), CliError> {
         ensure_acp_enabled()?;
         ensure_acp_agent(&state, &agent_id)?;
         let snapshot = state.acp_agent_manager.get(&agent_id)?;
@@ -59,21 +60,13 @@ pub(super) async fn delete_acp_agent(
             ))
             .into());
         }
-        Ok(snapshot.session_id)
+        Ok(())
     })() {
-        Ok(session_id) => {
-            let stop_agent_id = agent_id.clone();
-            let _guard = state
-                .managed_agent_mutation_locks
-                .lock(&session_id, &agent_id)
-                .await;
-            run_acp_agent_blocking(&state, "delete", move |manager| {
-                manager.stop(&stop_agent_id).map(ManagedAgentSnapshot::Acp)
-            })
-            .await
-        }
-        Err(error) => Err(error),
+        Ok(()) => stop_managed_agent(&state, ManagedAgentKind::Acp, &agent_id).await,
+        Err(error) => super::ManagedAgentStopAttempt::failed(error),
     };
+    let result =
+        super::record_runtime_stop_result(&state, ManagedAgentKind::Acp, &agent_id, result).await;
     timed_json(
         "DELETE",
         http_paths::MANAGED_AGENT_DELETE,

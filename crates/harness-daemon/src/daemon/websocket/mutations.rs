@@ -3,6 +3,7 @@ use std::sync::{Arc, Mutex};
 
 use serde_json::Value;
 
+mod error;
 mod request_parts;
 
 use crate::daemon::audit_events::{AuditEventDraft, record_audit_result};
@@ -20,6 +21,8 @@ use super::frames::{error_response, error_response_with_payload, ok_response};
 use super::params::{extract_session_agent_id, extract_session_id};
 use crate::daemon::db_handle::{AsyncDaemonDbHandle, DaemonDbOwnedHandle};
 use request_parts::{ActorBinding, task_mutation_request_parts};
+
+pub(crate) use error::MutationError;
 
 pub(crate) fn dispatch_query<T: serde::Serialize>(
     request_id: &str,
@@ -474,48 +477,6 @@ where
             dispatch_query_result(&request.id, Ok(detail))
         }
         Err(error) => error_response(&request.id, &error.code, &error.message),
-    }
-}
-
-pub(crate) struct MutationError {
-    code: String,
-    message: String,
-    status_code: Option<u16>,
-    data: Option<Box<Value>>,
-}
-
-impl From<CliError> for MutationError {
-    fn from(error: CliError) -> Self {
-        let payload = ws_error_payload_from_cli_error(&error);
-        Self {
-            code: payload.code,
-            message: payload.message,
-            status_code: payload.status_code,
-            data: payload.data.map(Box::new),
-        }
-    }
-}
-
-impl From<serde_json::Error> for MutationError {
-    fn from(error: serde_json::Error) -> Self {
-        Self {
-            code: "INVALID_PARAMS".into(),
-            message: format!("failed to parse request params: {error}"),
-            status_code: None,
-            data: None,
-        }
-    }
-}
-
-impl MutationError {
-    fn into_ws_error_payload(self) -> WsErrorPayload {
-        WsErrorPayload {
-            code: self.code,
-            message: self.message,
-            details: vec![],
-            status_code: self.status_code,
-            data: self.data.map(|data| *data),
-        }
     }
 }
 

@@ -9,6 +9,7 @@ mod candidate;
 mod identity;
 mod persist;
 mod preflight;
+mod provenance;
 mod retire;
 mod shadow;
 mod source;
@@ -56,6 +57,19 @@ impl AsyncAgentWorkspaceQueries for AsyncDaemonDb {
         let existing = load_existing_workspace_sources(&mut transaction, daemon_id).await?;
         let result = preflight(daemon_id, candidates, &existing);
         persist_preflight(&mut transaction, &result).await?;
+        let team_conflicts = super::agent_workspace_teams::reconcile_workspace_teams(
+            &mut transaction,
+            daemon_id,
+            None,
+        )
+        .await?;
+        for (workspace_id, conflicts) in team_conflicts {
+            tracing::warn!(
+                workspace_id,
+                conflict_count = conflicts.len(),
+                "durable agent team reconciliation blocked"
+            );
+        }
         let response = load_response(&mut transaction, daemon_id, &result).await?;
         transaction.commit().await.map_err(|error| {
             harness_daemon_db_core::db_error(format!(

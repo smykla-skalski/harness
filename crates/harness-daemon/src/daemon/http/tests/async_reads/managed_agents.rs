@@ -1,4 +1,4 @@
-use axum::extract::State;
+use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use serde_json::Value;
 
@@ -128,6 +128,7 @@ async fn get_managed_agent_wraps_codex_run_when_sync_db_is_unavailable() {
 
     let response = get_managed_agent(
         axum::extract::Path("codex-run-4".to_owned()),
+        Query(Default::default()),
         auth_headers(),
         State(state),
     )
@@ -286,6 +287,7 @@ async fn get_managed_agent_wraps_terminal_tui_when_sync_db_is_unavailable() {
 
     let response = get_managed_agent(
         axum::extract::Path("agent-tui-6".to_owned()),
+        Query(Default::default()),
         auth_headers(),
         State(state),
     )

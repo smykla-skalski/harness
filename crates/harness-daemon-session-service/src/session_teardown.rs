@@ -15,6 +15,9 @@ use harness_workspace::workspace::worktree::WorktreeController;
 /// For externally-rooted sessions (`external_origin` is `Some`), the worktree
 /// was not created by this daemon, so only deregistration runs; the worktree is
 /// left intact.
+///
+/// # Errors
+/// Returns [`CliError`] when active-session deregistration or owned-worktree cleanup fails.
 pub fn destroy_session_artifacts(state: &SessionState) -> Result<(), CliError> {
     let layout = build_layout(state);
     session_storage::deregister_active(&layout)?;

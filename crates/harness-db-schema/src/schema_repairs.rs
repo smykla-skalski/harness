@@ -3,10 +3,9 @@ use harness_session::service::canonicalize_active_session_without_leader;
 use harness_workspace::workspace::utc_now;
 use serde_json::Value;
 
-use super::schema_repairs_shape_probes::{
-    column_exists, index_exists, table_exists, table_sql_contains, trigger_exists,
-};
 use super::{CliError, Connection, db_error};
+
+mod current_objects;
 
 /// Mirrors `harness-daemon`'s own `db::session_status_db_label`: the schema
 /// history has no dependency back on `DaemonDb`, so this repair pass carries
@@ -20,68 +19,6 @@ fn session_status_db_label(status: SessionStatus) -> Result<String, CliError> {
         .map(ToOwned::to_owned)
         .ok_or_else(|| db_error("serialize session status: expected string"))
 }
-
-const CURRENT_SCHEMA_POLICY_COLUMNS: &[(&str, &str)] = &[
-    ("policy_workspace", "manual_ocr_paste_canvas_deleted"),
-    (
-        "policy_workspace",
-        "review_text_paste_dry_run_canvas_deleted",
-    ),
-    (
-        "policy_workspace",
-        "review_screenshot_extraction_canvas_deleted",
-    ),
-    ("policy_workspace", "global_policy_enforcement_enabled"),
-    ("policy_workspace", "spawn_requires_live_policy"),
-    ("policy_workspace", "spawn_kill_switch"),
-    ("policy_workspace", "scenarios_json"),
-    ("policy_workspace", "scenarios_seeded"),
-    ("policy_canvases", "is_manual_ocr_paste_canvas"),
-    ("policy_canvases", "is_review_text_paste_dry_run_canvas"),
-    ("policy_canvases", "is_review_screenshot_extraction_canvas"),
-    ("policy_canvases", "layout_zoom"),
-    ("policy_canvases", "layout_offset_x"),
-    ("policy_canvases", "layout_offset_y"),
-    ("policy_canvases", "live_document_json"),
-    ("policy_canvases", "live_updated_at"),
-    ("policy_nodes", "layout_source"),
-    ("policy_decisions", "evaluated_at"),
-    ("task_board_dispatch_intents", "consumed_approval_grant_id"),
-    ("task_board_dispatch_intents", "compensation_pending"),
-    ("task_board_items", "workflow_kind"),
-    ("task_board_items", "execution_repository"),
-    ("task_board_items", "estimated_tokens"),
-    ("task_board_items", "estimated_cost_microusd"),
-    ("task_board_items", "parent_item_id"),
-    ("task_board_items", "child_order"),
-    ("task_board_items", "kind"),
-    ("task_board_projects", "color"),
-    ("task_board_projects", "shape"),
-];
-
-const CURRENT_SCHEMA_RUN_COLUMNS: &[(&str, &str)] = &[
-    ("codex_runs", "task_id"),
-    ("codex_runs", "board_item_id"),
-    ("codex_runs", "workflow_execution_id"),
-    ("agent_turn_runs", "runtime_turn_id"),
-    ("task_board_ai_review_reports", "requested_runtime"),
-    ("task_board_ai_review_reports", "actual_runtime"),
-];
-
-const DEPRECATED_SCHEMA_POLICY_COLUMNS: &[(&str, &str)] =
-    &[("policy_workspace", "enforcement_snapshot_json")];
-const CURRENT_SCHEMA_TRIGGERS: &[&str] = &["remote_audit_events_touch_client_activity"];
-
-const CURRENT_SCHEMA_REMOTE_ACME_COLUMNS: &[(&str, &str)] = &[
-    ("remote_acme_state", "domain"),
-    ("remote_acme_state", "host"),
-    ("remote_acme_state", "https_port"),
-    ("remote_acme_state", "http_port"),
-    ("remote_acme_state", "acme_email"),
-    ("remote_acme_state", "acme_challenge"),
-    ("remote_acme_state", "acme_dns_provider"),
-    ("remote_acme_state", "account_credentials_json"),
-];
 
 pub(super) fn normalize_schema_sql(sql: &str) -> String {
     let mut normalized = String::with_capacity(sql.len());
@@ -145,7 +82,7 @@ fn remove_outside_literal(sql: &str, pattern: &str) -> String {
 /// # Errors
 /// Returns [`CliError`] on SQL failures.
 pub fn current_schema_shape_needs_repair(conn: &super::Connection) -> Result<bool, CliError> {
-    if current_schema_objects_missing(conn)? {
+    if current_objects::shape_needs_repair(conn)? {
         return Ok(true);
     }
     if super::schema_repairs_external_creates::indexes_need_repair(conn)? {
@@ -174,106 +111,6 @@ pub fn current_schema_shape_needs_repair(conn: &super::Connection) -> Result<boo
     }
     if super::schema_repairs_triage_override::shape_needs_repair(conn)? {
         return Ok(true);
-    }
-    // A missing index answers every query correctly, just slowly, so nothing
-    // else here would ever notice it had gone. Both v51 indexes belong in the
-    // list: checking only one leaves the other unrepairable.
-    for index in [
-        "task_board_items_source_project",
-        "task_board_projects_source_slug",
-    ] {
-        if !index_exists(conn, index)? {
-            return Ok(true);
-        }
-    }
-    Ok(false)
-}
-
-fn current_schema_objects_missing(conn: &super::Connection) -> Result<bool, CliError> {
-    for table in [
-        "policy_workspace",
-        "policy_canvases",
-        "policy_nodes",
-        "policy_edges",
-        "policy_groups",
-        "policy_group_nodes",
-        "audit_events",
-        "remote_acme_state",
-        "remote_audit_events",
-        "remote_clients",
-        "remote_pairing_codes",
-        "policy_decisions",
-        "task_board_items",
-        "task_board_identity",
-        "task_board_external_refs",
-        "task_board_machines",
-        "task_board_local_machine",
-        "task_board_orchestrator_settings",
-        "task_board_orchestrator_state",
-        "task_board_runtime_config",
-        "policy_workflow_runs",
-        "policy_event_inbox",
-        "policy_handoff_outbox",
-        "policy_notification_outbox",
-        "policy_task_creation_outbox",
-        "policy_approval_grants",
-        "task_board_dispatch_intents",
-        "task_board_imports",
-        "task_board_orchestrator_control",
-        "task_board_orchestrator_runs",
-        "task_board_workflow_executions",
-        "task_board_execution_attempts",
-        "task_board_admission_leases",
-        "task_board_provider_scope_state",
-        "task_board_external_create_intents",
-        "task_board_dispatch_admission_decisions",
-        "task_board_dispatch_admission_ledger",
-        "task_board_sync_conflicts",
-        "task_board_execution_hosts",
-        "task_board_remote_assignments",
-        "task_board_remote_host_quarantines",
-        "task_board_orchestrator_wake_events",
-        "task_board_reconciliation_cursors",
-        "task_board_projects",
-        "task_board_ai_review_reports",
-        "task_board_ai_review_report_order",
-    ] {
-        if !table_exists(conn, table)? {
-            return Ok(true);
-        }
-    }
-    for (table, column) in CURRENT_SCHEMA_POLICY_COLUMNS {
-        if !column_exists(conn, table, column)? {
-            return Ok(true);
-        }
-    }
-    for (table, column) in CURRENT_SCHEMA_RUN_COLUMNS {
-        if !column_exists(conn, table, column)? {
-            return Ok(true);
-        }
-    }
-    super::schema_repairs_external_creates::require_table_shape(conn)?;
-    super::schema_repairs_wake_events::require_table_shape(conn)?;
-    if !table_sql_contains(conn, "task_board_dispatch_intents", "'held'")? {
-        return Ok(true);
-    }
-    if table_sql_contains(conn, "task_board_projects", "'todoist'")? {
-        return Ok(true);
-    }
-    for (table, column) in CURRENT_SCHEMA_REMOTE_ACME_COLUMNS {
-        if !column_exists(conn, table, column)? {
-            return Ok(true);
-        }
-    }
-    for (table, column) in DEPRECATED_SCHEMA_POLICY_COLUMNS {
-        if column_exists(conn, table, column)? {
-            return Ok(true);
-        }
-    }
-    for trigger in CURRENT_SCHEMA_TRIGGERS {
-        if !trigger_exists(conn, trigger)? {
-            return Ok(true);
-        }
     }
     Ok(false)
 }
@@ -345,6 +182,8 @@ pub fn repair_current_schema_shape(
     super::schema_v60::run(conn)?;
     super::schema_v61::run(conn)?;
     super::schema_v62::run(conn)?;
+    super::schema_v63::run(conn)?;
+    super::schema_v64::run(conn)?;
     super::schema_repairs_external_creates::require_complete_shape(conn)?;
     super::schema_repairs_wake_events::require_complete_shape(conn)?;
     super::schema_repairs_admission::require_complete_shape(conn)?;

@@ -56,6 +56,7 @@ pub use reconcile::{
     liveness_project_dir_for_resolved, reconcile_expired_pending_signals,
     reconcile_expired_pending_signals_async, sync_resolved_liveness, sync_resolved_liveness_async,
 };
+pub use session_teardown::destroy_session_artifacts;
 pub use sessions::{
     list_projects, list_projects_async, list_sessions_async, resolve_runtime_session_agent_async,
     session_acp_transcript_async, session_detail_async, session_detail_core_async,

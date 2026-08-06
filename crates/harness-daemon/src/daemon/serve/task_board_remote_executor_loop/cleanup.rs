@@ -18,13 +18,14 @@ use crate::session::storage as session_storage;
 use crate::session::types::SessionState;
 use crate::task_board::TaskBoardRemoteAssignmentState;
 use crate::task_board::remote_wire::wire::RemoteSettledRequest;
-use crate::workspace::harness_data_root;
 use crate::workspace::layout::SessionLayout;
-use crate::workspace::layout::sessions_root;
-use crate::workspace::project_resolver::resolve_name;
 use crate::workspace::utc_now;
 use crate::workspace::worktree::WorktreeController;
 use harness_kernel::errors::{CliError, CliErrorKind};
+
+#[path = "cleanup/layout.rs"]
+mod layout;
+use layout::{cleanup_layout, deterministic_session_layout};
 
 pub(super) async fn reconcile_settled_executor_cleanup(
     state: &DaemonHttpState,
@@ -134,13 +135,17 @@ pub(super) async fn cleanup_unstarted_executor_provisioning(
         workspace.exists().then_some(workspace.as_path()),
     )
     .await?;
-    let cleanup_origin = origin.clone();
-    spawn_blocking(move || destroy_executor_session(&cleanup_origin, &layout))
-        .await
-        .map_err(|error| workflow_io(format!("join remote provisioning cleanup: {error}")))??;
     if had_session_row {
-        db.delete_session_row(&authority.identity.session_id)
-            .await?;
+        crate::daemon::service::delete_session_with_artifact_cleanup_async(
+            db,
+            &authority.identity.session_id,
+            move |_| destroy_executor_session(&origin, &layout),
+        )
+        .await?;
+    } else {
+        spawn_blocking(move || destroy_executor_session(&origin, &layout))
+            .await
+            .map_err(|error| workflow_io(format!("join remote provisioning cleanup: {error}")))??;
     }
     Ok(true)
 }
@@ -259,11 +264,12 @@ async fn cleanup_executor_session(
             .as_deref()
             .ok_or_else(|| concurrent("remote executor cleanup has no frozen checkout path"))?,
     );
-    let layout_for_worker = layout.clone();
-    spawn_blocking(move || destroy_executor_session(&origin, &layout_for_worker))
-        .await
-        .map_err(|error| workflow_io(format!("join remote executor cleanup: {error}")))??;
-    db.delete_session_row(&identity.session_id).await?;
+    crate::daemon::service::delete_session_with_artifact_cleanup_async(
+        db,
+        &identity.session_id,
+        move |_| destroy_executor_session(&origin, &layout),
+    )
+    .await?;
     Ok(())
 }
 
@@ -431,61 +437,6 @@ async fn cleanup_orphan_executor_session(
     spawn_blocking(move || destroy_executor_session(&origin, &layout))
         .await
         .map_err(|error| workflow_io(format!("join remote orphan cleanup: {error}")))?
-}
-
-fn deterministic_session_layout(
-    origin: &Path,
-    session_id: &str,
-) -> Result<SessionLayout, CliError> {
-    let canonical_origin = origin
-        .canonicalize()
-        .map_err(|error| workflow_io(format!("canonicalize remote cleanup origin: {error}")))?;
-    let sessions_root = sessions_root(&harness_data_root());
-    let project_name = resolve_name(&canonical_origin, &sessions_root)
-        .map_err(|error| workflow_io(format!("resolve remote cleanup project: {error}")))?;
-    Ok(SessionLayout {
-        sessions_root,
-        project_name,
-        session_id: session_id.into(),
-    })
-}
-
-fn cleanup_layout(project_dir: &str, session_id: &str) -> Result<SessionLayout, CliError> {
-    let workspace = Path::new(project_dir);
-    let session_dir = workspace
-        .parent()
-        .filter(|_| {
-            workspace
-                .file_name()
-                .is_some_and(|name| name == "workspace")
-        })
-        .ok_or_else(|| concurrent("remote executor cleanup worktree path is not canonical"))?;
-    if session_dir.file_name().and_then(|name| name.to_str()) != Some(session_id) {
-        return Err(concurrent(
-            "remote executor cleanup worktree does not match its session",
-        ));
-    }
-    let project = session_dir
-        .parent()
-        .ok_or_else(|| concurrent("remote executor cleanup session has no project directory"))?;
-    let sessions_root = project
-        .parent()
-        .ok_or_else(|| concurrent("remote executor cleanup session has no sessions root"))?;
-    let project_name = project
-        .file_name()
-        .and_then(|name| name.to_str())
-        .ok_or_else(|| concurrent("remote executor cleanup project name is invalid"))?;
-    let layout = SessionLayout {
-        sessions_root: sessions_root.into(),
-        project_name: project_name.into(),
-        session_id: session_id.into(),
-    };
-    if layout.workspace() != workspace {
-        return Err(concurrent(
-            "remote executor cleanup worktree path is not normalized",
-        ));
-    }
-    Ok(layout)
 }
 
 fn destroy_executor_session(origin: &Path, layout: &SessionLayout) -> Result<(), CliError> {

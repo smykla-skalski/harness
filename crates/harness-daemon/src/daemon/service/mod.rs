@@ -22,7 +22,6 @@ use crate::workspace::utc_now;
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_protocol::agent::HookAgent;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use tokio::runtime::Handle;
 use tokio::sync::{broadcast, watch as tokio_watch};
 use tokio::task::AbortHandle;
@@ -244,7 +243,11 @@ mod wake_route;
 pub use crate::reviews::fetch_review_avatar;
 pub use adopt::adopt_session_record;
 pub(crate) use adopt::adopt_session_record_async;
-pub(crate) use agent_workspaces::list_agent_workspaces_async;
+pub(crate) use agent_workspaces::{
+    delete_session_with_artifact_cleanup_async, get_agent_workspace_team_async,
+    list_agent_workspaces_async, prepare_agent_workspace_membership_operation_async,
+    prepare_agent_workspace_operation_async, remove_agent_workspace_member_async,
+};
 pub use dependency_check_wait::spawn_dependency_check_wait;
 pub use direct::{
     delete_session_direct, disconnect_agent_direct, join_session_direct, record_signal_ack_direct,

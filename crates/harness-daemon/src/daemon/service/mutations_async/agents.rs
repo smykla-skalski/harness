@@ -2,12 +2,13 @@ use std::path::PathBuf;
 
 use super::super::{
     AgentRemoveRequest, CliError, CliErrorKind, RoleChangeRequest, SessionDetail, build_log_entry,
-    effective_project_dir, session_detail_from_async_daemon_db, session_service,
-    sync_file_state_from_async_db, utc_now,
+    effective_project_dir, prepare_agent_workspace_membership_operation_async,
+    session_detail_from_async_daemon_db, session_service, sync_file_state_from_async_db, utc_now,
 };
 use super::{bump_session, persist_leave_signal_mutation, resolved_session_for_mutation};
 use crate::daemon::db::prelude::*;
 use crate::daemon::db_handle::AsyncDaemonDbHandle;
+use harness_protocol::daemon::summaries::AgentWorkspaceMemberOperationOutcome;
 use tokio::task::spawn_blocking;
 
 /// Change an agent role through the canonical async daemon DB.
@@ -43,16 +44,89 @@ pub(crate) async fn change_role_async(
 ///
 /// # Errors
 /// Returns `CliError` when the session cannot be resolved or the removal fails.
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "agent removal keeps state mutation and leave-signal persistence ordered"
-)]
 pub(crate) async fn remove_agent_async(
     session_id: &str,
     agent_id: &str,
     request: &AgentRemoveRequest,
     async_db: &AsyncDaemonDbHandle,
 ) -> Result<SessionDetail, CliError> {
+    let daemon_id =
+        prepare_agent_workspace_membership_operation_async(async_db, session_id, agent_id).await?;
+    let prepared = prepare_agent_removal(session_id, agent_id, request, async_db).await;
+    let (project_dir, leave_signal) = match prepared {
+        Ok(prepared) => prepared,
+        Err(error) => {
+            let detail = error.message();
+            if let Err(record_error) = async_db
+                .record_agent_workspace_membership_removal(
+                    &daemon_id,
+                    session_id,
+                    agent_id,
+                    AgentWorkspaceMemberOperationOutcome::Failed,
+                    Some(&detail),
+                )
+                .await
+            {
+                tracing::warn!(
+                    error = %record_error,
+                    session_id,
+                    agent_id,
+                    "failed to record unsuccessful membership removal"
+                );
+            }
+            return Err(error);
+        }
+    };
+    let recorded = async_db
+        .record_agent_workspace_membership_removal(
+            &daemon_id,
+            session_id,
+            agent_id,
+            AgentWorkspaceMemberOperationOutcome::Succeeded,
+            None,
+        )
+        .await;
+    let finalized = finalize_agent_removal(
+        session_id,
+        agent_id,
+        request,
+        async_db,
+        project_dir,
+        leave_signal,
+    )
+    .await;
+    match (finalized, recorded) {
+        (Ok(detail), Ok(true)) => Ok(detail),
+        (Err(error), Ok(true)) => Err(error),
+        (Ok(_), Ok(false)) => Err(CliErrorKind::workflow_io(
+            "membership removed but no durable member accepted the result",
+        )
+        .into()),
+        (Err(finalize_error), Ok(false)) => Err(CliErrorKind::workflow_io(format!(
+            "membership removed but no durable member accepted the result; post-removal finalization also failed: {}",
+            finalize_error.message()
+        ))
+        .into()),
+        (Ok(_), Err(error)) => Err(CliErrorKind::workflow_io(format!(
+            "membership removed but durable result recording failed: {}",
+            error.message()
+        ))
+        .into()),
+        (Err(finalize_error), Err(record_error)) => Err(CliErrorKind::workflow_io(format!(
+            "membership removed but durable result recording failed: {}; post-removal finalization also failed: {}",
+            record_error.message(),
+            finalize_error.message()
+        ))
+        .into()),
+    }
+}
+
+async fn prepare_agent_removal(
+    session_id: &str,
+    agent_id: &str,
+    request: &AgentRemoveRequest,
+    async_db: &AsyncDaemonDbHandle,
+) -> Result<(PathBuf, Option<session_service::LeaveSignalRecord>), CliError> {
     let project_dir =
         effective_project_dir(&resolved_session_for_mutation(async_db, session_id).await?)
             .to_path_buf();
@@ -69,6 +143,17 @@ pub(crate) async fn remove_agent_async(
             Ok(signal)
         })
         .await?;
+    Ok((project_dir, leave_signal))
+}
+
+async fn finalize_agent_removal(
+    session_id: &str,
+    agent_id: &str,
+    request: &AgentRemoveRequest,
+    async_db: &AsyncDaemonDbHandle,
+    project_dir: PathBuf,
+    leave_signal: Option<session_service::LeaveSignalRecord>,
+) -> Result<SessionDetail, CliError> {
     sync_file_state_from_async_db(async_db, session_id).await?;
     let leave_signals = write_and_collect_leave_signal_async(leave_signal, project_dir).await?;
     let resolved = resolved_session_for_mutation(async_db, session_id).await?;
