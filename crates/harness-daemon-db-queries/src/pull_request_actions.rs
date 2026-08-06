@@ -1,13 +1,13 @@
 //! Durable storage for pull request action records, keyed by idempotency id.
 
+use harness_daemon_db_core::{AsyncDaemonDb, db_error};
+use harness_kernel::errors::CliError;
 use harness_task_board::github::{
     ActionState, PullRequestAction, PullRequestActionFailureClass, PullRequestActionKind,
     PullRequestIdentity, RecordedAction,
 };
 use harness_workspace::workspace::utc_now;
 use sqlx::{query, query_as};
-
-use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 
 const SELECT_ACTION: &str = "SELECT id, kind, repository, number, url, head_revision, state, \
      failure_class, detail FROM pull_request_actions WHERE id = ?1";
@@ -42,14 +42,20 @@ type ActionRow = (
 /// port, kept as its own local trait so the eventual move of `AsyncDaemonDb`
 /// out of this crate only has to touch the (foreign) `PullRequestActionStore`
 /// impl in `daemon/pull_request_action_store.rs`, not this file.
-pub(crate) trait AsyncPullRequestActionQueries {
+pub trait AsyncPullRequestActionQueries {
     /// # Errors
     /// Returns [`CliError`] on SQL or decoding failure.
-    async fn load_pull_request_action(&self, id: &str) -> Result<Option<RecordedAction>, CliError>;
+    fn load_pull_request_action(
+        &self,
+        id: &str,
+    ) -> impl std::future::Future<Output = Result<Option<RecordedAction>, CliError>> + Send;
 
     /// # Errors
     /// Returns [`CliError`] on SQL failure.
-    async fn upsert_pull_request_action(&self, record: RecordedAction) -> Result<(), CliError>;
+    fn upsert_pull_request_action(
+        &self,
+        record: RecordedAction,
+    ) -> impl std::future::Future<Output = Result<(), CliError>> + Send;
 }
 
 impl AsyncPullRequestActionQueries for AsyncDaemonDb {
