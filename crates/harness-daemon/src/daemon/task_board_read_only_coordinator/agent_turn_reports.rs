@@ -8,11 +8,9 @@ use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{AgentTurnRunSnapshot, AgentTurnRunStatus};
 use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::task_board::{
-    TaskBoardAttemptResultArtifact, TaskBoardAttemptState, TaskBoardExecutionAttemptRecord,
-    TaskBoardExecutionState, TaskBoardFailureClass, TaskBoardPhaseVerdict,
-    TaskBoardReportOnlyReviewRequest, TaskBoardReviewResult, TaskBoardReviewerOutcome,
-    TaskBoardTerminalOutcomeKind, TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowKind,
-    complete_task_board_report_only_review,
+    TaskBoardAttemptState, TaskBoardExecutionAttemptRecord, TaskBoardExecutionState,
+    TaskBoardFailureClass, TaskBoardReportOnlyReviewRequest, TaskBoardTerminalOutcomeKind,
+    TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowKind,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
 
@@ -26,6 +24,10 @@ use super::reports::{
     transition_attempt,
 };
 use super::requests::{codex_attempt_request, run_context};
+
+#[path = "agent_turn_reports/completion.rs"]
+mod completion;
+use completion::completed_run_result;
 
 pub(super) async fn reconcile_agent_turn_report_attempt<R>(
     db: &AsyncDaemonDbHandle,
@@ -418,72 +420,6 @@ async fn settle_completed_run(
     )
     .await
     .map(|_| ())
-}
-
-fn completed_run_result(
-    execution: &TaskBoardWorkflowExecutionRecord,
-    attempt: &TaskBoardExecutionAttemptRecord,
-    run: &AgentTurnRunSnapshot,
-    runtime_name: &str,
-) -> Result<
-    (
-        crate::task_board::TaskBoardReportOnlyReviewReport,
-        TaskBoardAttemptResultArtifact,
-    ),
-    CliError,
-> {
-    let profile = harness_task_board_codex_requests::attempt_profile(execution, attempt)?;
-    let effective_model = run.actual_model.as_deref().ok_or_else(|| {
-        super::attempts::invalid_transition("completed review run has no effective model")
-    })?;
-    if profile
-        .model
-        .as_deref()
-        .is_some_and(|requested| requested != effective_model)
-    {
-        return Err(super::attempts::invalid_transition(
-            "completed review run used a different effective model",
-        ));
-    }
-    let requested_model = profile.model.as_deref().unwrap_or("provider-default");
-    let head_revision = execution
-        .transition
-        .exact_head_revision
-        .as_deref()
-        .ok_or_else(|| {
-            super::attempts::invalid_transition("completed review has no frozen head")
-        })?;
-    let output = run.report.as_deref().ok_or_else(|| {
-        super::attempts::invalid_transition("completed agent-turn run has no report output")
-    })?;
-    let report = complete_task_board_report_only_review(
-        head_revision,
-        runtime_name,
-        requested_model,
-        effective_model,
-        output.trim(),
-    )
-    .map_err(|error| super::attempts::invalid_transition(error.to_string()))?;
-    let verdict = if report.findings.is_empty() {
-        TaskBoardPhaseVerdict::Pass
-    } else {
-        TaskBoardPhaseVerdict::ChangesRequired
-    };
-    let profile_id = attempt
-        .action_key
-        .strip_prefix("review:")
-        .ok_or_else(|| super::attempts::invalid_transition("review attempt has no profile"))?;
-    let artifact = TaskBoardAttemptResultArtifact::Review(TaskBoardReviewerOutcome {
-        profile_id: profile_id.to_owned(),
-        result: TaskBoardReviewResult {
-            verdict,
-            head_revision: report.head_revision.clone(),
-            summary: report.summary.clone(),
-            findings: Vec::new(),
-            structured_findings: report.findings.clone(),
-        },
-    });
-    Ok((report, artifact))
 }
 
 async fn settle_invalid_run(

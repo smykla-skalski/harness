@@ -22,7 +22,6 @@ use crate::workspace::utc_now;
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_protocol::agent::HookAgent;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use tokio::runtime::Handle;
 use tokio::sync::{broadcast, watch as tokio_watch};
 use tokio::task::AbortHandle;

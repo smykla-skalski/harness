@@ -1,4 +1,3 @@
-use crate::daemon::db::DaemonDbConversation;
 use serde_json::Value;
 
 use super::super::test_support::{
@@ -6,12 +5,10 @@ use super::super::test_support::{
     test_http_state_with_async_db_timeline, test_http_state_with_db,
 };
 use super::*;
-use crate::agents::runtime::event::{ConversationEvent, ConversationEventKind};
-use crate::daemon::db::DaemonDb;
-use crate::daemon::db::prelude::*;
-use crate::daemon::db_handle::DaemonDbOwnedHandle;
-use crate::daemon::http::DaemonHttpState;
 use crate::daemon::protocol::WsRequest;
+
+mod support;
+use support::seed_sample_acp_transcript;
 
 #[tokio::test]
 async fn dispatch_read_query_runtime_session_resolve_requires_runtime_name() {
@@ -484,38 +481,4 @@ async fn dispatch_read_query_session_timeline_uses_async_db_when_sync_db_is_unav
     };
     assert_eq!(entries.len(), 1);
     assert_eq!(entries[0]["payload"], serde_json::json!({}));
-}
-
-fn seed_sample_acp_transcript(state: &DaemonHttpState) {
-    let db_path = state.db_path.as_ref().expect("db path");
-    let db = DaemonDb::open(db_path).expect("open file db");
-    let db = DaemonDbOwnedHandle(db);
-    let mut session = db
-        .load_session_state("f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4")
-        .expect("load sample session")
-        .expect("sample session present");
-    let agent = session
-        .agents
-        .get_mut("codex-worker")
-        .expect("sample codex worker present");
-    agent.runtime = "gemini".into();
-    agent.managed_agent = Some(crate::session::types::ManagedAgentRef::acp("acp-agent-1"));
-    db.save_session_state("project-abc123", &session)
-        .expect("save managed ACP session");
-    db.sync_conversation_events(
-        "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4",
-        "codex-worker",
-        "gemini",
-        &[ConversationEvent {
-            timestamp: Some("2026-04-13T19:03:00Z".into()),
-            sequence: 7,
-            kind: ConversationEventKind::AssistantText {
-                content: "ACP transcript line".into(),
-                message_id: None,
-            },
-            agent: "codex-worker".into(),
-            session_id: "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".into(),
-        }],
-    )
-    .expect("sync ACP conversation events");
 }

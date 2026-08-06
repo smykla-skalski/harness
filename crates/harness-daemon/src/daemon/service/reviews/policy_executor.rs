@@ -1,9 +1,5 @@
 use std::sync::Arc;
 
-use async_trait::async_trait;
-use serde_json::json;
-
-use crate::daemon::audit_events::{AuditEventDraft, record_audit_result};
 #[cfg(test)]
 use crate::daemon::db::AsyncDaemonDb;
 #[cfg(test)]
@@ -16,12 +12,17 @@ use crate::task_board::github::{
     ActionGateRequirement, GitHubMergeMethod, GitHubPullRequestEvidenceSource, MergeLedgerOutcome,
     PullRequestAction, PullRequestActionKind, PullRequestIdentity, merge_with_ledger,
 };
+use async_trait::async_trait;
 use harness_kernel::errors::CliError;
 use harness_kernel::errors::CliErrorKind;
+use serde_json::json;
 
+#[path = "policy_executor_audit.rs"]
+mod audit;
 #[path = "policy_executor_providers.rs"]
 mod providers;
 
+use audit::record_reviews_policy_action_audit_result;
 pub(crate) use providers::build_database_policy_provider_registry;
 #[cfg(test)]
 pub(crate) use providers::build_policy_provider_registry;
@@ -137,32 +138,6 @@ pub(crate) fn daemon_policy_executor_with_audit(
         client: ReviewsGitHubClient::new(&token)?,
         audit_db,
     })
-}
-
-async fn record_reviews_policy_action_audit_result<T>(
-    audit_db: Option<&Arc<AsyncDaemonDbHandle>>,
-    action_key: &'static str,
-    title: &'static str,
-    target: &ReviewTarget,
-    payload_json: serde_json::Value,
-    result: &Result<T, CliError>,
-) {
-    record_audit_result(
-        audit_db,
-        AuditEventDraft {
-            source: "github",
-            category: "githubMutation",
-            kind: action_key,
-            action_key,
-            title: title.to_owned(),
-            subject: Some(format!("{}#{}", target.repository, target.number)),
-            actor: Some("Harness Monitor".to_owned()),
-            payload_json: Some(payload_json),
-            related_urls: vec![target.url.clone()],
-        },
-        result,
-    )
-    .await;
 }
 
 #[cfg(test)]
