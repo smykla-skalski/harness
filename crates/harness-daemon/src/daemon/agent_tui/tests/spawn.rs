@@ -9,7 +9,8 @@ use crate::daemon::agent_tui::{
 };
 use crate::session::types::SessionRole;
 
-use super::super::spawn::ensure_runtime_bootstrap;
+use harness_daemon_managed_agents::ensure_runtime_bootstrap;
+
 use super::super::{
     build_auto_join_prompt, resolved_command_argv, send_initial_prompt, signal_readiness_ready,
     spawn_agent_tui_process,

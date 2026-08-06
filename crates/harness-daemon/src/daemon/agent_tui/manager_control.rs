@@ -8,15 +8,14 @@ use crate::workspace::utc_now;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::manager::AgentTuiManagerHandle;
-use super::model::{
-    AgentTuiLaunchProfile, AgentTuiListResponse, AgentTuiResizeRequestExt, AgentTuiSnapshot,
-    AgentTuiStatus,
-};
-use super::process::{AgentTuiSnapshotContext, snapshot_from_process};
-use super::readiness::signal_readiness_ready;
+use super::model::AgentTuiListResponse;
 use super::support::lock_db;
 use super::{AgentTuiInput, AgentTuiInputRequest, AgentTuiKey, AgentTuiResizeRequest};
 use crate::daemon::db::prelude::*;
+use harness_daemon_managed_agents::{
+    AgentTuiLaunchProfile, AgentTuiResizeRequestExt, AgentTuiSnapshot, AgentTuiSnapshotContext,
+    AgentTuiStatus, signal_readiness_ready, snapshot_from_process,
+};
 
 impl AgentTuiManagerHandle {
     /// List managed TUI snapshots for a session.

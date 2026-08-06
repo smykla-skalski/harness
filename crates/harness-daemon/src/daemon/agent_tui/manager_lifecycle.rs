@@ -10,14 +10,15 @@ use crate::infra::io::validate_safe_segment;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::manager::{ActiveAgentTui, AgentTuiManagerHandle};
-use super::model::{
-    AgentTuiSnapshot, AgentTuiStartRequest, AgentTuiStartRequestExt, AgentTuiStatus,
-};
-use super::process::{AgentTuiProcess, AgentTuiSnapshotContext, snapshot_from_process};
-use super::spawn::{build_auto_join_prompt, deliver_deferred_prompts, spawn_agent_tui_process};
+use super::model::{AgentTuiStartRequest, AgentTuiStartRequestExt};
+use super::spawn::build_auto_join_prompt;
 use super::support::{
     ResolvedTuiProject, lock_db, record_started_prompt, resolve_tui_project,
     resolve_tui_project_async, transcript_path,
+};
+use harness_daemon_managed_agents::{
+    AgentTuiProcess, AgentTuiSnapshot, AgentTuiSnapshotContext, AgentTuiStatus,
+    deliver_deferred_prompts, snapshot_from_process, spawn_agent_tui_process,
 };
 
 impl AgentTuiManagerHandle {

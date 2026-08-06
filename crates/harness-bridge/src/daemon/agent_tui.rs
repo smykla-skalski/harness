@@ -1,32 +1,14 @@
-use std::time::Duration;
-
-#[path = "../../../../crates/harness-daemon/src/daemon/agent_tui/model.rs"]
-mod model;
-#[path = "../../../../crates/harness-daemon/src/daemon/agent_tui/process.rs"]
-mod process;
-#[path = "../../../../crates/harness-daemon/src/daemon/agent_tui/readiness.rs"]
-mod readiness;
-#[path = "../../../../crates/harness-daemon/src/daemon/agent_tui/screen.rs"]
-mod screen;
-#[path = "../../../../crates/harness-daemon/src/daemon/agent_tui/spawn.rs"]
-mod spawn;
-mod support;
-
-pub(super) const READINESS_TIMEOUT: Duration = Duration::from_secs(10);
-
+pub(crate) use harness_daemon_managed_agents::AgentTuiResizeRequestExt;
+pub(crate) use harness_daemon_managed_agents::{
+    AgentTuiAttachState, AgentTuiInputWorker, AgentTuiSnapshotContext, deliver_deferred_prompts,
+    signal_readiness_ready, snapshot_from_process, spawn_agent_tui_process,
+};
+pub use harness_daemon_managed_agents::{
+    AgentTuiBackend, AgentTuiLaunchProfile, AgentTuiProcess, AgentTuiSpawnSpec,
+    PortablePtyAgentTuiBackend, TerminalScreenParser,
+};
 pub use harness_protocol::managed_agents::tui::{
     AgentTuiInput, AgentTuiInputRequest, AgentTuiInputSequence, AgentTuiInputSequenceStep,
     AgentTuiKey, AgentTuiListResponse, AgentTuiResizeRequest, AgentTuiSize, AgentTuiSnapshot,
     AgentTuiStartRequest, AgentTuiStatus, TerminalScreenSnapshot,
 };
-pub(crate) use model::AgentTuiResizeRequestExt;
-pub use model::{
-    AgentTuiBackend, AgentTuiLaunchProfile, AgentTuiSpawnSpec, PortablePtyAgentTuiBackend,
-};
-pub use process::AgentTuiProcess;
-pub(crate) use process::{
-    AgentTuiAttachState, AgentTuiInputWorker, AgentTuiSnapshotContext, snapshot_from_process,
-};
-pub(crate) use readiness::signal_readiness_ready;
-pub use screen::TerminalScreenParser;
-pub(crate) use spawn::{deliver_deferred_prompts, spawn_agent_tui_process};
