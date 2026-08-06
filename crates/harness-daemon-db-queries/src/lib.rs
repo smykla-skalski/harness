@@ -67,7 +67,11 @@ pub use conversation::{
 };
 pub use db_timeline_source::DaemonDbTimelineHandle;
 pub use diagnostics::{DaemonDbDiagnostics, import_daemon_events};
-pub use imports::{DaemonDbImports, ImportResult, ReconcileResult, session_state_import_required};
+pub use imports::{
+    DaemonDbImports, DaemonDbSessionResync, ImportResult, PreparedRuntimeTranscriptResync,
+    PreparedSessionResync, ReconcileResult, prepare_runtime_transcript_resync,
+    prepare_session_import_from_resolved, prepare_session_resync, session_state_import_required,
+};
 pub use pull_request_actions::AsyncPullRequestActionQueries;
 pub use rebuild::TaskReviewRebuild;
 pub use review_writes::{AsyncTaskReviewWrites, SyncTaskReviewWrites, TaskV10Columns};

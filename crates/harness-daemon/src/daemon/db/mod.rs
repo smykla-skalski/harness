@@ -23,24 +23,25 @@ pub(crate) use crate::daemon::protocol::CodexRunSnapshot;
 pub(crate) use crate::daemon::protocol::{CodexRunMode, CodexRunStatus};
 #[cfg(test)]
 pub(crate) use crate::session::types::AgentRegistration;
+pub(crate) use crate::session::types::SessionState;
 #[allow(unused_imports)]
 pub(crate) use crate::session::types::SessionStatus;
 #[cfg(test)]
 pub(crate) use crate::session::types::WorkItem;
-pub(crate) use crate::session::types::{
-    SessionLogEntry, SessionSignalRecord, SessionState, TaskCheckpoint,
-};
+#[cfg(test)]
+pub(crate) use crate::session::types::{SessionLogEntry, SessionSignalRecord, TaskCheckpoint};
 #[allow(unused_imports)]
 pub(crate) use crate::workspace::project_context_id;
 pub(crate) use crate::workspace::utc_now;
 pub(crate) use harness_kernel::errors::{CliError, CliErrorKind};
 
+pub(crate) use super::state;
 #[cfg(test)]
 pub(crate) use super::timeline as daemon_timeline;
-pub(crate) use super::{index as daemon_index, protocol as daemon_protocol, state};
 // The session snapshot layer lives in its own crate, depended on by both
 // `service` and `db` (file-based signal reads, the activity-fold
 // accumulator); this alias keeps every call site below unchanged.
+#[cfg(test)]
 pub(crate) use harness_daemon_snapshot as daemon_snapshot;
 
 pub(crate) use harness_daemon_db_core::audit_event_retention;
@@ -77,14 +78,13 @@ pub(crate) use harness_daemon_db_queries::ChangeTrackingQueries;
 pub(crate) use harness_daemon_db_queries::LOAD_CHANGE_TRACKING_SQL;
 pub(crate) mod conversation;
 pub use harness_daemon_db_queries::DaemonDbDiagnostics;
-pub(crate) mod imports;
-pub use harness_daemon_db_queries::{DaemonDbImports, ImportResult, ReconcileResult};
-pub(crate) use imports::{
-    prepare_runtime_transcript_resync, prepare_session_import_from_resolved, prepare_session_resync,
+pub use harness_daemon_db_queries::{
+    DaemonDbImports, DaemonDbSessionResync, ImportResult, PreparedRuntimeTranscriptResync,
+    PreparedSessionResync, ReconcileResult, prepare_runtime_transcript_resync,
+    prepare_session_import_from_resolved, prepare_session_resync,
 };
 mod policy_graph_connection;
 pub(crate) use harness_daemon_db_queries::AsyncPullRequestActionQueries;
-pub(crate) use harness_daemon_db_queries::TaskReviewRebuild;
 pub(crate) mod remote_acme;
 pub(crate) mod remote_identity;
 pub(crate) mod remote_pairing_revoke;
@@ -165,6 +165,7 @@ pub(crate) use task_board::{
 // `pub`, not `pub(crate)`: `harness-db-schema`'s own v43 controller-operation
 // migration test builds these trust-fence values directly to exercise the
 // paired lifecycle-trust columns the v43 migration adds.
+pub use harness_daemon_db_queries::SessionCoreQueries;
 pub use task_board::{TaskBoardRemoteHostTrustFence, TaskBoardRemoteLifecycleTrustSnapshot};
 #[cfg(test)]
 pub(crate) use task_board::{
@@ -172,9 +173,6 @@ pub(crate) use task_board::{
     running_status as remote_controller_running_status,
     status_request as remote_controller_status_request,
 };
-mod session_data;
-pub use harness_daemon_db_queries::SessionCoreQueries;
-pub(crate) use session_data::SessionMutationRefresh;
 mod signals;
 pub use harness_daemon_db_queries::SessionSummaryQueries;
 pub use harness_daemon_db_queries::SessionWriteQueries;
@@ -211,9 +209,6 @@ use harness_daemon_db_queries::import_daemon_events;
 pub(crate) use harness_daemon_db_queries::parse_session_status_db_label;
 #[cfg(test)]
 pub(crate) use harness_daemon_db_queries::session_status_db_label;
-pub(crate) use harness_daemon_db_queries::{
-    PreparedAgentTranscriptResync, PreparedConversationEventImport,
-};
 #[allow(unused_imports)]
 use harness_daemon_db_queries::{
     bump_session_timeline_state, replace_all_session_timeline_entries,
@@ -229,27 +224,6 @@ use harness_daemon_db_queries::{
 use harness_daemon_db_queries::{stored_timeline_entry, stored_timeline_entry_from_row};
 pub(crate) use harness_policy_graph_store::NewApprovalGrant;
 pub(crate) use runtime::ensure_shared_db;
-
-#[derive(Debug)]
-pub(crate) struct PreparedSessionResync {
-    pub(crate) resolved: daemon_index::ResolvedSession,
-    log_entries: Vec<SessionLogEntry>,
-    task_checkpoints: Vec<PreparedTaskCheckpointImport>,
-    signals: Vec<SessionSignalRecord>,
-    activities: Vec<daemon_protocol::AgentToolActivitySummary>,
-    conversation_events: Vec<PreparedConversationEventImport>,
-}
-
-#[derive(Debug)]
-pub(crate) struct PreparedTaskCheckpointImport {
-    checkpoints: Vec<TaskCheckpoint>,
-}
-
-#[derive(Debug)]
-pub(crate) struct PreparedRuntimeTranscriptResync {
-    session_id: String,
-    agents: Vec<PreparedAgentTranscriptResync>,
-}
 
 #[cfg(test)]
 mod tests;
