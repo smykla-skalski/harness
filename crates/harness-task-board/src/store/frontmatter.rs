@@ -45,6 +45,10 @@ pub(super) struct TaskBoardFrontmatter {
     session_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     work_item_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    workspace_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    working_copy_id: Option<String>,
     #[serde(default)]
     usage: TaskUsage,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -87,6 +91,8 @@ impl From<&TaskBoardItem> for TaskBoardFrontmatter {
             workflow: item.workflow.clone(),
             session_id: item.session_id.clone(),
             work_item_id: item.work_item_id.clone(),
+            workspace_id: item.workspace_id.clone(),
+            working_copy_id: item.working_copy_id.clone(),
             usage: item.usage.clone(),
             parent_item_id: item.parent_item_id.clone(),
             child_order: item.child_order,
@@ -125,6 +131,8 @@ impl TaskBoardFrontmatter {
             workflow: self.workflow,
             session_id: self.session_id,
             work_item_id: self.work_item_id,
+            workspace_id: self.workspace_id,
+            working_copy_id: self.working_copy_id,
             usage: self.usage,
             parent_item_id: self.parent_item_id,
             child_order: self.child_order,

@@ -214,12 +214,13 @@ impl RuntimeSnapshotQueries for DaemonDb {
         self.conn
             .execute(
                 "INSERT INTO agent_tuis (
-                    tui_id, session_id, agent_id, runtime, status, argv_json,
+                    tui_id, session_id, workspace_id, agent_id, runtime, status, argv_json,
                     project_dir, rows, cols, cursor_row, cursor_col, screen_text,
                     transcript_path, exit_code, signal, error, created_at, updated_at
-                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)
+                ) VALUES (?1, ?2, ?19, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)
                 ON CONFLICT(tui_id) DO UPDATE SET
                     session_id = excluded.session_id,
+                    workspace_id = excluded.workspace_id,
                     agent_id = excluded.agent_id,
                     runtime = excluded.runtime,
                     status = excluded.status,
@@ -237,7 +238,7 @@ impl RuntimeSnapshotQueries for DaemonDb {
                     updated_at = excluded.updated_at",
                 rusqlite::params![
                     snapshot.tui_id,
-                    snapshot.session_id,
+                    owned_session_id(snapshot),
                     snapshot.agent_id,
                     snapshot.runtime,
                     snapshot.status.as_str(),
@@ -254,6 +255,7 @@ impl RuntimeSnapshotQueries for DaemonDb {
                     snapshot.error,
                     snapshot.created_at,
                     snapshot.updated_at,
+                    snapshot.workspace_id,
                 ],
             )
             .map_err(|error| db_error(format!("save terminal agent: {error}")))?;
@@ -264,7 +266,8 @@ impl RuntimeSnapshotQueries for DaemonDb {
         let result = self.conn.query_row(
             "SELECT tui_id, session_id, agent_id, runtime, status, argv_json,
                 project_dir, rows, cols, cursor_row, cursor_col, screen_text,
-                transcript_path, exit_code, signal, error, created_at, updated_at
+                transcript_path, exit_code, signal, error, created_at, updated_at,
+                workspace_id
              FROM agent_tuis
              WHERE tui_id = ?1",
             [tui_id],
@@ -309,9 +312,10 @@ impl RuntimeSnapshotQueries for DaemonDb {
             .prepare(
                 "SELECT tui_id, session_id, agent_id, runtime, status, argv_json,
                     project_dir, rows, cols, cursor_row, cursor_col, screen_text,
-                    transcript_path, exit_code, signal, error, created_at, updated_at
+                    transcript_path, exit_code, signal, error, created_at, updated_at,
+                    workspace_id
                  FROM agent_tuis
-                 WHERE session_id = ?1
+                 WHERE session_id = ?1 OR workspace_id = ?1
                  ORDER BY updated_at DESC",
             )
             .map_err(|error| db_error(format!("prepare terminal agent list: {error}")))?;
@@ -382,9 +386,11 @@ fn agent_tui_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<AgentTuiSnaps
         .get::<_, Option<i64>>(13)?
         .map(|value| u32::try_from(value).map_err(|error| parse_error_to_sql(error.to_string())))
         .transpose()?;
+    let workspace_id: Option<String> = row.get(18)?;
     Ok(AgentTuiSnapshot {
         tui_id: row.get(0)?,
-        session_id: row.get(1)?,
+        session_id: owner_identity(row.get(1)?, workspace_id.as_deref()),
+        workspace_id,
         agent_id: row.get(2)?,
         runtime: row.get(3)?,
         status: AgentTuiStatus::parse(&status_raw).map_err(parse_error_to_sql)?,
@@ -406,6 +412,21 @@ fn agent_tui_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<AgentTuiSnaps
         created_at: row.get(16)?,
         updated_at: row.get(17)?,
     })
+}
+
+/// The `session_id` column only holds a real Session. A workspace-owned
+/// terminal writes NULL there - there is no Session row for the foreign key to
+/// point at - and keeps its workspace id in the snapshot's `session_id` field
+/// as the owner every reader already keys on.
+fn owned_session_id(snapshot: &AgentTuiSnapshot) -> Option<&str> {
+    snapshot
+        .workspace_id
+        .is_none()
+        .then_some(snapshot.session_id.as_str())
+}
+
+fn owner_identity(session_id: Option<String>, workspace_id: Option<&str>) -> String {
+    session_id.unwrap_or_else(|| workspace_id.unwrap_or_default().to_string())
 }
 
 fn row_i64_to_u16(value: i64, column: &str) -> rusqlite::Result<u16> {

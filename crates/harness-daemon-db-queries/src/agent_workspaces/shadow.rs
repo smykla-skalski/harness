@@ -4,7 +4,7 @@ use sha2::{Digest, Sha256};
 use super::preflight::WorkspacePlan;
 
 #[derive(Clone, Debug, Serialize)]
-pub(super) struct ShadowWorkspace {
+pub(crate) struct ShadowWorkspace {
     pub workspace_id: String,
     pub daemon_id: String,
     pub project_scope_id: String,
@@ -26,7 +26,7 @@ pub(super) struct ShadowWorkspace {
 }
 
 #[derive(Clone, Debug, Serialize)]
-pub(super) struct ShadowCandidate {
+pub(crate) struct ShadowCandidate {
     pub session_id: String,
     pub lifecycle: String,
     pub checkout_availability: String,
@@ -75,7 +75,7 @@ pub(super) fn plan_shadow_digest(plan: &WorkspacePlan, created_at: &str) -> Stri
     })
 }
 
-pub(super) fn shadow_digest(workspace: &ShadowWorkspace) -> String {
+pub(crate) fn shadow_digest(workspace: &ShadowWorkspace) -> String {
     let mut canonical = workspace.clone();
     canonical
         .candidates

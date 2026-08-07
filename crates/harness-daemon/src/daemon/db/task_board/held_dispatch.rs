@@ -148,8 +148,7 @@ async fn load_held_claim_state_in_tx(
     validate_held_workflow_claim_revision(&applied, revision)?;
     ensure_dispatch_item_startable(
         &item,
-        &applied.session_id,
-        &applied.work_item_id,
+        &applied,
         applied.item.workflow.execution_id.as_deref(),
     )?;
     Ok(HeldClaimState {

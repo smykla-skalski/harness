@@ -68,7 +68,11 @@ async fn prepare_pending_admission_refusal_in_tx(
                 applied.board_item_id
             ))
         })?;
-    let still_linked = item.session_id.as_deref() == Some(applied.session_id.as_str())
+    // Whichever owner this dispatch linked is the one the rollback has to find
+    // still attached; a fresh dispatch has a workspace where a legacy one has a
+    // Session, and matching on the wrong one would roll back someone else's work.
+    let still_linked = item.session_id == applied.session_id
+        && item.workspace_id == applied.workspace_id
         && item.work_item_id.as_deref() == Some(applied.work_item_id.as_str());
     if still_linked && dispatch_item_can_be_rolled_back(&item) {
         roll_back_dispatch_item_in_tx(transaction, item, revision, reason).await?;
@@ -189,8 +193,8 @@ async fn claimed_intent_identity(
     intent_id: &str,
     claim_token: &str,
     compensation_pending: bool,
-) -> Result<(String, String, String, String), CliError> {
-    query_as::<_, (String, String, String, String)>(
+) -> Result<(String, Option<String>, String, String), CliError> {
+    query_as::<_, (String, Option<String>, String, String)>(
         "SELECT item_id, session_id, work_item_id, workflow_execution_id
          FROM task_board_dispatch_intents
          WHERE intent_id = ?1 AND claim_token = ?2 AND status = 'starting'

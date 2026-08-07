@@ -202,7 +202,9 @@ pub(super) async fn link_and_enqueue_task_board_dispatch(
     record_lane_transition_audit_in_tx(&mut transaction, &write, change_sequence).await?;
     let applied = DispatchAppliedTask {
         board_item_id: board_item_id.to_string(),
-        session_id: session_id.to_string(),
+        session_id: Some(session_id.to_string()),
+        workspace_id: None,
+        working_copy_id: None,
         work_item_id: work_item_id.to_string(),
         lifecycle: lifecycle.clone(),
         item: write.item,
@@ -298,17 +300,20 @@ pub(super) async fn complete_task_board_dispatch(
 #[path = "dispatch_intents_completion.rs"]
 mod completion;
 
+/// The ticket still has to name the owner this dispatch linked. Taking the
+/// applied dispatch whole keeps the workspace and Session halves compared
+/// together, so a workspace item cannot pass on a Session match it never had.
 pub(super) fn ensure_dispatch_item_startable(
     item: &TaskBoardItem,
-    session_id: &str,
-    work_item_id: &str,
+    applied: &DispatchAppliedTask,
     execution_id: Option<&str>,
 ) -> Result<(), CliError> {
     let matches = !item.is_deleted()
         && item.status == TaskBoardStatus::InProgress
         && item.workflow.status == TaskBoardWorkflowStatus::Running
-        && item.session_id.as_deref() == Some(session_id)
-        && item.work_item_id.as_deref() == Some(work_item_id)
+        && item.session_id == applied.session_id
+        && item.workspace_id == applied.workspace_id
+        && item.work_item_id.as_deref() == Some(applied.work_item_id.as_str())
         && item.workflow.execution_id.as_deref() == execution_id;
     if matches {
         Ok(())
@@ -328,13 +333,13 @@ fn ensure_dispatch_linkage(
     work_item_id: &str,
 ) -> Result<DispatchAppliedTask, CliError> {
     let matches = applied.board_item_id == board_item_id
-        && applied.session_id == session_id
+        && applied.session_id.as_deref() == Some(session_id)
         && applied.work_item_id == work_item_id;
     if matches {
         return Ok(applied);
     }
     Err(CliErrorKind::session_agent_conflict(format!(
-        "task-board dispatch intent for item '{}' links session '{}' work item '{}', not requested item '{board_item_id}' session '{session_id}' work item '{work_item_id}'",
+        "task-board dispatch intent for item '{}' links session '{:?}' work item '{}', not requested item '{board_item_id}' session '{session_id}' work item '{work_item_id}'",
         applied.board_item_id, applied.session_id, applied.work_item_id
     ))
     .into())
@@ -420,8 +425,8 @@ pub(super) async fn claimed_intent_identity(
     transaction: &mut Transaction<'_, Sqlite>,
     intent_id: &str,
     claim_token: &str,
-) -> Result<(String, String, String, String), CliError> {
-    query_as::<_, (String, String, String, String)>(
+) -> Result<(String, Option<String>, String, String), CliError> {
+    query_as::<_, (String, Option<String>, String, String)>(
         "SELECT item_id, session_id, work_item_id, workflow_execution_id
          FROM task_board_dispatch_intents
          WHERE intent_id = ?1 AND claim_token = ?2 AND status = 'starting'

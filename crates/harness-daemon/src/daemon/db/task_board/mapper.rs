@@ -56,6 +56,8 @@ pub(super) fn item_from_rows(
         workflow: parse_json(&row.workflow_json, "task board workflow state")?,
         session_id: row.session_id,
         work_item_id: row.work_item_id,
+        workspace_id: row.workspace_id,
+        working_copy_id: row.working_copy_id,
         usage: parse_json(&row.usage_json, "task board usage")?,
         parent_item_id: row.parent_item_id,
         child_order: u32::try_from(row.child_order)

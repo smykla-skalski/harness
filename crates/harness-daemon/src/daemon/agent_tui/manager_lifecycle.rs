@@ -65,6 +65,7 @@ impl AgentTuiManagerHandle {
         }
         let snapshot_context = AgentTuiSnapshotContext {
             session_id,
+            workspace_id: None,
             agent_id: "",
             tui_id: &tui_id,
             profile: &profile,
@@ -103,7 +104,7 @@ impl AgentTuiManagerHandle {
         result
     }
 
-    fn ensure_automation_kill_switch_clear(&self) -> Result<(), CliError> {
+    pub(super) fn ensure_automation_kill_switch_clear(&self) -> Result<(), CliError> {
         let database = self.db()?;
         let database = lock_db(&database)?;
         if database
@@ -137,6 +138,27 @@ impl AgentTuiManagerHandle {
         );
         let pty_auto_join =
             matches!(delivery, InitialPromptDelivery::PtySend).then(|| auto_join.to_string());
+        self.spawn_prompt_delivery(snapshot, runtime, pty_auto_join, request);
+    }
+
+    /// Deliver only the work prompt. A workspace-owned terminal has no Session
+    /// roster to join, so there is no auto-join call to send ahead of it.
+    pub(super) fn spawn_workspace_prompt_delivery(
+        &self,
+        snapshot: AgentTuiSnapshot,
+        runtime: String,
+        request: &AgentTuiStartRequest,
+    ) {
+        self.spawn_prompt_delivery(snapshot, runtime, None, request);
+    }
+
+    fn spawn_prompt_delivery(
+        &self,
+        snapshot: AgentTuiSnapshot,
+        runtime: String,
+        pty_auto_join: Option<String>,
+        request: &AgentTuiStartRequest,
+    ) {
         let user_prompt = request
             .prompt
             .as_deref()
@@ -175,7 +197,7 @@ impl AgentTuiManagerHandle {
         );
     }
 
-    fn activate_tui(
+    pub(super) fn activate_tui(
         &self,
         process: AgentTuiProcess,
         context: &AgentTuiSnapshotContext<'_>,
@@ -252,7 +274,7 @@ impl AgentTuiManagerHandle {
         resolve_tui_project(&db_guard, session_id, requested_project_dir.as_deref())
     }
 
-    fn register_started_snapshot(
+    pub(super) fn register_started_snapshot(
         &self,
         snapshot: &AgentTuiSnapshot,
         active: ActiveAgentTui,

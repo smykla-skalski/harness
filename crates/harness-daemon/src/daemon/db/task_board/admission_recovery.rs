@@ -16,7 +16,9 @@ pub(crate) struct TaskBoardAdmissionWorkerRecovery {
     pub(crate) managed_worker_id: String,
     pub(crate) intent_id: String,
     pub(crate) item_id: String,
-    pub(crate) session_id: String,
+    /// Legacy owner. Absent for a workspace-owned dispatch, which is what makes
+    /// the Session-task side of recovery below a no-op for it.
+    pub(crate) session_id: Option<String>,
     pub(crate) task_id: String,
     pub(crate) workflow_execution_id: String,
     pub(crate) dispatch: DispatchAppliedTask,
@@ -25,7 +27,7 @@ pub(crate) struct TaskBoardAdmissionWorkerRecovery {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TaskBoardAdmissionMissingRunRecovery {
     pub(crate) item_id: String,
-    pub(crate) session_id: String,
+    pub(crate) session_id: Option<String>,
     pub(crate) session_changed: bool,
     pub(crate) concurrency_released: bool,
 }
@@ -35,7 +37,7 @@ struct AdmissionRecoveryRow {
     managed_worker_id: String,
     intent_id: String,
     item_id: String,
-    session_id: String,
+    session_id: Option<String>,
     work_item_id: String,
     workflow_execution_id: String,
     payload_json: String,
@@ -158,7 +160,7 @@ fn recovery_from_row(
         && dispatch.session_id == row.session_id
         && dispatch.work_item_id == row.work_item_id
         && dispatch.item.id == row.item_id
-        && dispatch.item.session_id.as_deref() == Some(row.session_id.as_str())
+        && dispatch.item.session_id == row.session_id
         && dispatch.item.work_item_id.as_deref() == Some(row.work_item_id.as_str())
         && dispatch.item.workflow.execution_id.as_deref()
             == Some(row.workflow_execution_id.as_str());
@@ -244,10 +246,15 @@ async fn block_linked_session_task(
     if !item_is_linked {
         return Ok(false);
     }
+    // A workspace-owned dispatch has no Session task to block; the board item
+    // and its execution carry that state instead.
+    let Some(session_id) = recovery.session_id.as_deref() else {
+        return Ok(false);
+    };
     let Some(row) = query_as::<_, AdmissionRecoverySessionRow>(
         "SELECT state_json, project_id FROM sessions WHERE session_id = ?1",
     )
-    .bind(&recovery.session_id)
+    .bind(session_id)
     .fetch_optional(transaction.as_mut())
     .await
     .map_err(|error| db_error(format!("load linked recovery session: {error}")))?
@@ -276,7 +283,7 @@ fn item_matches_recovery(
     recovery: &TaskBoardAdmissionWorkerRecovery,
 ) -> bool {
     !item.is_deleted()
-        && item.session_id.as_deref() == Some(recovery.session_id.as_str())
+        && item.session_id == recovery.session_id
         && item.work_item_id.as_deref() == Some(recovery.task_id.as_str())
         && item.workflow.execution_id.as_deref() == Some(recovery.workflow_execution_id.as_str())
         && item.workflow.status == TaskBoardWorkflowStatus::Running

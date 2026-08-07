@@ -102,8 +102,7 @@ pub(super) async fn validate_pending_dispatch(
     }
     if let Err(error) = ensure_dispatch_item_startable(
         &item,
-        &applied.session_id,
-        &applied.work_item_id,
+        applied,
         applied.item.workflow.execution_id.as_deref(),
     ) {
         refuse_pending_admission_in_tx(

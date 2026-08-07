@@ -5,14 +5,14 @@ use harness_protocol::daemon::summaries::AgentWorkspaceAvailability;
 use harness_workspace::git::identity::resolve_git_checkout_identity;
 
 #[derive(Clone, Copy)]
-pub(super) struct RecordedCheckout<'a> {
+pub(crate) struct RecordedCheckout<'a> {
     pub project_dir: Option<&'a str>,
     pub repository_root: Option<&'a str>,
     pub is_worktree: bool,
     pub worktree_name: Option<&'a str>,
 }
 
-pub(super) fn recorded_checkout_availability(
+pub(crate) fn recorded_checkout_availability(
     checkout: RecordedCheckout<'_>,
 ) -> Result<AgentWorkspaceAvailability, String> {
     let Some(project_dir) = checkout.project_dir.filter(|path| !path.trim().is_empty()) else {

@@ -67,12 +67,13 @@ const LIST_CODEX_RUNS_SQL: &str =
  WHERE session_id = ?1
  ORDER BY updated_at DESC";
 const UPSERT_AGENT_TUI_SQL: &str = "INSERT INTO agent_tuis (
-    tui_id, session_id, agent_id, runtime, status, argv_json,
+    tui_id, session_id, workspace_id, agent_id, runtime, status, argv_json,
     project_dir, rows, cols, cursor_row, cursor_col, screen_text,
     transcript_path, exit_code, signal, error, created_at, updated_at
-) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)
+) VALUES (?1, ?2, ?19, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)
 ON CONFLICT(tui_id) DO UPDATE SET
     session_id = excluded.session_id,
+    workspace_id = excluded.workspace_id,
     agent_id = excluded.agent_id,
     runtime = excluded.runtime,
     status = excluded.status,
@@ -90,14 +91,14 @@ ON CONFLICT(tui_id) DO UPDATE SET
     updated_at = excluded.updated_at";
 const AGENT_TUI_SQL: &str = "SELECT tui_id, session_id, agent_id, runtime, status, argv_json,
     project_dir, rows, cols, cursor_row, cursor_col, screen_text,
-    transcript_path, exit_code, signal, error, created_at, updated_at
+    transcript_path, exit_code, signal, error, created_at, updated_at, workspace_id
  FROM agent_tuis
  WHERE tui_id = ?1";
 const LIST_AGENT_TUIS_SQL: &str = "SELECT tui_id, session_id, agent_id, runtime, status, argv_json,
     project_dir, rows, cols, cursor_row, cursor_col, screen_text,
-    transcript_path, exit_code, signal, error, created_at, updated_at
+    transcript_path, exit_code, signal, error, created_at, updated_at, workspace_id
  FROM agent_tuis
- WHERE session_id = ?1
+ WHERE session_id = ?1 OR workspace_id = ?1
  ORDER BY updated_at DESC";
 const AGENT_TUI_LIVE_REFRESH_STATE_SQL: &str = "SELECT status, updated_at
  FROM agent_tuis
@@ -264,7 +265,7 @@ impl AsyncRuntimeSnapshotQueries for AsyncDaemonDb {
             .map_err(|error| db_error(format!("serialize async terminal agent argv: {error}")))?;
         query(UPSERT_AGENT_TUI_SQL)
             .bind(&snapshot.tui_id)
-            .bind(&snapshot.session_id)
+            .bind(owned_session_id(snapshot))
             .bind(&snapshot.agent_id)
             .bind(&snapshot.runtime)
             .bind(snapshot.status.as_str())
@@ -281,6 +282,7 @@ impl AsyncRuntimeSnapshotQueries for AsyncDaemonDb {
             .bind(&snapshot.error)
             .bind(&snapshot.created_at)
             .bind(&snapshot.updated_at)
+            .bind(&snapshot.workspace_id)
             .execute(self.pool())
             .await
             .map_err(|error| db_error(format!("save async terminal agent: {error}")))?;
@@ -395,7 +397,7 @@ impl AsyncCodexRunRow {
 #[derive(sqlx::FromRow)]
 struct AsyncAgentTuiRow {
     tui_id: String,
-    session_id: String,
+    session_id: Option<String>,
     agent_id: String,
     runtime: String,
     status: String,
@@ -412,6 +414,7 @@ struct AsyncAgentTuiRow {
     error: Option<String>,
     created_at: String,
     updated_at: String,
+    workspace_id: Option<String>,
 }
 
 impl AsyncAgentTuiRow {
@@ -432,7 +435,10 @@ impl AsyncAgentTuiRow {
             .transpose()?;
         Ok(AgentTuiSnapshot {
             tui_id: self.tui_id,
-            session_id: self.session_id,
+            session_id: self
+                .session_id
+                .unwrap_or_else(|| self.workspace_id.clone().unwrap_or_default()),
+            workspace_id: self.workspace_id,
             agent_id: self.agent_id,
             runtime: self.runtime,
             status: AgentTuiStatus::parse(&self.status)
@@ -473,6 +479,17 @@ impl AsyncAgentTuiLiveRefreshStateRow {
             updated_at: self.updated_at,
         })
     }
+}
+
+/// The `session_id` column only holds a real Session. A workspace-owned
+/// terminal writes NULL there - there is no Session row for the foreign key to
+/// point at - and carries its workspace id in the snapshot's `session_id`
+/// field, which is the owner every reader already keys on.
+fn owned_session_id(snapshot: &AgentTuiSnapshot) -> Option<&str> {
+    snapshot
+        .workspace_id
+        .is_none()
+        .then_some(snapshot.session_id.as_str())
 }
 
 fn row_i64_to_u16(value: i64, column: &str) -> Result<u16, CliError> {

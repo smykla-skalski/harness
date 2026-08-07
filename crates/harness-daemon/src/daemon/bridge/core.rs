@@ -55,6 +55,7 @@ pub(super) struct BridgeSnapshotContext {
 impl BridgeSnapshotContext {
     pub(super) fn borrowed(&self) -> AgentTuiSnapshotContext<'_> {
         AgentTuiSnapshotContext {
+            workspace_id: None,
             session_id: &self.session_id,
             agent_id: &self.agent_id,
             tui_id: &self.tui_id,

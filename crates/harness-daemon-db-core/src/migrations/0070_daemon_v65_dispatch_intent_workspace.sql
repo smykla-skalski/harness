@@ -2,15 +2,17 @@
 -- so the intent's `session_id` becomes optional correlation metadata and the
 -- CHECK moves the requirement onto "one owner or the other".
 --
--- Same `legacy_alter_table` reason as the terminal rebuild: the admission
--- decisions and ledger name `task_board_dispatch_intents` in their foreign
--- keys, and those keys have to keep pointing at the rebuilt table rather than
--- follow the rename to the scratch name this migration drops.
-PRAGMA legacy_alter_table = ON;
-ALTER TABLE task_board_dispatch_intents RENAME TO task_board_dispatch_intents_v64;
-PRAGMA legacy_alter_table = OFF;
+-- The admission decisions and ledger name this table in their foreign keys, and
+-- with `foreign_keys` on, renaming it out of the way rewrites those clauses to
+-- follow the scratch name - which then dangles when the scratch table is
+-- dropped. So the new table is built under the scratch name instead and renamed
+-- into place last, leaving the children's clauses untouched throughout. The
+-- window where the parent does not exist is covered by `defer_foreign_keys`;
+-- the caller runs this whole file in one transaction so the check lands after
+-- the rename has put the parent back.
+PRAGMA defer_foreign_keys = ON;
 
-CREATE TABLE task_board_dispatch_intents (
+CREATE TABLE task_board_dispatch_intents_v65 (
     intent_id TEXT PRIMARY KEY,
     item_id TEXT NOT NULL REFERENCES task_board_items(item_id) ON DELETE CASCADE,
     session_id TEXT,
@@ -82,7 +84,7 @@ CREATE TABLE task_board_dispatch_intents (
     )
 );
 
-INSERT INTO task_board_dispatch_intents (
+INSERT INTO task_board_dispatch_intents_v65 (
     intent_id, item_id, session_id, workspace_id, working_copy_id, work_item_id,
     workflow_execution_id, payload_json, status, attempts, available_at,
     claim_token, claimed_at, last_error, created_at, updated_at, completed_at,
@@ -94,9 +96,10 @@ SELECT intent_id, item_id, session_id, NULL, NULL, work_item_id,
        claim_token, claimed_at, last_error, created_at, updated_at, completed_at,
        consumed_approval_grant_id, compensation_pending, start_admission_outcome,
        start_admission_settings_revision
-FROM task_board_dispatch_intents_v64;
+FROM task_board_dispatch_intents;
 
-DROP TABLE task_board_dispatch_intents_v64;
+DROP TABLE task_board_dispatch_intents;
+ALTER TABLE task_board_dispatch_intents_v65 RENAME TO task_board_dispatch_intents;
 
 CREATE UNIQUE INDEX IF NOT EXISTS task_board_dispatch_intents_admission_identity
     ON task_board_dispatch_intents(intent_id, item_id);

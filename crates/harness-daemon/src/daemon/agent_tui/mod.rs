@@ -19,6 +19,8 @@ mod manager_lifecycle;
 #[cfg(feature = "daemon-runtime")]
 mod manager_refresh;
 #[cfg(feature = "daemon-runtime")]
+mod manager_workspace_lifecycle;
+#[cfg(feature = "daemon-runtime")]
 mod model;
 #[cfg(feature = "daemon-runtime")]
 mod spawn;
@@ -48,6 +50,8 @@ pub use harness_protocol::managed_agents::tui::{
 };
 #[cfg(feature = "daemon-runtime")]
 pub use manager::AgentTuiManagerHandle;
+#[cfg(feature = "daemon-runtime")]
+pub(crate) use manager_workspace_lifecycle::WorkspaceTerminalOwner;
 
 pub(crate) use harness_daemon_managed_agents::{
     AgentTuiAttachState, AgentTuiInputWorker, AgentTuiSnapshotContext, deliver_deferred_prompts,

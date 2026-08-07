@@ -199,6 +199,8 @@ pub(in crate::daemon::db::task_board) async fn complete_task_board_dispatch_prep
     let applied = DispatchAppliedTask {
         board_item_id: preparation.board_item_id.clone(),
         session_id: preparation.session_id.clone(),
+        workspace_id: preparation.workspace_id.clone(),
+        working_copy_id: preparation.working_copy_id.clone(),
         work_item_id: preparation.work_item_id.clone(),
         lifecycle: preparation.plan.applied_lifecycle(),
         item,
@@ -216,7 +218,7 @@ pub(in crate::daemon::db::task_board) async fn complete_task_board_dispatch_prep
         "UPDATE task_board_dispatch_intents
              SET payload_json = ?3, status = ?4, claim_token = NULL,
                  claimed_at = NULL, last_error = NULL, updated_at = ?5,
-                 consumed_approval_grant_id = ?6
+                 consumed_approval_grant_id = ?6, workspace_id = ?7
              WHERE intent_id = ?1 AND claim_token = ?2 AND status = 'preparing_claimed'",
     )
     .bind(&claim.intent_id)
@@ -229,6 +231,7 @@ pub(in crate::daemon::db::task_board) async fn complete_task_board_dispatch_prep
     } else {
         preparation.plan.consumed_approval_grant_id.as_deref()
     })
+    .bind(preparation.workspace_id.as_deref())
     .execute(transaction.as_mut())
     .await
     .map_err(|error| db_error(format!("complete task board preparation: {error}")))?;

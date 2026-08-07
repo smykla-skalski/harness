@@ -119,10 +119,12 @@ async fn task_board_dispatch_has_status(
     let Some(execution_id) = applied.item.workflow.execution_id.as_deref() else {
         return Ok(false);
     };
+    // `IS` rather than `=` so a workspace dispatch's NULL session matches; `=`
+    // is never true against NULL and would report every one of them as missing.
     query_scalar::<_, bool>(
         "SELECT EXISTS(
                  SELECT 1 FROM task_board_dispatch_intents
-                 WHERE item_id = ?1 AND session_id = ?2 AND work_item_id = ?3
+                 WHERE item_id = ?1 AND session_id IS ?2 AND work_item_id = ?3
                    AND workflow_execution_id = ?4 AND status = ?5
              )",
     )
@@ -249,7 +251,7 @@ async fn finish_failed_task_board_dispatch(
         .load_item_in_tx(&item_id)
         .await?
         .ok_or_else(|| db_error(format!("task-board item '{item_id}' not found")))?;
-    let still_linked = item.session_id.as_deref() == Some(session_id.as_str())
+    let still_linked = item.session_id == session_id
         && item.work_item_id.as_deref() == Some(work_item_id.as_str())
         && item.workflow.execution_id.as_deref() == Some(execution_id.as_str());
     let mut lane_write: Option<LaneTransitionWrite> = None;
@@ -260,6 +262,8 @@ async fn finish_failed_task_board_dispatch(
         item.workflow.last_error = Some(reason.to_string());
         item.status = TaskBoardStatus::Todo;
         item.session_id = None;
+        item.workspace_id = None;
+        item.working_copy_id = None;
         item.work_item_id = None;
         item.updated_at = utc_now();
         lane_write = Some(

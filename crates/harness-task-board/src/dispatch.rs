@@ -62,7 +62,17 @@ pub struct DispatchExecutionSummary {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct DispatchAppliedTask {
     pub board_item_id: String,
-    pub session_id: String,
+    /// Legacy owner, present only when this dispatch reclaimed the Session a
+    /// pre-workspace board item was already linked to.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session_id: Option<String>,
+    /// Durable workspace the started worker belongs to. Set for every fresh
+    /// dispatch; absent only on a legacy item still running under its Session.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace_id: Option<String>,
+    /// Checkout the daemon created for this dispatch.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub working_copy_id: Option<String>,
     pub work_item_id: String,
     pub lifecycle: DispatchLifecycle,
     pub item: TaskBoardItem,
@@ -112,6 +122,20 @@ pub struct TaskBoardWriteWorkflowLaunch {
     pub base_head_revision: String,
     pub planning_result: TaskBoardPlanningResult,
     pub plan_approval: TaskBoardPlanApprovalBinding,
+}
+
+impl DispatchAppliedTask {
+    /// The owner a frozen workflow launch records against.
+    ///
+    /// Workspace first: a fresh dispatch has one and no Session, a legacy one
+    /// has only its Session, so this is the single id both the launch and the
+    /// board item agree on.
+    #[must_use]
+    pub fn launch_owner_id(&self) -> Option<&str> {
+        self.workspace_id
+            .as_deref()
+            .or(self.session_id.as_deref())
+    }
 }
 
 impl DispatchExecutionSummary {

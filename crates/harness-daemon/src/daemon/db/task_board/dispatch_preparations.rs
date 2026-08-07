@@ -37,7 +37,20 @@ pub(crate) enum TaskBoardPreparationRelease {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct TaskBoardDispatchPreparation {
     pub(crate) board_item_id: String,
-    pub(crate) session_id: String,
+    /// The Session this dispatch reclaims, for a board item linked to one
+    /// before workspaces existed. A fresh dispatch leaves it empty and carries
+    /// `working_copy_id` instead.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) session_id: Option<String>,
+    /// Checkout this dispatch reserved. Minted at reservation so a crashed
+    /// preparation retries onto the same directory rather than a second one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) working_copy_id: Option<String>,
+    /// Workspace that checkout turned out to belong to. Unknown at reservation
+    /// - the id is derived from the checkout's own git identity - so
+    /// preparation fills it in before publishing the intent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) workspace_id: Option<String>,
     pub(crate) work_item_id: String,
     pub(crate) workflow_execution_id: String,
     pub(crate) actor: String,
@@ -178,9 +191,15 @@ pub(super) async fn reserve_task_board_dispatch(
     }
     let intent_id = format!("dispatch-intent-{}", Uuid::new_v4().simple());
     let workflow_execution_id = format!("workflow-{}", Uuid::new_v4().simple());
-    let session_id = match &plan.session {
-        SessionIntent::Existing { session_id } => session_id.clone(),
-        SessionIntent::Create { .. } => Uuid::new_v4().to_string(),
+    // Exactly one owner is reserved here. A legacy item keeps running under the
+    // Session it is already linked to; anything else gets a checkout id, and
+    // preparation turns that into a real workspace and worktree.
+    let (session_id, working_copy_id) = match &plan.session {
+        SessionIntent::Existing { session_id } => (Some(session_id.clone()), None),
+        SessionIntent::Create { .. } => (
+            None,
+            Some(format!("working-copy-{}", Uuid::new_v4().simple())),
+        ),
     };
     let workflow_kind = item.workflow_kind;
     // Stamp the owning execution onto the ticket in the same transaction that
@@ -199,6 +218,8 @@ pub(super) async fn reserve_task_board_dispatch(
     let preparation = TaskBoardDispatchPreparation {
         board_item_id: plan.board_item_id.clone(),
         session_id,
+        working_copy_id,
+        workspace_id: None,
         work_item_id: format!("task-board-{}", Uuid::new_v4().simple()),
         workflow_execution_id,
         actor: actor.to_string(),

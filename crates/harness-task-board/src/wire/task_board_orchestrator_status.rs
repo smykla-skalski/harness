@@ -97,6 +97,8 @@ pub fn task_board_orchestrator_applied_task_from_dispatch(
     TaskBoardOrchestratorAppliedTask {
         board_item_id: applied.board_item_id,
         session_id: applied.session_id,
+        workspace_id: applied.workspace_id,
+        working_copy_id: applied.working_copy_id,
         work_item_id: applied.work_item_id,
         item_title: applied.item.title,
     }

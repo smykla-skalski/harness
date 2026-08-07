@@ -9,15 +9,20 @@ use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::http::{
     DaemonHttpState, require_async_db, run_codex_agent_blocking, run_terminal_agent_blocking,
 };
+use crate::daemon::agent_tui::WorkspaceTerminalOwner;
 use crate::daemon::protocol::ManagedAgentSnapshot;
 use crate::daemon::reviews_store::PolicyGraphQueries;
 use crate::task_board::{
     AgentMode, DispatchAppliedTask, TaskBoardLaunchCapability, codex_worker_id, managed_worker_id,
     terminal_worker_id,
 };
+use harness_daemon_db_queries::{
+    AsyncAgentWorkingCopyQueries, WorkspaceManagedAgentKind, WorkspaceMemberRegistration,
+};
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 const DISPATCH_CLAIM_HEARTBEAT_INTERVAL: Duration = Duration::from_secs(10);
+const DISPATCH_WORKER_RUNTIME: &str = "codex";
 
 mod requests;
 use requests::{codex_worker_request, terminal_worker_request};
@@ -110,11 +115,11 @@ async fn start_worker_for_applied_task(
     dispatch_intent_id: &str,
     claim_token: &str,
 ) -> Result<ManagedAgentSnapshot, TaskBoardWorkerStartError> {
-    let session_id = applied.session_id.clone();
+    let owner = worker_lock_owner(applied);
     let worker_id = managed_worker_id(applied, dispatch_intent_id);
     let _guard = state
         .managed_agent_mutation_locks
-        .lock(&session_id, &worker_id)
+        .lock(&owner, &worker_id)
         .await;
     start_worker_for_applied_task_in_lane(
         state,
@@ -140,7 +145,7 @@ async fn start_worker_for_applied_task_in_lane(
         .await
         .map_err(TaskBoardWorkerStartError::uncertain)?;
     if let Some(snapshot) = existing {
-        return recover_same_applied_worker(snapshot, applied)
+        return recover_same_applied_worker(snapshot, applied, worker_id)
             .map_err(TaskBoardWorkerStartError::uncertain);
     }
     // Fail-closed recheck at the shared worker-start seam: this guards the
@@ -176,16 +181,17 @@ async fn start_or_recover_worker(
         Err(error) => error,
     };
     let probe = probe_existing_worker(state, applied, worker_id).await;
-    resolve_start_failure(start_error, probe, applied)
+    resolve_start_failure(start_error, probe, applied, worker_id)
 }
 
 fn resolve_start_failure(
     start_error: CliError,
     probe: Result<Option<ManagedAgentSnapshot>, CliError>,
     applied: &DispatchAppliedTask,
+    worker_id: &str,
 ) -> Result<ManagedAgentSnapshot, TaskBoardWorkerStartError> {
     match probe {
-        Ok(Some(snapshot)) => recover_same_applied_worker(snapshot, applied)
+        Ok(Some(snapshot)) => recover_same_applied_worker(snapshot, applied, worker_id)
             .map_err(TaskBoardWorkerStartError::uncertain),
         Ok(None) => Err(TaskBoardWorkerStartError::from(start_error)),
         Err(probe_error) => Err(TaskBoardWorkerStartError::uncertain_after_start(
@@ -234,11 +240,11 @@ async fn compensate_worker_for_applied_task(
     claim_token: &str,
     reason: Option<&str>,
 ) -> Result<(), CliError> {
-    let session_id = applied.session_id.clone();
+    let owner = worker_lock_owner(applied);
     let managed_worker_id = managed_worker_id(applied, dispatch_intent_id);
     let _guard = state
         .managed_agent_mutation_locks
-        .lock(&session_id, &managed_worker_id)
+        .lock(&owner, &managed_worker_id)
         .await;
     if let Some(reason) = reason {
         db.begin_task_board_dispatch_compensation(
@@ -252,7 +258,16 @@ async fn compensate_worker_for_applied_task(
         db.renew_task_board_dispatch_claim(dispatch_intent_id, claim_token)
             .await?;
     }
-    stop_worker_in_lane(state, applied, managed_worker_id).await
+    stop_worker_in_lane(state, applied, managed_worker_id).await?;
+    // Only after the runtime is down: releasing while a worker is still shutting
+    // down would let the next dispatch claim a directory this one is still in.
+    release_worker_workspace_checkout(
+        db,
+        applied,
+        reason.unwrap_or("task-board dispatch compensated"),
+    )
+    .await;
+    Ok(())
 }
 
 async fn stop_worker_in_lane(
@@ -323,18 +338,112 @@ fn exact_worker_not_found(error: &CliError, mode: AgentMode, worker_id: &str) ->
 fn recover_same_applied_worker(
     snapshot: ManagedAgentSnapshot,
     applied: &DispatchAppliedTask,
+    worker_id: &str,
 ) -> Result<ManagedAgentSnapshot, CliError> {
-    if snapshot.session_id() != applied.session_id {
+    // A workspace-owned runtime reports its workspace where a session id would
+    // go, and a standalone Codex run reports its own run id. Both are the owner
+    // the reclaim has to match; comparing anything else would hand this dispatch
+    // a worker that belongs to another one.
+    let expected = applied_worker_owner(applied, worker_id);
+    if !expected
+        .iter()
+        .any(|owner| owner.as_str() == snapshot.session_id())
+    {
         return Err(CliErrorKind::session_agent_conflict(format!(
-            "managed worker '{}' belongs to session '{}', not reclaimed session '{}'",
+            "managed worker '{}' belongs to '{}', not reclaimed owner '{}'",
             snapshot.agent_id(),
             snapshot.session_id(),
-            applied.session_id,
+            expected.join("' or '"),
         ))
         .into());
     }
     validate_recovered_workflow_worker(&snapshot, applied)?;
     Ok(snapshot)
+}
+
+/// Record the started worker as a member of its workspace team.
+///
+/// The daemon started this process, so it registers the membership itself
+/// rather than waiting for the agent to announce itself the way a Session
+/// auto-join does. Idempotent on the managed identity, so a reclaimed start
+/// updates the existing member instead of adding a second one.
+pub(crate) async fn join_worker_to_workspace(
+    db: &AsyncDaemonDbHandle,
+    applied: &DispatchAppliedTask,
+    worker_id: &str,
+) -> Result<(), CliError> {
+    let Some(workspace_id) = applied.workspace_id.clone() else {
+        return Ok(());
+    };
+    let kind = if applied.item.agent_mode == AgentMode::Interactive {
+        WorkspaceManagedAgentKind::Terminal
+    } else {
+        WorkspaceManagedAgentKind::Codex
+    };
+    db.register_workspace_managed_member(&WorkspaceMemberRegistration {
+        workspace_id,
+        kind,
+        managed_agent_id: worker_id.to_string(),
+        // Both dispatch modes run Codex today - the terminal one through a PTY,
+        // the headless one through the controller - so the runtime family is the
+        // same and only the managed kind above tells them apart.
+        runtime_kind: DISPATCH_WORKER_RUNTIME.to_string(),
+        display_name: format!("Task Board: {}", applied.item.title),
+        assignment_id: Some(applied.work_item_id.clone()),
+    })
+    .await
+    .map(|_| ())
+}
+
+/// Return a failed dispatch's checkout to the pool.
+///
+/// Best effort by design: compensation has already stopped the runtime and
+/// finalized the claim, and a checkout that cannot be released is a leaked
+/// directory rather than a reason to fail the compensation that just succeeded.
+pub(crate) async fn release_worker_workspace_checkout(
+    db: &AsyncDaemonDbHandle,
+    applied: &DispatchAppliedTask,
+    reason: &str,
+) {
+    let Some(working_copy_id) = applied.working_copy_id.as_deref() else {
+        return;
+    };
+    if let Err(error) = db.release_agent_working_copy(working_copy_id, reason).await {
+        tracing::warn!(
+            board_item_id = %applied.board_item_id,
+            working_copy_id,
+            %error,
+            "compensated dispatch left its working copy recorded as live"
+        );
+    }
+}
+
+/// The lane a worker's start and compensation serialize on. Keyed by whichever
+/// owner the dispatch actually has, so two dispatches in one workspace still
+/// contend and a legacy dispatch keeps contending on its Session.
+fn worker_lock_owner(applied: &DispatchAppliedTask) -> String {
+    applied
+        .workspace_id
+        .clone()
+        .or_else(|| applied.session_id.clone())
+        .unwrap_or_else(|| applied.board_item_id.clone())
+}
+
+/// Owner identities a reclaimed worker may legitimately report.
+///
+/// A workspace-owned Codex run names itself, because `start_standalone_run_with_id`
+/// has no owner to name and stamps the run id where a session id would go; the
+/// terminal names its workspace. A legacy dispatch accepts only its Session.
+fn applied_worker_owner(applied: &DispatchAppliedTask, worker_id: &str) -> Vec<String> {
+    let mut owners = Vec::new();
+    if let Some(workspace_id) = applied.workspace_id.clone() {
+        owners.push(workspace_id);
+        owners.push(worker_id.to_string());
+    }
+    if let Some(session_id) = applied.session_id.clone() {
+        owners.push(session_id);
+    }
+    owners
 }
 
 async fn start_worker_by_mode(
@@ -389,9 +498,21 @@ async fn start_codex_worker(
     applied: &DispatchAppliedTask,
     dispatch_intent_id: &str,
 ) -> Result<ManagedAgentSnapshot, CliError> {
-    let session_id = applied.session_id.clone();
     let run_id = codex_worker_id(dispatch_intent_id);
     let request = codex_worker_request(applied, &run_id)?;
+    if applied.workspace_id.is_some() {
+        // No owning Session, so the run identifies itself: `start_standalone_run_with_id`
+        // stamps the run id where a session id would go and takes the checkout
+        // directly, which is exactly what a workspace-owned worker has.
+        let project_dir = worker_checkout(applied)?;
+        return run_codex_agent_blocking(state, "task-board worker start", move |controller| {
+            controller
+                .start_standalone_run_with_id(&project_dir, &request, run_id)
+                .map(ManagedAgentSnapshot::Codex)
+        })
+        .await;
+    }
+    let session_id = legacy_session_id(applied)?;
     run_codex_agent_blocking(state, "task-board worker start", move |controller| {
         controller
             .start_run_with_id(&session_id, &request, run_id)
@@ -405,15 +526,54 @@ async fn start_interactive_worker(
     applied: &DispatchAppliedTask,
     dispatch_intent_id: &str,
 ) -> Result<ManagedAgentSnapshot, CliError> {
-    let session_id = applied.session_id.clone();
     let tui_id = terminal_worker_id(dispatch_intent_id);
     let request = terminal_worker_request(applied, &tui_id)?;
+    if let Some(workspace_id) = applied.workspace_id.clone() {
+        let project_dir = worker_checkout(applied)?;
+        return run_terminal_agent_blocking(state, "task-board worker start", move |manager| {
+            manager
+                .start_in_workspace_with_id(
+                    &WorkspaceTerminalOwner {
+                        workspace_id: &workspace_id,
+                        project_dir: &project_dir,
+                    },
+                    &request,
+                    tui_id,
+                )
+                .map(ManagedAgentSnapshot::Terminal)
+        })
+        .await;
+    }
+    let session_id = legacy_session_id(applied)?;
     run_terminal_agent_blocking(state, "task-board worker start", move |manager| {
         manager
             .start_with_id(&session_id, &request, tui_id)
             .map(ManagedAgentSnapshot::Terminal)
     })
     .await
+}
+
+/// The checkout a workspace-owned worker runs in. Completion writes it onto the
+/// ticket, so an applied task missing it never had a working copy and must not
+/// be started against whatever directory the daemon happens to be in.
+fn worker_checkout(applied: &DispatchAppliedTask) -> Result<String, CliError> {
+    applied.item.workflow.worktree.clone().ok_or_else(|| {
+        CliErrorKind::workflow_io(format!(
+            "task-board item '{}' has no working copy to start its worker in",
+            applied.board_item_id
+        ))
+        .into()
+    })
+}
+
+fn legacy_session_id(applied: &DispatchAppliedTask) -> Result<String, CliError> {
+    applied.session_id.clone().ok_or_else(|| {
+        CliErrorKind::workflow_io(format!(
+            "task-board dispatch for item '{}' has neither a workspace nor a Session owner",
+            applied.board_item_id
+        ))
+        .into()
+    })
 }
 
 const fn launch_capability(mode: AgentMode) -> Option<TaskBoardLaunchCapability> {

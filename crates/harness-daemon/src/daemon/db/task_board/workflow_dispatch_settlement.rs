@@ -305,7 +305,7 @@ async fn screen_workflow_dispatch_in_tx(
         revision,
     )
     .await?;
-    ensure_dispatch_item_startable(&item, &session_id, &work_item_id, Some(&execution_id))?;
+    ensure_dispatch_item_startable(&item, &applied, Some(&execution_id))?;
     item.workflow.current_step_id = Some("workflow_prepared".into());
     item.updated_at = utc_now();
     Ok(PreparedWorkflowDispatch {

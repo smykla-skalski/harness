@@ -24,6 +24,8 @@ use crate::{AgentTuiInput, AgentTuiInputSequence};
 
 pub struct AgentTuiSnapshotContext<'a> {
     pub session_id: &'a str,
+    /// Durable owner when this terminal has no Session behind it.
+    pub workspace_id: Option<&'a str>,
     pub agent_id: &'a str,
     pub tui_id: &'a str,
     pub profile: &'a AgentTuiLaunchProfile,
@@ -47,6 +49,7 @@ pub fn snapshot_from_process(
     Ok(AgentTuiSnapshot {
         tui_id: context.tui_id.to_string(),
         session_id: context.session_id.to_string(),
+        workspace_id: context.workspace_id.map(ToString::to_string),
         agent_id: context.agent_id.to_string(),
         runtime: context.profile.runtime.clone(),
         status,

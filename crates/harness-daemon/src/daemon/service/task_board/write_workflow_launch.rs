@@ -219,11 +219,11 @@ pub(crate) async fn validate_write_workflow_launch(
         && snapshot.reviewer == launch.resolved_reviewers
         && item_snapshot.item_revision == launch.prepared_item_revision
         && launch.task_id == applied.work_item_id
-        && launch.run_context.session_id == applied.session_id
+        && Some(launch.run_context.session_id.as_str()) == applied.launch_owner_id()
         && launch.run_context.title == item.title
         && launch.run_context.body == item.body
         && launch.run_context.tags == item.tags
-        && item.session_id.as_deref() == Some(launch.run_context.session_id.as_str())
+        && item.owner_id() == Some(launch.run_context.session_id.as_str())
         && item.workflow.worktree.as_deref() == Some(launch.run_context.worktree.as_str())
         && result == launch.planning_result
         && approval == launch.plan_approval

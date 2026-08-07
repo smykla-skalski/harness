@@ -3,10 +3,11 @@ use crate::daemon::protocol::ManagedAgentSnapshot;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::{
-    TaskBoardWorkerStartError, ensure_spawn_kill_switch_clear, launch_capability,
-    managed_admission_owner_id, managed_worker_id, probe_existing_worker,
-    recover_same_applied_worker, start_worker_for_applied_task_in_lane, stop_worker_in_lane,
-    validate_workflow_launch,
+    TaskBoardWorkerStartError, ensure_spawn_kill_switch_clear, join_worker_to_workspace,
+    launch_capability, managed_admission_owner_id, managed_worker_id, probe_existing_worker,
+    recover_same_applied_worker, release_worker_workspace_checkout,
+    start_worker_for_applied_task_in_lane, stop_worker_in_lane, validate_workflow_launch,
+    worker_lock_owner,
 };
 use crate::daemon::db::ClaimedTaskBoardDispatch;
 use crate::daemon::db::task_board::prelude::*;
@@ -23,7 +24,7 @@ pub(crate) async fn settle_claimed_task_board_worker(
     let worker_id = managed_worker_id(&claim.applied, &claim.intent_id);
     let _guard = state
         .managed_agent_mutation_locks
-        .lock(&claim.applied.session_id, &worker_id)
+        .lock(&worker_lock_owner(&claim.applied), &worker_id)
         .await;
     let worker = match start_worker_for_applied_task_in_lane(
         state,
@@ -58,7 +59,10 @@ async fn finish_worker_settlement(
         return compensate_settlement_failure(state, db, claim, worker_id, error).await;
     }
     match complete_worker_settlement(db, claim).await {
-        Ok(()) => Ok(Some(worker)),
+        Ok(()) => {
+            join_worker_to_workspace(db, &claim.applied, worker_id).await?;
+            Ok(Some(worker))
+        }
         Err(error) => {
             // Boxed to keep this frame out of the caller's future; see above.
             Box::pin(adopt_committed_settlement(
@@ -81,6 +85,7 @@ async fn adopt_committed_settlement(
 ) -> Result<Option<ManagedAgentSnapshot>, CliError> {
     if completion_was_committed(db, claim).await? {
         claim.applied.item = db.task_board_item(&claim.applied.board_item_id).await?;
+        join_worker_to_workspace(db, &claim.applied, worker_id).await?;
         return Ok(Some(worker));
     }
     compensate_settlement_failure(state, db, claim, worker_id, error).await
@@ -94,7 +99,7 @@ async fn settle_workflow_before_start(
     let worker_id = managed_worker_id(&claim.applied, &claim.intent_id);
     let _guard = state
         .managed_agent_mutation_locks
-        .lock(&claim.applied.session_id, &worker_id)
+        .lock(&worker_lock_owner(&claim.applied), &worker_id)
         .await;
     let existing = probe_recovered_workflow_worker(state, claim, &worker_id).await?;
     if existing.is_none()
@@ -124,7 +129,7 @@ async fn probe_recovered_workflow_worker(
                 "workflow worker recovery probe was uncertain: {error}"
             ))
         })?
-        .map(|snapshot| recover_same_applied_worker(snapshot, &claim.applied))
+        .map(|snapshot| recover_same_applied_worker(snapshot, &claim.applied, worker_id))
         .transpose()?;
     Ok(existing)
 }
@@ -310,6 +315,10 @@ async fn compensate_settlement_failure(
     )
     .await
     .map_err(|compensation_error| settlement_compensation_error(&error, &compensation_error))?;
+    // The checkout goes last: the runtime is already stopped and the claim is
+    // finalized, so nothing is left holding the directory. Doing it earlier
+    // would pull the worktree out from under a worker still shutting down.
+    release_worker_workspace_checkout(db, &claim.applied, &error.to_string()).await;
     Err(error)
 }
 

@@ -239,6 +239,7 @@ mod task_board_workflow_review_tests;
 pub(crate) mod task_board_workflow_test_support;
 mod task_board_working_copies;
 mod wake_route;
+pub(crate) mod workspace_checkout;
 
 pub use crate::reviews::fetch_review_avatar;
 pub use adopt::adopt_session_record;

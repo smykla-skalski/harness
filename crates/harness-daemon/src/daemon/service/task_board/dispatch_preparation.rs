@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::time::Duration;
 
 use futures_util::FutureExt;
@@ -12,21 +12,13 @@ use crate::daemon::db::{
     TaskBoardPreparationUnavailable,
 };
 use crate::daemon::db_handle::AsyncDaemonDbHandle;
-use crate::daemon::index::{self, DiscoveredProject};
-use crate::daemon::protocol::{SessionStartRequest, TaskBoardDispatchRequest, TaskCreateRequest};
-use crate::daemon::service::{
-    build_log_entry, create_task_with_id_async, session_service, start_session_direct_async,
-};
-use crate::sandbox;
-use crate::session::adopter::SessionAdopter;
-use crate::session::storage as session_storage;
-use crate::session::types::{CONTROL_PLANE_ACTOR_ID, SessionState};
+use crate::daemon::protocol::{TaskBoardDispatchRequest, TaskCreateRequest};
+use crate::daemon::service::create_task_with_id_async;
+use crate::session::types::CONTROL_PLANE_ACTOR_ID;
 use crate::task_board::{
     DispatchAppliedTask, DispatchFailureKind, DispatchPlan, SessionIntent,
     TaskBoardReadOnlyWorkflowLaunch, TaskBoardWriteWorkflowLaunch,
 };
-use crate::workspace::layout::SessionLayout;
-use crate::workspace::worktree::WorktreeController;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 const PREPARATION_HEARTBEAT_INTERVAL: Duration = Duration::from_secs(10);
@@ -132,8 +124,13 @@ pub(crate) async fn prepare_claimed_task_board_dispatch(
         }
     };
     let checkout = prepared?;
+    // The workspace id is only known once the checkout exists, so publication
+    // reads it off a claim carrying what preparation just learned rather than
+    // what reservation guessed.
+    let mut claim = claim.clone();
+    claim.preparation.workspace_id = checkout.workspace_id;
     db.complete_task_board_dispatch_preparation_with_workflow(
-        claim,
+        &claim,
         &checkout.branch,
         &checkout.worktree,
         checkout.read_only_workflow,
@@ -146,6 +143,7 @@ pub(crate) async fn prepare_claimed_task_board_dispatch(
 struct DispatchCheckout {
     branch: String,
     worktree: String,
+    workspace_id: Option<String>,
     read_only_workflow: Option<TaskBoardReadOnlyWorkflowLaunch>,
     write_workflow: Option<Box<TaskBoardWriteWorkflowLaunch>>,
 }
@@ -154,33 +152,12 @@ async fn prepare_dispatch_side_effects(
     db: &AsyncDaemonDbHandle,
     claim: &ClaimedTaskBoardDispatchPreparation,
 ) -> Result<DispatchCheckout, (DispatchFailureKind, CliError)> {
-    ensure_dispatch_session(db, claim)
-        .await
-        .map_err(|error| (DispatchFailureKind::CreateSession, error))?;
-    ensure_dispatch_task(db, claim)
-        .await
-        .map_err(|error| (DispatchFailureKind::CreateTask, error))?;
-    let resolved = db
-        .resolve_session(&claim.preparation.session_id)
-        .await
-        .map_err(|error| (DispatchFailureKind::CreateSession, error))?
-        .ok_or_else(|| {
-            (
-                DispatchFailureKind::CreateSession,
-                CliError::from(CliErrorKind::session_not_active(format!(
-                    "dispatch session '{}' no longer exists",
-                    claim.preparation.session_id
-                ))),
-            )
-        })?;
-    let worktree = canonical_dispatch_worktree(resolved.state.worktree_path.clone())
-        .await
-        .map_err(|error| (DispatchFailureKind::CreateSession, error))?;
+    let owner = prepare_dispatch_owner(db, claim).await?;
     let read_only_workflow = super::read_only_workflow_launch::prepare_read_only_workflow_launch(
         db,
         &claim.preparation.board_item_id,
-        &claim.preparation.session_id,
-        &worktree,
+        &owner.launch_owner_id,
+        &owner.worktree,
         claim.preparation.source_item_revision,
     )
     .boxed()
@@ -189,20 +166,79 @@ async fn prepare_dispatch_side_effects(
     let write_workflow = super::write_workflow_launch::prepare_write_workflow_launch(
         db,
         &claim.preparation.board_item_id,
-        &claim.preparation.session_id,
+        &owner.launch_owner_id,
         &claim.preparation.work_item_id,
         &claim.preparation.workflow_execution_id,
-        &worktree,
+        &owner.worktree,
         claim.preparation.source_item_revision,
     )
     .boxed()
     .await
     .map_err(|error| (DispatchFailureKind::LinkItem, error))?;
     Ok(DispatchCheckout {
-        branch: resolved.state.branch_ref,
-        worktree,
+        branch: owner.branch,
+        worktree: owner.worktree,
+        workspace_id: owner.workspace_id,
         read_only_workflow,
         write_workflow,
+    })
+}
+
+/// The checkout this dispatch will run in, and who owns it.
+struct DispatchOwner {
+    branch: String,
+    worktree: String,
+    workspace_id: Option<String>,
+    /// Correlation id the workflow launch records against. A legacy dispatch
+    /// keeps naming its Session; a fresh one names its workspace, which is the
+    /// owner that actually exists for it.
+    launch_owner_id: String,
+}
+
+/// Give the dispatch a checkout to run in.
+///
+/// A board item already linked to a Session keeps using it, so work started
+/// before workspaces existed stays dispatchable. Everything else provisions a
+/// durable workspace and a checkout of its own, and creates no Session row and
+/// no Session task on the way.
+async fn prepare_dispatch_owner(
+    db: &AsyncDaemonDbHandle,
+    claim: &ClaimedTaskBoardDispatchPreparation,
+) -> Result<DispatchOwner, (DispatchFailureKind, CliError)> {
+    if let Some(session_id) = claim.preparation.session_id.clone() {
+        return prepare_legacy_session_owner(db, claim, session_id).await;
+    }
+    workspace_owner::prepare_workspace_owner(db, claim).await
+}
+
+async fn prepare_legacy_session_owner(
+    db: &AsyncDaemonDbHandle,
+    claim: &ClaimedTaskBoardDispatchPreparation,
+    session_id: String,
+) -> Result<DispatchOwner, (DispatchFailureKind, CliError)> {
+    ensure_dispatch_task(db, claim, &session_id)
+        .await
+        .map_err(|error| (DispatchFailureKind::CreateTask, error))?;
+    let resolved = db
+        .resolve_session(&session_id)
+        .await
+        .map_err(|error| (DispatchFailureKind::CreateSession, error))?
+        .ok_or_else(|| {
+            (
+                DispatchFailureKind::CreateSession,
+                CliError::from(CliErrorKind::session_not_active(format!(
+                    "dispatch session '{session_id}' no longer exists"
+                ))),
+            )
+        })?;
+    let worktree = canonical_dispatch_worktree(resolved.state.worktree_path.clone())
+        .await
+        .map_err(|error| (DispatchFailureKind::CreateSession, error))?;
+    Ok(DispatchOwner {
+        branch: resolved.state.branch_ref,
+        worktree,
+        workspace_id: None,
+        launch_owner_id: session_id,
     })
 }
 
@@ -242,163 +278,20 @@ fn heartbeat_error(result: Result<Result<(), CliError>, JoinError>) -> CliError 
     }
 }
 
-async fn ensure_dispatch_session(
-    db: &AsyncDaemonDbHandle,
-    claim: &ClaimedTaskBoardDispatchPreparation,
-) -> Result<(), CliError> {
-    let preparation = &claim.preparation;
-    if db.resolve_session(&preparation.session_id).await?.is_some() {
-        return Ok(());
-    }
-    let SessionIntent::Create { title, context, .. } = &preparation.plan.session else {
-        return Err(CliErrorKind::session_not_active(format!(
-            "dispatch session '{}' no longer exists",
-            preparation.session_id
-        ))
-        .into());
-    };
-    let project_dir = preparation.project_dir.clone().ok_or_else(|| {
-        CliErrorKind::workflow_io("task-board dispatch preparation has no project_dir")
-    })?;
-    if recover_prepared_session(db, claim, title, context.as_deref(), &project_dir).await? {
-        return Ok(());
-    }
-    start_session_direct_async(
-        &SessionStartRequest {
-            title: title.clone(),
-            context: context.clone().unwrap_or_else(|| title.clone()),
-            session_id: Some(preparation.session_id.clone()),
-            project_dir,
-            policy_preset: None,
-            base_ref: None,
-        },
-        db,
-    )
-    .await?;
-    Ok(())
-}
-
-async fn recover_prepared_session(
-    db: &AsyncDaemonDbHandle,
-    claim: &ClaimedTaskBoardDispatchPreparation,
-    title: &str,
-    context: Option<&str>,
-    project_dir: &str,
-) -> Result<bool, CliError> {
-    let preparation = &claim.preparation;
-    let recovery = PreparedSessionRecoveryRequest {
-        session_id: preparation.session_id.clone(),
-        title: title.to_string(),
-        context: context.unwrap_or(title).to_string(),
-        project_dir: project_dir.to_string(),
-    };
-    let recovered = spawn_blocking(move || recover_session_artifacts(&recovery))
-        .await
-        .map_err(|error| {
-            CliErrorKind::workflow_io(format!("join dispatch recovery worker: {error}"))
-        })??;
-    let Some(recovered) = recovered else {
-        return Ok(false);
-    };
-    // The origin-touching project discovery already ran inside the security scope
-    // in recover_session_artifacts; only the DB write remains here.
-    db.sync_project(&recovered.project).await?;
-    let project_id = recovered.project.project_id.clone();
-    db.create_session_record(&project_id, &recovered.state)
-        .await?;
-    db.append_log_entry(&build_log_entry(
-        &recovered.state.session_id,
-        session_service::log_session_started(title, context.unwrap_or(title)),
-        None,
-        None,
-    ))
-    .await?;
-    db.bump_change(&recovered.state.session_id).await?;
-    db.bump_change("global").await?;
-    Ok(true)
-}
-
-struct PreparedSessionRecoveryRequest {
-    session_id: String,
-    title: String,
-    context: String,
-    project_dir: String,
-}
-
-struct RecoveredPreparedSession {
-    project: DiscoveredProject,
-    state: SessionState,
-}
-
-fn recover_session_artifacts(
-    request: &PreparedSessionRecoveryRequest,
-) -> Result<Option<RecoveredPreparedSession>, CliError> {
-    // Sandboxed callers store a bookmark id as project_dir; resolve it the way
-    // session_setup does and hold the scope while the origin worktree below is
-    // probed or destroyed and its project identity is discovered. The scope
-    // drops when this function returns, so every read of the origin path must
-    // finish before then - the caller only writes the discovered project to
-    // the DB, which does not touch the origin.
-    let project_scope = sandbox::resolve_project_input(&request.project_dir)?;
-    let origin = project_scope.path().to_path_buf();
-    let layout = session_storage::layout_from_project_dir(&origin, &request.session_id)?;
-    if !layout.state_file().exists() {
-        clear_incomplete_session_artifacts(&origin, &layout)?;
-        return Ok(None);
-    }
-    let probed = SessionAdopter::probe(&layout.session_root()).map_err(CliError::from)?;
-    let state = probed.state();
-    if state.session_id != request.session_id
-        || state.title != request.title
-        || state.context != request.context
-        || state.origin_path != origin
-    {
-        return Err(CliErrorKind::session_agent_conflict(format!(
-            "prepared dispatch session '{}' does not match its durable reservation",
-            request.session_id
-        ))
-        .into());
-    }
-    session_storage::register_active(&layout)?;
-    // Auxiliary discovery file; the DB sync in the caller is authoritative, so a
-    // write hiccup here must not block an otherwise-valid recovery. Matches the
-    // best-effort call on the session-start path.
-    let _ = session_storage::record_project_origin(&origin);
-    let project = index::discovered_project_for_checkout(&origin);
-    Ok(Some(RecoveredPreparedSession {
-        project,
-        state: state.clone(),
-    }))
-}
-
-fn clear_incomplete_session_artifacts(
-    origin: &Path,
-    layout: &SessionLayout,
-) -> Result<(), CliError> {
-    if layout.workspace().exists() {
-        WorktreeController::destroy(origin, layout).map_err(|error| {
-            CliErrorKind::workflow_io(format!(
-                "remove incomplete prepared dispatch session: {error}"
-            ))
-        })?;
-    } else if layout.session_root().exists() {
-        fs_err::remove_dir_all(layout.session_root()).map_err(|error| {
-            CliErrorKind::workflow_io(format!(
-                "remove incomplete prepared dispatch directory: {error}"
-            ))
-        })?;
-    }
-    Ok(())
-}
-
+/// Create the Session task a legacy dispatch's worker reports progress into.
+///
+/// Only reached for a board item already linked to a Session. A fresh dispatch
+/// has no Session to hang a task off and does not create one - the board item
+/// and its execution are the work record now.
 async fn ensure_dispatch_task(
     db: &AsyncDaemonDbHandle,
     claim: &ClaimedTaskBoardDispatchPreparation,
+    session_id: &str,
 ) -> Result<(), CliError> {
     let preparation = &claim.preparation;
     let task = &preparation.plan.task;
     create_task_with_id_async(
-        &preparation.session_id,
+        session_id,
         &preparation.work_item_id,
         &TaskCreateRequest {
             actor: preparation.actor.clone(),
@@ -422,11 +315,14 @@ fn dispatch_project_dir(
     }
     request.project_dir.clone().map(Some).ok_or_else(|| {
         CliErrorKind::workflow_io(
-            "task-board dispatch requires project_dir when a session must be created",
+            "task-board dispatch requires project_dir when a working copy must be created",
         )
         .into()
     })
 }
+
+#[path = "dispatch_preparation_workspace_owner.rs"]
+mod workspace_owner;
 
 #[cfg(test)]
 mod tests {

@@ -64,10 +64,18 @@ pub struct TaskBoardItem {
     pub planning: PlanningState,
     #[serde(default, skip_serializing_if = "TaskBoardWorkflowState::is_default")]
     pub workflow: TaskBoardWorkflowState,
+    /// Legacy owner. Set only on items dispatched before the workspace owners
+    /// below existed; a fresh dispatch leaves it empty and fills those instead.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub work_item_id: Option<String>,
+    /// Durable workspace the dispatched worker belongs to.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace_id: Option<String>,
+    /// Checkout the daemon created for that workspace to run this item in.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub working_copy_id: Option<String>,
     #[serde(default)]
     pub usage: TaskUsage,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -101,6 +109,14 @@ pub enum TaskBoardTombstoneCause {
 }
 
 impl TaskBoardItem {
+    /// The owner a dispatched item is linked to, whichever kind it has.
+    #[must_use]
+    pub fn owner_id(&self) -> Option<&str> {
+        self.workspace_id
+            .as_deref()
+            .or(self.session_id.as_deref())
+    }
+
     #[must_use]
     pub fn new(id: String, title: String, body: String, now: String) -> Self {
         Self {
@@ -125,6 +141,8 @@ impl TaskBoardItem {
             planning: PlanningState::default(),
             workflow: TaskBoardWorkflowState::default(),
             session_id: None,
+            workspace_id: None,
+            working_copy_id: None,
             work_item_id: None,
             usage: TaskUsage::default(),
             parent_item_id: None,
