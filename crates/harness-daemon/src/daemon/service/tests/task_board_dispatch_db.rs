@@ -4,7 +4,6 @@ use crate::daemon::db::{ReservedTaskBoardDispatch, approved_write_item};
 use harness_daemon_db_queries::AsyncAgentWorkingCopyQueries;
 use std::collections::HashMap;
 
-use crate::daemon::db::prelude::*;
 use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
@@ -186,6 +185,102 @@ async fn dispatch_resume_reclaim_and_assert(crashed: CrashedDispatchPreparation)
         std::path::Path::new(&recorded.worktree_path).is_dir(),
         "the recorded checkout must exist on disk"
     );
+}
+
+/// A board item linked to a Session before workspaces existed must keep
+/// dispatching through that Session. Its work is already running there, and
+/// re-owning it mid-flight would strand the agents that joined it.
+#[test]
+fn a_legacy_session_linked_item_still_dispatches_through_its_session() {
+    with_temp_project(|project| {
+        let runtime = tokio::runtime::Runtime::new().expect("runtime");
+        runtime.block_on(async {
+            let db = crate::daemon::db::AsyncDaemonDb::connect(
+                &project
+                    .parent()
+                    .expect("project parent")
+                    .join("legacy.sqlite"),
+            )
+            .await
+            .expect("open async daemon db");
+            let db = AsyncDaemonDbHandle(db);
+            let session = crate::daemon::service::start_session_direct_async(
+                &crate::daemon::protocol::SessionStartRequest {
+                    title: "Legacy owner".into(),
+                    context: "Started before workspaces existed".into(),
+                    session_id: None,
+                    project_dir: project.to_string_lossy().into_owned(),
+                    policy_preset: None,
+                    base_ref: None,
+                },
+                &db,
+            )
+            .await
+            .expect("start the legacy session");
+
+            let mut item = TaskBoardItem::new(
+                "dispatch-legacy-session".into(),
+                "Keep the legacy owner".into(),
+                "Dispatch against an existing Session".into(),
+                "2026-08-07T10:00:00Z".into(),
+            );
+            item.session_id = Some(session.session_id.clone());
+            db.create_task_board_item(item.clone())
+                .await
+                .expect("create legacy-linked item");
+            let item = db
+                .task_board_item("dispatch-legacy-session")
+                .await
+                .expect("load legacy-linked item");
+            let plan = build_dispatch_plans_with_policy(
+                &[item],
+                None,
+                None,
+                crate::task_board::SpawnGateSwitches::default(),
+                &HashMap::new(),
+            )
+            .remove(0);
+            let reserved = db
+                .reserve_task_board_dispatch(
+                    &plan,
+                    crate::session::types::CONTROL_PLANE_ACTOR_ID,
+                    None,
+                    false,
+                )
+                .await
+                .expect("reserve the legacy dispatch");
+            let intent_id = match reserved {
+                ReservedTaskBoardDispatch::Preparing { intent_id, .. } => intent_id,
+                other => panic!("unexpected reservation: {other:?}"),
+            };
+            let claim = db
+                .claim_task_board_dispatch_preparation(&intent_id)
+                .await
+                .expect("claim the legacy preparation")
+                .expect("pending legacy preparation");
+            let applied = Box::pin(task_board::prepare_claimed_task_board_dispatch(&db, &claim))
+                .await
+                .expect("prepare the legacy dispatch");
+
+            assert_eq!(applied.session_id.as_deref(), Some(session.session_id.as_str()));
+            assert_eq!(applied.workspace_id, None);
+            assert_eq!(applied.working_copy_id, None);
+            let copies = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM agent_working_copies")
+                .fetch_one(db.pool())
+                .await
+                .expect("count working copies");
+            assert_eq!(copies, 0, "a legacy dispatch provisions no working copy");
+            let resolved = db
+                .resolve_session(&session.session_id)
+                .await
+                .expect("resolve legacy session")
+                .expect("legacy session exists");
+            assert!(
+                resolved.state.tasks.contains_key(&applied.work_item_id),
+                "the legacy path still creates the Session task its worker reports into"
+            );
+        });
+    });
 }
 
 #[test]
