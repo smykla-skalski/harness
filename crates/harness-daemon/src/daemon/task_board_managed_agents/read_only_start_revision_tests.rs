@@ -15,7 +15,7 @@ use crate::task_board::{
 };
 
 use super::start_authorization_test_support::StartAuthorizationPause;
-use super::test_support::{codex_snapshot, seed_session, test_http_state};
+use super::test_support::{codex_snapshot, seed_owner_session, test_http_state};
 use super::{
     codex_worker_request, managed_worker_id, settle_claimed_task_board_worker,
     start_worker_for_applied_task,
@@ -35,7 +35,7 @@ use read_only_start_revision_support::{
 async fn workflow_dispatch_persists_before_any_codex_start() {
     let (state, mut claim, _worktree) = Box::pin(claimed_read_only_dispatch()).await;
     let db = state.async_db.get().cloned().expect("test async db");
-    seed_session(&db, claim.applied.session_id.as_deref().expect("this fixture dispatches through a Session")).await;
+    seed_owner_session(&db, &claim.applied).await;
 
     let settlement = settle_claimed_task_board_worker(&state, &db, &mut claim)
         .await
@@ -480,7 +480,7 @@ async fn seed_exact_read_only_worker(
     claim: &ClaimedTaskBoardDispatch,
     status: CodexRunStatus,
 ) -> crate::daemon::protocol::CodexRunSnapshot {
-    seed_session(db, claim.applied.session_id.as_deref().expect("this fixture dispatches through a Session")).await;
+    seed_owner_session(db, &claim.applied).await;
     let worker_id = managed_worker_id(&claim.applied, &claim.intent_id);
     let request = codex_worker_request(&claim.applied, &worker_id).expect("render worker request");
     let launch = claim
@@ -488,7 +488,7 @@ async fn seed_exact_read_only_worker(
         .read_only_workflow
         .as_ref()
         .expect("read-only launch");
-    let mut snapshot = codex_snapshot(status, claim.applied.session_id.as_deref().expect("this fixture dispatches through a Session"));
+    let mut snapshot = codex_snapshot(status, claim.applied.launch_owner_id().expect("a dispatched task has an owner"));
     snapshot.run_id = worker_id;
     snapshot.board_item_id = Some(claim.applied.board_item_id.clone());
     snapshot.workflow_execution_id = claim.applied.item.workflow.execution_id.clone();

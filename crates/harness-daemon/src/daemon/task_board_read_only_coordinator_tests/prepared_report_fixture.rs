@@ -57,10 +57,17 @@ pub(super) async fn seed_dispatched_initial_report(label: &str) -> Fixture {
         .expect("claim dispatched report preparation")
         .expect("pending dispatched report preparation");
     let fixture_root = test.path.parent().expect("prepared report fixture root");
+    // The Session here only supplies a real worktree to complete against; the
+    // dispatch itself is workspace-owned, so the launch records that owner.
+    let owner = preparation
+        .preparation
+        .launch_owner_id()
+        .expect("a prepared dispatch has an owner")
+        .to_string();
     let session =
-        start_dispatch_session(&test.db, fixture_root, preparation.preparation.session_id.as_deref().expect("this fixture dispatches through a Session")).await;
+        start_dispatch_session(&test.db, fixture_root, &uuid::Uuid::new_v4().to_string()).await;
     let worktree = session.worktree_path.to_string_lossy().into_owned();
-    let launch = launch(&test.db, &item_id, &session).await;
+    let launch = launch(&test.db, &item_id, &session, &owner).await;
     let applied = test
         .db
         .complete_task_board_dispatch_preparation_with_workflow(
@@ -151,6 +158,7 @@ async fn launch(
     db: &AsyncDaemonDbHandle,
     item_id: &str,
     session: &SessionState,
+    owner: &str,
 ) -> TaskBoardReadOnlyWorkflowLaunch {
     let snapshot = db
         .task_board_item_snapshot(item_id)
@@ -175,7 +183,7 @@ async fn launch(
         prepared_item_revision: snapshot.item_revision,
         run_context: TaskBoardReadOnlyRunContext {
             schema_version: TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION,
-            session_id: session.session_id.clone(),
+            session_id: owner.to_string(),
             title: snapshot.item.title,
             body: snapshot.item.body,
             tags: snapshot.item.tags,

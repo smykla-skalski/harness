@@ -1,6 +1,6 @@
 use super::read_only_start_revision_tests::{claimed_read_only_dispatch, intent_status};
 use super::settle_claimed_task_board_worker;
-use super::test_support::seed_session;
+use super::test_support::seed_owner_session;
 use super::workflow_prepared_terminal_tests::claim_local_target_and_start;
 use crate::daemon::db::prelude::*;
 use crate::daemon::db::task_board::prelude::*;
@@ -15,7 +15,7 @@ use crate::task_board::{
 async fn terminal_local_start_charges_prepared_admission_before_release() {
     let (state, mut claim, _worktree) = Box::pin(claimed_read_only_dispatch()).await;
     let db = state.async_db.get().cloned().expect("test async db");
-    seed_session(&db, claim.applied.session_id.as_deref().expect("this fixture dispatches through a Session")).await;
+    seed_owner_session(&db, &claim.applied).await;
     settle_claimed_task_board_worker(&state, &db, &mut claim)
         .await
         .expect("prepare workflow dispatch");

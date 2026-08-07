@@ -3,7 +3,7 @@ use super::read_only_start_revision_tests::{
     intent_status,
 };
 use super::settle_claimed_task_board_worker;
-use super::test_support::{codex_snapshot, seed_session};
+use super::test_support::{codex_snapshot, seed_owner_session};
 use crate::daemon::db::prelude::*;
 use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::protocol::CodexRunStatus;
@@ -18,7 +18,7 @@ use crate::task_board::{
 async fn confirmed_local_start_atomically_completes_prepared_admission() {
     let (state, mut claim, _worktree) = Box::pin(claimed_read_only_dispatch()).await;
     let db = state.async_db.get().cloned().expect("test async db");
-    seed_session(&db, claim.applied.session_id.as_deref().expect("this fixture dispatches through a Session")).await;
+    seed_owner_session(&db, &claim.applied).await;
     settle_claimed_task_board_worker(&state, &db, &mut claim)
         .await
         .expect("prepare workflow dispatch");
@@ -43,7 +43,7 @@ async fn confirmed_local_start_atomically_completes_prepared_admission() {
     .await
     .expect("claim local target")
     .expect("new local target claim");
-    let mut run = codex_snapshot(CodexRunStatus::Running, claim.applied.session_id.as_deref().expect("this fixture dispatches through a Session"));
+    let mut run = codex_snapshot(CodexRunStatus::Running, claim.applied.launch_owner_id().expect("a dispatched task has an owner"));
     run.run_id = claimed_attempt.idempotency_key.clone();
     run.board_item_id = Some(claim.applied.board_item_id.clone());
     run.workflow_execution_id = Some(execution_id.into());
@@ -69,7 +69,7 @@ async fn confirmed_local_start_atomically_completes_prepared_admission() {
 async fn unconfigured_start_authorization_survives_policy_enablement() {
     let (state, mut claim, _worktree) = Box::pin(claimed_read_only_dispatch_without_policy()).await;
     let db = state.async_db.get().cloned().expect("test async db");
-    seed_session(&db, claim.applied.session_id.as_deref().expect("this fixture dispatches through a Session")).await;
+    seed_owner_session(&db, &claim.applied).await;
     settle_claimed_task_board_worker(&state, &db, &mut claim)
         .await
         .expect("prepare workflow dispatch");
@@ -111,7 +111,7 @@ async fn unconfigured_start_authorization_survives_policy_enablement() {
 async fn configured_start_rejects_missing_frozen_admission_evidence() {
     let (state, mut claim, _worktree) = Box::pin(claimed_read_only_dispatch()).await;
     let db = state.async_db.get().cloned().expect("test async db");
-    seed_session(&db, claim.applied.session_id.as_deref().expect("this fixture dispatches through a Session")).await;
+    seed_owner_session(&db, &claim.applied).await;
     settle_claimed_task_board_worker(&state, &db, &mut claim)
         .await
         .expect("prepare workflow dispatch");
@@ -153,7 +153,7 @@ async fn configured_start_rejects_missing_frozen_admission_evidence() {
 async fn expired_first_start_reservation_is_reevaluated_before_local_target() {
     let (state, mut claim, _worktree) = Box::pin(claimed_read_only_dispatch()).await;
     let db = state.async_db.get().cloned().expect("test async db");
-    seed_session(&db, claim.applied.session_id.as_deref().expect("this fixture dispatches through a Session")).await;
+    seed_owner_session(&db, &claim.applied).await;
     settle_claimed_task_board_worker(&state, &db, &mut claim)
         .await
         .expect("prepare workflow dispatch");
@@ -218,7 +218,7 @@ async fn expired_first_start_reservation_is_reevaluated_before_local_target() {
 async fn blocked_expired_first_start_settles_durably_without_io() {
     let (state, mut claim, _worktree) = Box::pin(claimed_read_only_dispatch()).await;
     let db = state.async_db.get().cloned().expect("test async db");
-    seed_session(&db, claim.applied.session_id.as_deref().expect("this fixture dispatches through a Session")).await;
+    seed_owner_session(&db, &claim.applied).await;
     settle_claimed_task_board_worker(&state, &db, &mut claim)
         .await
         .expect("prepare workflow dispatch");
@@ -271,7 +271,7 @@ async fn blocked_expired_first_start_settles_durably_without_io() {
 async fn terminal_before_first_target_closes_prepared_dispatch_and_reservation() {
     let (state, mut claim, _worktree) = Box::pin(claimed_read_only_dispatch()).await;
     let db = state.async_db.get().cloned().expect("test async db");
-    seed_session(&db, claim.applied.session_id.as_deref().expect("this fixture dispatches through a Session")).await;
+    seed_owner_session(&db, &claim.applied).await;
     settle_claimed_task_board_worker(&state, &db, &mut claim)
         .await
         .expect("prepare workflow dispatch");
@@ -417,7 +417,7 @@ pub(super) async fn claim_local_target_and_start(
     .await
     .expect("claim local target")
     .expect("new local target claim");
-    let mut run = codex_snapshot(CodexRunStatus::Running, claim.applied.session_id.as_deref().expect("this fixture dispatches through a Session"));
+    let mut run = codex_snapshot(CodexRunStatus::Running, claim.applied.launch_owner_id().expect("a dispatched task has an owner"));
     run.run_id = claimed_attempt.idempotency_key;
     run.board_item_id = Some(claim.applied.board_item_id.clone());
     run.workflow_execution_id = Some(execution_id.into());

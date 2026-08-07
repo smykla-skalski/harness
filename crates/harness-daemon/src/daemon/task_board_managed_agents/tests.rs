@@ -16,7 +16,7 @@ use crate::task_board::{
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::test_support::{
-    applied_task, codex_snapshot, seed_session, terminal_snapshot, test_http_state,
+    applied_task, codex_snapshot, seed_owner_session, terminal_snapshot, test_http_state,
 };
 use super::{
     begin_worker_compensation, codex_worker_id, codex_worker_request, exact_worker_not_found,
@@ -343,7 +343,7 @@ fn read_only_recovery_rejects_a_conflicting_durable_run() {
     applied.read_only_workflow = Some(review_launch());
     let run_id = "codex-review-attempt";
     let request = codex_worker_request(&applied, run_id).expect("render review request");
-    let mut run = codex_snapshot(CodexRunStatus::Running, applied.session_id.as_deref().expect("this fixture dispatches through a Session"));
+    let mut run = codex_snapshot(CodexRunStatus::Running, applied.launch_owner_id().expect("a dispatched task has an owner"));
     run.run_id = run_id.into();
     run.board_item_id = request.board_item_id;
     run.workflow_execution_id = request.workflow_execution_id;
@@ -455,8 +455,8 @@ async fn deterministic_worker_evidence_precedes_claim_preflight() {
     let applied = applied_task(AgentMode::Headless);
     let intent_id = "dispatch-intent-reclaimed";
     let worker_id = managed_worker_id(&applied, intent_id);
-    seed_session(&db, applied.session_id.as_deref().expect("this fixture dispatches through a Session")).await;
-    let mut snapshot = codex_snapshot(CodexRunStatus::Running, applied.session_id.as_deref().expect("this fixture dispatches through a Session"));
+    seed_owner_session(&db, &applied).await;
+    let mut snapshot = codex_snapshot(CodexRunStatus::Running, applied.launch_owner_id().expect("a dispatched task has an owner"));
     snapshot.run_id.clone_from(&worker_id);
     snapshot.board_item_id = Some(applied.board_item_id.clone());
     snapshot.task_id = Some(applied.work_item_id.clone());

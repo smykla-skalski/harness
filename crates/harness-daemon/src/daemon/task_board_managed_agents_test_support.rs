@@ -136,6 +136,19 @@ pub(super) fn applied_task(mode: AgentMode) -> DispatchAppliedTask {
     }
 }
 
+/// Seed the Session a dispatch reclaims, when it has one.
+///
+/// A workspace dispatch has no Session and `codex_runs.session_id` is nullable
+/// for exactly that case, so there is nothing to seed and nothing to assert.
+pub(super) async fn seed_owner_session(
+    db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
+    applied: &DispatchAppliedTask,
+) {
+    if let Some(session_id) = applied.session_id.as_deref() {
+        seed_session(db, session_id).await;
+    }
+}
+
 pub(super) async fn seed_session(
     db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
     session_id: &str,

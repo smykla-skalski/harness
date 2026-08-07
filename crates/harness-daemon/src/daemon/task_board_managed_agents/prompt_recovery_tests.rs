@@ -20,7 +20,7 @@ fn running_review_worker() -> (crate::task_board::DispatchAppliedTask, ManagedAg
     applied.read_only_workflow = Some(review_launch());
     let run_id = "codex-review-attempt";
     let request = codex_worker_request(&applied, run_id).expect("render review request");
-    let mut run = codex_snapshot(CodexRunStatus::Running, applied.session_id.as_deref().expect("this fixture dispatches through a Session"));
+    let mut run = codex_snapshot(CodexRunStatus::Running, applied.launch_owner_id().expect("a dispatched task has an owner"));
     run.run_id = run_id.into();
     run.board_item_id = request.board_item_id;
     run.workflow_execution_id = request.workflow_execution_id;
