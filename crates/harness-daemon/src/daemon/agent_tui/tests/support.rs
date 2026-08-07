@@ -26,6 +26,7 @@ pub(super) fn sample_snapshot(
     AgentTuiSnapshot {
         tui_id: tui_id.to_string(),
         session_id: session_id.to_string(),
+        workspace_id: None,
         agent_id: agent_id.to_string(),
         runtime: runtime.to_string(),
         status: AgentTuiStatus::Running,

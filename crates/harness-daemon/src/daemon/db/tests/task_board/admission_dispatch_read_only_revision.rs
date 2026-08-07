@@ -58,7 +58,10 @@ async fn read_only_publication_rebuilds_context_from_transaction_owned_item() {
     assert_eq!(context.title, "Review exact head");
     assert_eq!(context.body, "Review without workspace writes");
     assert!(context.tags.is_empty());
-    assert_eq!(context.session_id, preparation.preparation.session_id);
+    assert_eq!(
+        Some(context.session_id.as_str()),
+        preparation.preparation.session_id.as_deref()
+    );
     assert_eq!(context.worktree, "/tmp/worktree");
     let claimed = db
         .claim_task_board_dispatch(&applied.board_item_id)
@@ -425,7 +428,7 @@ async fn reserved_read_only_unclaimed(
         prepared_item_revision: snapshot.item_revision,
         run_context: TaskBoardReadOnlyRunContext {
             schema_version: TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION,
-            session_id: preparation.session_id.clone(),
+            session_id: preparation.session_id.clone().expect("this fixture dispatches through a Session"),
             title: snapshot.item.title,
             body: snapshot.item.body,
             tags: snapshot.item.tags,

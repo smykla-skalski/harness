@@ -11,6 +11,8 @@ use crate::daemon::http::{
 };
 use crate::daemon::protocol::ManagedAgentSnapshot;
 use crate::daemon::reviews_store::PolicyGraphQueries;
+#[cfg(test)]
+use crate::task_board::{codex_worker_id, terminal_worker_id};
 use crate::task_board::{
     AgentMode, DispatchAppliedTask, TaskBoardLaunchCapability, managed_worker_id,
 };
@@ -20,6 +22,8 @@ const DISPATCH_CLAIM_HEARTBEAT_INTERVAL: Duration = Duration::from_secs(10);
 const DISPATCH_WORKER_RUNTIME: &str = "codex";
 
 mod requests;
+#[cfg(test)]
+use requests::{codex_worker_request, terminal_worker_request};
 
 mod workflow_launch;
 use workflow_launch::{validate_recovered_workflow_worker, validate_workflow_launch};
@@ -28,7 +32,8 @@ mod claim_settlement;
 pub(crate) use claim_settlement::settle_claimed_task_board_worker;
 
 mod workspace_ownership;
-use workspace_ownership::{applied_worker_owner, join_worker_to_workspace, worker_lock_owner};
+use workspace_ownership::{applied_worker_owner, join_worker_to_workspace};
+pub(crate) use workspace_ownership::worker_lock_owner;
 pub(crate) use workspace_ownership::settle_compensated_workspace_worker;
 
 mod worker_start;

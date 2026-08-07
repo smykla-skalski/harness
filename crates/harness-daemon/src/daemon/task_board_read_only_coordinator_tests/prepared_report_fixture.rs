@@ -58,7 +58,7 @@ pub(super) async fn seed_dispatched_initial_report(label: &str) -> Fixture {
         .expect("pending dispatched report preparation");
     let fixture_root = test.path.parent().expect("prepared report fixture root");
     let session =
-        start_dispatch_session(&test.db, fixture_root, &preparation.preparation.session_id).await;
+        start_dispatch_session(&test.db, fixture_root, preparation.preparation.session_id.as_deref().expect("this fixture dispatches through a Session")).await;
     let worktree = session.worktree_path.to_string_lossy().into_owned();
     let launch = launch(&test.db, &item_id, &session).await;
     let applied = test

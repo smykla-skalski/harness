@@ -4,6 +4,7 @@ use crate::daemon::db::{ReservedTaskBoardDispatch, approved_write_item};
 use harness_daemon_db_queries::AsyncAgentWorkingCopyQueries;
 use std::collections::HashMap;
 
+use crate::daemon::db::prelude::*;
 use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;

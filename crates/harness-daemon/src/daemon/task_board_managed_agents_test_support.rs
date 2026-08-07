@@ -114,7 +114,9 @@ pub(super) fn applied_task(mode: AgentMode) -> DispatchAppliedTask {
     };
     DispatchAppliedTask {
         board_item_id: item.id.clone(),
-        session_id: "session-1".into(),
+        session_id: Some("session-1".into()),
+        workspace_id: None,
+        working_copy_id: None,
         work_item_id: "task-1".into(),
         lifecycle: dispatch_lifecycle_planned(
             &crate::task_board::WorkerIntent { mode },
@@ -178,6 +180,7 @@ pub(super) fn terminal_snapshot(status: AgentTuiStatus, session_id: &str) -> Age
     AgentTuiSnapshot {
         tui_id: "agent-tui-dispatch-intent-existing".into(),
         session_id: session_id.into(),
+        workspace_id: None,
         agent_id: "worker-terminal".into(),
         runtime: "codex".into(),
         status,

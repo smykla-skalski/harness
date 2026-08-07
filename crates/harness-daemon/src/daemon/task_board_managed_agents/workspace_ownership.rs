@@ -148,7 +148,7 @@ fn warn_checkout_cleanup(board_item_id: &str, working_copy_id: &str, error: &Cli
 /// The lane a worker's start and compensation serialize on. Keyed by whichever
 /// owner the dispatch actually has, so two dispatches in one workspace still
 /// contend and a legacy dispatch keeps contending on its Session.
-pub(super) fn worker_lock_owner(applied: &DispatchAppliedTask) -> String {
+pub(crate) fn worker_lock_owner(applied: &DispatchAppliedTask) -> String {
     applied
         .workspace_id
         .clone()

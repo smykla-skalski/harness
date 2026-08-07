@@ -35,7 +35,7 @@ use read_only_start_revision_support::{
 async fn workflow_dispatch_persists_before_any_codex_start() {
     let (state, mut claim, _worktree) = Box::pin(claimed_read_only_dispatch()).await;
     let db = state.async_db.get().cloned().expect("test async db");
-    seed_session(&db, &claim.applied.session_id).await;
+    seed_session(&db, claim.applied.session_id.as_deref().expect("this fixture dispatches through a Session")).await;
 
     let settlement = settle_claimed_task_board_worker(&state, &db, &mut claim)
         .await
@@ -411,7 +411,7 @@ async fn claimed_read_only_dispatch_with_policy(
     let worktree_path = worktree.path().to_string_lossy().into_owned();
     let launch = read_only_launch(
         &db,
-        &preparation.preparation.session_id,
+        preparation.preparation.session_id.as_deref().expect("this fixture dispatches through a Session"),
         worktree.path(),
         exact_head,
     )
@@ -480,7 +480,7 @@ async fn seed_exact_read_only_worker(
     claim: &ClaimedTaskBoardDispatch,
     status: CodexRunStatus,
 ) -> crate::daemon::protocol::CodexRunSnapshot {
-    seed_session(db, &claim.applied.session_id).await;
+    seed_session(db, claim.applied.session_id.as_deref().expect("this fixture dispatches through a Session")).await;
     let worker_id = managed_worker_id(&claim.applied, &claim.intent_id);
     let request = codex_worker_request(&claim.applied, &worker_id).expect("render worker request");
     let launch = claim
@@ -488,7 +488,7 @@ async fn seed_exact_read_only_worker(
         .read_only_workflow
         .as_ref()
         .expect("read-only launch");
-    let mut snapshot = codex_snapshot(status, &claim.applied.session_id);
+    let mut snapshot = codex_snapshot(status, claim.applied.session_id.as_deref().expect("this fixture dispatches through a Session"));
     snapshot.run_id = worker_id;
     snapshot.board_item_id = Some(claim.applied.board_item_id.clone());
     snapshot.workflow_execution_id = claim.applied.item.workflow.execution_id.clone();

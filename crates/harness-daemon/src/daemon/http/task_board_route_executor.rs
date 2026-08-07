@@ -293,7 +293,9 @@ mod tests {
         );
         DispatchAppliedTask {
             board_item_id: id.into(),
-            session_id: format!("session-{id}"),
+            session_id: Some(format!("session-{id}")),
+            workspace_id: None,
+            working_copy_id: None,
             work_item_id: format!("work-{id}"),
             lifecycle,
             item,
@@ -306,6 +308,7 @@ mod tests {
         ManagedAgentSnapshot::Terminal(AgentTuiSnapshot {
             tui_id: id.into(),
             session_id: format!("session-{id}"),
+            workspace_id: None,
             agent_id: format!("agent-{id}"),
             runtime: "codex".into(),
             status: AgentTuiStatus::Running,

@@ -48,6 +48,7 @@ fn sandboxed_stop_without_bridge_falls_back_to_local_cleanup() {
     let snapshot = AgentTuiSnapshot {
         tui_id: "agent-tui-test-stop".into(),
         session_id: "65b1e884-aced-5040-a647-c1b3cda701c4".into(),
+        workspace_id: None,
         agent_id: "agent-stop-test".into(),
         runtime: "codex".into(),
         status: AgentTuiStatus::Running,

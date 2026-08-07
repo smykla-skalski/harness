@@ -262,7 +262,9 @@ fn apply_dispatch_plan(
         .map_err(|error| (DispatchFailureKind::LinkItem, error))?;
     Ok(DispatchAppliedTask {
         board_item_id: plan.board_item_id.clone(),
-        session_id,
+        session_id: Some(session_id),
+        workspace_id: None,
+        working_copy_id: None,
         work_item_id,
         lifecycle: plan.applied_lifecycle(),
         item,

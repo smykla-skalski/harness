@@ -15,7 +15,7 @@ use crate::task_board::{
 async fn terminal_local_start_charges_prepared_admission_before_release() {
     let (state, mut claim, _worktree) = Box::pin(claimed_read_only_dispatch()).await;
     let db = state.async_db.get().cloned().expect("test async db");
-    seed_session(&db, &claim.applied.session_id).await;
+    seed_session(&db, claim.applied.session_id.as_deref().expect("this fixture dispatches through a Session")).await;
     settle_claimed_task_board_worker(&state, &db, &mut claim)
         .await
         .expect("prepare workflow dispatch");

@@ -305,6 +305,7 @@ pub(super) fn sample_agent_tui(tui_id: &str, updated_at: &str) -> AgentTuiSnapsh
     AgentTuiSnapshot {
         tui_id: tui_id.into(),
         session_id: "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".into(),
+        workspace_id: None,
         agent_id: "claude-leader".into(),
         runtime: "copilot".into(),
         status: AgentTuiStatus::Running,

@@ -5,7 +5,7 @@ use std::time::Duration;
 use crate::agents::runtime::InitialPromptDelivery;
 use crate::daemon::agent_tui::{
     AgentTuiBackend, AgentTuiInput, AgentTuiLaunchProfile, AgentTuiSize, AgentTuiSpawnSpec,
-    PortablePtyAgentTuiBackend,
+    ManagedTerminalOwner, PortablePtyAgentTuiBackend,
 };
 use crate::session::types::SessionRole;
 
@@ -94,7 +94,7 @@ fn spawn_agent_tui_process_bootstraps_runtime_assets_before_launch() {
             )
             .expect("profile");
             let process = spawn_agent_tui_process(
-                "sess-bootstrap-spawn",
+                ManagedTerminalOwner::Session("sess-bootstrap-spawn"),
                 "agent-tui-bootstrap",
                 profile,
                 &project,

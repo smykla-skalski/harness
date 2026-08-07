@@ -20,7 +20,7 @@ fn running_review_worker() -> (crate::task_board::DispatchAppliedTask, ManagedAg
     applied.read_only_workflow = Some(review_launch());
     let run_id = "codex-review-attempt";
     let request = codex_worker_request(&applied, run_id).expect("render review request");
-    let mut run = codex_snapshot(CodexRunStatus::Running, &applied.session_id);
+    let mut run = codex_snapshot(CodexRunStatus::Running, applied.session_id.as_deref().expect("this fixture dispatches through a Session"));
     run.run_id = run_id.into();
     run.board_item_id = request.board_item_id;
     run.workflow_execution_id = request.workflow_execution_id;
@@ -49,7 +49,7 @@ fn a_worker_launched_before_the_prompt_changed_still_recovers() {
             .expect("parse overrides"),
     );
 
-    recover_same_applied_worker(snapshot, &applied)
+    recover_same_applied_worker(snapshot, &applied, "codex-dispatch-intent-existing")
         .expect("a prompt change must not strand a running worker");
 }
 
@@ -67,7 +67,7 @@ fn a_prompt_change_does_not_excuse_a_different_worktree() {
             .expect("parse overrides"),
     );
 
-    let error = recover_same_applied_worker(ManagedAgentSnapshot::Codex(run), &applied)
+    let error = recover_same_applied_worker(ManagedAgentSnapshot::Codex(run), &applied, "codex-dispatch-intent-existing")
         .expect_err("a conflicting worktree still fails");
 
     assert_eq!(error.code(), "KSRCLI092");
@@ -88,6 +88,6 @@ fn a_worker_recovers_even_when_the_configured_prompt_cannot_render() {
             .expect("parse overrides"),
     );
 
-    recover_same_applied_worker(snapshot, &applied)
+    recover_same_applied_worker(snapshot, &applied, "codex-dispatch-intent-existing")
         .expect("a broken template must not strand a healthy worker");
 }

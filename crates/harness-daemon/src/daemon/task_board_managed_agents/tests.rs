@@ -22,9 +22,13 @@ use super::{
     begin_worker_compensation, codex_worker_id, codex_worker_request, exact_worker_not_found,
     managed_admission_owner_id, managed_worker_id, recover_same_applied_worker,
     resolve_start_failure, start_worker_for_applied_task, stop_worker_in_lane, terminal_worker_id,
-    terminal_worker_request,
+    terminal_worker_request, worker_lock_owner,
 };
 use crate::daemon::db::prelude::*;
+
+/// Identity the fixtures reclaim under. Only the workspace path accepts a
+/// worker naming itself, so a Session fixture is unaffected by the value.
+const WORKER_ID: &str = "codex-dispatch-intent-existing";
 
 #[path = "write_request_recovery_tests.rs"]
 mod write_request_recovery_tests;
@@ -314,7 +318,7 @@ fn terminal_and_failed_same_session_workers_are_recovered() {
     for snapshot in snapshots {
         let expected_id = snapshot.agent_id().to_string();
         let applied = applied_task(AgentMode::Headless);
-        let recovered = resolve_start_failure(start_failure(), Ok(Some(snapshot)), &applied)
+        let recovered = resolve_start_failure(start_failure(), Ok(Some(snapshot)), &applied, WORKER_ID)
             .expect("same-session durable worker evidence");
         assert_eq!(recovered.agent_id(), expected_id);
     }
@@ -326,7 +330,7 @@ fn deterministic_worker_from_another_session_fails_closed() {
         ManagedAgentSnapshot::Codex(codex_snapshot(CodexRunStatus::Running, "different-session"));
 
     let applied = applied_task(AgentMode::Headless);
-    let error = recover_same_applied_worker(snapshot, &applied)
+    let error = recover_same_applied_worker(snapshot, &applied, WORKER_ID)
         .expect_err("cross-session deterministic identity must conflict");
 
     assert_eq!(error.code(), "KSRCLI092");
@@ -339,7 +343,7 @@ fn read_only_recovery_rejects_a_conflicting_durable_run() {
     applied.read_only_workflow = Some(review_launch());
     let run_id = "codex-review-attempt";
     let request = codex_worker_request(&applied, run_id).expect("render review request");
-    let mut run = codex_snapshot(CodexRunStatus::Running, &applied.session_id);
+    let mut run = codex_snapshot(CodexRunStatus::Running, applied.session_id.as_deref().expect("this fixture dispatches through a Session"));
     run.run_id = run_id.into();
     run.board_item_id = request.board_item_id;
     run.workflow_execution_id = request.workflow_execution_id;
@@ -357,16 +361,16 @@ fn read_only_recovery_rejects_a_conflicting_durable_run() {
         .clone();
     let matching = ManagedAgentSnapshot::Codex(run.clone());
 
-    recover_same_applied_worker(matching, &applied).expect("matching durable run");
+    recover_same_applied_worker(matching, &applied, WORKER_ID).expect("matching durable run");
 
     let mut wrong_worktree = run.clone();
     wrong_worktree.project_dir = "/tmp/other-worktree".into();
-    let error = recover_same_applied_worker(ManagedAgentSnapshot::Codex(wrong_worktree), &applied)
+    let error = recover_same_applied_worker(ManagedAgentSnapshot::Codex(wrong_worktree), &applied, WORKER_ID)
         .expect_err("conflicting worktree must fail");
     assert_eq!(error.code(), "KSRCLI092");
 
     run.workflow_execution_id = Some("workflow-other".into());
-    let error = recover_same_applied_worker(ManagedAgentSnapshot::Codex(run), &applied)
+    let error = recover_same_applied_worker(ManagedAgentSnapshot::Codex(run), &applied, WORKER_ID)
         .expect_err("conflicting run must fail");
     assert_eq!(error.code(), "KSRCLI092");
     assert!(error.message().contains("frozen workflow"));
@@ -396,7 +400,7 @@ fn only_exact_deterministic_lookup_miss_allows_start() {
 fn uncertain_probe_errors_are_not_rollback_safe() {
     let probe_error = CliErrorKind::workflow_io("managed worker lookup failed").into();
     let applied = applied_task(AgentMode::Headless);
-    let error = resolve_start_failure(start_failure(), Err(probe_error), &applied)
+    let error = resolve_start_failure(start_failure(), Err(probe_error), &applied, WORKER_ID)
         .expect_err("uncertain second probe must retain recovery ownership");
 
     assert!(!error.may_rollback());
@@ -406,7 +410,7 @@ fn uncertain_probe_errors_are_not_rollback_safe() {
 #[test]
 fn exact_post_start_miss_is_rollback_safe() {
     let applied = applied_task(AgentMode::Headless);
-    let error = resolve_start_failure(start_failure(), Ok(None), &applied)
+    let error = resolve_start_failure(start_failure(), Ok(None), &applied, WORKER_ID)
         .expect_err("exact second miss preserves the start failure");
 
     assert!(error.may_rollback());
@@ -424,7 +428,7 @@ async fn worker_start_waits_for_lane_before_preflight() {
     let intent_id = "dispatch-intent-test";
     let outer_guard = state
         .managed_agent_mutation_locks
-        .lock(&applied.session_id, &managed_worker_id(&applied, intent_id))
+        .lock(&worker_lock_owner(&applied), &managed_worker_id(&applied, intent_id))
         .await;
     let future = start_worker_for_applied_task(&state, &applied, intent_id, "stale-claim");
     tokio::pin!(future);
@@ -451,8 +455,8 @@ async fn deterministic_worker_evidence_precedes_claim_preflight() {
     let applied = applied_task(AgentMode::Headless);
     let intent_id = "dispatch-intent-reclaimed";
     let worker_id = managed_worker_id(&applied, intent_id);
-    seed_session(&db, &applied.session_id).await;
-    let mut snapshot = codex_snapshot(CodexRunStatus::Running, &applied.session_id);
+    seed_session(&db, applied.session_id.as_deref().expect("this fixture dispatches through a Session")).await;
+    let mut snapshot = codex_snapshot(CodexRunStatus::Running, applied.session_id.as_deref().expect("this fixture dispatches through a Session"));
     snapshot.run_id.clone_from(&worker_id);
     snapshot.board_item_id = Some(applied.board_item_id.clone());
     snapshot.task_id = Some(applied.work_item_id.clone());
@@ -478,7 +482,7 @@ async fn compensation_renews_claim_inside_worker_lane_before_stop() {
     let worker_id = managed_worker_id(&applied, intent_id);
     let outer_guard = state
         .managed_agent_mutation_locks
-        .lock(&applied.session_id, &worker_id)
+        .lock(&worker_lock_owner(&applied), &worker_id)
         .await;
     let future = begin_worker_compensation(
         &state,

@@ -49,11 +49,11 @@ async fn a_worker_run_keeps_the_prompt_it_started_with() {
     let state = test_http_state();
     let db = state.async_db.get().cloned().expect("test async db");
     let applied = applied_task(AgentMode::Headless);
-    seed_session(&db, &applied.session_id).await;
+    seed_session(&db, applied.session_id.as_deref().expect("this fixture dispatches through a Session")).await;
     let run_id = managed_worker_id(&applied, "dispatch-intent-1");
     let request = codex_worker_request(&applied, &run_id).expect("render worker request");
 
-    let recovered = round_trip(&db, &run_id, &applied.session_id, &request.prompt).await;
+    let recovered = round_trip(&db, &run_id, applied.session_id.as_deref().expect("this fixture dispatches through a Session"), &request.prompt).await;
 
     assert_eq!(recovered, request.prompt);
 }
@@ -64,11 +64,11 @@ async fn an_implementation_run_keeps_the_prompt_it_started_with() {
     let db = state.async_db.get().cloned().expect("test async db");
     let mut applied = applied_task(AgentMode::Headless);
     applied.write_workflow = Some(Box::new(write_launch()));
-    seed_session(&db, &applied.session_id).await;
+    seed_session(&db, applied.session_id.as_deref().expect("this fixture dispatches through a Session")).await;
     let run_id = "codex-implementation-attempt";
     let request = codex_worker_request(&applied, run_id).expect("render write request");
 
-    let recovered = round_trip(&db, run_id, &applied.session_id, &request.prompt).await;
+    let recovered = round_trip(&db, run_id, applied.session_id.as_deref().expect("this fixture dispatches through a Session"), &request.prompt).await;
 
     assert_eq!(recovered, request.prompt);
 }
@@ -79,11 +79,11 @@ async fn a_review_run_keeps_the_prompt_it_started_with() {
     let db = state.async_db.get().cloned().expect("test async db");
     let mut applied = applied_task(AgentMode::Evaluate);
     applied.read_only_workflow = Some(review_launch());
-    seed_session(&db, &applied.session_id).await;
+    seed_session(&db, applied.session_id.as_deref().expect("this fixture dispatches through a Session")).await;
     let run_id = "codex-review-attempt";
     let request = codex_worker_request(&applied, run_id).expect("render review request");
 
-    let recovered = round_trip(&db, run_id, &applied.session_id, &request.prompt).await;
+    let recovered = round_trip(&db, run_id, applied.session_id.as_deref().expect("this fixture dispatches through a Session"), &request.prompt).await;
 
     assert_eq!(recovered, request.prompt);
 }
@@ -93,7 +93,7 @@ async fn an_escalation_run_keeps_the_prompt_it_started_with() {
     let state = test_http_state();
     let db = state.async_db.get().cloned().expect("test async db");
     let applied = applied_task(AgentMode::Headless);
-    seed_session(&db, &applied.session_id).await;
+    seed_session(&db, applied.session_id.as_deref().expect("this fixture dispatches through a Session")).await;
     let prompt = render_triage_escalation_prompt(
         &applied.item,
         "escalation-1",
@@ -102,7 +102,7 @@ async fn an_escalation_run_keeps_the_prompt_it_started_with() {
     )
     .expect("render escalation prompt");
 
-    let recovered = round_trip(&db, "codex-escalation-1", &applied.session_id, &prompt).await;
+    let recovered = round_trip(&db, "codex-escalation-1", applied.session_id.as_deref().expect("this fixture dispatches through a Session"), &prompt).await;
 
     assert_eq!(recovered, prompt);
 }
