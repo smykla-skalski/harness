@@ -50,12 +50,16 @@ pub(super) async fn seed_dispatched_initial_report(label: &str) -> Fixture {
         crate::daemon::db::ReservedTaskBoardDispatch::Preparing { intent_id, .. } => intent_id,
         other => panic!("unexpected dispatched report reservation: {other:?}"),
     };
-    let preparation = test
+    let mut preparation = test
         .db
         .claim_task_board_dispatch_preparation(&intent_id)
         .await
         .expect("claim dispatched report preparation")
         .expect("pending dispatched report preparation");
+    // Preparation provisions the workspace and hands publication the id it
+    // learned, so a fixture that publishes directly has to stamp it too or the
+    // applied task names no owner for the worker start to match.
+    preparation.preparation.workspace_id = Some(format!("agent-workspace-{label}"));
     let fixture_root = test.path.parent().expect("prepared report fixture root");
     // The Session here only supplies a real worktree to complete against; the
     // dispatch itself is workspace-owned, so the launch records that owner.

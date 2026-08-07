@@ -29,6 +29,17 @@ pub(crate) enum TaskBoardPublishVerification {
     Absent,
 }
 
+/// Who owns a workflow attempt's Codex run, and where it runs.
+///
+/// A legacy attempt names the Session its dispatch was linked to and the run
+/// binds to it. A workspace-owned attempt has no Session, so the run names
+/// itself and takes the checkout directly.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct WorkflowRunOwner<'a> {
+    pub owner_id: &'a str,
+    pub worktree: &'a str,
+}
+
 #[async_trait]
 pub(crate) trait TaskBoardReadOnlyRuntime: Send + Sync {
     async fn load_codex_report_run(
@@ -38,7 +49,7 @@ pub(crate) trait TaskBoardReadOnlyRuntime: Send + Sync {
 
     async fn start_report_run(
         &self,
-        session_id: &str,
+        owner: WorkflowRunOwner<'_>,
         request: &CodexRunRequest,
         run_id: &str,
     ) -> Result<CodexRunSnapshot, CliError>;
@@ -54,7 +65,7 @@ pub(crate) trait TaskBoardReadOnlyRuntime: Send + Sync {
 
     async fn start_codex_workspace_run(
         &self,
-        _session_id: &str,
+        _owner: WorkflowRunOwner<'_>,
         _request: &CodexRunRequest,
         _run_id: &str,
     ) -> Result<CodexRunSnapshot, CliError> {
@@ -142,6 +153,37 @@ impl<'a> ProductionTaskBoardReadOnlyRuntime<'a> {
     pub(crate) const fn new(state: &'a DaemonHttpState, db: &'a AsyncDaemonDbHandle) -> Self {
         Self { state, db }
     }
+
+    /// Start an attempt's Codex run under whichever owner the dispatch left it.
+    ///
+    /// A Session-bound run derives its directory from the Session's worktree, so
+    /// only a Session owner can take that path. Everything else is
+    /// workspace-owned: the run names itself and takes the checkout the attempt
+    /// already records. The id shape decides, because a Session id is a
+    /// canonical lowercase UUID and a workspace id never is - looking the owner
+    /// up instead would fail on the very ids this has to route.
+    async fn start_owned_run(
+        &self,
+        owner: WorkflowRunOwner<'_>,
+        request: &CodexRunRequest,
+        run_id: &str,
+        label: &'static str,
+    ) -> Result<CodexRunSnapshot, CliError> {
+        let session_bound = harness_workspace::workspace::ids::validate(owner.owner_id).is_ok();
+        let owner_id = owner.owner_id.to_owned();
+        let worktree = owner.worktree.to_owned();
+        let request = request.clone();
+        let run_id = run_id.to_owned();
+        let snapshot = run_codex_agent_blocking(self.state, label, move |handle| {
+            if session_bound {
+                handle.start_run_with_id(&owner_id, &request, run_id)
+            } else {
+                handle.start_standalone_run_with_id(&worktree, &request, run_id)
+            }
+        })
+        .await?;
+        stop_codex_run_if_killed(self.state, self.db, snapshot).await
+    }
 }
 
 #[async_trait]
@@ -165,7 +207,7 @@ impl TaskBoardReadOnlyRuntime for ProductionTaskBoardReadOnlyRuntime<'_> {
 
     async fn start_report_run(
         &self,
-        session_id: &str,
+        owner: WorkflowRunOwner<'_>,
         request: &CodexRunRequest,
         run_id: &str,
     ) -> Result<CodexRunSnapshot, CliError> {
@@ -175,16 +217,8 @@ impl TaskBoardReadOnlyRuntime for ProductionTaskBoardReadOnlyRuntime<'_> {
                 "read-only workflow runtime only starts Codex Report runs",
             ));
         }
-        let session_id = session_id.to_owned();
-        let request = request.clone();
-        let run_id = run_id.to_owned();
-        let snapshot = run_codex_agent_blocking(
-            self.state,
-            "task-board read-only report start",
-            move |handle| handle.start_run_with_id(&session_id, &request, run_id),
-        )
-        .await?;
-        stop_codex_run_if_killed(self.state, self.db, snapshot).await
+        self.start_owned_run(owner, request, run_id, "task-board read-only report start")
+            .await
     }
 
     async fn load_codex_workspace_run(
@@ -196,7 +230,7 @@ impl TaskBoardReadOnlyRuntime for ProductionTaskBoardReadOnlyRuntime<'_> {
 
     async fn start_codex_workspace_run(
         &self,
-        session_id: &str,
+        owner: WorkflowRunOwner<'_>,
         request: &CodexRunRequest,
         run_id: &str,
     ) -> Result<CodexRunSnapshot, CliError> {
@@ -206,16 +240,8 @@ impl TaskBoardReadOnlyRuntime for ProductionTaskBoardReadOnlyRuntime<'_> {
                 "write workflow runtime only starts Codex WorkspaceWrite runs",
             ));
         }
-        let session_id = session_id.to_owned();
-        let request = request.clone();
-        let run_id = run_id.to_owned();
-        let snapshot = run_codex_agent_blocking(
-            self.state,
-            "task-board write workspace start",
-            move |handle| handle.start_run_with_id(&session_id, &request, run_id),
-        )
-        .await?;
-        stop_codex_run_if_killed(self.state, self.db, snapshot).await
+        self.start_owned_run(owner, request, run_id, "task-board write workspace start")
+            .await
     }
 
     async fn start_agent_turn_report_run(

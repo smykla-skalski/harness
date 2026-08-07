@@ -15,7 +15,7 @@ use crate::task_board::{
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::super::task_board_read_only_runtime::{
-    AgentTurnReportStart, TaskBoardPublishVerification, TaskBoardReadOnlyRuntime,
+    AgentTurnReportStart, TaskBoardPublishVerification, TaskBoardReadOnlyRuntime, WorkflowRunOwner,
 };
 use super::fixture::{FROZEN_HEAD, NOW};
 
@@ -221,7 +221,7 @@ impl TaskBoardReadOnlyRuntime for FakeReadOnlyRuntime {
 
     async fn start_report_run(
         &self,
-        session_id: &str,
+        owner: WorkflowRunOwner<'_>,
         request: &CodexRunRequest,
         run_id: &str,
     ) -> Result<CodexRunSnapshot, CliError> {
@@ -262,20 +262,26 @@ impl TaskBoardReadOnlyRuntime for FakeReadOnlyRuntime {
             exact_head_revision: FROZEN_HEAD.into(),
             artifact: plan.artifact,
         };
-        let project_dir = if let Some(db) = &self.durable_db {
-            db.resolve_session(session_id)
-                .await?
-                .ok_or_else(|| {
-                    CliError::from(CliErrorKind::session_not_found(session_id.to_string()))
-                })?
-                .state
-                .worktree_path
-                .to_string_lossy()
-                .into_owned()
-        } else {
-            "/tmp/read-only-worktree".into()
+        // A legacy owner is a Session id, and the run binds to it and inherits
+        // its worktree. A workspace-owned attempt has no Session: the run names
+        // itself the way `start_standalone_run_with_id` does, and takes the
+        // checkout the attempt already records.
+        let resolved = match &self.durable_db {
+            // A workspace owner is not a Session id at all, so resolution
+            // rejects it outright rather than reporting it missing. Either way
+            // there is no Session behind this attempt.
+            Some(db) => db.resolve_session(owner.owner_id).await.ok().flatten(),
+            None => None,
         };
-        let run = planned_run(session_id, request, run_id, &project_dir, &result, status)?;
+        let (session_id, project_dir) = match (resolved, &self.durable_db) {
+            (Some(session), _) => (
+                owner.owner_id.to_string(),
+                session.state.worktree_path.to_string_lossy().into_owned(),
+            ),
+            (None, Some(_)) => (run_id.to_string(), owner.worktree.to_string()),
+            (None, None) => (owner.owner_id.to_string(), "/tmp/read-only-worktree".into()),
+        };
+        let run = planned_run(&session_id, request, run_id, &project_dir, &result, status)?;
         if let Some(db) = &self.durable_db {
             db.save_codex_run(&run).await?;
         }

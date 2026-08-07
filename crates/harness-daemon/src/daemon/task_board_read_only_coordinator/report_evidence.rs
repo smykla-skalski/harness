@@ -82,8 +82,14 @@ pub(super) fn validate_run_binding(
     let session_id = context.session_id.as_str();
     // The prompt is configuration and may have been customized after this
     // attempt started, so the frozen attempt identity is what binds the run.
+    // A Session-owned attempt binds its run to that Session. A workspace-owned
+    // attempt has no Session, so the run names itself the way
+    // `start_standalone_run_with_id` stamps it. Both are the owner this attempt
+    // froze; anything else belongs to another attempt.
+    let owner_matches =
+        run.session_id == session_id || run.session_id == attempt.idempotency_key;
     let valid = run.run_id == attempt.idempotency_key
-        && run.session_id == session_id
+        && owner_matches
         && run.task_id == expected.task_id
         && run.board_item_id.as_deref() == Some(execution.item_id.as_str())
         && run.workflow_execution_id.as_deref() == Some(execution.execution_id.as_str())
