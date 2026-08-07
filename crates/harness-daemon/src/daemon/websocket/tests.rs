@@ -34,6 +34,10 @@ use crate::workspace::utc_now;
 use harness_testkit::with_isolated_harness_env;
 
 pub(super) async fn test_websocket_state_with_empty_async_db(db_path: &Path) -> DaemonHttpState {
+    // A serving daemon mints its identity at startup, and dispatch needs it to
+    // key the workspace it provisions. Without it every dispatch refuses and the
+    // response carries no applied task at all.
+    crate::daemon::state::ensure_daemon_identity().expect("mint daemon identity");
     let (sender, _) = broadcast::channel(8);
     let db_slot = Arc::new(OnceLock::new());
     let async_db_slot = Arc::new(OnceLock::new());
