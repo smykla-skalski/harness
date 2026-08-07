@@ -322,8 +322,9 @@ fn acknowledge_signal(
             return None;
         }
     };
-    let (stored, should_emit) = match claim {
-        runtime::signal::SignalAckClaim::Created(stored) => (stored, true),
+    let (stored, owns_delivery) = match claim {
+        runtime::signal::SignalAckClaim::Created(stored)
+        | runtime::signal::SignalAckClaim::Recovered(stored) => (stored, true),
         runtime::signal::SignalAckClaim::Existing(stored) => (stored, false),
     };
     record_signal_ack_in_session(
@@ -333,7 +334,8 @@ fn acknowledge_signal(
         stored.result,
         project_dir,
     );
-    should_emit.then_some(stored.result)
+    (owns_delivery && stored.result == runtime::signal::AckResult::Accepted)
+        .then_some(stored.result)
 }
 
 fn record_signal_ack_in_session(

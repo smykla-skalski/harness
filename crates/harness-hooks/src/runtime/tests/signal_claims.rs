@@ -1,4 +1,6 @@
 use std::slice;
+use std::sync::{Arc, Barrier};
+use std::thread;
 
 use super::*;
 
@@ -36,6 +38,83 @@ fn identities() -> SignalIdentities {
     }
 }
 
+fn acknowledgment(signal: &runtime::signal::Signal) -> runtime::signal::SignalAck {
+    runtime::signal::SignalAck {
+        signal_id: signal.signal_id.clone(),
+        acknowledged_at: "2026-08-06T10:00:01Z".into(),
+        result: runtime::signal::AckResult::Accepted,
+        agent: RUNTIME_SESSION.into(),
+        session_id: ORCHESTRATION_SESSION.into(),
+        details: None,
+    }
+}
+
+fn write_prepared_ack(signal_dir: &Path, signal: &runtime::signal::Signal) -> PathBuf {
+    let acknowledged = runtime::signal::acknowledged_dir(signal_dir);
+    fs::create_dir_all(&acknowledged).unwrap();
+    fs::write(
+        acknowledged.join(format!("{}.ack.json", signal.signal_id)),
+        serde_json::to_string_pretty(&acknowledgment(signal)).unwrap(),
+    )
+    .unwrap();
+    acknowledged
+}
+
+fn observe_signal(
+    project: &Path,
+    signal_dir: &Path,
+    signal: &runtime::signal::Signal,
+    now: &str,
+) -> Vec<String> {
+    observation::acknowledged_signal_lines(
+        signal_dir,
+        slice::from_ref(signal),
+        &identities(),
+        project,
+        now,
+    )
+}
+
+fn assert_settlement_is_prepared(
+    signal_dir: &Path,
+    signal: &runtime::signal::Signal,
+    acknowledged: &Path,
+) {
+    assert!(
+        runtime::signal::pending_dir(signal_dir)
+            .join(format!("{}.json", signal.signal_id))
+            .exists()
+    );
+    assert!(
+        acknowledged
+            .join(format!("{}.ack.json", signal.signal_id))
+            .exists()
+    );
+    assert!(
+        runtime::signal::read_acknowledgments(signal_dir)
+            .unwrap()
+            .is_empty()
+    );
+}
+
+fn assert_recovery_delivers_once(
+    project: &Path,
+    signal_dir: &Path,
+    signal: &runtime::signal::Signal,
+) {
+    let recovered = observe_signal(project, signal_dir, signal, "2026-08-06T10:00:02Z");
+    let retry = observe_signal(project, signal_dir, signal, "2026-08-06T10:00:03Z");
+
+    assert_eq!(recovered, ["[signal:inject_context] deliver once"]);
+    assert!(retry.is_empty());
+    assert_eq!(
+        runtime::signal::read_acknowledgments(signal_dir)
+            .unwrap()
+            .len(),
+        1
+    );
+}
+
 #[test]
 fn only_the_first_hook_claim_emits_a_signal() {
     with_temp_project(|project| {
@@ -69,36 +148,37 @@ fn only_the_first_hook_claim_emits_a_signal() {
 }
 
 #[test]
-fn preexisting_ack_repairs_pending_payload_without_emission() {
+fn concurrent_recovery_emits_a_prepared_signal_once() {
     with_temp_project(|project| {
         let signal_dir = project.join("signals");
         let signal = signal();
         runtime::signal::write_signal_file(&signal_dir, &signal).unwrap();
-        let acknowledgment = runtime::signal::SignalAck {
-            signal_id: signal.signal_id.clone(),
-            acknowledged_at: "2026-08-06T10:00:01Z".into(),
-            result: runtime::signal::AckResult::Accepted,
-            agent: RUNTIME_SESSION.into(),
-            session_id: ORCHESTRATION_SESSION.into(),
-            details: None,
-        };
-        let acknowledged = runtime::signal::acknowledged_dir(&signal_dir);
-        fs::create_dir_all(&acknowledged).unwrap();
-        fs::write(
-            acknowledged.join(format!("{}.ack.json", signal.signal_id)),
-            serde_json::to_string_pretty(&acknowledgment).unwrap(),
-        )
-        .unwrap();
+        let acknowledged = write_prepared_ack(&signal_dir, &signal);
+        let barrier = Arc::new(Barrier::new(2));
+        let attempts = [(), ()].map(|()| {
+            let barrier = Arc::clone(&barrier);
+            let project = project.to_path_buf();
+            let signal_dir = signal_dir.clone();
+            let signal = signal.clone();
+            thread::spawn(move || {
+                barrier.wait();
+                observation::acknowledged_signal_lines(
+                    &signal_dir,
+                    slice::from_ref(&signal),
+                    &identities(),
+                    &project,
+                    "2026-08-06T10:00:02Z",
+                )
+            })
+        });
+        let results = attempts.map(|attempt| attempt.join().unwrap());
 
-        let lines = observation::acknowledged_signal_lines(
-            &signal_dir,
-            slice::from_ref(&signal),
-            &identities(),
-            project,
-            "2026-08-06T10:00:02Z",
+        assert_eq!(results.iter().filter(|lines| !lines.is_empty()).count(), 1);
+        assert!(
+            results
+                .iter()
+                .any(|lines| { lines.as_slice() == ["[signal:inject_context] deliver once"] })
         );
-
-        assert!(lines.is_empty());
         assert!(
             runtime::signal::read_pending_signals(&signal_dir)
                 .unwrap()
@@ -109,5 +189,30 @@ fn preexisting_ack_repairs_pending_payload_without_emission() {
                 .join(format!("{}.json", signal.signal_id))
                 .exists()
         );
+        assert_eq!(
+            runtime::signal::read_acknowledgments(&signal_dir)
+                .unwrap()
+                .len(),
+            1
+        );
+    });
+}
+
+#[test]
+fn failed_payload_settlement_is_recovered_without_losing_delivery() {
+    with_temp_project(|project| {
+        let signal_dir = project.join("signals");
+        let signal = signal();
+        runtime::signal::write_signal_file(&signal_dir, &signal).unwrap();
+        let acknowledged = runtime::signal::acknowledged_dir(&signal_dir);
+        let obstructed_payload = acknowledged.join(format!("{}.json", signal.signal_id));
+        fs::create_dir_all(&obstructed_payload).unwrap();
+
+        let failed = observe_signal(project, &signal_dir, &signal, "2026-08-06T10:00:01Z");
+        assert!(failed.is_empty());
+        assert_settlement_is_prepared(&signal_dir, &signal, &acknowledged);
+
+        fs::remove_dir(&obstructed_payload).unwrap();
+        assert_recovery_delivers_once(project, &signal_dir, &signal);
     });
 }

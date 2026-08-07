@@ -6,7 +6,9 @@ use harness_infra::persistence::flock::{FlockErrorContext, with_exclusive_flock}
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_kernel::io::write_text;
 
-use super::{SignalAck, acknowledged_dir, pending_dir, signal_ack_name, signal_json_name};
+use super::{
+    AckResult, SignalAck, acknowledged_dir, pending_dir, signal_ack_name, signal_json_name,
+};
 
 pub(super) struct AckPaths {
     pub(super) acknowledged_dir: PathBuf,
@@ -33,6 +35,7 @@ impl AckPaths {
 #[derive(Debug, Clone)]
 pub enum SignalAckClaim {
     Created(SignalAck),
+    Recovered(SignalAck),
     Existing(SignalAck),
 }
 
@@ -61,9 +64,23 @@ pub(super) fn claim_ack_locked(
     acknowledgment: &SignalAck,
     acknowledgment_json: &str,
 ) -> Result<SignalAckClaim, CliError> {
-    if let Some(existing) = read_existing_ack_and_repair(paths, &acknowledgment.signal_id)? {
+    if let Some(existing) = read_existing_ack(paths, &acknowledgment.signal_id)? {
+        if pending_signal_exists(paths)? {
+            let existing =
+                resolve_prepared_ack(paths, existing, acknowledgment, acknowledgment_json)?;
+            move_acknowledged_signal(&paths.signal_file, &paths.acknowledged_signal_file)?;
+            return Ok(SignalAckClaim::Recovered(existing));
+        }
         return Ok(SignalAckClaim::Existing(existing));
     }
+    write_new_ack_locked(paths, acknowledgment, acknowledgment_json).map(SignalAckClaim::Created)
+}
+
+fn write_new_ack_locked(
+    paths: &AckPaths,
+    acknowledgment: &SignalAck,
+    acknowledgment_json: &str,
+) -> Result<SignalAck, CliError> {
     if !paths.signal_file.try_exists().map_err(|error| {
         CliErrorKind::workflow_io(format!(
             "inspect pending signal '{}': {error}",
@@ -78,10 +95,23 @@ pub(super) fn claim_ack_locked(
     }
     write_text(&paths.ack_file, acknowledgment_json)?;
     move_acknowledged_signal(&paths.signal_file, &paths.acknowledged_signal_file)?;
-    Ok(SignalAckClaim::Created(acknowledgment.clone()))
+    Ok(acknowledgment.clone())
 }
 
-pub(super) fn read_existing_ack_and_repair(
+pub(super) fn resolve_prepared_ack(
+    paths: &AckPaths,
+    existing: SignalAck,
+    requested: &SignalAck,
+    requested_json: &str,
+) -> Result<SignalAck, CliError> {
+    if existing.result == AckResult::Accepted && requested.result != AckResult::Accepted {
+        write_text(&paths.ack_file, requested_json)?;
+        return Ok(requested.clone());
+    }
+    Ok(existing)
+}
+
+pub(super) fn read_existing_ack(
     paths: &AckPaths,
     signal_id: &str,
 ) -> Result<Option<SignalAck>, CliError> {
@@ -100,34 +130,32 @@ pub(super) fn read_existing_ack_and_repair(
         ))
         .into());
     }
-    move_pending_if_present(paths)?;
     Ok(Some(existing))
 }
 
-pub(super) fn move_pending_if_present(paths: &AckPaths) -> Result<(), CliError> {
-    if paths.signal_file.try_exists().map_err(|error| {
+pub(super) fn pending_signal_exists(paths: &AckPaths) -> Result<bool, CliError> {
+    paths.signal_file.try_exists().map_err(|error| {
         CliErrorKind::workflow_io(format!(
             "inspect pending signal '{}': {error}",
             paths.signal_file.display()
         ))
-    })? {
+        .into()
+    })
+}
+
+pub(super) fn move_pending_if_present(paths: &AckPaths) -> Result<(), CliError> {
+    if pending_signal_exists(paths)? {
         move_acknowledged_signal(&paths.signal_file, &paths.acknowledged_signal_file)?;
     }
     Ok(())
 }
 
-pub(super) fn reconcile_pending_signal(
+pub(super) fn acknowledgment_is_terminal(
     signal_dir: &Path,
     signal_id: &str,
 ) -> Result<bool, CliError> {
     let paths = AckPaths::new(signal_dir, signal_id)?;
-    fs::create_dir_all(&paths.acknowledged_dir)
-        .map_err(|error| CliErrorKind::workflow_io(format!("create ack dir: {error}")))?;
-    with_exclusive_flock(
-        &paths.ack_lock_file,
-        FlockErrorContext::new("pending signal read"),
-        || Ok(read_existing_ack_and_repair(&paths, signal_id)?.is_none()),
-    )
+    Ok(!pending_signal_exists(&paths)?)
 }
 
 /// Acknowledge a signal and return the first equivalent acknowledgment stored.
@@ -135,15 +163,43 @@ pub(super) fn reconcile_pending_signal(
 /// # Errors
 /// Returns `CliError` on filesystem failures or a conflicting acknowledgment.
 pub fn acknowledge_signal_once(signal_dir: &Path, ack: &SignalAck) -> Result<SignalAck, CliError> {
-    match claim_signal_acknowledgment(signal_dir, ack)? {
-        SignalAckClaim::Created(stored) => Ok(stored),
-        SignalAckClaim::Existing(stored) if acknowledgments_match(&stored, ack) => Ok(stored),
-        SignalAckClaim::Existing(_) => Err(CliErrorKind::session_agent_conflict(format!(
-            "signal '{}' already has a different runtime acknowledgment",
-            ack.signal_id
-        ))
-        .into()),
+    let paths = AckPaths::new(signal_dir, &ack.signal_id)?;
+    fs::create_dir_all(&paths.acknowledged_dir)
+        .map_err(|error| CliErrorKind::workflow_io(format!("create ack dir: {error}")))?;
+    let ack_json = serde_json::to_string_pretty(ack)
+        .map_err(|error| CliErrorKind::workflow_serialize(format!("ack: {error}")))?;
+    with_exclusive_flock(
+        &paths.ack_lock_file,
+        FlockErrorContext::new("signal acknowledgment"),
+        || acknowledge_signal_once_locked(&paths, ack, &ack_json),
+    )
+}
+
+fn acknowledge_signal_once_locked(
+    paths: &AckPaths,
+    requested: &SignalAck,
+    requested_json: &str,
+) -> Result<SignalAck, CliError> {
+    let Some(existing) = read_existing_ack(paths, &requested.signal_id)? else {
+        return write_new_ack_locked(paths, requested, requested_json);
+    };
+    let stored = if pending_signal_exists(paths)? {
+        resolve_prepared_ack(paths, existing, requested, requested_json)?
+    } else {
+        existing
+    };
+    if !acknowledgments_match(&stored, requested) {
+        return Err(acknowledgment_conflict(&requested.signal_id));
     }
+    move_pending_if_present(paths)?;
+    Ok(stored)
+}
+
+fn acknowledgment_conflict(signal_id: &str) -> CliError {
+    CliErrorKind::session_agent_conflict(format!(
+        "signal '{signal_id}' already has a different runtime acknowledgment"
+    ))
+    .into()
 }
 
 /// Acknowledge a signal: write its ack and move its payload to acknowledged storage.

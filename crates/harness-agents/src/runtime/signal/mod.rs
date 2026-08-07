@@ -69,16 +69,11 @@ pub fn write_signal_file(signal_dir: &Path, signal: &Signal) -> Result<PathBuf, 
 /// # Errors
 /// Returns `CliError` on filesystem failures.
 pub fn read_pending_signals(signal_dir: &Path) -> Result<Vec<Signal>, CliError> {
-    let mut signals = Vec::new();
-    for path in read_json_entry_paths(&pending_dir(signal_dir))? {
-        let Some(signal) = try_parse_json_file::<Signal>(&path) else {
-            continue;
-        };
-        if acknowledgment::reconcile_pending_signal(signal_dir, &signal.signal_id)? {
-            signals.push(signal);
-        }
-    }
-    Ok(signals)
+    read_json_files_from_dir::<Signal>(&pending_dir(signal_dir))
+}
+
+fn read_json_files_from_dir<T: DeserializeOwned>(dir: &Path) -> Result<Vec<T>, CliError> {
+    read_filtered_json_files(dir, |_| true)
 }
 
 fn read_filtered_json_files<T, F>(dir: &Path, include_path: F) -> Result<Vec<T>, CliError>
@@ -174,7 +169,19 @@ fn parse_json_file_contents<T: DeserializeOwned>(path: &Path, content: &str) -> 
 /// # Errors
 /// Returns `CliError` on filesystem failures.
 pub fn read_acknowledgments(signal_dir: &Path) -> Result<Vec<SignalAck>, CliError> {
-    read_filtered_json_files(&acknowledged_dir(signal_dir), is_signal_ack_file)
+    let mut acknowledgments = Vec::new();
+    for path in read_json_entry_paths(&acknowledged_dir(signal_dir))? {
+        if !is_signal_ack_file(&path) {
+            continue;
+        }
+        let Some(acknowledgment) = try_parse_json_file::<SignalAck>(&path) else {
+            continue;
+        };
+        if acknowledgment::acknowledgment_is_terminal(signal_dir, &acknowledgment.signal_id)? {
+            acknowledgments.push(acknowledgment);
+        }
+    }
+    Ok(acknowledgments)
 }
 
 /// Return pending signals whose `created_at` is older than `threshold_seconds`.
