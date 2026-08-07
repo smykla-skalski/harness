@@ -14,7 +14,9 @@ mod delivery;
 #[cfg(test)]
 mod tests;
 
-pub use delivery::{SignalFileState, ensure_signal_file};
+pub use delivery::{
+    SignalFileState, SignalSettlement, ensure_signal_file, settle_signal_if_present,
+};
 pub use harness_protocol::agent::{
     AckResult, DeliveryConfig, Signal, SignalAck, SignalPayload, SignalPriority,
     signal_matches_session,
@@ -211,21 +213,27 @@ fn write_ack_once(
     with_exclusive_flock(
         &paths.ack_lock_file,
         FlockErrorContext::new("signal acknowledgment"),
-        || {
-            let exists = paths.ack_file.try_exists().map_err(|error| {
-                CliErrorKind::workflow_io(format!(
-                    "inspect signal acknowledgment '{}': {error}",
-                    paths.ack_file.display()
-                ))
-            })?;
-            if exists {
-                ensure_existing_ack_matches(&paths.ack_file, ack)
-            } else {
-                write_text(&paths.ack_file, ack_json)?;
-                Ok(ack.clone())
-            }
-        },
+        || write_ack_locked(paths, ack, ack_json),
     )
+}
+
+fn write_ack_locked(
+    paths: &AckPaths,
+    ack: &SignalAck,
+    ack_json: &str,
+) -> Result<SignalAck, CliError> {
+    let exists = paths.ack_file.try_exists().map_err(|error| {
+        CliErrorKind::workflow_io(format!(
+            "inspect signal acknowledgment '{}': {error}",
+            paths.ack_file.display()
+        ))
+    })?;
+    if exists {
+        ensure_existing_ack_matches(&paths.ack_file, ack)
+    } else {
+        write_text(&paths.ack_file, ack_json)?;
+        Ok(ack.clone())
+    }
 }
 
 fn read_acknowledgment(path: &Path) -> Result<SignalAck, CliError> {

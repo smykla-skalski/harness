@@ -9,6 +9,7 @@ use crate::daemon::db::prelude::*;
 use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 
+mod expired_retry;
 mod recovery;
 
 #[test]

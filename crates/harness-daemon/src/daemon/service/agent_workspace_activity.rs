@@ -9,6 +9,7 @@ use harness_protocol::daemon::activity::{
     AgentWorkspaceSignalAckRequest, AgentWorkspaceSignalCancelRequest, AgentWorkspaceSignalRecord,
     AgentWorkspaceSignalSendRequest,
 };
+use harness_protocol::session::SessionSignalStatus;
 use harness_protocol::timeline::TimelineWindowRequest;
 
 use super::sync_support::read_runtime_acknowledgments_async;
@@ -23,7 +24,7 @@ mod wake_delivery;
 use runtime_delivery::{
     persist_durable_acknowledgment, persist_runtime_acknowledgment, record_failed_signal_delivery,
     runtime_acknowledgment, runtime_signal_session_id, scoped_signal_idempotency_key,
-    settle_runtime_acknowledgment, write_runtime_signal,
+    settle_expired_runtime_signal, settle_runtime_acknowledgment, write_runtime_signal,
 };
 use wake_delivery::wake_managed_agent;
 
@@ -103,8 +104,22 @@ pub(crate) async fn send_agent_workspace_signal_async(
             &signal,
         )
         .await?;
-    if !insertion.inserted && insertion.record.acknowledgment.is_some() {
-        return Ok(insertion.record);
+    if !insertion.inserted {
+        if insertion.record.acknowledgment.is_some() {
+            return Ok(insertion.record);
+        }
+        if insertion.record.status == SessionSignalStatus::Expired {
+            let acknowledgment =
+                settle_expired_runtime_signal(&target, &insertion.record.signal).await?;
+            return persist_runtime_acknowledgment(
+                db,
+                &daemon_id,
+                workspace_id,
+                member_id,
+                &acknowledgment,
+            )
+            .await;
+        }
     }
     let record = insertion.record;
     let runtime_state = match write_runtime_signal(&target, &record.signal).await {

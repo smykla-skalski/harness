@@ -263,6 +263,7 @@ pub(super) async fn claim_signal_wake(
          SET wake_claimed_at = ?4
          WHERE workspace_id = ?1 AND member_id = ?2 AND signal_id = ?3
            AND status = 'pending' AND ack_json IS NULL
+           AND julianday(json_extract(signal_json, '$.expires_at')) >= julianday(?4)
            AND (
                wake_claimed_at IS NULL
                OR datetime(wake_claimed_at) <= datetime(?4, ?5)

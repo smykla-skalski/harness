@@ -205,6 +205,51 @@ fn ensure_signal_file_repairs_missing_delivery_without_reviving_acknowledged_sig
 }
 
 #[test]
+fn settle_signal_if_present_does_not_recreate_a_missing_payload() {
+    let tmp = tempfile::tempdir().unwrap();
+    let signal_dir = tmp.path().join("signals");
+    let acknowledgment = SignalAck {
+        signal_id: "sig-test-001".into(),
+        acknowledged_at: "2026-03-28T12:05:00Z".into(),
+        result: AckResult::Expired,
+        agent: "codex".into(),
+        session_id: "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
+        details: Some("expired".into()),
+    };
+
+    assert!(matches!(
+        settle_signal_if_present(&signal_dir, &acknowledgment).unwrap(),
+        SignalSettlement::Missing
+    ));
+    assert!(read_pending_signals(&signal_dir).unwrap().is_empty());
+    assert!(read_acknowledgments(&signal_dir).unwrap().is_empty());
+}
+
+#[test]
+fn settle_signal_if_present_moves_an_existing_payload() {
+    let tmp = tempfile::tempdir().unwrap();
+    let signal_dir = tmp.path().join("signals");
+    write_signal_file(&signal_dir, &sample_signal()).unwrap();
+    let acknowledgment = SignalAck {
+        signal_id: "sig-test-001".into(),
+        acknowledged_at: "2026-03-28T12:05:00Z".into(),
+        result: AckResult::Expired,
+        agent: "codex".into(),
+        session_id: "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
+        details: Some("expired".into()),
+    };
+
+    let SignalSettlement::Acknowledged(stored) =
+        settle_signal_if_present(&signal_dir, &acknowledgment).unwrap()
+    else {
+        panic!("existing payload must be settled")
+    };
+    assert_eq!(stored.result, AckResult::Expired);
+    assert!(read_pending_signals(&signal_dir).unwrap().is_empty());
+    assert_eq!(read_acknowledgments(&signal_dir).unwrap().len(), 1);
+}
+
+#[test]
 fn read_acknowledgments_ignores_acknowledged_signal_payloads() {
     let tmp = tempfile::tempdir().unwrap();
     let signal_dir = tmp.path().join("signals");

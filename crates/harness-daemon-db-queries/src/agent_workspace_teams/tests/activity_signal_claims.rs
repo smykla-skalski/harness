@@ -69,6 +69,27 @@ async fn assert_tokenized_lease(
         .await
     );
     release(fixture, workspace_id, member_id, signal_id, reclaimed).await;
+    sqlx::query(
+        "UPDATE agent_workspace_signals
+         SET signal_json = json_set(signal_json, '$.expires_at', '2000-01-01T00:00:00Z')
+         WHERE workspace_id = ?1 AND member_id = ?2 AND signal_id = ?3",
+    )
+    .bind(workspace_id)
+    .bind(member_id)
+    .bind(signal_id)
+    .execute(fixture.db.pool())
+    .await
+    .expect("expire signal before a later wake claim");
+    assert!(
+        !claim(
+            fixture,
+            workspace_id,
+            member_id,
+            signal_id,
+            "2026-08-06T13:00:00Z",
+        )
+        .await
+    );
 }
 
 async fn claim(

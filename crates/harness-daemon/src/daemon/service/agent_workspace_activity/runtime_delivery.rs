@@ -2,7 +2,8 @@ use std::path::PathBuf;
 
 use harness_agents::runtime;
 use harness_agents::runtime::signal::{
-    AckResult, Signal, SignalAck, SignalFileState, acknowledge_signal_once, acknowledgments_match,
+    AckResult, Signal, SignalAck, SignalFileState, SignalSettlement, acknowledge_signal_once,
+    acknowledgments_match, settle_signal_if_present,
 };
 use harness_daemon_db_queries::{AgentWorkspaceSignalAcknowledgment, AgentWorkspaceSignalTarget};
 use harness_kernel::errors::{CliError, CliErrorKind};
@@ -86,6 +87,41 @@ pub(super) async fn settle_runtime_acknowledgment(
         ))
         .into()),
     }
+}
+
+pub(super) async fn settle_expired_runtime_signal(
+    target: &AgentWorkspaceSignalTarget,
+    signal: &Signal,
+) -> Result<SignalAck, CliError> {
+    let requested = runtime_acknowledgment(
+        target,
+        &signal.signal_id,
+        harness_workspace::workspace::utc_now(),
+        AckResult::Expired,
+        Some("expired before agent acknowledged delivery".to_string()),
+    );
+    let runtime = runtime::runtime_for_name(&target.runtime).ok_or_else(|| {
+        CliErrorKind::session_agent_conflict(format!(
+            "unknown runtime '{}' for durable member '{}'",
+            target.runtime, target.member_id
+        ))
+    })?;
+    let signal_dir = runtime.signal_dir(
+        PathBuf::from(&target.project_dir).as_path(),
+        &runtime_signal_session_id(target),
+    );
+    let runtime_request = requested.clone();
+    let settlement = tokio::task::spawn_blocking(move || {
+        settle_signal_if_present(&signal_dir, &runtime_request)
+    })
+    .await
+    .map_err(|error| {
+        CliErrorKind::workflow_io(format!("join expired signal settlement: {error}"))
+    })??;
+    Ok(match settlement {
+        SignalSettlement::Missing => requested,
+        SignalSettlement::Acknowledged(existing) => existing,
+    })
 }
 
 pub(super) async fn write_runtime_signal(
