@@ -5,10 +5,9 @@ use harness_infra::persistence::flock::{FlockErrorContext, with_exclusive_flock}
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::acknowledgment::{
-    AckPaths, move_pending_if_present, pending_signal_exists, read_existing_ack,
-    resolve_prepared_ack, write_new_ack_locked,
+    AckPaths, move_pending_if_present, read_existing_ack, write_new_ack_locked,
 };
-use super::{Signal, SignalAck, acknowledgments_match, write_signal_file};
+use super::{Signal, SignalAck, write_signal_file};
 
 /// Result of reconciling one durable signal with its runtime file queue.
 #[derive(Debug, Clone)]
@@ -38,11 +37,6 @@ pub fn ensure_signal_file(signal_dir: &Path, signal: &Signal) -> Result<SignalFi
         FlockErrorContext::new("signal delivery"),
         || {
             if let Some(acknowledgment) = read_existing_ack(&paths, &signal.signal_id)? {
-                if pending_signal_exists(&paths)?
-                    && acknowledgment.result == super::AckResult::Accepted
-                {
-                    return Ok(SignalFileState::Pending);
-                }
                 move_pending_if_present(&paths)?;
                 return Ok(SignalFileState::Acknowledged(acknowledgment));
             }
@@ -86,21 +80,7 @@ fn settle_locked(
     acknowledgment: &SignalAck,
 ) -> Result<SignalSettlement, CliError> {
     if let Some(existing) = read_existing_ack(paths, &acknowledgment.signal_id)? {
-        if pending_signal_exists(paths)? {
-            let acknowledgment_json = serde_json::to_string_pretty(acknowledgment)
-                .map_err(|error| CliErrorKind::workflow_serialize(format!("ack: {error}")))?;
-            let stored =
-                resolve_prepared_ack(paths, existing, acknowledgment, &acknowledgment_json)?;
-            if !acknowledgments_match(&stored, acknowledgment) {
-                return Err(CliErrorKind::session_agent_conflict(format!(
-                    "signal '{}' has a different prepared runtime acknowledgment",
-                    acknowledgment.signal_id
-                ))
-                .into());
-            }
-            move_pending_if_present(paths)?;
-            return Ok(SignalSettlement::Acknowledged(stored));
-        }
+        move_pending_if_present(paths)?;
         return Ok(SignalSettlement::Acknowledged(existing));
     }
     if !paths.signal_file.try_exists().map_err(|error| {

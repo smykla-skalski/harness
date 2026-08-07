@@ -9,9 +9,7 @@ use harness_infra::persistence::flock::{
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_kernel::io::write_text;
 
-use super::{
-    AckResult, SignalAck, acknowledged_dir, pending_dir, signal_ack_name, signal_json_name,
-};
+use super::{SignalAck, acknowledged_dir, pending_dir, signal_ack_name, signal_json_name};
 
 #[derive(Debug)]
 pub(super) struct AckPaths {
@@ -41,7 +39,6 @@ pub struct PendingSignalDelivery {
     paths: AckPaths,
     acknowledgment: SignalAck,
     acknowledgment_json: String,
-    prepared: bool,
     _guard: FlockGuard,
 }
 
@@ -57,10 +54,6 @@ impl PendingSignalDelivery {
     /// # Errors
     /// Returns `CliError` when the acknowledgment or payload move cannot be persisted.
     pub fn commit(self) -> Result<SignalAck, CliError> {
-        if self.prepared {
-            move_pending_if_present(&self.paths)?;
-            return Ok(self.acknowledgment);
-        }
         write_new_ack_locked(&self.paths, &self.acknowledgment, &self.acknowledgment_json)
     }
 }
@@ -69,7 +62,6 @@ impl PendingSignalDelivery {
 #[derive(Debug)]
 pub enum SignalAckClaim {
     Created(PendingSignalDelivery),
-    Recovered(PendingSignalDelivery),
     Existing(SignalAck),
     Busy,
 }
@@ -105,17 +97,7 @@ fn claim_ack_locked(
     guard: FlockGuard,
 ) -> Result<SignalAckClaim, CliError> {
     if let Some(existing) = read_existing_ack(&paths, &acknowledgment.signal_id)? {
-        if pending_signal_exists(&paths)? {
-            let existing =
-                resolve_prepared_ack(&paths, existing, acknowledgment, &acknowledgment_json)?;
-            return Ok(SignalAckClaim::Recovered(PendingSignalDelivery {
-                paths,
-                acknowledgment: existing,
-                acknowledgment_json,
-                prepared: true,
-                _guard: guard,
-            }));
-        }
+        move_pending_if_present(&paths)?;
         return Ok(SignalAckClaim::Existing(existing));
     }
     require_pending_signal(&paths)?;
@@ -123,7 +105,6 @@ fn claim_ack_locked(
         paths,
         acknowledgment: acknowledgment.clone(),
         acknowledgment_json,
-        prepared: false,
         _guard: guard,
     }))
 }
@@ -148,19 +129,6 @@ fn require_pending_signal(paths: &AckPaths) -> Result<(), CliError> {
         paths.signal_file.display()
     ))
     .into())
-}
-
-pub(super) fn resolve_prepared_ack(
-    paths: &AckPaths,
-    existing: SignalAck,
-    requested: &SignalAck,
-    requested_json: &str,
-) -> Result<SignalAck, CliError> {
-    if existing.result == AckResult::Accepted && requested.result != AckResult::Accepted {
-        write_text(&paths.ack_file, requested_json)?;
-        return Ok(requested.clone());
-    }
-    Ok(existing)
 }
 
 pub(super) fn read_existing_ack(
@@ -235,15 +203,11 @@ fn acknowledge_signal_once_locked(
     let Some(existing) = read_existing_ack(paths, &requested.signal_id)? else {
         return write_new_ack_locked(paths, requested, requested_json);
     };
-    let stored = if pending_signal_exists(paths)? {
-        resolve_prepared_ack(paths, existing, requested, requested_json)?
-    } else {
-        existing
-    };
+    let stored = existing;
+    move_pending_if_present(paths)?;
     if !acknowledgments_match(&stored, requested) {
         return Err(acknowledgment_conflict(&requested.signal_id));
     }
-    move_pending_if_present(paths)?;
     Ok(stored)
 }
 

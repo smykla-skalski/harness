@@ -53,7 +53,7 @@ pub use agent_working_copies::{
     WorkspaceCheckoutRequest, WorkspaceManagedAgentKind, WorkspaceMemberRegistration,
 };
 pub use agent_workspace_activity::{
-    AgentWorkspaceSignalAcknowledgment, AgentWorkspaceSignalTarget,
+    AgentWorkspaceSignalAcknowledgment, AgentWorkspaceSignalRoute, AgentWorkspaceSignalTarget,
     AsyncAgentWorkspaceActivityQueries,
 };
 pub use agent_workspace_teams::{

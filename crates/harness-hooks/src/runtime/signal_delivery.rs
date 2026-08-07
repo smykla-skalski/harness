@@ -59,10 +59,7 @@ pub(super) fn claim_signal_for_context(
     };
     let target = SignalAckTarget::new(ids, project_dir);
     match runtime::signal::claim_signal_acknowledgment(signal_dir, &acknowledgment) {
-        Ok(
-            runtime::signal::SignalAckClaim::Created(claim)
-            | runtime::signal::SignalAckClaim::Recovered(claim),
-        ) => handle_owned_claim(claim, target),
+        Ok(runtime::signal::SignalAckClaim::Created(claim)) => handle_owned_claim(claim, target),
         Ok(runtime::signal::SignalAckClaim::Existing(stored)) => {
             target.record(&stored);
             None

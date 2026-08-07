@@ -1,6 +1,3 @@
-use std::path::PathBuf;
-
-use harness_agents::runtime;
 use harness_agents::runtime::signal::{AckResult, SignalFileState};
 use harness_daemon_db_queries::AgentWorkspaceSignalAcknowledgment;
 use harness_kernel::errors::{CliError, CliErrorKind};
@@ -12,12 +9,12 @@ use harness_protocol::daemon::activity::{
 use harness_protocol::session::SessionSignalStatus;
 use harness_protocol::timeline::TimelineWindowRequest;
 
-use super::sync_support::read_runtime_acknowledgments_async;
 use super::wake_route::WakeDispatch;
 use crate::daemon::db::prelude::*;
 use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::state;
 
+mod runtime_ack_import;
 mod runtime_delivery;
 mod wake_delivery;
 
@@ -27,6 +24,21 @@ use runtime_delivery::{
     settle_expired_runtime_signal, settle_runtime_acknowledgment, write_runtime_signal,
 };
 use wake_delivery::wake_managed_agent;
+
+pub(super) async fn record_native_runtime_acknowledgment_from_session_route(
+    db: &AsyncDaemonDbHandle,
+    source_session_id: &str,
+    source_agent_id: &str,
+    signal_id: &str,
+) -> Result<bool, CliError> {
+    runtime_ack_import::record_native_runtime_acknowledgment_from_session_route(
+        db,
+        source_session_id,
+        source_agent_id,
+        signal_id,
+    )
+    .await
+}
 
 /// Return a workspace-owned activity window after reconciling legacy sources.
 ///
@@ -55,7 +67,9 @@ pub(crate) async fn get_agent_workspace_member_activity_async(
     let response = db
         .load_agent_workspace_member_activity(&daemon_id, workspace_id, member_id)
         .await?;
-    if reconcile_runtime_acknowledgments(db, &daemon_id, &response).await {
+    if runtime_ack_import::reconcile_runtime_acknowledgments_for_read(db, &daemon_id, &response)
+        .await
+    {
         db.load_agent_workspace_member_activity(&daemon_id, workspace_id, member_id)
             .await
     } else {
@@ -257,7 +271,9 @@ pub(crate) async fn cancel_agent_workspace_signal_async(
     let mut activity = db
         .load_agent_workspace_member_activity(&daemon_id, workspace_id, member_id)
         .await?;
-    if reconcile_runtime_acknowledgments(db, &daemon_id, &activity).await {
+    if runtime_ack_import::reconcile_runtime_acknowledgments_for_read(db, &daemon_id, &activity)
+        .await
+    {
         activity = db
             .load_agent_workspace_member_activity(&daemon_id, workspace_id, member_id)
             .await?;
@@ -349,80 +365,6 @@ pub(crate) async fn cancel_agent_workspace_signal_async(
         &runtime_acknowledgment,
     )
     .await
-}
-
-async fn reconcile_runtime_acknowledgments(
-    db: &AsyncDaemonDbHandle,
-    daemon_id: &str,
-    response: &AgentWorkspaceMemberActivityResponse,
-) -> bool {
-    if response
-        .signals
-        .iter()
-        .all(|signal| signal.acknowledgment.is_some())
-    {
-        return false;
-    }
-    let target = match db
-        .load_agent_workspace_signal_target(daemon_id, &response.workspace_id, &response.member_id)
-        .await
-    {
-        Ok(target) => target,
-        Err(error) => {
-            tracing::debug!(%error, member_id = response.member_id, "runtime acknowledgment scan skipped");
-            return false;
-        }
-    };
-    let Some(runtime) = runtime::runtime_for_name(&target.runtime) else {
-        return false;
-    };
-    let signal_session_id = runtime_signal_session_id(&target);
-    let mut acknowledgments = match read_runtime_acknowledgments_async(
-        runtime,
-        PathBuf::from(&target.project_dir),
-        signal_session_id,
-        "durable agent activity",
-    )
-    .await
-    {
-        Ok(acknowledgments) => acknowledgments,
-        Err(error) => {
-            tracing::warn!(%error, member_id = response.member_id, "runtime acknowledgment scan failed");
-            return false;
-        }
-    };
-    acknowledgments.sort_by(|left, right| {
-        (&left.acknowledged_at, &left.signal_id).cmp(&(&right.acknowledged_at, &right.signal_id))
-    });
-    let mut changed = false;
-    for acknowledgment in acknowledgments {
-        let is_pending = response.signals.iter().any(|record| {
-            record.signal.signal_id == acknowledgment.signal_id && record.acknowledgment.is_none()
-        });
-        if !is_pending {
-            continue;
-        }
-        match persist_durable_acknowledgment(
-            db,
-            daemon_id,
-            &response.workspace_id,
-            &response.member_id,
-            &AgentWorkspaceSignalAcknowledgment {
-                signal_id: acknowledgment.signal_id.clone(),
-                result: acknowledgment.result,
-                details: acknowledgment.details.clone(),
-                acknowledged_at: Some(acknowledgment.acknowledged_at.clone()),
-            },
-        )
-        .await
-        {
-            Ok(_) => changed = true,
-            Err(error) => {
-                tracing::warn!(%error, signal_id = acknowledgment.signal_id, "runtime acknowledgment import failed");
-            }
-        }
-    }
-    changed
 }
 
 async fn prepare_activity_scope(db: &AsyncDaemonDbHandle) -> Result<String, CliError> {

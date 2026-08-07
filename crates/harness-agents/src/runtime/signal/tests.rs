@@ -49,16 +49,7 @@ fn write_prepared_ack(signal_dir: &Path, acknowledgment: &SignalAck) {
     .unwrap();
 }
 
-fn assert_prepared_delivery(signal_dir: &Path, signal: &Signal) {
-    assert_eq!(read_pending_signals(signal_dir).unwrap().len(), 1);
-    assert!(read_acknowledgments(signal_dir).unwrap().is_empty());
-    assert!(matches!(
-        ensure_signal_file(signal_dir, signal).unwrap(),
-        SignalFileState::Pending
-    ));
-}
-
-fn assert_recovered_delivery(signal_dir: &Path, signal: &Signal, expected: &SignalAck) {
+fn assert_settled_delivery(signal_dir: &Path, signal: &Signal, expected: &SignalAck) {
     assert!(read_pending_signals(signal_dir).unwrap().is_empty());
     assert!(
         acknowledged_dir(signal_dir)
@@ -254,7 +245,7 @@ fn ensure_signal_file_repairs_missing_delivery_without_reviving_acknowledged_sig
 }
 
 #[test]
-fn acknowledged_pending_signal_remains_recoverable_until_claimed() {
+fn acknowledged_pending_signal_settles_without_redelivery() {
     let tmp = tempfile::tempdir().unwrap();
     let signal_dir = tmp.path().join("signals");
     let signal = sample_signal();
@@ -262,38 +253,13 @@ fn acknowledged_pending_signal_remains_recoverable_until_claimed() {
     let acknowledgment = accepted_ack(&signal.signal_id);
     write_prepared_ack(&signal_dir, &acknowledgment);
 
-    assert_prepared_delivery(&signal_dir, &signal);
+    assert_eq!(read_pending_signals(&signal_dir).unwrap().len(), 1);
     let claim = claim_signal_acknowledgment(&signal_dir, &acknowledgment).unwrap();
-    let SignalAckClaim::Recovered(delivery) = claim else {
-        panic!("prepared acknowledgment must be recovered")
+    let SignalAckClaim::Existing(stored) = claim else {
+        panic!("prepared acknowledgment must be terminal")
     };
-    delivery.commit().unwrap();
-    assert_recovered_delivery(&signal_dir, &signal, &acknowledgment);
-}
-
-#[test]
-fn prepared_acceptance_can_expire_before_recovery() {
-    let tmp = tempfile::tempdir().unwrap();
-    let signal_dir = tmp.path().join("signals");
-    let signal = sample_signal();
-    write_signal_file(&signal_dir, &signal).unwrap();
-    let prepared = accepted_ack(&signal.signal_id);
-    write_prepared_ack(&signal_dir, &prepared);
-    let expired = SignalAck {
-        acknowledged_at: "2026-03-28T12:05:00Z".into(),
-        result: AckResult::Expired,
-        details: Some("expired".into()),
-        ..prepared
-    };
-
-    let stored = acknowledge_signal_once(&signal_dir, &expired).unwrap();
-
-    assert_eq!(stored.result, AckResult::Expired);
-    assert!(read_pending_signals(&signal_dir).unwrap().is_empty());
-    assert_eq!(
-        read_acknowledgments(&signal_dir).unwrap()[0].result,
-        AckResult::Expired
-    );
+    assert!(acknowledgments_match(&stored, &acknowledgment));
+    assert_settled_delivery(&signal_dir, &signal, &acknowledgment);
 }
 
 #[test]

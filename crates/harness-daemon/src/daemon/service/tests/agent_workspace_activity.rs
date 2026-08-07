@@ -11,6 +11,7 @@ use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 mod expired_retry;
+mod native_ack_route;
 mod prepared_rejection;
 mod recovery;
 
@@ -163,7 +164,8 @@ async fn assert_workspace_signal_round_trip(
         },
     )
     .expect("write runtime acknowledgment");
-    record_compatibility_acknowledgment(&sent.signal.signal_id, fixture).await;
+    native_ack_route::record_and_assert_native_acknowledgment(&sent.signal.signal_id, fixture)
+        .await;
     assert_delivered_signal_cannot_be_cancelled(
         &fixture.db,
         &fixture.workspace_id,
@@ -395,32 +397,6 @@ async fn assert_durable_acknowledgment(signal_id: &str, fixture: &WorkspaceActiv
         })
         .count();
     assert_eq!(acknowledgment_count, 1);
-}
-
-async fn record_compatibility_acknowledgment(signal_id: &str, fixture: &WorkspaceActivityFixture) {
-    let target = fixture
-        .db
-        .load_agent_workspace_signal_target(
-            &crate::daemon::state::ensure_daemon_identity()
-                .expect("ensure daemon identity")
-                .daemon_id,
-            &fixture.workspace_id,
-            &fixture.member_id,
-        )
-        .await
-        .expect("load compatibility acknowledgment target");
-    crate::daemon::service::record_signal_ack_direct_async(
-        target.source_session_id.as_deref().expect("source session"),
-        &SignalAckRequest {
-            agent_id: target.source_agent_id.expect("source agent"),
-            signal_id: signal_id.to_string(),
-            result: AckResult::Accepted,
-            project_dir: target.project_dir,
-        },
-        &fixture.db,
-    )
-    .await
-    .expect("record compatibility acknowledgment through daemon service");
 }
 
 async fn assert_delivered_signal_cannot_be_cancelled(

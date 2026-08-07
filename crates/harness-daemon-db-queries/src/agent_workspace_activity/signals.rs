@@ -6,7 +6,9 @@ use sha2::{Digest, Sha256};
 use sqlx::{FromRow, Sqlite, Transaction, query, query_as};
 
 use super::reads::load_signal_record;
-use super::types::{AgentWorkspaceSignalInsertion, AgentWorkspaceSignalTarget};
+use super::types::{
+    AgentWorkspaceSignalInsertion, AgentWorkspaceSignalRoute, AgentWorkspaceSignalTarget,
+};
 
 const WAKE_CLAIM_LEASE_SECONDS: i64 = 30;
 
@@ -21,6 +23,44 @@ struct SignalTargetRow {
     project_dir: String,
     source_session_id: Option<String>,
     source_agent_id: Option<String>,
+}
+
+#[derive(Debug, FromRow)]
+struct SignalRouteRow {
+    workspace_id: String,
+    member_id: String,
+}
+
+pub(super) async fn load_signal_route(
+    transaction: &mut Transaction<'_, Sqlite>,
+    daemon_id: &str,
+    source_session_id: &str,
+    source_agent_id: &str,
+    signal_id: &str,
+) -> Result<Option<AgentWorkspaceSignalRoute>, CliError> {
+    query_as::<_, SignalRouteRow>(
+        "SELECT signal.workspace_id, signal.member_id
+         FROM agent_workspace_signals signal
+         JOIN agent_workspace_members member
+           ON member.workspace_id = signal.workspace_id AND member.member_id = signal.member_id
+         JOIN agent_workspaces workspace ON workspace.workspace_id = signal.workspace_id
+         WHERE workspace.daemon_id = ?1
+           AND member.source_session_id = ?2 AND member.source_agent_id = ?3
+           AND signal.signal_id = ?4 AND signal.origin_kind = 'native'",
+    )
+    .bind(daemon_id.trim())
+    .bind(source_session_id.trim())
+    .bind(source_agent_id.trim())
+    .bind(signal_id.trim())
+    .fetch_optional(transaction.as_mut())
+    .await
+    .map(|row| {
+        row.map(|row| AgentWorkspaceSignalRoute {
+            workspace_id: row.workspace_id,
+            member_id: row.member_id,
+        })
+    })
+    .map_err(|error| db_error(format!("load durable signal compatibility route: {error}")))
 }
 
 pub(super) async fn load_signal_target(

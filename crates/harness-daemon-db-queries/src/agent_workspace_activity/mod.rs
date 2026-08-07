@@ -15,7 +15,8 @@ mod signals;
 mod types;
 
 pub use types::{
-    AgentWorkspaceSignalAcknowledgment, AgentWorkspaceSignalInsertion, AgentWorkspaceSignalTarget,
+    AgentWorkspaceSignalAcknowledgment, AgentWorkspaceSignalInsertion, AgentWorkspaceSignalRoute,
+    AgentWorkspaceSignalTarget,
 };
 
 pub trait AsyncAgentWorkspaceActivityQueries: Send + Sync {
@@ -62,6 +63,18 @@ pub trait AsyncAgentWorkspaceActivityQueries: Send + Sync {
         workspace_id: &str,
         member_id: &str,
     ) -> impl Future<Output = Result<AgentWorkspaceSignalTarget, CliError>> + Send;
+
+    /// Resolve a native signal reached through its compatibility session route.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when the route lookup cannot be completed.
+    fn load_agent_workspace_signal_route(
+        &self,
+        daemon_id: &str,
+        source_session_id: &str,
+        source_agent_id: &str,
+        signal_id: &str,
+    ) -> impl Future<Output = Result<Option<AgentWorkspaceSignalRoute>, CliError>> + Send;
 
     /// Persist a workspace-owned signal before runtime delivery.
     ///
@@ -176,6 +189,26 @@ impl AsyncAgentWorkspaceActivityQueries for AsyncDaemonDb {
             signals::load_signal_cleanup_target(&mut transaction, workspace_id, member_id).await?;
         commit_activity_transaction(transaction, "signal cleanup target read").await?;
         Ok(target)
+    }
+
+    async fn load_agent_workspace_signal_route(
+        &self,
+        daemon_id: &str,
+        source_session_id: &str,
+        source_agent_id: &str,
+        signal_id: &str,
+    ) -> Result<Option<AgentWorkspaceSignalRoute>, CliError> {
+        let mut transaction = begin_activity_transaction(self, "signal route read").await?;
+        let route = signals::load_signal_route(
+            &mut transaction,
+            daemon_id,
+            source_session_id,
+            source_agent_id,
+            signal_id,
+        )
+        .await?;
+        commit_activity_transaction(transaction, "signal route read").await?;
+        Ok(route)
     }
 
     async fn insert_agent_workspace_signal(

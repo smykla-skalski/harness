@@ -10,6 +10,12 @@ pub struct AgentWorkspaceSignalAcknowledgment {
 }
 
 #[derive(Debug, Clone)]
+pub struct AgentWorkspaceSignalRoute {
+    pub workspace_id: String,
+    pub member_id: String,
+}
+
+#[derive(Debug, Clone)]
 pub struct AgentWorkspaceSignalTarget {
     pub workspace_id: String,
     pub member_id: String,
