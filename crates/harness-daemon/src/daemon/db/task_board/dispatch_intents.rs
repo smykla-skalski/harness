@@ -300,20 +300,39 @@ pub(super) async fn complete_task_board_dispatch(
 #[path = "dispatch_intents_completion.rs"]
 mod completion;
 
-/// The ticket still has to name the owner this dispatch linked. Taking the
-/// applied dispatch whole keeps the workspace and Session halves compared
-/// together, so a workspace item cannot pass on a Session match it never had.
+/// Who a dispatch linked its ticket to.
+///
+/// Both halves travel together on purpose: a workspace item must not pass this
+/// check on a Session match it never had, and comparing one field at a time is
+/// how that slips through.
+#[derive(Clone, Copy)]
+pub(in crate::daemon::db::task_board) struct DispatchItemOwners<'a> {
+    pub(in crate::daemon::db::task_board) session_id: Option<&'a str>,
+    pub(in crate::daemon::db::task_board) workspace_id: Option<&'a str>,
+    pub(in crate::daemon::db::task_board) work_item_id: &'a str,
+}
+
+impl<'a> DispatchItemOwners<'a> {
+    pub(in crate::daemon::db::task_board) fn of(applied: &'a DispatchAppliedTask) -> Self {
+        Self {
+            session_id: applied.session_id.as_deref(),
+            workspace_id: applied.workspace_id.as_deref(),
+            work_item_id: applied.work_item_id.as_str(),
+        }
+    }
+}
+
 pub(super) fn ensure_dispatch_item_startable(
     item: &TaskBoardItem,
-    applied: &DispatchAppliedTask,
+    owners: DispatchItemOwners<'_>,
     execution_id: Option<&str>,
 ) -> Result<(), CliError> {
     let matches = !item.is_deleted()
         && item.status == TaskBoardStatus::InProgress
         && item.workflow.status == TaskBoardWorkflowStatus::Running
-        && item.session_id == applied.session_id
-        && item.workspace_id == applied.workspace_id
-        && item.work_item_id.as_deref() == Some(applied.work_item_id.as_str())
+        && item.session_id.as_deref() == owners.session_id
+        && item.workspace_id.as_deref() == owners.workspace_id
+        && item.work_item_id.as_deref() == Some(owners.work_item_id)
         && item.workflow.execution_id.as_deref() == execution_id;
     if matches {
         Ok(())

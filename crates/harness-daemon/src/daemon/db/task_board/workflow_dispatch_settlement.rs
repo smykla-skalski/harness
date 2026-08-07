@@ -4,7 +4,9 @@ use super::ITEMS_CHANGE_SCOPE;
 use super::admission_lifecycle::{
     renew_dispatch_admission_in_tx, validate_worker_start_fence_in_tx,
 };
-use super::dispatch_intents::{claimed_intent_identity, ensure_dispatch_item_startable};
+use super::dispatch_intents::{
+    DispatchItemOwners, claimed_intent_identity, ensure_dispatch_item_startable,
+};
 use super::dispatch_workflow_start::{
     insert_started_workflow_in_tx, load_claimed_applied, workflow_start_fence,
 };
@@ -296,7 +298,7 @@ async fn screen_workflow_dispatch_in_tx(
         .load_item_in_tx(&item_id)
         .await?
         .ok_or_else(|| db_error(format!("task-board item '{item_id}' not found")))?;
-    validate_claimed_identity(&item, &session_id, &work_item_id, &execution_id, &applied)?;
+    validate_claimed_identity(&item, session_id.as_deref(), &work_item_id, &execution_id, &applied)?;
     let (prepared_revision, configuration_revision) = workflow_start_fence(&applied)?
         .ok_or_else(|| db_error("workflow dispatch has no immutable start fence"))?;
     validate_worker_start_fence_in_tx(
@@ -305,7 +307,7 @@ async fn screen_workflow_dispatch_in_tx(
         revision,
     )
     .await?;
-    ensure_dispatch_item_startable(&item, &applied, Some(&execution_id))?;
+    ensure_dispatch_item_startable(&item, DispatchItemOwners::of(&applied), Some(&execution_id))?;
     item.workflow.current_step_id = Some("workflow_prepared".into());
     item.updated_at = utc_now();
     Ok(PreparedWorkflowDispatch {
@@ -353,16 +355,17 @@ fn ensure_workflow_launch(applied: &DispatchAppliedTask) -> Result<(), CliError>
 
 fn validate_claimed_identity(
     item: &TaskBoardItem,
-    session_id: &str,
+    session_id: Option<&str>,
     work_item_id: &str,
     execution_id: &str,
     applied: &DispatchAppliedTask,
 ) -> Result<(), CliError> {
-    let linked = item.session_id.as_deref() == Some(session_id)
+    let linked = item.session_id.as_deref() == session_id
+        && item.workspace_id == applied.workspace_id
         && item.work_item_id.as_deref() == Some(work_item_id)
         && item.workflow.execution_id.as_deref() == Some(execution_id)
         && applied.board_item_id == item.id
-        && applied.session_id == session_id
+        && applied.session_id.as_deref() == session_id
         && applied.work_item_id == work_item_id
         && applied.item.workflow.execution_id.as_deref() == Some(execution_id);
     if linked {

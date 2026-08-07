@@ -15,6 +15,7 @@ use super::super::items::bump_change_in_tx;
 use super::super::lane_order::{
     LaneTransitionKind, record_lane_transition_audit_in_tx, replace_with_lane_transition_in_tx,
 };
+use super::dispatch_intents::DispatchItemOwners;
 use super::ensure_dispatch_item_startable;
 use crate::daemon::db::{CliError, db_error, utc_now};
 use crate::task_board::{DispatchAppliedTask, TaskBoardItem, TaskBoardWorkflowStatus};
@@ -53,7 +54,7 @@ pub(super) async fn screen_dispatch_completion_in_tx(
         )));
     }
     validate_dispatch_start_fence_in_tx(transaction, &applied, revision).await?;
-    ensure_dispatch_item_startable(&item, &applied, Some(&execution_id))?;
+    ensure_dispatch_item_startable(&item, DispatchItemOwners::of(&applied), Some(&execution_id))?;
     Ok(Box::new(ScreenedDispatchCompletion {
         item,
         revision,

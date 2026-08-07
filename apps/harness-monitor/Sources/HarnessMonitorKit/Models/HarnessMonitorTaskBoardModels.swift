@@ -299,8 +299,11 @@ public struct TaskBoardItem: Codable, Equatable, Identifiable, Sendable {
   public let importedFromProvider: TaskBoardExternalRefProvider?
   public let planning: TaskBoardPlanningState
   public let workflow: TaskBoardWorkflowState?
+  /// Legacy owner. Only items dispatched before workspaces existed carry one.
   public let sessionId: String?
   public let workItemId: String?
+  public let workspaceId: String?
+  public let workingCopyId: String?
   public let usage: TaskBoardUsage
   public let parentItemId: String?
   public let childOrder: UInt32
@@ -332,6 +335,8 @@ public struct TaskBoardItem: Codable, Equatable, Identifiable, Sendable {
     workflow: TaskBoardWorkflowState?,
     sessionId: String?,
     workItemId: String?,
+    workspaceId: String? = nil,
+    workingCopyId: String? = nil,
     usage: TaskBoardUsage,
     parentItemId: String? = nil,
     childOrder: UInt32 = 0,
@@ -362,6 +367,8 @@ public struct TaskBoardItem: Codable, Equatable, Identifiable, Sendable {
     self.workflow = workflow
     self.sessionId = sessionId
     self.workItemId = workItemId
+    self.workspaceId = workspaceId
+    self.workingCopyId = workingCopyId
     self.usage = usage
     self.parentItemId = parentItemId
     self.childOrder = childOrder

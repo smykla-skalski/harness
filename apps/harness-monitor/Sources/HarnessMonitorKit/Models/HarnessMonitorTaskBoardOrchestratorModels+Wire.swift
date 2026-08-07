@@ -50,6 +50,8 @@ extension TaskBoardOrchestratorAppliedTask {
     self.init(
       boardItemId: wire.boardItemId,
       sessionId: wire.sessionId,
+      workspaceId: wire.workspaceId,
+      workingCopyId: wire.workingCopyId,
       workItemId: wire.workItemId,
       itemTitle: wire.itemTitle
     )

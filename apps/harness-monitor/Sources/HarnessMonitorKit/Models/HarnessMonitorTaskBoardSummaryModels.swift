@@ -308,11 +308,18 @@ public struct TaskBoardDispatchFailure: Codable, Equatable, Sendable {
 
 public struct TaskBoardDispatchAppliedTask: Codable, Equatable, Identifiable, Sendable {
   public let boardItemId: String
-  public let sessionId: String
+  /// Legacy owner, present only for a dispatch that reclaimed an existing
+  /// Session. Fresh dispatch reports `workspaceId` and `workingCopyId` instead.
+  public let sessionId: String?
+  public let workspaceId: String?
+  public let workingCopyId: String?
   public let workItemId: String
   public let item: TaskBoardItem
 
   public var id: String { boardItemId }
+
+  /// Whichever owner this dispatch actually has.
+  public var ownerId: String? { workspaceId ?? sessionId }
 }
 
 public struct TaskBoardDispatchReadiness: Codable, Equatable, Sendable {

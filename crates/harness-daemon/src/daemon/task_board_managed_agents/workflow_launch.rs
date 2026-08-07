@@ -31,7 +31,7 @@ pub(super) fn validate_recovered_workflow_worker(
         (Some(_), Some(_)) => return Err(workflow_recovery_conflict(snapshot.agent_id())),
         (Some(launch), None) => {
             if validate_task_board_read_only_run_context(&launch.run_context).is_err()
-                || launch.run_context.session_id != applied.session_id
+                || Some(launch.run_context.session_id.as_str()) != applied.launch_owner_id()
             {
                 return Err(workflow_recovery_conflict(snapshot.agent_id()));
             }
@@ -39,7 +39,7 @@ pub(super) fn validate_recovered_workflow_worker(
         }
         (None, Some(launch)) => {
             if validate_task_board_read_only_run_context(&launch.run_context).is_err()
-                || launch.run_context.session_id != applied.session_id
+                || Some(launch.run_context.session_id.as_str()) != applied.launch_owner_id()
             {
                 return Err(workflow_recovery_conflict(snapshot.agent_id()));
             }

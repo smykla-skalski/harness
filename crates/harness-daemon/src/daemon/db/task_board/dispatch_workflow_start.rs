@@ -1,7 +1,7 @@
 use sqlx::{Sqlite, Transaction, query_as};
 
 use super::admission_lifecycle::{TaskBoardAdmissionCheck, revalidate_dispatch_admission_in_tx};
-use super::dispatch_intents::ensure_dispatch_item_startable;
+use super::dispatch_intents::{DispatchItemOwners, ensure_dispatch_item_startable};
 use super::dispatch_intents::helpers::refuse_pending_admission_in_tx;
 use super::item_tx_ext::TaskBoardItemTxExt;
 use super::workflow_dispatch::{
@@ -102,7 +102,7 @@ pub(super) async fn validate_pending_dispatch(
     }
     if let Err(error) = ensure_dispatch_item_startable(
         &item,
-        applied,
+        DispatchItemOwners::of(applied),
         applied.item.workflow.execution_id.as_deref(),
     ) {
         refuse_pending_admission_in_tx(
