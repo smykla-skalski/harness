@@ -46,7 +46,7 @@ pub fn run(conn: &Connection) -> Result<(), CliError> {
     if table_exists(conn, "task_board_dispatch_intents")?
         && !column_exists(conn, "task_board_dispatch_intents", "workspace_id")?
     {
-        apply_in_transaction(
+        apply(
             conn,
             "dispatch intent workspace ownership",
             DISPATCH_INTENT_WORKSPACE_SQL,
@@ -55,28 +55,13 @@ pub fn run(conn: &Connection) -> Result<(), CliError> {
     stamp_schema_version(conn)
 }
 
+/// The dispatch-intent file carries its own `BEGIN`/`COMMIT` and suspends
+/// foreign keys around the swap, so it must not be wrapped in a transaction
+/// here - the pragma would be a no-op and the swap would rewrite the admission
+/// children's foreign keys. `execute_batch` runs it exactly as written.
 fn apply(conn: &Connection, label: &str, sql: &str) -> Result<(), CliError> {
     conn.execute_batch(sql)
         .map_err(|error| super::db_error(format!("apply schema v65 {label}: {error}")))
-}
-
-/// The dispatch-intent rebuild swaps the parent out from under two foreign-key
-/// children and relies on `defer_foreign_keys` to hold the check until the
-/// replacement is in place. That pragma lasts exactly one transaction, so the
-/// statements have to share one - `execute_batch` alone would commit each
-/// statement separately and check the constraint mid-swap. The async migrator
-/// already runs each migration in a transaction; this is the sync path's
-/// equivalent.
-fn apply_in_transaction(conn: &Connection, label: &str, sql: &str) -> Result<(), CliError> {
-    let transaction = conn
-        .unchecked_transaction()
-        .map_err(|error| super::db_error(format!("begin schema v65 {label}: {error}")))?;
-    transaction
-        .execute_batch(sql)
-        .map_err(|error| super::db_error(format!("apply schema v65 {label}: {error}")))?;
-    transaction
-        .commit()
-        .map_err(|error| super::db_error(format!("commit schema v65 {label}: {error}")))
 }
 
 fn stamp_schema_version(conn: &Connection) -> Result<(), CliError> {

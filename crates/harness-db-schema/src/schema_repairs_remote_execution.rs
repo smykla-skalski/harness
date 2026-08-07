@@ -37,6 +37,13 @@ const DISPATCH_ACTIVE_INDEX: &str = "idx_task_board_dispatch_active_item";
 const MIGRATION_SQL: &str = include_str!(
     "../../harness-daemon-db-core/src/migrations/0037_daemon_v43_task_board_remote_execution.sql"
 );
+/// v65 rebuilt the dispatch table to make `session_id` optional and add the
+/// workspace owners. Both shapes are current as far as this guard is concerned:
+/// it exists to refuse a *destructive* repair against a schema it does not
+/// recognize, and a database that has taken v65 is recognized.
+const DISPATCH_V65_MIGRATION_SQL: &str = include_str!(
+    "../../harness-daemon-db-core/src/migrations/0070_daemon_v65_dispatch_intent_workspace.sql"
+);
 
 const LEGACY_HOST_TABLE_SQL: &str = "
 CREATE TABLE task_board_execution_hosts (
@@ -225,7 +232,7 @@ fn classify_shape(conn: &Connection) -> Result<RemoteSchemaShape, CliError> {
             RECOVERY_QUARANTINE_TABLE,
         )?
         && quarantine::current_shape_matches(conn)?
-        && is_expected_table(&dispatch_sql, DISPATCH_TABLE)?
+        && dispatch_table_current(&dispatch_sql)?
         && table_current(admission_decision_sql.as_deref(), ADMISSION_DECISION_TABLE)?
         && table_current(admission_ledger_sql.as_deref(), ADMISSION_LEDGER_TABLE)?;
     if others_current && is_expected_table(&assignment_sql, ASSIGNMENT_TABLE)? {
@@ -251,7 +258,10 @@ fn classify_shape(conn: &Connection) -> Result<RemoteSchemaShape, CliError> {
     {
         return Ok(RemoteSchemaShape::LegacyV36);
     }
-    Err(incompatible_schema())
+    Err(db_error(format!(
+        "incompatible remote execution ledger schema; refusing destructive repair{}",
+        incompatible_schema_detail(conn)
+    )))
 }
 
 fn indexes_need_repair(conn: &Connection) -> Result<bool, CliError> {
@@ -285,6 +295,15 @@ fn is_repairable_legacy_index(name: &str, actual: &str) -> bool {
         && LEGACY_DISPATCH_ACTIVE_INDEXES
             .iter()
             .any(|expected| normalize_sql(actual) == normalize_sql(expected))
+}
+
+/// The dispatch table has two current shapes: the v43 one and the v65 rebuild.
+fn dispatch_table_current(stored_sql: &str) -> Result<bool, CliError> {
+    if is_expected_table(stored_sql, DISPATCH_TABLE)? {
+        return Ok(true);
+    }
+    Ok(normalize_sql(stored_sql)
+        == objects::expected_table_sql(DISPATCH_V65_MIGRATION_SQL, DISPATCH_TABLE)?)
 }
 
 fn is_expected_table(stored_sql: &str, table: &str) -> Result<bool, CliError> {
@@ -323,6 +342,32 @@ fn object_sql(
 
 fn incompatible_schema() -> CliError {
     db_error("incompatible remote execution ledger schema; refusing destructive repair")
+}
+
+/// Name the table whose stored shape stopped the classification.
+///
+/// Without this the refusal says only that *something* is unrecognized, which
+/// is nearly useless when a migration changes one of a dozen ledger tables.
+fn incompatible_schema_detail(conn: &Connection) -> String {
+    let checks: [(&str, fn(&Connection) -> Result<bool, CliError>); 3] = [
+        (HOST_TABLE, |conn| {
+            table_sql(conn, HOST_TABLE)?
+                .map_or(Ok(false), |sql| is_expected_table(&sql, HOST_TABLE))
+        }),
+        (ASSIGNMENT_TABLE, |conn| {
+            table_sql(conn, ASSIGNMENT_TABLE)?
+                .map_or(Ok(false), |sql| is_expected_table(&sql, ASSIGNMENT_TABLE))
+        }),
+        (DISPATCH_TABLE, |conn| {
+            table_sql(conn, DISPATCH_TABLE)?.map_or(Ok(false), |sql| dispatch_table_current(&sql))
+        }),
+    ];
+    for (table, matches) in checks {
+        if !matches(conn).unwrap_or(false) {
+            return format!(" (unrecognized {table})");
+        }
+    }
+    String::new()
 }
 
 fn normalize_sql(sql: &str) -> String {

@@ -1,18 +1,26 @@
+-- no-transaction
 -- Fresh dispatch reserves a workspace and a working copy instead of a Session,
--- so the intent's `session_id` becomes optional correlation metadata and the
--- CHECK moves the requirement onto "one owner or the other".
+-- so the intent's `session_id` becomes optional correlation metadata.
 --
 -- The admission decisions and ledger name this table in their foreign keys, and
 -- with `foreign_keys` on, renaming it out of the way rewrites those clauses to
--- follow the scratch name - which then dangles when the scratch table is
--- dropped. So the new table is built under the scratch name instead and renamed
--- into place last, leaving the children's clauses untouched throughout. The
--- window where the parent does not exist is covered by `defer_foreign_keys`;
--- the caller runs this whole file in one transaction so the check lands after
--- the rename has put the parent back.
-PRAGMA defer_foreign_keys = ON;
+-- follow the scratch name. Suspending enforcement is the only thing that stops
+-- that, and the pragma is a no-op inside a transaction - hence
+-- `-- no-transaction` above and the explicit BEGIN below, matching what
+-- `schema_repairs_remote_execution_precursor` does for the same swap.
+--
+-- Renaming the scratch table into place would work too, but SQLite rewrites the
+-- stored CREATE with the new name quoted, and the remote-execution shape guard
+-- compares that text. Creating the replacement under its real name keeps the
+-- stored DDL identical whichever path a database arrives by.
+PRAGMA foreign_keys = OFF;
+PRAGMA legacy_alter_table = ON;
 
-CREATE TABLE task_board_dispatch_intents_v65 (
+BEGIN IMMEDIATE;
+
+ALTER TABLE task_board_dispatch_intents RENAME TO task_board_dispatch_intents_v64;
+
+CREATE TABLE task_board_dispatch_intents (
     intent_id TEXT PRIMARY KEY,
     item_id TEXT NOT NULL REFERENCES task_board_items(item_id) ON DELETE CASCADE,
     session_id TEXT,
@@ -88,7 +96,7 @@ CREATE TABLE task_board_dispatch_intents_v65 (
     )
 );
 
-INSERT INTO task_board_dispatch_intents_v65 (
+INSERT INTO task_board_dispatch_intents (
     intent_id, item_id, session_id, workspace_id, working_copy_id, work_item_id,
     workflow_execution_id, payload_json, status, attempts, available_at,
     claim_token, claimed_at, last_error, created_at, updated_at, completed_at,
@@ -100,10 +108,9 @@ SELECT intent_id, item_id, session_id, NULL, NULL, work_item_id,
        claim_token, claimed_at, last_error, created_at, updated_at, completed_at,
        consumed_approval_grant_id, compensation_pending, start_admission_outcome,
        start_admission_settings_revision
-FROM task_board_dispatch_intents;
+FROM task_board_dispatch_intents_v64;
 
-DROP TABLE task_board_dispatch_intents;
-ALTER TABLE task_board_dispatch_intents_v65 RENAME TO task_board_dispatch_intents;
+DROP TABLE task_board_dispatch_intents_v64;
 
 CREATE UNIQUE INDEX IF NOT EXISTS task_board_dispatch_intents_admission_identity
     ON task_board_dispatch_intents(intent_id, item_id);
@@ -125,3 +132,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_task_board_dispatch_active_item
     );
 
 UPDATE schema_meta SET value = '65' WHERE key = 'version';
+
+COMMIT;
+
+PRAGMA legacy_alter_table = OFF;
+PRAGMA foreign_keys = ON;
