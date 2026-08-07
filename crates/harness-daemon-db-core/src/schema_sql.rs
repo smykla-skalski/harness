@@ -22,6 +22,35 @@ CREATE INDEX IF NOT EXISTS idx_codex_runs_status
     ON codex_runs(status);
 ";
 
+/// The v7 baseline `agents` table.
+///
+/// A database created before v7 never received the baseline, and no step in the
+/// pre-v7 chain creates this table - so a v4 database migrated forward reached
+/// current with no `agents` at all, and v64's triggers had nothing to attach
+/// to. The later ALTERs that widen it are version-gated, so ensuring the
+/// baseline here lets them bring it current.
+pub(super) const AGENTS_SCHEMA: &str = "
+CREATE TABLE IF NOT EXISTS agents (
+    agent_id                  TEXT NOT NULL,
+    session_id                TEXT NOT NULL REFERENCES sessions(session_id) ON DELETE CASCADE,
+    name                      TEXT NOT NULL,
+    runtime                   TEXT NOT NULL,
+    role                      TEXT NOT NULL,
+    capabilities_json         TEXT NOT NULL DEFAULT '[]',
+    status                    TEXT NOT NULL,
+    agent_session_id          TEXT,
+    joined_at                 TEXT NOT NULL,
+    updated_at                TEXT NOT NULL,
+    last_activity_at          TEXT,
+    current_task_id           TEXT,
+    runtime_capabilities_json TEXT NOT NULL DEFAULT '{}',
+    PRIMARY KEY (session_id, agent_id)
+) WITHOUT ROWID;
+
+CREATE INDEX IF NOT EXISTS idx_agents_runtime_session
+    ON agents(runtime, agent_session_id);
+";
+
 pub(super) const AGENT_TUIS_SCHEMA: &str = "
 CREATE TABLE IF NOT EXISTS agent_tuis (
     tui_id          TEXT PRIMARY KEY,

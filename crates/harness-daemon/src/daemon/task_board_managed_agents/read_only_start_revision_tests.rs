@@ -411,7 +411,7 @@ async fn claimed_read_only_dispatch_with_policy(
     let worktree_path = worktree.path().to_string_lossy().into_owned();
     let launch = read_only_launch(
         &db,
-        preparation.preparation.session_id.as_deref().expect("this fixture dispatches through a Session"),
+        preparation.preparation.launch_owner_id().expect("a prepared dispatch has an owner"),
         worktree.path(),
         exact_head,
     )

@@ -109,10 +109,9 @@ async fn write_launch(
             schema_version: TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION,
             session_id: preparation
                 .preparation
-                .workspace_id
-                .clone()
-                .or_else(|| preparation.preparation.session_id.clone())
-                .unwrap_or_default(),
+                .launch_owner_id()
+                .unwrap_or_default()
+                .to_string(),
             title: item_snapshot.item.title,
             body: item_snapshot.item.body,
             tags: item_snapshot.item.tags,

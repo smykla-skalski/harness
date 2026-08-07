@@ -109,12 +109,17 @@ pub enum TaskBoardTombstoneCause {
 }
 
 impl TaskBoardItem {
-    /// The owner a dispatched item is linked to, whichever kind it has.
+    /// The owner a dispatched item is linked to, most specific first.
+    ///
+    /// Same order as `DispatchAppliedTask::launch_owner_id`, because a frozen
+    /// launch is validated by comparing the two; disagreeing would read an
+    /// untouched launch as changed.
     #[must_use]
     pub fn owner_id(&self) -> Option<&str> {
         self.workspace_id
             .as_deref()
             .or(self.session_id.as_deref())
+            .or(self.working_copy_id.as_deref())
     }
 
     #[must_use]

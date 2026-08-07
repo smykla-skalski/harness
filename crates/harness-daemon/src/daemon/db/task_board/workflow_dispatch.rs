@@ -278,7 +278,7 @@ fn validate_write_launch(
         || item.workflow_kind != launch.workflow_kind
         || execution_repository != launch.execution_repository
         || item_revision != started_revision
-        || item.session_id.as_deref() != Some(launch.run_context.session_id.as_str())
+        || item.owner_id() != Some(launch.run_context.session_id.as_str())
         || item.title != launch.run_context.title
         || item.body != launch.run_context.body
         || item.tags != launch.run_context.tags
@@ -354,7 +354,7 @@ fn validate_launch(
         || item.agent_mode != AgentMode::Evaluate
         || execution_repository != launch.execution_repository
         || pull_request != launch.pull_request
-        || item.session_id.as_deref() != Some(launch.run_context.session_id.as_str())
+        || item.owner_id() != Some(launch.run_context.session_id.as_str())
         || item.title != launch.run_context.title
         || item.body != launch.run_context.body
         || item.tags != launch.run_context.tags

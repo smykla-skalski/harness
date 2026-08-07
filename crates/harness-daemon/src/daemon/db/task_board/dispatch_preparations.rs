@@ -62,6 +62,22 @@ pub(crate) struct TaskBoardDispatchPreparation {
     pub(crate) hold_worker: bool,
 }
 
+impl TaskBoardDispatchPreparation {
+    /// The owner a frozen workflow launch records against, most specific first.
+    ///
+    /// A legacy dispatch names its Session. A fresh one names the workspace once
+    /// preparation has made the checkout and learned which workspace it belongs
+    /// to; before that the reserved working copy is the only identity it has,
+    /// and it is the right answer for a launch frozen mid-preparation. Total by
+    /// construction: reservation always leaves one of the three set.
+    pub(crate) fn launch_owner_id(&self) -> Option<&str> {
+        self.workspace_id
+            .as_deref()
+            .or(self.session_id.as_deref())
+            .or(self.working_copy_id.as_deref())
+    }
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct ClaimedTaskBoardDispatchPreparation {
     pub(crate) intent_id: String,

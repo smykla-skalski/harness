@@ -1,4 +1,4 @@
-use super::schema_sql::{AGENT_TUIS_SCHEMA, CODEX_RUNS_SCHEMA};
+use super::schema_sql::{AGENT_TUIS_SCHEMA, AGENTS_SCHEMA, CODEX_RUNS_SCHEMA};
 use super::{CliError, Connection, db_error};
 
 pub(super) fn run_pre_v7_migrations(conn: &Connection, version: &str) -> Result<bool, CliError> {
@@ -191,6 +191,16 @@ fn migrate_v5_to_v6(conn: &Connection) -> Result<(), CliError> {
 }
 
 fn migrate_v6_to_v7(conn: &Connection) -> Result<(), CliError> {
+    // Reaching v7 means having the v7 baseline, and a database that entered the
+    // chain partway never got the tables the earlier steps would have made.
+    // Everything downstream - v11's widening, v64's triggers - assumes they are
+    // there, so ensure them rather than let a later step fail on a missing one.
+    conn.execute_batch(AGENTS_SCHEMA)
+        .map_err(|error| db_error(format!("migrate v6 -> v7 agents: {error}")))?;
+    conn.execute_batch(CODEX_RUNS_SCHEMA)
+        .map_err(|error| db_error(format!("migrate v6 -> v7 codex runs: {error}")))?;
+    conn.execute_batch(AGENT_TUIS_SCHEMA)
+        .map_err(|error| db_error(format!("migrate v6 -> v7 agent tuis: {error}")))?;
     conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS session_timeline_entries (
              session_id       TEXT NOT NULL REFERENCES sessions(session_id) ON DELETE CASCADE,

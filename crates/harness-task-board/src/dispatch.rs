@@ -125,16 +125,20 @@ pub struct TaskBoardWriteWorkflowLaunch {
 }
 
 impl DispatchAppliedTask {
-    /// The owner a frozen workflow launch records against.
+    /// The owner a frozen workflow launch records against, most specific first.
     ///
-    /// Workspace first: a fresh dispatch has one and no Session, a legacy one
-    /// has only its Session, so this is the single id both the launch and the
-    /// board item agree on.
+    /// Mirrors the preparation's rule exactly, because the launch is frozen from
+    /// the preparation and validated against the applied task: a legacy dispatch
+    /// names its Session, a fresh one names its workspace, and one whose launch
+    /// was frozen before preparation learned the workspace names the working
+    /// copy it reserved. Disagreeing with that order would read every such
+    /// launch as tampered with.
     #[must_use]
     pub fn launch_owner_id(&self) -> Option<&str> {
         self.workspace_id
             .as_deref()
             .or(self.session_id.as_deref())
+            .or(self.working_copy_id.as_deref())
     }
 }
 
