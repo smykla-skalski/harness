@@ -3,6 +3,7 @@ use serde_json::json;
 use super::*;
 
 mod delivery_claims;
+mod prepared_terminal;
 
 fn sample_signal() -> Signal {
     Signal {

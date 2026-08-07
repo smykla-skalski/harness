@@ -38,11 +38,13 @@ pub fn ensure_signal_file(signal_dir: &Path, signal: &Signal) -> Result<SignalFi
         FlockErrorContext::new("signal delivery"),
         || {
             if let Some(acknowledgment) = read_existing_ack(&paths, &signal.signal_id)? {
-                return if pending_signal_exists(&paths)? {
-                    Ok(SignalFileState::Pending)
-                } else {
-                    Ok(SignalFileState::Acknowledged(acknowledgment))
-                };
+                if pending_signal_exists(&paths)?
+                    && acknowledgment.result == super::AckResult::Accepted
+                {
+                    return Ok(SignalFileState::Pending);
+                }
+                move_pending_if_present(&paths)?;
+                return Ok(SignalFileState::Acknowledged(acknowledgment));
             }
             let existed = paths.signal_file.try_exists().map_err(|error| {
                 CliErrorKind::workflow_io(format!(

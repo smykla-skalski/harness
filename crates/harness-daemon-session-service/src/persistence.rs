@@ -61,49 +61,47 @@ pub fn record_signal_ack<S: SignalStorage>(
             project_dir,
         )?
     };
-    let result = signal.as_ref().map_or(result, |signal| {
-        session_service::normalize_signal_ack_result(&signal.signal, result)
-    });
-    let started_task = if let Some(signal) = signal.as_ref() {
-        let started_task = session_service::apply_signal_ack_result(
-            &mut state,
+    let Some(signal) = signal else {
+        return Ok(());
+    };
+    if !session_service::signal_belongs_to_session_route(&signal.signal, session_id, agent_id) {
+        return Ok(());
+    }
+    let result = session_service::normalize_signal_ack_result(&signal.signal, result);
+    let started_task = session_service::apply_signal_ack_result(
+        &mut state,
+        agent_id,
+        &signal.signal,
+        result,
+        &now,
+    );
+    session_service::refresh_session(&mut state, &now);
+    let project_id = storage
+        .project_id_for_session(session_id)?
+        .ok_or_else(|| session_not_found(session_id))?;
+    storage.save_session_state(&project_id, &state)?;
+    let ack_agent = state
+        .agents
+        .get(agent_id)
+        .and_then(|agent| agent.agent_session_id.as_deref())
+        .unwrap_or(session_id);
+    let acknowledgment = build_signal_ack(
+        session_id,
+        &signal.signal.signal_id,
+        &now,
+        result,
+        ack_agent,
+        None,
+    );
+    storage.merge_signal_records(
+        session_id,
+        &[acknowledged_signal_record(
+            &signal.runtime,
             agent_id,
             &signal.signal,
-            result,
-            &now,
-        );
-        session_service::refresh_session(&mut state, &now);
-        let project_id = storage
-            .project_id_for_session(session_id)?
-            .ok_or_else(|| session_not_found(session_id))?;
-        storage.save_session_state(&project_id, &state)?;
-        let ack_agent = state
-            .agents
-            .get(agent_id)
-            .and_then(|agent| agent.agent_session_id.as_deref())
-            .unwrap_or(session_id);
-        let acknowledgment = build_signal_ack(
-            session_id,
-            &signal.signal.signal_id,
-            &now,
-            result,
-            ack_agent,
-            None,
-        );
-        storage.merge_signal_records(
-            session_id,
-            &[acknowledged_signal_record(
-                &signal.runtime,
-                agent_id,
-                &signal.signal,
-                &acknowledgment,
-            )],
-        )?;
-        started_task
-    } else {
-        refresh_signal_index(storage, session_id)?;
-        None
-    };
+            &acknowledgment,
+        )],
+    )?;
 
     if let Some(task_id) = started_task.as_deref() {
         storage.append_log_entry(&build_log_entry(

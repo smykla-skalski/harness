@@ -325,7 +325,9 @@ pub fn record_signal_acknowledgment(
     )
 }
 
-fn signal_belongs_to_session_route(signal: &Signal, session_id: &str, agent_id: &str) -> bool {
+/// Return whether a runtime signal belongs to the legacy Session route that observed it.
+#[must_use]
+pub fn signal_belongs_to_session_route(signal: &Signal, session_id: &str, agent_id: &str) -> bool {
     let prefix = format!("{session_id}:{agent_id}:");
     signal
         .delivery

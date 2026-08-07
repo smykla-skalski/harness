@@ -3,6 +3,7 @@ use harness_protocol::daemon::activity::{
     AgentWorkspaceSignalCancelRequest, AgentWorkspaceSignalSendRequest,
 };
 use harness_protocol::session::{SessionRole, SessionSignalStatus};
+use harness_protocol::session_wire::SignalAckRequest;
 
 use super::*;
 use crate::daemon::db::prelude::*;
@@ -10,6 +11,7 @@ use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 mod expired_retry;
+mod prepared_rejection;
 mod recovery;
 
 #[test]
@@ -407,14 +409,18 @@ async fn record_compatibility_acknowledgment(signal_id: &str, fixture: &Workspac
         )
         .await
         .expect("load compatibility acknowledgment target");
-    session_service::record_signal_acknowledgment(
+    crate::daemon::service::record_signal_ack_direct_async(
         target.source_session_id.as_deref().expect("source session"),
-        target.source_agent_id.as_deref().expect("source agent"),
-        signal_id,
-        AckResult::Accepted,
-        Path::new(&target.project_dir),
+        &SignalAckRequest {
+            agent_id: target.source_agent_id.expect("source agent"),
+            signal_id: signal_id.to_string(),
+            result: AckResult::Accepted,
+            project_dir: target.project_dir,
+        },
+        &fixture.db,
     )
-    .expect("record compatibility acknowledgment");
+    .await
+    .expect("record compatibility acknowledgment through daemon service");
 }
 
 async fn assert_delivered_signal_cannot_be_cancelled(

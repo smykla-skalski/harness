@@ -165,7 +165,7 @@ pub use runtime_registration::register_agent_runtime_session;
 // keep their former fused shape for the same `harness-hooks` reason as above.
 pub use signals::{
     cancel_signal_local, list_signals_local, record_signal_acknowledgment,
-    resolve_session_agent_for_runtime_session, send_signal_local,
+    resolve_session_agent_for_runtime_session, send_signal_local, signal_belongs_to_session_route,
 };
 pub use tasks::{
     assign_task_local, create_task, create_task_with_source_local, delete_task_local,
