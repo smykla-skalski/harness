@@ -301,7 +301,7 @@ fn acknowledge_signal(
     ids: &SignalIdentities,
     project_dir: &Path,
     now: &str,
-) -> runtime::signal::AckResult {
+) -> Option<runtime::signal::AckResult> {
     let result =
         session_service::normalize_signal_ack_result(signal, runtime::signal::AckResult::Accepted);
     let ack = runtime::signal::SignalAck {
@@ -312,21 +312,28 @@ fn acknowledge_signal(
         session_id: ids.orchestration_session.clone(),
         details: None,
     };
-    if let Err(error) = runtime::signal::acknowledge_signal(signal_dir, &ack) {
-        warn_formatted(&format!(
-            "failed to acknowledge signal {}: {error} (session={})",
-            signal.signal_id, ids.runtime_session,
-        ));
-        return result;
-    }
+    let claim = match runtime::signal::claim_signal_acknowledgment(signal_dir, &ack) {
+        Ok(claim) => claim,
+        Err(error) => {
+            warn_formatted(&format!(
+                "failed to acknowledge signal {}: {error} (session={})",
+                signal.signal_id, ids.runtime_session,
+            ));
+            return None;
+        }
+    };
+    let (stored, should_emit) = match claim {
+        runtime::signal::SignalAckClaim::Created(stored) => (stored, true),
+        runtime::signal::SignalAckClaim::Existing(stored) => (stored, false),
+    };
     record_signal_ack_in_session(
         &ids.orchestration_session,
         &ids.agent,
         &signal.signal_id,
-        ack.result,
+        stored.result,
         project_dir,
     );
-    result
+    should_emit.then_some(stored.result)
 }
 
 fn record_signal_ack_in_session(

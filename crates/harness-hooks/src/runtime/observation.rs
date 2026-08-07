@@ -412,7 +412,7 @@ pub(super) fn acknowledged_signal_lines(
                 signal_command = %signal.command
             )
             .entered();
-            let result = super::acknowledge_signal(signal_dir, signal, ids, project_dir, now);
+            let result = super::acknowledge_signal(signal_dir, signal, ids, project_dir, now)?;
             (result != runtime::signal::AckResult::Expired)
                 .then(|| format!("[signal:{}] {}", signal.command, signal.payload.message))
         })

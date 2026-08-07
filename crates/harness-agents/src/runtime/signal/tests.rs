@@ -205,6 +205,47 @@ fn ensure_signal_file_repairs_missing_delivery_without_reviving_acknowledged_sig
 }
 
 #[test]
+fn acknowledged_pending_signal_is_repaired_without_being_replayed() {
+    let tmp = tempfile::tempdir().unwrap();
+    let signal_dir = tmp.path().join("signals");
+    let signal = sample_signal();
+    write_signal_file(&signal_dir, &signal).unwrap();
+    let acknowledgment = SignalAck {
+        signal_id: signal.signal_id.clone(),
+        acknowledged_at: "2026-03-28T12:00:03Z".into(),
+        result: AckResult::Accepted,
+        agent: "codex".into(),
+        session_id: "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
+        details: None,
+    };
+    let acknowledged = acknowledged_dir(&signal_dir);
+    fs::create_dir_all(&acknowledged).unwrap();
+    fs::write(
+        acknowledged.join(format!("{}.ack.json", signal.signal_id)),
+        serde_json::to_string_pretty(&acknowledgment).unwrap(),
+    )
+    .unwrap();
+
+    assert!(read_pending_signals(&signal_dir).unwrap().is_empty());
+    assert!(
+        !pending_dir(&signal_dir)
+            .join(format!("{}.json", signal.signal_id))
+            .exists()
+    );
+    assert!(
+        acknowledged
+            .join(format!("{}.json", signal.signal_id))
+            .exists()
+    );
+    let SignalFileState::Acknowledged(stored) = ensure_signal_file(&signal_dir, &signal).unwrap()
+    else {
+        panic!("durable acknowledgment must prevent payload recreation")
+    };
+    assert!(acknowledgments_match(&stored, &acknowledgment));
+    assert_eq!(stored.acknowledged_at, acknowledgment.acknowledged_at);
+}
+
+#[test]
 fn settle_signal_if_present_does_not_recreate_a_missing_payload() {
     let tmp = tempfile::tempdir().unwrap();
     let signal_dir = tmp.path().join("signals");
@@ -359,7 +400,7 @@ fn malformed_pending_signal_is_quarantined() {
 }
 
 #[test]
-fn acknowledge_signal_surfaces_rename_failures() {
+fn acknowledge_signal_rejects_a_missing_payload() {
     let tmp = tempfile::tempdir().unwrap();
     let signal_dir = tmp.path().join("signals");
     fs::create_dir_all(pending_dir(&signal_dir)).unwrap();
@@ -375,9 +416,10 @@ fn acknowledge_signal_surfaces_rename_failures() {
 
     let error = acknowledge_signal(&signal_dir, &ack).unwrap_err();
     assert!(
-        error.to_string().contains("move acknowledged signal"),
-        "rename failure should be surfaced: {error}"
+        error.to_string().contains("pending signal") && error.to_string().contains("is missing"),
+        "missing payload should be surfaced: {error}"
     );
+    assert!(read_acknowledgments(&signal_dir).unwrap().is_empty());
 }
 
 #[test]
