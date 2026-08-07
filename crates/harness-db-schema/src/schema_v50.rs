@@ -18,8 +18,27 @@ pub fn run(conn: &Connection) -> Result<(), CliError> {
     if !codex_runs_table_exists(conn)? {
         return stamp_schema_version(conn);
     }
+    // The repair chain replays every version step, and by v64 there are triggers
+    // that name `codex_runs`. Rebuilding it again renames the table out from
+    // under them, so they follow the scratch name and dangle when it is dropped.
+    // Once the column is already nullable there is nothing left to widen, so the
+    // replay stops here rather than breaking what later versions added.
+    if codex_runs_session_is_nullable(conn)? {
+        return stamp_schema_version(conn);
+    }
     conn.execute_batch(MIGRATION_SQL)
         .map_err(|error| super::db_error(format!("apply schema v50: {error}")))
+}
+
+fn codex_runs_session_is_nullable(conn: &Connection) -> Result<bool, CliError> {
+    conn.query_row(
+        "SELECT COUNT(*) FROM pragma_table_info('codex_runs')
+         WHERE name = 'session_id' AND [notnull] = 0",
+        [],
+        |row| row.get::<_, i64>(0),
+    )
+    .map(|count| count > 0)
+    .map_err(|error| super::db_error(format!("check codex_runs session nullability: {error}")))
 }
 
 fn codex_runs_table_exists(conn: &Connection) -> Result<bool, CliError> {
