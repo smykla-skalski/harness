@@ -71,6 +71,10 @@ pub(super) async fn dispatch_http_item(
 pub(super) async fn serve_http(
     state: crate::daemon::http::DaemonHttpState,
 ) -> (String, JoinHandle<()>) {
+    // A serving daemon mints its identity at startup, and dispatch needs it to
+    // key the workspace it provisions. Without it every dispatch refuses and the
+    // response carries no applied task at all.
+    crate::daemon::state::ensure_daemon_identity().expect("mint daemon identity");
     let app = super::super::daemon_http_router(state);
     let listener = TcpListener::bind("127.0.0.1:0")
         .await
