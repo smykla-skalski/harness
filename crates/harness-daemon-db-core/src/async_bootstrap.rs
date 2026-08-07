@@ -91,6 +91,12 @@ async fn migration_effect_observed(
     if migration_version == 65 {
         return table_exists(pool, "agent_workspace_teams").await;
     }
+    if migration_version == 66 {
+        return table_exists(pool, "agent_working_copies").await;
+    }
+    if migration_version == 70 {
+        return column_exists(pool, "task_board_dispatch_intents", "workspace_id").await;
+    }
     let Some((table, column)) = migration_effect_column(migration_version) else {
         return Ok(false);
     };
@@ -127,6 +133,9 @@ const fn migration_effect_column(migration_version: i64) -> Option<(&'static str
         50 => Some(("task_board_projects", "shape")),
         60 => Some(("task_board_ai_review_reports", "requested_runtime")),
         61 => Some(("task_board_ai_review_reports", "actual_runtime")),
+        67 => Some(("agent_tuis", "workspace_id")),
+        68 => Some(("codex_runs", "workspace_id")),
+        69 => Some(("task_board_items", "workspace_id")),
         _ => None,
     }
 }
@@ -214,6 +223,10 @@ const fn migration_floor_version(migration_version: i64) -> u64 {
         64 => 63,
         // v64 adds workspace-owned agent teams and runtime operation results.
         65 => 64,
+        // v65 ships as five files: the working-copy registry, then one owner
+        // column per table it reaches, so the repair chain can skip whichever
+        // parts a database already has.
+        66..=70 => 65,
         _ => u64::MAX,
     }
 }
