@@ -4,6 +4,7 @@ use std::sync::{Arc, Barrier};
 use std::thread;
 
 use crate::adapters::RenderedHookResponse;
+use crate::application::prepare_normalized_context;
 
 use super::*;
 
@@ -334,18 +335,19 @@ fn copilot_delivers_pending_signal_after_tool_use() {
         let event = NormalizedEvent::AfterToolUse;
         let signal_dir = runtime::runtime_for(agent).signal_dir(project, RUNTIME_SESSION);
         runtime::signal::write_signal_file(&signal_dir, &signal()).unwrap();
-        let context = NormalizedHookContext {
-            event: event.clone(),
-            session: SessionContext {
-                session_id: RUNTIME_SESSION.into(),
-                cwd: Some(project.to_path_buf()),
-                transcript_path: None,
-            },
-            tool: None,
-            agent: None,
-            skill: SkillContext::inactive(),
-            raw: RawPayload::new(json!({})),
-        };
+        let raw = serde_json::to_vec(&json!({
+            "sessionId": RUNTIME_SESSION,
+            "cwd": project,
+            "toolName": "bash",
+            "toolArgs": { "command": "true" },
+            "toolResult": { "exitCode": 0 }
+        }))
+        .unwrap();
+        let parsed = adapter_for(agent).parse_input(&raw).unwrap();
+        let context = prepare_normalized_context(parsed, "suite:run", event.clone());
+
+        assert_eq!(context.session.session_id, RUNTIME_SESSION);
+        assert_eq!(context.tool.as_ref().unwrap().input_raw["command"], "true");
 
         let (result, deliveries) =
             inject_pending_signals(agent, &context, NormalizedHookResult::allow());

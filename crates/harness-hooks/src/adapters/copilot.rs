@@ -46,12 +46,14 @@ struct CopilotPostToolUseOutput<'a> {
 
 #[derive(Debug, Deserialize)]
 struct CopilotHookPayload {
+    #[serde(rename = "sessionId")]
+    session_id: String,
     #[serde(default)]
     cwd: Option<PathBuf>,
     #[serde(rename = "toolName", default)]
     tool_name: Option<String>,
     #[serde(rename = "toolArgs", default)]
-    tool_args: Option<String>,
+    tool_args: Value,
     #[serde(rename = "toolResult", default)]
     tool_result: Value,
     #[serde(default)]
@@ -77,18 +79,13 @@ impl AgentAdapter for CopilotAdapter {
             serde_json::from_value(value.clone()).map_err(|error| {
                 CliErrorKind::hook_payload_invalid(format!("invalid hook payload: {error}"))
             })?;
-        let tool_input = payload
-            .tool_args
-            .as_deref()
-            .and_then(|input| serde_json::from_str::<Value>(input).ok())
-            .unwrap_or_else(|| Value::String(payload.tool_args.unwrap_or_default()));
         let process_payload = ProcessHookPayload {
             tool_name: payload.tool_name,
-            tool_input,
+            tool_input: payload.tool_args,
             tool_response: payload.tool_result,
             last_assistant_message: None,
             transcript_path: None,
-            session_id: None,
+            session_id: Some(payload.session_id),
             cwd: payload.cwd,
             directory: None,
             hook_event_name: None,
