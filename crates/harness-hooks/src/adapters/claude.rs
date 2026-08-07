@@ -53,7 +53,13 @@ impl AgentAdapter for ClaudeAdapter {
         RenderedHookResponse {
             stdout: output::render_normalized_hook_output(event_to_hook_type(event), result),
             exit_code: 0,
+            additional_context_rendered: result.additional_context.is_some()
+                && self.supports_additional_context(event),
         }
+    }
+
+    fn supports_additional_context(&self, event: &NormalizedEvent) -> bool {
+        matches!(event, NormalizedEvent::BeforeToolUse)
     }
 
     fn normalize_tool(&self, tool_name: &str) -> ToolCategory {

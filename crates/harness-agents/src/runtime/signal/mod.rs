@@ -15,8 +15,8 @@ mod delivery;
 mod tests;
 
 pub use acknowledgment::{
-    SignalAckClaim, acknowledge_signal, acknowledge_signal_once, acknowledgments_match,
-    claim_signal_acknowledgment,
+    PendingSignalDelivery, SignalAckClaim, acknowledge_signal, acknowledge_signal_once,
+    acknowledgments_match, claim_signal_acknowledgment,
 };
 pub use delivery::{
     SignalFileState, SignalSettlement, ensure_signal_file, settle_signal_if_present,

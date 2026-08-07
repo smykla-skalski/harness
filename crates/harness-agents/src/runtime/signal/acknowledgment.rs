@@ -2,7 +2,10 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use harness_infra::persistence::flock::{FlockErrorContext, with_exclusive_flock};
+use harness_infra::persistence::flock::{
+    FlockErrorContext, FlockGuard, TryAcquireFlockError, try_acquire_exclusive_flock,
+    with_exclusive_flock,
+};
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_kernel::io::write_text;
 
@@ -10,6 +13,7 @@ use super::{
     AckResult, SignalAck, acknowledged_dir, pending_dir, signal_ack_name, signal_json_name,
 };
 
+#[derive(Debug)]
 pub(super) struct AckPaths {
     pub(super) acknowledged_dir: PathBuf,
     pub(super) signal_file: PathBuf,
@@ -31,15 +35,46 @@ impl AckPaths {
     }
 }
 
-/// Whether this caller created the terminal acknowledgment or observed the first writer's result.
-#[derive(Debug, Clone)]
-pub enum SignalAckClaim {
-    Created(SignalAck),
-    Recovered(SignalAck),
-    Existing(SignalAck),
+/// A per-signal delivery claim held until the hook output reaches stdout.
+#[derive(Debug)]
+pub struct PendingSignalDelivery {
+    paths: AckPaths,
+    acknowledgment: SignalAck,
+    acknowledgment_json: String,
+    prepared: bool,
+    _guard: FlockGuard,
 }
 
-/// Claim and settle one signal acknowledgment under its per-signal flock.
+impl PendingSignalDelivery {
+    /// Return the decision this delivery will commit.
+    #[must_use]
+    pub fn acknowledgment(&self) -> &SignalAck {
+        &self.acknowledgment
+    }
+
+    /// Commit the terminal acknowledgment after the hook output is flushed.
+    ///
+    /// # Errors
+    /// Returns `CliError` when the acknowledgment or payload move cannot be persisted.
+    pub fn commit(self) -> Result<SignalAck, CliError> {
+        if self.prepared {
+            move_pending_if_present(&self.paths)?;
+            return Ok(self.acknowledgment);
+        }
+        write_new_ack_locked(&self.paths, &self.acknowledgment, &self.acknowledgment_json)
+    }
+}
+
+/// Whether this caller owns delivery, observed its terminal result, or found another live owner.
+#[derive(Debug)]
+pub enum SignalAckClaim {
+    Created(PendingSignalDelivery),
+    Recovered(PendingSignalDelivery),
+    Existing(SignalAck),
+    Busy,
+}
+
+/// Claim one signal under its per-signal flock without settling its acknowledgment.
 ///
 /// # Errors
 /// Returns `CliError` on missing payloads, filesystem failures, or invalid identities.
@@ -52,50 +87,67 @@ pub fn claim_signal_acknowledgment(
         .map_err(|error| CliErrorKind::workflow_io(format!("create ack dir: {error}")))?;
     let acknowledgment_json = serde_json::to_string_pretty(acknowledgment)
         .map_err(|error| CliErrorKind::workflow_serialize(format!("ack: {error}")))?;
-    with_exclusive_flock(
+    let guard = match try_acquire_exclusive_flock(
         &paths.ack_lock_file,
         FlockErrorContext::new("signal acknowledgment"),
-        || claim_ack_locked(&paths, acknowledgment, &acknowledgment_json),
-    )
+    ) {
+        Ok(guard) => guard,
+        Err(TryAcquireFlockError::Busy) => return Ok(SignalAckClaim::Busy),
+        Err(TryAcquireFlockError::Io(error)) => return Err(error),
+    };
+    claim_ack_locked(paths, acknowledgment, acknowledgment_json, guard)
 }
 
-pub(super) fn claim_ack_locked(
-    paths: &AckPaths,
+fn claim_ack_locked(
+    paths: AckPaths,
     acknowledgment: &SignalAck,
-    acknowledgment_json: &str,
+    acknowledgment_json: String,
+    guard: FlockGuard,
 ) -> Result<SignalAckClaim, CliError> {
-    if let Some(existing) = read_existing_ack(paths, &acknowledgment.signal_id)? {
-        if pending_signal_exists(paths)? {
+    if let Some(existing) = read_existing_ack(&paths, &acknowledgment.signal_id)? {
+        if pending_signal_exists(&paths)? {
             let existing =
-                resolve_prepared_ack(paths, existing, acknowledgment, acknowledgment_json)?;
-            move_acknowledged_signal(&paths.signal_file, &paths.acknowledged_signal_file)?;
-            return Ok(SignalAckClaim::Recovered(existing));
+                resolve_prepared_ack(&paths, existing, acknowledgment, &acknowledgment_json)?;
+            return Ok(SignalAckClaim::Recovered(PendingSignalDelivery {
+                paths,
+                acknowledgment: existing,
+                acknowledgment_json,
+                prepared: true,
+                _guard: guard,
+            }));
         }
         return Ok(SignalAckClaim::Existing(existing));
     }
-    write_new_ack_locked(paths, acknowledgment, acknowledgment_json).map(SignalAckClaim::Created)
+    require_pending_signal(&paths)?;
+    Ok(SignalAckClaim::Created(PendingSignalDelivery {
+        paths,
+        acknowledgment: acknowledgment.clone(),
+        acknowledgment_json,
+        prepared: false,
+        _guard: guard,
+    }))
 }
 
-fn write_new_ack_locked(
+pub(super) fn write_new_ack_locked(
     paths: &AckPaths,
     acknowledgment: &SignalAck,
     acknowledgment_json: &str,
 ) -> Result<SignalAck, CliError> {
-    if !paths.signal_file.try_exists().map_err(|error| {
-        CliErrorKind::workflow_io(format!(
-            "inspect pending signal '{}': {error}",
-            paths.signal_file.display()
-        ))
-    })? {
-        return Err(CliErrorKind::workflow_io(format!(
-            "pending signal '{}' is missing",
-            paths.signal_file.display()
-        ))
-        .into());
-    }
+    require_pending_signal(paths)?;
     write_text(&paths.ack_file, acknowledgment_json)?;
     move_acknowledged_signal(&paths.signal_file, &paths.acknowledged_signal_file)?;
     Ok(acknowledgment.clone())
+}
+
+fn require_pending_signal(paths: &AckPaths) -> Result<(), CliError> {
+    if pending_signal_exists(paths)? {
+        return Ok(());
+    }
+    Err(CliErrorKind::workflow_io(format!(
+        "pending signal '{}' is missing",
+        paths.signal_file.display()
+    ))
+    .into())
 }
 
 pub(super) fn resolve_prepared_ack(

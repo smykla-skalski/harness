@@ -38,6 +38,12 @@ struct CopilotDenyOutput<'a> {
     permission_decision_reason: &'a str,
 }
 
+#[derive(Serialize)]
+struct CopilotPostToolUseOutput<'a> {
+    #[serde(rename = "additionalContext")]
+    additional_context: &'a str,
+}
+
 #[derive(Debug, Deserialize)]
 struct CopilotHookPayload {
     #[serde(default)]
@@ -100,12 +106,24 @@ impl AgentAdapter for CopilotAdapter {
     fn render_output(
         &self,
         result: &NormalizedHookResult,
-        _event: &NormalizedEvent,
+        event: &NormalizedEvent,
     ) -> RenderedHookResponse {
+        if matches!(event, NormalizedEvent::AfterToolUse)
+            && let Some(context) = result.additional_context.as_deref()
+        {
+            return RenderedHookResponse {
+                stdout: render_json(&CopilotPostToolUseOutput {
+                    additional_context: context,
+                }),
+                exit_code: 0,
+                additional_context_rendered: true,
+            };
+        }
         if !result.is_denial() {
             return RenderedHookResponse {
                 stdout: String::new(),
                 exit_code: 0,
+                additional_context_rendered: false,
             };
         }
 
@@ -116,7 +134,12 @@ impl AgentAdapter for CopilotAdapter {
                 permission_decision_reason: &reason,
             }),
             exit_code: 0,
+            additional_context_rendered: false,
         }
+    }
+
+    fn supports_additional_context(&self, event: &NormalizedEvent) -> bool {
+        matches!(event, NormalizedEvent::AfterToolUse)
     }
 
     fn normalize_tool(&self, tool_name: &str) -> ToolCategory {
@@ -162,5 +185,26 @@ impl AgentAdapter for CopilotAdapter {
             hooks: events,
         })
         .expect("typed hook JSON serializes")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn post_tool_use_serializes_additional_context() {
+        let pre_tool_event = NormalizedEvent::BeforeToolUse;
+        let post_tool_event = NormalizedEvent::AfterToolUse;
+        let rendered = CopilotAdapter.render_output(
+            &NormalizedHookResult::allow().with_additional_context("pending signal"),
+            &post_tool_event,
+        );
+        let output: Value = serde_json::from_str(&rendered.stdout).expect("Copilot hook JSON");
+
+        assert!(!CopilotAdapter.supports_additional_context(&pre_tool_event));
+        assert!(CopilotAdapter.supports_additional_context(&post_tool_event));
+        assert!(rendered.additional_context_rendered);
+        assert_eq!(output["additionalContext"], "pending signal");
     }
 }

@@ -2,6 +2,8 @@ use serde_json::json;
 
 use super::*;
 
+mod delivery_claims;
+
 fn sample_signal() -> Signal {
     Signal {
         signal_id: "sig-test-001".into(),
@@ -261,7 +263,10 @@ fn acknowledged_pending_signal_remains_recoverable_until_claimed() {
 
     assert_prepared_delivery(&signal_dir, &signal);
     let claim = claim_signal_acknowledgment(&signal_dir, &acknowledgment).unwrap();
-    assert!(matches!(claim, SignalAckClaim::Recovered(_)));
+    let SignalAckClaim::Recovered(delivery) = claim else {
+        panic!("prepared acknowledgment must be recovered")
+    };
+    delivery.commit().unwrap();
     assert_recovered_delivery(&signal_dir, &signal, &acknowledgment);
 }
 

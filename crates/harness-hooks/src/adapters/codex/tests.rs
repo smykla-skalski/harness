@@ -139,3 +139,19 @@ fn codex_config_names_match_current_lifecycle_events() {
         Some("SessionEnd")
     );
 }
+
+#[test]
+fn render_pre_tool_use_serializes_additional_context() {
+    let rendered = CodexAdapter.render_output(
+        &NormalizedHookResult::allow().with_additional_context("deliver the pending signal"),
+        &NormalizedEvent::BeforeToolUse,
+    );
+    let output: Value = serde_json::from_str(&rendered.stdout).expect("Codex hook JSON");
+
+    assert!(rendered.additional_context_rendered);
+    assert_eq!(output["hookSpecificOutput"]["hookEventName"], "PreToolUse");
+    assert_eq!(
+        output["hookSpecificOutput"]["additionalContext"],
+        "deliver the pending signal"
+    );
+}

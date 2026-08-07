@@ -4,12 +4,14 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::HookType;
 use crate::adapters::{
     AgentAdapter, HookRegistration, ProcessHookPayload, RenderedHookResponse, payload_context,
 };
 use crate::protocol::context::{
     AgentContext, NormalizedEvent, NormalizedHookContext, RawPayload, SessionContext, SkillContext,
 };
+use crate::protocol::output;
 use crate::protocol::result::NormalizedHookResult;
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_kernel::kernel::tooling::{ToolCategory, ToolContext, ToolInput};
@@ -90,12 +92,20 @@ impl AgentAdapter for CodexAdapter {
     fn render_output(
         &self,
         result: &NormalizedHookResult,
-        _event: &NormalizedEvent,
+        event: &NormalizedEvent,
     ) -> RenderedHookResponse {
+        if matches!(event, NormalizedEvent::BeforeToolUse) {
+            return RenderedHookResponse {
+                stdout: output::render_normalized_hook_output(HookType::PreToolUse, result),
+                exit_code: 0,
+                additional_context_rendered: result.additional_context.is_some(),
+            };
+        }
         if !result.is_denial() {
             return RenderedHookResponse {
                 stdout: String::new(),
                 exit_code: 0,
+                additional_context_rendered: false,
             };
         }
         let reason = result.display_message();
@@ -105,7 +115,12 @@ impl AgentAdapter for CodexAdapter {
                 reason: &reason,
             }),
             exit_code: 0,
+            additional_context_rendered: false,
         }
+    }
+
+    fn supports_additional_context(&self, event: &NormalizedEvent) -> bool {
+        matches!(event, NormalizedEvent::BeforeToolUse)
     }
 
     fn normalize_tool(&self, tool_name: &str) -> ToolCategory {

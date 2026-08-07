@@ -1,11 +1,29 @@
+use std::io::{self, Write};
 use std::slice;
 use std::sync::{Arc, Barrier};
 use std::thread;
+
+use crate::adapters::RenderedHookResponse;
 
 use super::*;
 
 const RUNTIME_SESSION: &str = "runtime-008d974f-c6a9-53e5-a62e-d331367c449a";
 const ORCHESTRATION_SESSION: &str = "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc";
+
+struct FailingWriter;
+
+impl Write for FailingWriter {
+    fn write(&mut self, _buffer: &[u8]) -> io::Result<usize> {
+        Err(io::Error::new(
+            io::ErrorKind::BrokenPipe,
+            "closed hook pipe",
+        ))
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
 
 fn signal() -> runtime::signal::Signal {
     runtime::signal::Signal {
@@ -65,7 +83,7 @@ fn observe_signal(
     signal_dir: &Path,
     signal: &runtime::signal::Signal,
     now: &str,
-) -> Vec<String> {
+) -> signal_delivery::SignalInjection {
     observation::acknowledged_signal_lines(
         signal_dir,
         slice::from_ref(signal),
@@ -73,6 +91,14 @@ fn observe_signal(
         project,
         now,
     )
+}
+
+fn rendered_signal_output(output: String) -> RenderedHookResponse {
+    RenderedHookResponse {
+        stdout: output,
+        exit_code: 0,
+        additional_context_rendered: true,
+    }
 }
 
 fn assert_settlement_is_prepared(
@@ -103,10 +129,12 @@ fn assert_recovery_delivers_once(
     signal: &runtime::signal::Signal,
 ) {
     let recovered = observe_signal(project, signal_dir, signal, "2026-08-06T10:00:02Z");
+    assert_eq!(recovered.lines, ["[signal:inject_context] deliver once"]);
+    let mut output = Vec::new();
+    let rendered = rendered_signal_output(recovered.lines.join("\n"));
+    signal_delivery::write_hook_output(&mut output, &rendered, recovered.deliveries).unwrap();
     let retry = observe_signal(project, signal_dir, signal, "2026-08-06T10:00:03Z");
-
-    assert_eq!(recovered, ["[signal:inject_context] deliver once"]);
-    assert!(retry.is_empty());
+    assert!(retry.lines.is_empty());
     assert_eq!(
         runtime::signal::read_acknowledgments(signal_dir)
             .unwrap()
@@ -137,8 +165,11 @@ fn only_the_first_hook_claim_emits_a_signal() {
             "2026-08-06T10:00:02Z",
         );
 
-        assert_eq!(first, ["[signal:inject_context] deliver once"]);
-        assert!(retry.is_empty());
+        assert_eq!(first.lines, ["[signal:inject_context] deliver once"]);
+        assert!(retry.lines.is_empty());
+        let mut output = Vec::new();
+        let rendered = rendered_signal_output(first.lines.join("\n"));
+        signal_delivery::write_hook_output(&mut output, &rendered, first.deliveries).unwrap();
         assert!(
             runtime::signal::read_pending_signals(&signal_dir)
                 .unwrap()
@@ -173,12 +204,25 @@ fn concurrent_recovery_emits_a_prepared_signal_once() {
         });
         let results = attempts.map(|attempt| attempt.join().unwrap());
 
-        assert_eq!(results.iter().filter(|lines| !lines.is_empty()).count(), 1);
+        assert_eq!(
+            results
+                .iter()
+                .filter(|injection| !injection.lines.is_empty())
+                .count(),
+            1
+        );
         assert!(
             results
                 .iter()
-                .any(|lines| { lines.as_slice() == ["[signal:inject_context] deliver once"] })
+                .any(|injection| injection.lines == ["[signal:inject_context] deliver once"])
         );
+        let owner = results
+            .into_iter()
+            .find(|injection| !injection.lines.is_empty())
+            .expect("one recovery owner");
+        let mut output = Vec::new();
+        let rendered = rendered_signal_output(owner.lines.join("\n"));
+        signal_delivery::write_hook_output(&mut output, &rendered, owner.deliveries).unwrap();
         assert!(
             runtime::signal::read_pending_signals(&signal_dir)
                 .unwrap()
@@ -209,10 +253,118 @@ fn failed_payload_settlement_is_recovered_without_losing_delivery() {
         fs::create_dir_all(&obstructed_payload).unwrap();
 
         let failed = observe_signal(project, &signal_dir, &signal, "2026-08-06T10:00:01Z");
-        assert!(failed.is_empty());
+        assert_eq!(failed.lines, ["[signal:inject_context] deliver once"]);
+        let mut first_output = Vec::new();
+        let rendered = rendered_signal_output(failed.lines.join("\n"));
+        signal_delivery::write_hook_output(&mut first_output, &rendered, failed.deliveries)
+            .unwrap();
         assert_settlement_is_prepared(&signal_dir, &signal, &acknowledged);
 
         fs::remove_dir(&obstructed_payload).unwrap();
         assert_recovery_delivers_once(project, &signal_dir, &signal);
+    });
+}
+
+#[test]
+fn failed_stdout_write_keeps_signal_recoverable() {
+    with_temp_project(|project| {
+        let signal_dir = project.join("signals");
+        let signal = signal();
+        runtime::signal::write_signal_file(&signal_dir, &signal).unwrap();
+        let injection = observe_signal(project, &signal_dir, &signal, "2026-08-06T10:00:01Z");
+        let rendered = rendered_signal_output(injection.lines.join("\n"));
+
+        let error =
+            signal_delivery::write_hook_output(&mut FailingWriter, &rendered, injection.deliveries)
+                .expect_err("closed stdout must reject the delivery");
+
+        assert_eq!(error.kind(), io::ErrorKind::BrokenPipe);
+        assert_eq!(
+            runtime::signal::read_pending_signals(&signal_dir)
+                .unwrap()
+                .len(),
+            1
+        );
+        assert!(
+            runtime::signal::read_acknowledgments(&signal_dir)
+                .unwrap()
+                .is_empty()
+        );
+        assert_recovery_delivers_once(project, &signal_dir, &signal);
+    });
+}
+
+#[test]
+fn unrelated_hook_output_cannot_commit_signal_delivery() {
+    with_temp_project(|project| {
+        let signal_dir = project.join("signals");
+        let signal = signal();
+        runtime::signal::write_signal_file(&signal_dir, &signal).unwrap();
+        let injection = observe_signal(project, &signal_dir, &signal, "2026-08-06T10:00:01Z");
+        let rendered = RenderedHookResponse {
+            stdout: r#"{"decision":"block","reason":"unrelated denial"}"#.into(),
+            exit_code: 0,
+            additional_context_rendered: false,
+        };
+
+        let error =
+            signal_delivery::write_hook_output(&mut Vec::new(), &rendered, injection.deliveries)
+                .expect_err("output without signal context must not commit delivery");
+
+        assert_eq!(error.kind(), io::ErrorKind::WriteZero);
+        assert_eq!(
+            runtime::signal::read_pending_signals(&signal_dir)
+                .unwrap()
+                .len(),
+            1
+        );
+        assert!(
+            runtime::signal::read_acknowledgments(&signal_dir)
+                .unwrap()
+                .is_empty()
+        );
+        assert_recovery_delivers_once(project, &signal_dir, &signal);
+    });
+}
+
+#[test]
+fn copilot_delivers_pending_signal_after_tool_use() {
+    with_temp_project(|project| {
+        let agent = HookAgent::Copilot;
+        let event = NormalizedEvent::AfterToolUse;
+        let signal_dir = runtime::runtime_for(agent).signal_dir(project, RUNTIME_SESSION);
+        runtime::signal::write_signal_file(&signal_dir, &signal()).unwrap();
+        let context = NormalizedHookContext {
+            event: event.clone(),
+            session: SessionContext {
+                session_id: RUNTIME_SESSION.into(),
+                cwd: Some(project.to_path_buf()),
+                transcript_path: None,
+            },
+            tool: None,
+            agent: None,
+            skill: SkillContext::inactive(),
+            raw: RawPayload::new(json!({})),
+        };
+
+        let (result, deliveries) =
+            inject_pending_signals(agent, &context, NormalizedHookResult::allow());
+        let rendered = adapter_for(agent).render_output(&result, &event);
+        let mut output = Vec::new();
+        signal_delivery::write_hook_output(&mut output, &rendered, deliveries).unwrap();
+
+        assert!(rendered.additional_context_rendered);
+        assert!(String::from_utf8(output).unwrap().contains("deliver once"));
+        assert!(
+            runtime::signal::read_pending_signals(&signal_dir)
+                .unwrap()
+                .is_empty()
+        );
+        assert_eq!(
+            runtime::signal::read_acknowledgments(&signal_dir)
+                .unwrap()
+                .len(),
+            1
+        );
     });
 }

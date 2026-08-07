@@ -36,6 +36,7 @@ pub(super) struct HookExecution {
     pub(super) render_event: NormalizedEvent,
     pub(super) render_event_name: String,
     pub(super) result: NormalizedHookResult,
+    pub(super) signal_deliveries: Vec<super::HookSignalDelivery>,
 }
 
 #[expect(
@@ -163,7 +164,7 @@ pub(super) fn prepare_hook_execution(
     record_hook_context_fields(metadata.span, &render_event_name, &normalized_for_record);
 
     let result = execute_hook_with_observability(metadata.hook_impl, normalized);
-    let result = {
+    let (result, signal_deliveries) = {
         let _signal_span = tracing::debug_span!("harness.hook.inject_pending_signals").entered();
         super::inject_pending_signals(metadata.agent, &normalized_for_record, result)
     };
@@ -173,6 +174,7 @@ pub(super) fn prepare_hook_execution(
         render_event,
         render_event_name,
         result,
+        signal_deliveries,
     })
 }
 
@@ -402,19 +404,29 @@ pub(super) fn acknowledged_signal_lines(
     ids: &super::SignalIdentities,
     project_dir: &Path,
     now: &str,
-) -> Vec<String> {
-    signals
-        .iter()
-        .filter_map(|signal| {
-            let _ack_span = tracing::debug_span!(
-                "harness.hook.acknowledge_signal",
-                signal_id = %signal.signal_id,
-                signal_command = %signal.command
-            )
-            .entered();
-            let result = super::acknowledge_signal(signal_dir, signal, ids, project_dir, now)?;
-            (result != runtime::signal::AckResult::Expired)
-                .then(|| format!("[signal:{}] {}", signal.command, signal.payload.message))
-        })
-        .collect()
+) -> super::signal_delivery::SignalInjection {
+    let mut injection = super::signal_delivery::SignalInjection::default();
+    for signal in signals {
+        let _ack_span = tracing::debug_span!(
+            "harness.hook.claim_signal",
+            signal_id = %signal.signal_id,
+            signal_command = %signal.command
+        )
+        .entered();
+        let Some(delivery) = super::signal_delivery::claim_signal_for_context(
+            signal_dir,
+            signal,
+            ids,
+            project_dir,
+            now,
+        ) else {
+            continue;
+        };
+        injection.lines.push(format!(
+            "[signal:{}] {}",
+            signal.command, signal.payload.message
+        ));
+        injection.deliveries.push(delivery);
+    }
+    injection
 }

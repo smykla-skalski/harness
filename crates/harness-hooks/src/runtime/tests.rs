@@ -222,7 +222,22 @@ fn collect_signal_context_acknowledges_runtime_target_and_logs_transition() {
         };
 
         let injected = collect_signal_context(HookAgent::Codex, &context).expect("signal text");
-        assert!(injected.contains("follow the queued task"));
+        assert!(injected.text.contains("follow the queued task"));
+        let signal_dir = runtime::runtime_for_name("codex")
+            .expect("codex runtime")
+            .signal_dir(project, "008d974f-c6a9-53e5-a62e-d331367c449a");
+        assert!(
+            runtime::signal::read_acknowledgments(&signal_dir)
+                .expect("acknowledgments before output")
+                .is_empty()
+        );
+        let mut output = Vec::new();
+        let rendered = adapter_for(HookAgent::Codex).render_output(
+            &NormalizedHookResult::allow().with_additional_context(&injected.text),
+            &NormalizedEvent::BeforeToolUse,
+        );
+        write_hook_output(&mut output, &rendered, injected.deliveries)
+            .expect("write signal context");
 
         let layout = session_storage::layout_from_project_dir(
             project,

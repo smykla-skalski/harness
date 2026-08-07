@@ -5,8 +5,8 @@ use harness_infra::persistence::flock::{FlockErrorContext, with_exclusive_flock}
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::acknowledgment::{
-    AckPaths, SignalAckClaim, claim_ack_locked, move_pending_if_present, pending_signal_exists,
-    read_existing_ack, resolve_prepared_ack,
+    AckPaths, move_pending_if_present, pending_signal_exists, read_existing_ack,
+    resolve_prepared_ack, write_new_ack_locked,
 };
 use super::{Signal, SignalAck, acknowledgments_match, write_signal_file};
 
@@ -111,10 +111,6 @@ fn settle_locked(
     }
     let acknowledgment_json = serde_json::to_string_pretty(acknowledgment)
         .map_err(|error| CliErrorKind::workflow_serialize(format!("ack: {error}")))?;
-    let claimed = claim_ack_locked(paths, acknowledgment, &acknowledgment_json)?;
-    Ok(SignalSettlement::Acknowledged(match claimed {
-        SignalAckClaim::Created(stored)
-        | SignalAckClaim::Recovered(stored)
-        | SignalAckClaim::Existing(stored) => stored,
-    }))
+    write_new_ack_locked(paths, acknowledgment, &acknowledgment_json)
+        .map(SignalSettlement::Acknowledged)
 }

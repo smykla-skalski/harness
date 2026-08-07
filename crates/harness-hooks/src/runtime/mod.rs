@@ -1,3 +1,4 @@
+use std::io;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
@@ -20,8 +21,10 @@ use observation::{
     read_hook_payload, record_hook_event_failure, record_trace_id,
     resolve_signal_session_with_trace,
 };
+use signal_delivery::{HookSignalDelivery, SignalContext, write_hook_output};
 
 mod observation;
+mod signal_delivery;
 
 pub(crate) fn hook_runtime_result(hook: &dyn Hook, code: &str, message: &str) -> HookResult {
     if hook.hook_type().is_guard() {
@@ -152,8 +155,9 @@ pub fn run_hook_command(agent: HookAgent, skill: &str, hook: &HookCommand) -> i3
         started_at,
     );
     let rendered = adapter_for(agent).render_output(&execution.result, &execution.render_event);
-    if !rendered.stdout.is_empty() {
-        print!("{}", rendered.stdout);
+    let mut stdout = io::stdout().lock();
+    if let Err(error) = write_hook_output(&mut stdout, &rendered, execution.signal_deliveries) {
+        warn_formatted(&format!("failed to write hook output: {error}"));
     }
     rendered.exit_code
 }
@@ -168,7 +172,7 @@ fn hook_outcome_label(result: &NormalizedHookResult) -> &'static str {
     }
 }
 
-/// Check for pending signals on `BeforeToolUse` events and inject context.
+/// Check for pending signals when the adapter can expose model context.
 ///
 /// Non-blocking and failure-tolerant: signal delivery failure is logged but
 /// never breaks the hook.
@@ -176,23 +180,24 @@ fn inject_pending_signals(
     agent: HookAgent,
     context: &super::protocol::context::NormalizedHookContext,
     mut result: NormalizedHookResult,
-) -> NormalizedHookResult {
-    if !matches!(context.event, NormalizedEvent::BeforeToolUse) {
-        return result;
+) -> (NormalizedHookResult, Vec<HookSignalDelivery>) {
+    if !adapter_for(agent).supports_additional_context(&context.event) {
+        return (result, Vec::new());
     }
-    if let Some(text) = collect_signal_context(agent, context) {
+    if let Some(signal_context) = collect_signal_context(agent, context) {
         result.additional_context = Some(match result.additional_context {
-            Some(existing) => format!("{existing}\n{text}"),
-            None => text,
+            Some(existing) => format!("{existing}\n{}", signal_context.text),
+            None => signal_context.text,
         });
+        return (result, signal_context.deliveries);
     }
-    result
+    (result, Vec::new())
 }
 
 fn collect_signal_context(
     agent: HookAgent,
     context: &super::protocol::context::NormalizedHookContext,
-) -> Option<String> {
+) -> Option<SignalContext> {
     let runtime_session_id = &context.session.session_id;
     if runtime_session_id.trim().is_empty() {
         return None;
@@ -209,8 +214,7 @@ fn collect_signal_context(
     )?;
     let ids = derive_signal_ids(agent_runtime, runtime_session_id, resolved_session.as_ref());
     let now = utc_now();
-    let lines = acknowledged_signal_lines(&signal_dir, &signals, &ids, project_dir, &now);
-    (!lines.is_empty()).then(|| lines.join("\n"))
+    acknowledged_signal_lines(&signal_dir, &signals, &ids, project_dir, &now).into_context()
 }
 
 struct SignalIdentities {
@@ -292,69 +296,6 @@ fn read_signals_from_dir(
             ));
             None
         }
-    }
-}
-
-fn acknowledge_signal(
-    signal_dir: &Path,
-    signal: &runtime::signal::Signal,
-    ids: &SignalIdentities,
-    project_dir: &Path,
-    now: &str,
-) -> Option<runtime::signal::AckResult> {
-    let result =
-        session_service::normalize_signal_ack_result(signal, runtime::signal::AckResult::Accepted);
-    let ack = runtime::signal::SignalAck {
-        signal_id: signal.signal_id.clone(),
-        acknowledged_at: now.to_string(),
-        result,
-        agent: ids.runtime_session.clone(),
-        session_id: ids.orchestration_session.clone(),
-        details: None,
-    };
-    let claim = match runtime::signal::claim_signal_acknowledgment(signal_dir, &ack) {
-        Ok(claim) => claim,
-        Err(error) => {
-            warn_formatted(&format!(
-                "failed to acknowledge signal {}: {error} (session={})",
-                signal.signal_id, ids.runtime_session,
-            ));
-            return None;
-        }
-    };
-    let (stored, owns_delivery) = match claim {
-        runtime::signal::SignalAckClaim::Created(stored)
-        | runtime::signal::SignalAckClaim::Recovered(stored) => (stored, true),
-        runtime::signal::SignalAckClaim::Existing(stored) => (stored, false),
-    };
-    record_signal_ack_in_session(
-        &ids.orchestration_session,
-        &ids.agent,
-        &signal.signal_id,
-        stored.result,
-        project_dir,
-    );
-    (owns_delivery && stored.result == runtime::signal::AckResult::Accepted)
-        .then_some(stored.result)
-}
-
-fn record_signal_ack_in_session(
-    orchestration_session_id: &str,
-    agent_id: &str,
-    signal_id: &str,
-    result: runtime::signal::AckResult,
-    project_dir: &Path,
-) {
-    if let Err(error) = session_service::record_signal_acknowledgment(
-        orchestration_session_id,
-        agent_id,
-        signal_id,
-        result,
-        project_dir,
-    ) {
-        warn_formatted(&format!(
-            "failed to persist signal acknowledgment {signal_id}: {error} (agent={agent_id})"
-        ));
     }
 }
 
