@@ -139,6 +139,8 @@ const fn migration_effect_column(migration_version: i64) -> Option<(&'static str
         67 => Some(("agent_tuis", "workspace_id")),
         68 => Some(("codex_runs", "workspace_id")),
         69 => Some(("task_board_items", "workspace_id")),
+        72 => Some(("agent_workspace_signals", "idempotency_key")),
+        74 => Some(("agent_workspace_signals", "wake_claimed_at")),
         _ => None,
     }
 }
@@ -232,6 +234,8 @@ const fn migration_floor_version(migration_version: i64) -> u64 {
         66..=70 => 65,
         // v66 adds workspace-owned signals, transcripts, activity, and timeline history.
         71 => 66,
+        // v67 adds signal idempotency and a managed-agent wake claim, then stamps the schema.
+        72..=75 => 67,
         _ => u64::MAX,
     }
 }

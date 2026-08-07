@@ -101,3 +101,4 @@ pub mod schema_v63;
 pub mod schema_v64;
 pub mod schema_v65;
 pub mod schema_v66;
+pub mod schema_v67;

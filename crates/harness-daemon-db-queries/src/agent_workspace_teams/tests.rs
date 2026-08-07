@@ -11,6 +11,7 @@ use super::{AsyncAgentWorkspaceTeamOperationQueries, AsyncAgentWorkspaceTeamQuer
 use crate::AsyncAgentWorkspaceQueries;
 
 mod activity;
+mod activity_signal_claims;
 mod activity_streams;
 mod deletion_safety;
 mod operation_precedence;

@@ -3,45 +3,66 @@ use std::path::PathBuf;
 use harness_agents::runtime;
 use harness_agents::runtime::signal::Signal;
 use harness_daemon_db_queries::AgentWorkspaceSignalTarget;
+use harness_kernel::errors::CliError;
 
 use super::super::signals::build_active_signal_prompt;
 use super::super::wake_route::WakeDispatch;
-use super::runtime_delivery::{
-    release_signal_wake, reserve_signal_wake, runtime_orchestration_session_id,
-    runtime_signal_session_id,
-};
+use super::runtime_delivery::{runtime_orchestration_session_id, runtime_signal_session_id};
 use crate::daemon::agent_acp::AcpWakePrompt;
+use crate::daemon::db::prelude::*;
+use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::protocol::CodexSteerRequest;
 
-pub(super) fn wake_managed_agent(
+pub(super) async fn wake_managed_agent(
+    db: &AsyncDaemonDbHandle,
+    daemon_id: &str,
     target: &AgentWorkspaceSignalTarget,
     signal: &Signal,
     dispatch: WakeDispatch<'_>,
-) {
+) -> Result<(), CliError> {
     let Some(runtime) = runtime::runtime_for_name(&target.runtime) else {
-        return;
+        return Ok(());
     };
-    let prompt = build_active_signal_prompt(signal);
-    if target.managed_agent_kind == "acp" {
-        let _ = wake_acp(target, signal, &prompt, runtime, dispatch);
-        return;
-    }
-    let attempted = match target.managed_agent_kind.as_str() {
+    let route_available = match target.managed_agent_kind.as_str() {
         "tui" => dispatch.agent_tui.is_some(),
+        "acp" => dispatch.acp_agent.is_some(),
         "codex" => dispatch.codex.is_some(),
         _ => false,
     };
-    if !attempted || !reserve_signal_wake(&signal.signal_id) {
-        return;
+    if !route_available {
+        return Ok(());
     }
+    let claimed_at = harness_workspace::workspace::utc_now();
+    if !db
+        .claim_agent_workspace_signal_wake(
+            daemon_id,
+            &target.workspace_id,
+            &target.member_id,
+            &signal.signal_id,
+            &claimed_at,
+        )
+        .await?
+    {
+        return Ok(());
+    }
+    let prompt = build_active_signal_prompt(signal);
     let delivered = match target.managed_agent_kind.as_str() {
         "tui" => wake_tui(target, &prompt, dispatch),
+        "acp" => wake_acp(target, signal, &prompt, runtime, dispatch),
         "codex" => wake_codex(target, &prompt, dispatch),
         _ => false,
     };
     if !delivered {
-        release_signal_wake(&signal.signal_id);
+        db.release_agent_workspace_signal_wake(
+            daemon_id,
+            &target.workspace_id,
+            &target.member_id,
+            &signal.signal_id,
+            &claimed_at,
+        )
+        .await?;
     }
+    Ok(())
 }
 
 fn wake_tui(target: &AgentWorkspaceSignalTarget, prompt: &str, dispatch: WakeDispatch<'_>) -> bool {

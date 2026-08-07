@@ -112,7 +112,7 @@ async fn assert_pending_retry_rewakes(fixture: &WorkspaceActivityFixture) {
         message: "Recover wake dispatch for the pending signal".into(),
         action_hint: None,
     };
-    send_agent_workspace_signal_async(
+    let sent = send_agent_workspace_signal_async(
         &fixture.db,
         &fixture.workspace_id,
         &fixture.member_id,
@@ -133,6 +133,17 @@ async fn assert_pending_retry_rewakes(fixture: &WorkspaceActivityFixture) {
     .await
     .expect("retry pending signal wake");
     assert_eq!(wake.calls.load(Ordering::SeqCst), 1);
+    let wake_claimed_at = sqlx::query_scalar::<_, Option<String>>(
+        "SELECT wake_claimed_at FROM agent_workspace_signals
+         WHERE workspace_id = ?1 AND member_id = ?2 AND signal_id = ?3",
+    )
+    .bind(&fixture.workspace_id)
+    .bind(&fixture.member_id)
+    .bind(&sent.signal.signal_id)
+    .fetch_one(fixture.db.pool())
+    .await
+    .expect("load failed wake claim");
+    assert!(wake_claimed_at.is_none());
 }
 
 async fn assert_response_loss_retry_does_not_rewake(fixture: &WorkspaceActivityFixture) {
@@ -165,6 +176,27 @@ async fn assert_response_loss_retry_does_not_rewake(fixture: &WorkspaceActivityF
     .await
     .expect("retry signal after simulated response loss");
     assert_eq!(wake.calls.load(Ordering::SeqCst), 1);
+
+    sqlx::query(
+        "UPDATE agent_workspace_signals SET wake_claimed_at = '2000-01-01T00:00:00Z'
+         WHERE workspace_id = ?1 AND member_id = ?2 AND signal_id = ?3",
+    )
+    .bind(&fixture.workspace_id)
+    .bind(&fixture.member_id)
+    .bind(&sent.signal.signal_id)
+    .execute(fixture.db.pool())
+    .await
+    .expect("expire durable signal wake claim");
+    send_agent_workspace_signal_async(
+        &fixture.db,
+        &fixture.workspace_id,
+        &fixture.member_id,
+        &request,
+        dispatch,
+    )
+    .await
+    .expect("retry signal after wake claim expiry");
+    assert_eq!(wake.calls.load(Ordering::SeqCst), 2);
 
     cancel_agent_workspace_signal_async(
         &fixture.db,

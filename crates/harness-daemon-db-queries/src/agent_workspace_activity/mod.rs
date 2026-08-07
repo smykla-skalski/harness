@@ -76,6 +76,35 @@ pub trait AsyncAgentWorkspaceActivityQueries: Send + Sync {
         signal: &harness_protocol::agent::Signal,
     ) -> impl Future<Output = Result<AgentWorkspaceSignalInsertion, CliError>> + Send;
 
+    /// Claim one pending signal's managed-agent wake for a bounded interval.
+    ///
+    /// The claim timestamp is also its release token, so an expired sender cannot release a newer
+    /// claim.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when the scope is invalid or the claim cannot be persisted.
+    fn claim_agent_workspace_signal_wake(
+        &self,
+        daemon_id: &str,
+        workspace_id: &str,
+        member_id: &str,
+        signal_id: &str,
+        claimed_at: &str,
+    ) -> impl Future<Output = Result<bool, CliError>> + Send;
+
+    /// Release a wake claim only when its persisted timestamp still matches the caller's token.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when the scope is invalid or the release cannot be persisted.
+    fn release_agent_workspace_signal_wake(
+        &self,
+        daemon_id: &str,
+        workspace_id: &str,
+        member_id: &str,
+        signal_id: &str,
+        claimed_at: &str,
+    ) -> impl Future<Output = Result<(), CliError>> + Send;
+
     /// Record one durable signal acknowledgment.
     ///
     /// # Errors
@@ -187,6 +216,49 @@ impl AsyncAgentWorkspaceActivityQueries for AsyncDaemonDb {
         .await?;
         commit_activity_transaction(transaction, "signal acknowledgment").await?;
         Ok(record)
+    }
+
+    async fn claim_agent_workspace_signal_wake(
+        &self,
+        daemon_id: &str,
+        workspace_id: &str,
+        member_id: &str,
+        signal_id: &str,
+        claimed_at: &str,
+    ) -> Result<bool, CliError> {
+        let mut transaction = begin_activity_transaction(self, "signal wake claim").await?;
+        ensure_workspace_scope(&mut transaction, daemon_id, workspace_id).await?;
+        let claimed = signals::claim_signal_wake(
+            &mut transaction,
+            workspace_id,
+            member_id,
+            signal_id,
+            claimed_at,
+        )
+        .await?;
+        commit_activity_transaction(transaction, "signal wake claim").await?;
+        Ok(claimed)
+    }
+
+    async fn release_agent_workspace_signal_wake(
+        &self,
+        daemon_id: &str,
+        workspace_id: &str,
+        member_id: &str,
+        signal_id: &str,
+        claimed_at: &str,
+    ) -> Result<(), CliError> {
+        let mut transaction = begin_activity_transaction(self, "signal wake release").await?;
+        ensure_workspace_scope(&mut transaction, daemon_id, workspace_id).await?;
+        signals::release_signal_wake(
+            &mut transaction,
+            workspace_id,
+            member_id,
+            signal_id,
+            claimed_at,
+        )
+        .await?;
+        commit_activity_transaction(transaction, "signal wake release").await
     }
 }
 

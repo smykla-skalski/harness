@@ -8,6 +8,8 @@ use sqlx::{FromRow, Sqlite, Transaction, query, query_as};
 use super::reads::load_signal_record;
 use super::types::{AgentWorkspaceSignalInsertion, AgentWorkspaceSignalTarget};
 
+const WAKE_CLAIM_LEASE_SECONDS: i64 = 30;
+
 #[derive(Debug, FromRow)]
 struct SignalTargetRow {
     workspace_id: String,
@@ -212,7 +214,7 @@ pub(super) async fn acknowledge_signal(
         "UPDATE agent_workspace_signals
          SET status = ?4, ack_json = ?5,
              source_digest = source_digest || ':' || ?4 || ':' || ?6,
-             updated_at = ?6
+             updated_at = ?6, wake_claimed_at = NULL
          WHERE workspace_id = ?1 AND member_id = ?2 AND signal_id = ?3
            AND ack_json IS NULL",
     )
@@ -247,6 +249,57 @@ pub(super) async fn acknowledge_signal(
     .await?;
     refresh_timeline_state(transaction, workspace_id).await?;
     load_signal_record(transaction, workspace_id, member_id, signal_id).await
+}
+
+pub(super) async fn claim_signal_wake(
+    transaction: &mut Transaction<'_, Sqlite>,
+    workspace_id: &str,
+    member_id: &str,
+    signal_id: &str,
+    claimed_at: &str,
+) -> Result<bool, CliError> {
+    query(
+        "UPDATE agent_workspace_signals
+         SET wake_claimed_at = ?4
+         WHERE workspace_id = ?1 AND member_id = ?2 AND signal_id = ?3
+           AND status = 'pending' AND ack_json IS NULL
+           AND (
+               wake_claimed_at IS NULL
+               OR datetime(wake_claimed_at) <= datetime(?4, ?5)
+           )",
+    )
+    .bind(workspace_id)
+    .bind(member_id)
+    .bind(signal_id)
+    .bind(claimed_at)
+    .bind(format!("-{WAKE_CLAIM_LEASE_SECONDS} seconds"))
+    .execute(transaction.as_mut())
+    .await
+    .map(|result| result.rows_affected() == 1)
+    .map_err(|error| db_error(format!("claim durable agent signal wake: {error}")))
+}
+
+pub(super) async fn release_signal_wake(
+    transaction: &mut Transaction<'_, Sqlite>,
+    workspace_id: &str,
+    member_id: &str,
+    signal_id: &str,
+    claimed_at: &str,
+) -> Result<(), CliError> {
+    query(
+        "UPDATE agent_workspace_signals
+         SET wake_claimed_at = NULL
+         WHERE workspace_id = ?1 AND member_id = ?2 AND signal_id = ?3
+           AND wake_claimed_at = ?4 AND ack_json IS NULL",
+    )
+    .bind(workspace_id)
+    .bind(member_id)
+    .bind(signal_id)
+    .bind(claimed_at)
+    .execute(transaction.as_mut())
+    .await
+    .map(|_| ())
+    .map_err(|error| db_error(format!("release durable agent signal wake: {error}")))
 }
 
 #[expect(

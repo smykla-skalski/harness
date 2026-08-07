@@ -124,7 +124,7 @@ pub(crate) async fn send_agent_workspace_signal_async(
     };
     match runtime_state {
         SignalFileState::Created | SignalFileState::Pending => {
-            wake_managed_agent(&target, &record.signal, dispatch);
+            wake_managed_agent(db, &daemon_id, &target, &record.signal, dispatch).await?;
             Ok(record)
         }
         SignalFileState::Acknowledged(acknowledgment) => {

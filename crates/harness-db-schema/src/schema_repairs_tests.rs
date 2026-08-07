@@ -126,6 +126,35 @@ fn repair_restores_durable_team_objects() {
     assert_schema_object_exists(&db, "trigger", "agent_workspace_team_source_tui_delete");
 }
 
+#[test]
+fn repair_restores_durable_activity_objects_and_wake_claim() {
+    let db = DaemonDb::open_in_memory().expect("open current database");
+    db.connection()
+        .execute_batch(
+            "DROP TABLE agent_workspace_activity_summaries;
+             DROP TRIGGER agent_workspace_activity_signal_update;
+             DROP INDEX idx_agent_workspace_signals_member;
+             ALTER TABLE agent_workspace_signals DROP COLUMN wake_claimed_at;",
+        )
+        .expect("damage durable activity objects");
+
+    repair_current_schema_shape(db.connection(), SCHEMA_VERSION).expect("repair schema shape");
+
+    assert_schema_object_exists(&db, "table", "agent_workspace_activity_summaries");
+    assert_schema_object_exists(&db, "index", "idx_agent_workspace_signals_member");
+    assert_schema_object_exists(&db, "trigger", "agent_workspace_activity_signal_update");
+    let wake_claim_column: i64 = db
+        .connection()
+        .query_row(
+            "SELECT COUNT(*) FROM pragma_table_info('agent_workspace_signals')
+             WHERE name = 'wake_claimed_at'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("inspect restored wake claim column");
+    assert_eq!(wake_claim_column, 1);
+}
+
 fn assert_schema_object_exists(db: &DaemonDb, object_type: &str, name: &str) {
     let restored: i64 = db
         .connection()

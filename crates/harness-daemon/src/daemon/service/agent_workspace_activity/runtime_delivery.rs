@@ -1,6 +1,4 @@
-use std::collections::HashSet;
 use std::path::PathBuf;
-use std::sync::{LazyLock, Mutex};
 
 use harness_agents::runtime;
 use harness_agents::runtime::signal::{
@@ -12,9 +10,6 @@ use harness_protocol::daemon::activity::AgentWorkspaceSignalRecord;
 
 use crate::daemon::db::prelude::*;
 use crate::daemon::db_handle::AsyncDaemonDbHandle;
-
-static ACTIVE_SIGNAL_WAKES: LazyLock<Mutex<HashSet<String>>> =
-    LazyLock::new(|| Mutex::new(HashSet::new()));
 
 pub(super) async fn persist_runtime_acknowledgment(
     db: &AsyncDaemonDbHandle,
@@ -69,13 +64,8 @@ pub(super) async fn persist_durable_acknowledgment(
     member_id: &str,
     acknowledgment: &AgentWorkspaceSignalAcknowledgment,
 ) -> Result<AgentWorkspaceSignalRecord, CliError> {
-    let result = db
-        .acknowledge_agent_workspace_signal(daemon_id, workspace_id, member_id, acknowledgment)
-        .await;
-    if result.is_ok() {
-        release_signal_wake(&acknowledgment.signal_id);
-    }
-    result
+    db.acknowledge_agent_workspace_signal(daemon_id, workspace_id, member_id, acknowledgment)
+        .await
 }
 
 pub(super) async fn settle_runtime_acknowledgment(
@@ -170,20 +160,6 @@ pub(super) fn runtime_orchestration_session_id(target: &AgentWorkspaceSignalTarg
         .source_session_id
         .clone()
         .unwrap_or_else(|| target.workspace_id.clone())
-}
-
-pub(super) fn reserve_signal_wake(signal_id: &str) -> bool {
-    let mut active = ACTIVE_SIGNAL_WAKES
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
-    active.insert(signal_id.to_string())
-}
-
-pub(super) fn release_signal_wake(signal_id: &str) {
-    let mut active = ACTIVE_SIGNAL_WAKES
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
-    active.remove(signal_id);
 }
 
 pub(super) fn scoped_signal_idempotency_key(
