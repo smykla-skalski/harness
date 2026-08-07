@@ -350,6 +350,21 @@ mod tests {
     }
 
     #[test]
+    fn copilot_capabilities_expose_post_tool_context_injection() {
+        use super::runtime_for;
+
+        let capabilities = runtime_for(HookAgent::Copilot).capabilities();
+
+        assert!(capabilities.supports_context_injection);
+        assert!(
+            capabilities
+                .hook_points
+                .iter()
+                .any(|point| { point.name == "postToolUse" && point.supports_context_injection })
+        );
+    }
+
+    #[test]
     fn initial_prompt_delivery_covers_all_runtimes() {
         use super::{InitialPromptDelivery, runtime_for};
 

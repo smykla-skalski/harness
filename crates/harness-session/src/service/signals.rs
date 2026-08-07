@@ -1,6 +1,6 @@
 use super::{
     AckResult, CliError, CliErrorKind, Path, ResolvedRuntimeSessionAgent, SessionSignalRecord,
-    SessionSignalStatus, SessionTransition, SignalAck, apply_send_signal_state,
+    SessionSignalStatus, SessionTransition, Signal, SignalAck, apply_send_signal_state,
     apply_signal_ack_result, build_signal, daemon_client_error, load_signal_record_for_agent,
     load_state_or_err, log_signal_acknowledged, log_signal_sent, log_task_assigned,
     normalize_signal_ack_result, read_pending_signals, reconcile_expired_pending_signals,
@@ -292,17 +292,19 @@ pub fn record_signal_acknowledgment(
     }
 
     let now = utc_now();
-    let signal = load_signal_record_for_agent(session_id, agent_id, signal_id, project_dir)?;
-    let result = signal.as_ref().map_or(result, |signal| {
-        normalize_signal_ack_result(&signal.signal, result)
-    });
+    let Some(signal) = load_signal_record_for_agent(session_id, agent_id, signal_id, project_dir)?
+    else {
+        return Ok(());
+    };
+    if !signal_belongs_to_session_route(&signal.signal, session_id, agent_id) {
+        return Ok(());
+    }
+    let result = normalize_signal_ack_result(&signal.signal, result);
     let mut started_task = None;
 
     storage::update_state(&layout, |state| {
-        if let Some(signal) = signal.as_ref() {
-            started_task = apply_signal_ack_result(state, agent_id, &signal.signal, result, &now);
-            refresh_session(state, &now);
-        }
+        started_task = apply_signal_ack_result(state, agent_id, &signal.signal, result, &now);
+        refresh_session(state, &now);
         Ok(())
     })?;
 
@@ -321,4 +323,13 @@ pub fn record_signal_acknowledgment(
         Some(agent_id),
         None,
     )
+}
+
+fn signal_belongs_to_session_route(signal: &Signal, session_id: &str, agent_id: &str) -> bool {
+    let prefix = format!("{session_id}:{agent_id}:");
+    signal
+        .delivery
+        .idempotency_key
+        .as_deref()
+        .is_none_or(|key| key.starts_with(&prefix))
 }

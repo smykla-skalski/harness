@@ -161,6 +161,7 @@ async fn assert_workspace_signal_round_trip(
         },
     )
     .expect("write runtime acknowledgment");
+    record_compatibility_acknowledgment(&sent.signal.signal_id, fixture).await;
     assert_delivered_signal_cannot_be_cancelled(
         &fixture.db,
         &fixture.workspace_id,
@@ -371,6 +372,49 @@ async fn assert_durable_acknowledgment(signal_id: &str, fixture: &WorkspaceActiv
     assert_eq!(acknowledgment.acknowledged_at, "2026-08-06T10:30:00Z");
     assert_eq!(acknowledgment.session_id, fixture.workspace_id);
     assert_eq!(acknowledgment.agent, fixture.member_id);
+    let timeline = get_agent_workspace_activity_async(
+        &fixture.db,
+        &fixture.workspace_id,
+        &TimelineWindowRequest::default(),
+    )
+    .await
+    .expect("load workspace activity timeline");
+    let acknowledgment_count = timeline
+        .entries
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|entry| {
+            entry.kind == "signal_acknowledged"
+                && entry
+                    .payload
+                    .get("signal_id")
+                    .and_then(|value| value.as_str())
+                    == Some(signal_id)
+        })
+        .count();
+    assert_eq!(acknowledgment_count, 1);
+}
+
+async fn record_compatibility_acknowledgment(signal_id: &str, fixture: &WorkspaceActivityFixture) {
+    let target = fixture
+        .db
+        .load_agent_workspace_signal_target(
+            &crate::daemon::state::ensure_daemon_identity()
+                .expect("ensure daemon identity")
+                .daemon_id,
+            &fixture.workspace_id,
+            &fixture.member_id,
+        )
+        .await
+        .expect("load compatibility acknowledgment target");
+    session_service::record_signal_acknowledgment(
+        target.source_session_id.as_deref().expect("source session"),
+        target.source_agent_id.as_deref().expect("source agent"),
+        signal_id,
+        AckResult::Accepted,
+        Path::new(&target.project_dir),
+    )
+    .expect("record compatibility acknowledgment");
 }
 
 async fn assert_delivered_signal_cannot_be_cancelled(
