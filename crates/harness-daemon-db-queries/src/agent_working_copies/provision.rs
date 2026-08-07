@@ -89,8 +89,18 @@ pub(super) async fn provision_in_tx(
             ?14, ?15, 'workspace', ?16, ?17
          )
          ON CONFLICT(workspace_id) DO UPDATE SET
+            source_project_id = excluded.source_project_id,
+            project_name = excluded.project_name,
+            checkout_name = excluded.checkout_name,
+            project_dir = excluded.project_dir,
+            repository_root = excluded.repository_root,
+            context_root = excluded.context_root,
+            is_worktree = excluded.is_worktree,
+            worktree_name = excluded.worktree_name,
             availability = excluded.availability,
+            manifest_digest = excluded.manifest_digest,
             shadow_digest = excluded.shadow_digest,
+            orchestration_authority = 'workspace',
             updated_at = excluded.updated_at",
     )
     .bind(&workspace_id)

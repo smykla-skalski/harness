@@ -1,7 +1,7 @@
 use super::*;
 
 use crate::daemon::db::{ReservedTaskBoardDispatch, approved_write_item};
-use crate::daemon::protocol::SessionStartRequest;
+use harness_daemon_db_queries::AsyncAgentWorkingCopyQueries;
 use std::collections::HashMap;
 
 use crate::daemon::db::prelude::*;
@@ -16,7 +16,7 @@ use crate::task_board::{
 struct CrashedDispatchPreparation {
     db: crate::daemon::db_handle::AsyncDaemonDbHandle,
     first_claim_token: String,
-    session_id: String,
+    working_copy_id: String,
     work_item_id: String,
 }
 
@@ -80,47 +80,22 @@ async fn dispatch_resume_prepare_and_simulate_crash(
             panic!("default admission blocked dispatch")
         }
     };
+    assert!(
+        preparation.session_id.is_none(),
+        "a fresh dispatch reserves no Session"
+    );
+    let working_copy_id = preparation
+        .working_copy_id
+        .clone()
+        .expect("fresh dispatch reserves a working copy");
     let first_claim = db
         .claim_task_board_dispatch_preparation(&intent_id)
         .await
         .expect("claim preparation")
         .expect("pending preparation");
 
-    let crate::task_board::SessionIntent::Create { title, context, .. } = &preparation.plan.session
-    else {
-        panic!("new task board item should create a session");
-    };
-    start_session_direct_async(
-        &SessionStartRequest {
-            title: title.clone(),
-            context: context.clone().unwrap_or_else(|| title.clone()),
-            session_id: Some(preparation.session_id.clone()),
-            project_dir: project.to_string_lossy().into_owned(),
-            policy_preset: None,
-            base_ref: None,
-        },
-        &db,
-    )
-    .await
-    .expect("create reserved session before simulated crash");
-    assert!(
-        db.delete_session_row(&preparation.session_id)
-            .await
-            .expect("remove database row for crash simulation")
-    );
-    assert!(
-        db.resolve_session(&preparation.session_id)
-            .await
-            .expect("verify missing database row")
-            .is_none()
-    );
-    assert!(
-        crate::session::storage::layout_from_project_dir(project, &preparation.session_id)
-            .expect("session layout")
-            .state_file()
-            .is_file(),
-        "the crash fixture must retain file/worktree artifacts"
-    );
+    // Crash the holder mid-preparation by expiring its claim; the reclaim below
+    // must resume onto the same reserved working copy rather than mint another.
     sqlx::query(
         "UPDATE task_board_dispatch_intents
          SET claimed_at = '1970-01-01T00:00:00Z' WHERE intent_id = ?1",
@@ -133,7 +108,7 @@ async fn dispatch_resume_prepare_and_simulate_crash(
     CrashedDispatchPreparation {
         db,
         first_claim_token: first_claim.claim_token,
-        session_id: preparation.session_id,
+        working_copy_id,
         work_item_id: preparation.work_item_id,
     }
 }
@@ -152,42 +127,69 @@ async fn dispatch_resume_reclaim_and_assert(crashed: CrashedDispatchPreparation)
     ))
     .await
     .expect("resume preparation");
-    assert_eq!(applied.session_id, crashed.session_id);
+
+    assert_eq!(applied.session_id, None);
+    assert_eq!(
+        applied.working_copy_id.as_deref(),
+        Some(crashed.working_copy_id.as_str()),
+        "the resumed preparation must reuse the reserved working copy"
+    );
+    let workspace_id = applied
+        .workspace_id
+        .clone()
+        .expect("a started dispatch belongs to a workspace");
     assert_eq!(applied.work_item_id, crashed.work_item_id);
 
-    let resolved = db
-        .resolve_session(&crashed.session_id)
+    let sessions = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM sessions")
+        .fetch_one(db.pool())
         .await
-        .expect("resolve session")
-        .expect("session exists");
-    assert_eq!(resolved.state.tasks.len(), 1);
-    assert!(resolved.state.tasks.contains_key(&crashed.work_item_id));
+        .expect("count sessions");
+    assert_eq!(sessions, 0, "starting a worker must create no Session row");
+    let tasks = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM tasks")
+        .fetch_one(db.pool())
+        .await
+        .expect("count session tasks");
+    assert_eq!(tasks, 0, "starting a worker must create no Session task");
+
     let linked = db
         .task_board_item("dispatch-crash-recovery")
         .await
         .expect("load linked item");
+    assert_eq!(linked.session_id, None);
+    assert_eq!(linked.workspace_id.as_deref(), Some(workspace_id.as_str()));
     assert_eq!(
-        linked.session_id.as_deref(),
-        Some(crashed.session_id.as_str())
+        linked.working_copy_id.as_deref(),
+        Some(crashed.working_copy_id.as_str())
     );
     assert_eq!(
         linked.work_item_id.as_deref(),
         Some(crashed.work_item_id.as_str())
     );
-    assert_eq!(
-        linked.workflow.branch.as_deref(),
-        Some(resolved.state.branch_ref.as_str())
-    );
-    let canonical_worktree =
-        std::fs::canonicalize(&resolved.state.worktree_path).expect("canonical resolved worktree");
+
+    let recorded = db
+        .load_agent_working_copy(&crashed.working_copy_id)
+        .await
+        .expect("load recorded working copy")
+        .expect("the dispatch recorded its checkout");
+    assert_eq!(recorded.workspace_id, workspace_id);
+    assert!(!recorded.released);
     assert_eq!(
         linked.workflow.worktree.as_deref(),
-        canonical_worktree.to_str()
+        Some(recorded.worktree_path.as_str()),
+        "the ticket must point at the checkout the daemon actually made"
+    );
+    assert_eq!(
+        linked.workflow.branch.as_deref(),
+        Some(recorded.branch_ref.as_str())
+    );
+    assert!(
+        std::path::Path::new(&recorded.worktree_path).is_dir(),
+        "the recorded checkout must exist on disk"
     );
 }
 
 #[test]
-fn prepared_dispatch_resumes_without_duplicate_session_or_task() {
+fn prepared_dispatch_resumes_onto_one_workspace_and_no_session() {
     with_temp_project(|project| {
         let runtime = tokio::runtime::Runtime::new().expect("runtime");
         runtime.block_on(async {

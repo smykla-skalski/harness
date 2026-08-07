@@ -1,6 +1,7 @@
+use std::path::PathBuf;
 use std::time::Duration;
 
-use tokio::task::JoinHandle;
+use tokio::task::{JoinHandle, spawn_blocking};
 use tokio::time::sleep;
 
 use crate::daemon::db::task_board::prelude::*;
@@ -12,6 +13,7 @@ use crate::daemon::http::{
 use crate::daemon::agent_tui::WorkspaceTerminalOwner;
 use crate::daemon::protocol::ManagedAgentSnapshot;
 use crate::daemon::reviews_store::PolicyGraphQueries;
+use crate::daemon::service::workspace_checkout;
 use crate::task_board::{
     AgentMode, DispatchAppliedTask, TaskBoardLaunchCapability, codex_worker_id, managed_worker_id,
     terminal_worker_id,
@@ -395,11 +397,15 @@ pub(crate) async fn join_worker_to_workspace(
     .map(|_| ())
 }
 
-/// Return a failed dispatch's checkout to the pool.
+/// Return a failed dispatch's checkout to the pool and remove it from disk.
 ///
 /// Best effort by design: compensation has already stopped the runtime and
 /// finalized the claim, and a checkout that cannot be released is a leaked
 /// directory rather than a reason to fail the compensation that just succeeded.
+///
+/// The row is released first and only once - `release_agent_working_copy`
+/// reports whether this call was the one that claimed the cleanup - so two
+/// racing compensations cannot both start removing the same worktree.
 pub(crate) async fn release_worker_workspace_checkout(
     db: &AsyncDaemonDbHandle,
     applied: &DispatchAppliedTask,
@@ -408,14 +414,39 @@ pub(crate) async fn release_worker_workspace_checkout(
     let Some(working_copy_id) = applied.working_copy_id.as_deref() else {
         return;
     };
-    if let Err(error) = db.release_agent_working_copy(working_copy_id, reason).await {
-        tracing::warn!(
-            board_item_id = %applied.board_item_id,
-            working_copy_id,
-            %error,
-            "compensated dispatch left its working copy recorded as live"
-        );
+    let recorded = match db.load_agent_working_copy(working_copy_id).await {
+        Ok(recorded) => recorded,
+        Err(error) => {
+            warn_checkout_cleanup(&applied.board_item_id, working_copy_id, &error);
+            return;
+        }
+    };
+    match db.release_agent_working_copy(working_copy_id, reason).await {
+        Ok(true) => {}
+        Ok(false) => return,
+        Err(error) => {
+            warn_checkout_cleanup(&applied.board_item_id, working_copy_id, &error);
+            return;
+        }
     }
+    let Some(recorded) = recorded else {
+        return;
+    };
+    let layout = workspace_checkout::recorded_layout(&recorded.project_name, working_copy_id);
+    let origin = PathBuf::from(recorded.origin_path);
+    let _ = spawn_blocking(move || {
+        workspace_checkout::discard_workspace_checkout(&origin, &layout);
+    })
+    .await;
+}
+
+fn warn_checkout_cleanup(board_item_id: &str, working_copy_id: &str, error: &CliError) {
+    tracing::warn!(
+        board_item_id,
+        working_copy_id,
+        %error,
+        "compensated dispatch left its working copy recorded as live"
+    );
 }
 
 /// The lane a worker's start and compensation serialize on. Keyed by whichever

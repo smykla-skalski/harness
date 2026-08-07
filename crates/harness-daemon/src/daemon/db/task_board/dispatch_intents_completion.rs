@@ -15,8 +15,7 @@ use super::super::items::bump_change_in_tx;
 use super::super::lane_order::{
     LaneTransitionKind, record_lane_transition_audit_in_tx, replace_with_lane_transition_in_tx,
 };
-use super::dispatch_intents::DispatchItemOwners;
-use super::ensure_dispatch_item_startable;
+use super::{DispatchItemOwners, ensure_dispatch_item_startable};
 use crate::daemon::db::{CliError, db_error, utc_now};
 use crate::task_board::{DispatchAppliedTask, TaskBoardItem, TaskBoardWorkflowStatus};
 
