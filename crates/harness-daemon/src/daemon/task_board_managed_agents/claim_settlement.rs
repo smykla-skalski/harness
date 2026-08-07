@@ -3,9 +3,9 @@ use crate::daemon::protocol::ManagedAgentSnapshot;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::{
-    TaskBoardWorkerStartError, ensure_spawn_kill_switch_clear, join_worker_to_workspace,
-    launch_capability, managed_admission_owner_id, managed_worker_id, probe_existing_worker,
-    recover_same_applied_worker, release_worker_workspace_checkout,
+    TaskBoardWorkerStartError, ensure_spawn_kill_switch_clear, launch_capability,
+    managed_admission_owner_id, managed_worker_id, probe_existing_worker,
+    recover_same_applied_worker, settle_compensated_workspace_worker,
     start_worker_for_applied_task_in_lane, stop_worker_in_lane, validate_workflow_launch,
     worker_lock_owner,
 };
@@ -59,10 +59,7 @@ async fn finish_worker_settlement(
         return compensate_settlement_failure(state, db, claim, worker_id, error).await;
     }
     match complete_worker_settlement(db, claim).await {
-        Ok(()) => {
-            join_worker_to_workspace(db, &claim.applied, worker_id).await?;
-            Ok(Some(worker))
-        }
+        Ok(()) => Ok(Some(worker)),
         Err(error) => {
             // Boxed to keep this frame out of the caller's future; see above.
             Box::pin(adopt_committed_settlement(
@@ -85,7 +82,6 @@ async fn adopt_committed_settlement(
 ) -> Result<Option<ManagedAgentSnapshot>, CliError> {
     if completion_was_committed(db, claim).await? {
         claim.applied.item = db.task_board_item(&claim.applied.board_item_id).await?;
-        join_worker_to_workspace(db, &claim.applied, worker_id).await?;
         return Ok(Some(worker));
     }
     compensate_settlement_failure(state, db, claim, worker_id, error).await
@@ -318,7 +314,7 @@ async fn compensate_settlement_failure(
     // The checkout goes last: the runtime is already stopped and the claim is
     // finalized, so nothing is left holding the directory. Doing it earlier
     // would pull the worktree out from under a worker still shutting down.
-    release_worker_workspace_checkout(db, &claim.applied, &error.to_string()).await;
+    settle_compensated_workspace_worker(db, &claim.applied, worker_id, &error.to_string()).await;
     Err(error)
 }
 
