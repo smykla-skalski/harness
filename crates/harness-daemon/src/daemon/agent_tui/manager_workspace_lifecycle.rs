@@ -16,7 +16,7 @@ use super::manager::{ActiveAgentTui, AgentTuiManagerHandle};
 use super::model::{AgentTuiStartRequest, AgentTuiStartRequestExt};
 use super::support::{record_started_prompt, transcript_path};
 use harness_daemon_managed_agents::{
-    AgentTuiSnapshot, AgentTuiSnapshotContext, spawn_agent_tui_process,
+    AgentTuiSnapshot, AgentTuiSnapshotContext, ManagedTerminalOwner, spawn_agent_tui_process,
 };
 
 /// Where a workspace-owned terminal runs and who owns it.
@@ -73,7 +73,7 @@ impl AgentTuiManagerHandle {
             transcript_path: &transcript_path,
         };
         let process = spawn_agent_tui_process(
-            owner.workspace_id,
+            ManagedTerminalOwner::Workspace(owner.workspace_id),
             &tui_id,
             profile.clone(),
             &project_dir,
@@ -100,6 +100,7 @@ impl AgentTuiManagerHandle {
         // persistence rather than sent across the bridge protocol.
         let mut snapshot = bridge.agent_tui_start(&AgentTuiStartSpec {
             session_id: owner.workspace_id.to_string(),
+            workspace_id: Some(owner.workspace_id.to_string()),
             agent_id: String::new(),
             tui_id,
             profile: request.launch_profile()?,

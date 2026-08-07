@@ -161,6 +161,10 @@ impl PersistedBridgeConfig {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AgentTuiStartSpec {
     pub session_id: String,
+    /// Set when the terminal belongs to a durable workspace instead of a
+    /// Session. Optional on the wire so an older bridge simply ignores it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace_id: Option<String>,
     pub agent_id: String,
     pub tui_id: String,
     pub profile: AgentTuiLaunchProfile,

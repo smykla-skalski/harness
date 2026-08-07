@@ -18,7 +18,7 @@ use super::support::{
 };
 use harness_daemon_managed_agents::{
     AgentTuiProcess, AgentTuiSnapshot, AgentTuiSnapshotContext, AgentTuiStatus,
-    deliver_deferred_prompts, snapshot_from_process, spawn_agent_tui_process,
+    ManagedTerminalOwner, deliver_deferred_prompts, snapshot_from_process, spawn_agent_tui_process,
 };
 
 impl AgentTuiManagerHandle {
@@ -83,7 +83,7 @@ impl AgentTuiManagerHandle {
             request.persona.as_deref(),
         );
         let process = spawn_agent_tui_process(
-            session_id,
+            ManagedTerminalOwner::Session(session_id),
             &tui_id,
             profile.clone(),
             &project.project_dir,
@@ -232,6 +232,7 @@ impl AgentTuiManagerHandle {
         let transcript_path = transcript_path(&project.context_root, &profile.runtime, &tui_id);
         let snapshot = bridge.agent_tui_start(&AgentTuiStartSpec {
             session_id: session_id.to_string(),
+            workspace_id: None,
             agent_id: String::new(),
             tui_id,
             profile,
