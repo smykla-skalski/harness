@@ -48,7 +48,11 @@ CREATE TABLE task_board_dispatch_intents_v65 (
         ),
     start_admission_outcome TEXT,
     start_admission_settings_revision INTEGER,
-    CHECK (session_id IS NOT NULL OR workspace_id IS NOT NULL),
+    -- The reserved owner, not the resolved one: reservation mints the working
+    -- copy id, while the workspace it turns out to belong to is only known once
+    -- preparation has made the checkout. Checking workspace_id here would refuse
+    -- every fresh dispatch at insert.
+    CHECK (session_id IS NOT NULL OR working_copy_id IS NOT NULL),
     CHECK (COALESCE((
         (
             start_admission_outcome IS NULL

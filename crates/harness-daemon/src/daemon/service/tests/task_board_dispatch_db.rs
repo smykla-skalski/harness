@@ -1,6 +1,7 @@
 use super::*;
 
 use crate::daemon::db::{ReservedTaskBoardDispatch, approved_write_item};
+use crate::daemon::state::ensure_daemon_identity;
 use harness_daemon_db_queries::AsyncAgentWorkingCopyQueries;
 use std::collections::HashMap;
 
@@ -12,6 +13,15 @@ use crate::task_board::{
     AgentMode, HARNESS_GITHUB_TOKEN_ENV, TaskBoardGitHubProjectConfig, TaskBoardItem,
     TaskBoardWorkflowKind, build_dispatch_plans_with_policy,
 };
+
+/// Mint the daemon identity a serving daemon establishes at startup.
+///
+/// Provisioning a workspace needs it: the workspace key is per daemon, and a
+/// workspace minted under a stand-in id would be invisible to the
+/// reconciliation that lists it.
+fn seed_daemon_identity() {
+    ensure_daemon_identity().expect("mint daemon identity");
+}
 
 struct CrashedDispatchPreparation {
     db: crate::daemon::db_handle::AsyncDaemonDbHandle,
@@ -27,6 +37,7 @@ async fn dispatch_resume_prepare_and_simulate_crash(
         .parent()
         .expect("project parent")
         .join("dispatch.sqlite");
+    seed_daemon_identity();
     let db = crate::daemon::db::AsyncDaemonDb::connect(&db_path)
         .await
         .expect("open async daemon db");
@@ -196,6 +207,7 @@ fn a_legacy_session_linked_item_still_dispatches_through_its_session() {
     with_temp_project(|project| {
         let runtime = tokio::runtime::Runtime::new().expect("runtime");
         runtime.block_on(async {
+            seed_daemon_identity();
             let db = crate::daemon::db::AsyncDaemonDb::connect(
                 &project
                     .parent()
@@ -219,12 +231,21 @@ fn a_legacy_session_linked_item_still_dispatches_through_its_session() {
             .await
             .expect("start the legacy session");
 
-            let mut item = TaskBoardItem::new(
+            let mut settings = db
+                .task_board_orchestrator_settings()
+                .await
+                .expect("load orchestrator settings");
+            settings.github_project = TaskBoardGitHubProjectConfig::default();
+            db.replace_task_board_orchestrator_settings(&settings)
+                .await
+                .expect("configure write publication");
+            let mut item = approved_write_item(TaskBoardItem::new(
                 "dispatch-legacy-session".into(),
                 "Keep the legacy owner".into(),
                 "Dispatch against an existing Session".into(),
                 "2026-08-07T10:00:00Z".into(),
-            );
+            ));
+            item.execution_repository = Some("example/compass".into());
             item.session_id = Some(session.session_id.clone());
             db.create_task_board_item(item.clone())
                 .await
@@ -259,9 +280,12 @@ fn a_legacy_session_linked_item_still_dispatches_through_its_session() {
                 .await
                 .expect("claim the legacy preparation")
                 .expect("pending legacy preparation");
-            let applied = Box::pin(task_board::prepare_claimed_task_board_dispatch(&db, &claim))
-                .await
-                .expect("prepare the legacy dispatch");
+            let applied = Box::pin(temp_env::async_with_vars(
+                [(HARNESS_GITHUB_TOKEN_ENV, Some("fixture-token"))],
+                task_board::prepare_claimed_task_board_dispatch(&db, &claim),
+            ))
+            .await
+            .expect("prepare the legacy dispatch");
 
             assert_eq!(applied.session_id.as_deref(), Some(session.session_id.as_str()));
             assert_eq!(applied.workspace_id, None);
@@ -300,6 +324,7 @@ fn read_only_dispatch_rejects_aba_after_claim_before_late_head_resolution() {
     with_temp_project(|project| {
         let runtime = tokio::runtime::Runtime::new().expect("runtime");
         runtime.block_on(async {
+            seed_daemon_identity();
             let db = crate::daemon::db::AsyncDaemonDb::connect(
                 &project
                     .parent()
