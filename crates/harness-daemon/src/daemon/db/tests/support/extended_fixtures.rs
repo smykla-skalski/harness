@@ -68,7 +68,12 @@ pub(crate) fn session_agent_identity_rows(
 
 pub(crate) fn simulate_pre_v11_agents_table(conn: &Connection) {
     conn.execute_batch(
-        "CREATE TABLE agents_legacy (
+        // Renaming reparses every trigger, and the v64 detach guard names
+        // `agents` - which is dropped for the moment the rename runs, so the
+        // reparse fails. `legacy_alter_table` leaves the trigger bodies alone,
+        // and the rename puts the table back under the name they expect.
+        "PRAGMA legacy_alter_table = ON;
+         CREATE TABLE agents_legacy (
              agent_id                  TEXT NOT NULL,
              session_id                TEXT NOT NULL REFERENCES sessions(session_id) ON DELETE CASCADE,
              name                      TEXT NOT NULL,
@@ -97,7 +102,8 @@ pub(crate) fn simulate_pre_v11_agents_table(conn: &Connection) {
          DROP TABLE agents;
          ALTER TABLE agents_legacy RENAME TO agents;
          CREATE INDEX idx_agents_runtime_session ON agents(runtime, agent_session_id);
-         UPDATE schema_meta SET value = '10' WHERE key = 'version';",
+         UPDATE schema_meta SET value = '10' WHERE key = 'version';
+         PRAGMA legacy_alter_table = OFF;",
     )
     .expect("simulate pre-v11 agents table");
 }

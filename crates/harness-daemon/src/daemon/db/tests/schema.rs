@@ -463,7 +463,16 @@ fn codex_run_columns(conn: &Connection) -> Vec<String> {
 
 fn simulate_pre_v13_codex_runs_table(conn: &Connection) {
     conn.execute_batch(
-        "DROP INDEX IF EXISTS idx_codex_runs_session_updated;
+        // A database this old predates the v64 team triggers, and they read
+        // columns the aged table gives up - `task_id` only arrives at v32. Every
+        // later ALTER reparses each trigger body, so leaving them behind breaks
+        // the replay at v23 instead. The repair chain puts them back on the way
+        // up.
+        "DROP TRIGGER IF EXISTS agent_workspace_team_source_codex_insert;
+         DROP TRIGGER IF EXISTS agent_workspace_team_source_codex_update;
+         DROP TRIGGER IF EXISTS agent_workspace_team_source_codex_delete;
+         DROP TRIGGER IF EXISTS agent_workspace_team_detach_session;
+         DROP INDEX IF EXISTS idx_codex_runs_session_updated;
          DROP INDEX IF EXISTS idx_codex_runs_status;
          DROP TABLE codex_runs;
          CREATE TABLE codex_runs (

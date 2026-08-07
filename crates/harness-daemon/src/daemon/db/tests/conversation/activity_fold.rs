@@ -200,6 +200,18 @@ fn deleting_a_session_evicts_its_activity_fold() {
         "append must populate the in-memory activity fold"
     );
 
+    // The v64 detach guard refuses to drop a Session that still owns agents,
+    // so the agents go first, the way any real caller has to detach them. The
+    // fold is keyed on the Session alone and must survive that.
+    db.conn
+        .execute("DELETE FROM agents WHERE session_id = ?1", [FOLD_SESSION_ID])
+        .expect("detach the session agents");
+    assert_eq!(
+        db.activity_fold_entry_count(),
+        1,
+        "detaching agents must leave the session fold in place"
+    );
+
     assert!(
         db.delete_session_row(FOLD_SESSION_ID)
             .expect("delete session row"),
