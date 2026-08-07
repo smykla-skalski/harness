@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
 use harness_agents::runtime;
-use harness_agents::runtime::signal::{AckResult, Signal, SignalAck, SignalFileState};
-use harness_daemon_db_queries::{AgentWorkspaceSignalAcknowledgment, AgentWorkspaceSignalTarget};
+use harness_agents::runtime::signal::{AckResult, SignalFileState};
+use harness_daemon_db_queries::AgentWorkspaceSignalAcknowledgment;
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_protocol::daemon::activity::{
     AgentWorkspaceActivityWindowResponse, AgentWorkspaceMemberActivityResponse,
@@ -11,21 +11,21 @@ use harness_protocol::daemon::activity::{
 };
 use harness_protocol::timeline::TimelineWindowRequest;
 
-use super::signals::build_active_signal_prompt;
 use super::sync_support::read_runtime_acknowledgments_async;
 use super::wake_route::WakeDispatch;
-use crate::daemon::agent_acp::AcpWakePrompt;
 use crate::daemon::db::prelude::*;
 use crate::daemon::db_handle::AsyncDaemonDbHandle;
-use crate::daemon::protocol::CodexSteerRequest;
 use crate::daemon::state;
 
 mod runtime_delivery;
+mod wake_delivery;
 
 use runtime_delivery::{
-    persist_runtime_acknowledgment, record_failed_signal_delivery, scoped_signal_idempotency_key,
+    persist_durable_acknowledgment, persist_runtime_acknowledgment, record_failed_signal_delivery,
+    runtime_acknowledgment, runtime_signal_session_id, scoped_signal_idempotency_key,
     settle_runtime_acknowledgment, write_runtime_signal,
 };
+use wake_delivery::wake_managed_agent;
 
 /// Return a workspace-owned activity window after reconciling legacy sources.
 ///
@@ -160,14 +160,14 @@ pub(crate) async fn acknowledge_agent_workspace_signal_async(
         .into_iter()
         .find(|record| record.signal.signal_id == signal_id)
     else {
-        return db
-            .acknowledge_agent_workspace_signal(
-                &daemon_id,
-                workspace_id,
-                member_id,
-                &durable_request,
-            )
-            .await;
+        return persist_durable_acknowledgment(
+            db,
+            &daemon_id,
+            workspace_id,
+            member_id,
+            &durable_request,
+        )
+        .await;
     };
     let acknowledged_at = match current.acknowledgment.as_ref() {
         None => harness_workspace::workspace::utc_now(),
@@ -178,14 +178,14 @@ pub(crate) async fn acknowledge_agent_workspace_signal_async(
             acknowledgment.acknowledged_at.clone()
         }
         Some(_) => {
-            return db
-                .acknowledge_agent_workspace_signal(
-                    &daemon_id,
-                    workspace_id,
-                    member_id,
-                    &durable_request,
-                )
-                .await;
+            return persist_durable_acknowledgment(
+                db,
+                &daemon_id,
+                workspace_id,
+                member_id,
+                &durable_request,
+            )
+            .await;
         }
     };
     let target = match db
@@ -195,27 +195,26 @@ pub(crate) async fn acknowledge_agent_workspace_signal_async(
         Ok(target) => target,
         Err(error) => {
             tracing::debug!(%error, member_id, signal_id, "runtime signal acknowledgment skipped");
-            return db
-                .acknowledge_agent_workspace_signal(
-                    &daemon_id,
-                    workspace_id,
-                    member_id,
-                    &durable_request,
-                )
-                .await;
+            return persist_durable_acknowledgment(
+                db,
+                &daemon_id,
+                workspace_id,
+                member_id,
+                &durable_request,
+            )
+            .await;
         }
     };
     let runtime_acknowledgment = settle_runtime_acknowledgment(
         &target,
         &current.signal,
-        &SignalAck {
-            signal_id: signal_id.to_string(),
+        &runtime_acknowledgment(
+            &target,
+            signal_id,
             acknowledged_at,
-            result: request.result,
-            agent: member_id.to_string(),
-            session_id: workspace_id.to_string(),
-            details: request.details.clone(),
-        },
+            request.result,
+            request.details.clone(),
+        ),
     )
     .await?;
     persist_runtime_acknowledgment(
@@ -254,8 +253,31 @@ pub(crate) async fn cancel_agent_workspace_signal_async(
         .into_iter()
         .find(|record| record.signal.signal_id == signal_id)
     else {
-        return db
-            .acknowledge_agent_workspace_signal(
+        return persist_durable_acknowledgment(
+            db,
+            &daemon_id,
+            workspace_id,
+            member_id,
+            &AgentWorkspaceSignalAcknowledgment {
+                signal_id: signal_id.to_string(),
+                result: AckResult::Rejected,
+                details: Some(details),
+                acknowledged_at: None,
+            },
+        )
+        .await;
+    };
+    let acknowledged_at = match current.acknowledgment.as_ref() {
+        None => harness_workspace::workspace::utc_now(),
+        Some(acknowledgment)
+            if acknowledgment.result == AckResult::Rejected
+                && acknowledgment.details.as_deref() == Some(details.as_str()) =>
+        {
+            acknowledgment.acknowledged_at.clone()
+        }
+        _ => {
+            return persist_durable_acknowledgment(
+                db,
                 &daemon_id,
                 workspace_id,
                 member_id,
@@ -267,29 +289,6 @@ pub(crate) async fn cancel_agent_workspace_signal_async(
                 },
             )
             .await;
-    };
-    let acknowledged_at = match current.acknowledgment.as_ref() {
-        None => harness_workspace::workspace::utc_now(),
-        Some(acknowledgment)
-            if acknowledgment.result == AckResult::Rejected
-                && acknowledgment.details.as_deref() == Some(details.as_str()) =>
-        {
-            acknowledgment.acknowledged_at.clone()
-        }
-        _ => {
-            return db
-                .acknowledge_agent_workspace_signal(
-                    &daemon_id,
-                    workspace_id,
-                    member_id,
-                    &AgentWorkspaceSignalAcknowledgment {
-                        signal_id: signal_id.to_string(),
-                        result: AckResult::Rejected,
-                        details: Some(details),
-                        acknowledged_at: None,
-                    },
-                )
-                .await;
         }
     };
     let acknowledgment = AgentWorkspaceSignalAcknowledgment {
@@ -305,27 +304,26 @@ pub(crate) async fn cancel_agent_workspace_signal_async(
         Ok(target) => target,
         Err(error) => {
             tracing::debug!(%error, member_id, signal_id, "runtime signal cancellation skipped");
-            return db
-                .acknowledge_agent_workspace_signal(
-                    &daemon_id,
-                    workspace_id,
-                    member_id,
-                    &acknowledgment,
-                )
-                .await;
+            return persist_durable_acknowledgment(
+                db,
+                &daemon_id,
+                workspace_id,
+                member_id,
+                &acknowledgment,
+            )
+            .await;
         }
     };
     let runtime_acknowledgment = settle_runtime_acknowledgment(
         &target,
         &current.signal,
-        &SignalAck {
-            signal_id: signal_id.to_string(),
+        &runtime_acknowledgment(
+            &target,
+            signal_id,
             acknowledged_at,
-            result: AckResult::Rejected,
-            agent: member_id.to_string(),
-            session_id: workspace_id.to_string(),
-            details: acknowledgment.details.clone(),
-        },
+            AckResult::Rejected,
+            acknowledgment.details.clone(),
+        ),
     )
     .await?;
     persist_runtime_acknowledgment(
@@ -363,10 +361,7 @@ async fn reconcile_runtime_acknowledgments(
     let Some(runtime) = runtime::runtime_for_name(&target.runtime) else {
         return false;
     };
-    let signal_session_id = target
-        .runtime_session_id
-        .clone()
-        .unwrap_or_else(|| target.workspace_id.clone());
+    let signal_session_id = runtime_signal_session_id(&target);
     let mut acknowledgments = match read_runtime_acknowledgments_async(
         runtime,
         PathBuf::from(&target.project_dir),
@@ -392,19 +387,19 @@ async fn reconcile_runtime_acknowledgments(
         if !is_pending {
             continue;
         }
-        match db
-            .acknowledge_agent_workspace_signal(
-                daemon_id,
-                &response.workspace_id,
-                &response.member_id,
-                &AgentWorkspaceSignalAcknowledgment {
-                    signal_id: acknowledgment.signal_id.clone(),
-                    result: acknowledgment.result,
-                    details: acknowledgment.details.clone(),
-                    acknowledged_at: Some(acknowledgment.acknowledged_at.clone()),
-                },
-            )
-            .await
+        match persist_durable_acknowledgment(
+            db,
+            daemon_id,
+            &response.workspace_id,
+            &response.member_id,
+            &AgentWorkspaceSignalAcknowledgment {
+                signal_id: acknowledgment.signal_id.clone(),
+                result: acknowledgment.result,
+                details: acknowledgment.details.clone(),
+                acknowledged_at: Some(acknowledgment.acknowledged_at.clone()),
+            },
+        )
+        .await
         {
             Ok(_) => changed = true,
             Err(error) => {
@@ -423,59 +418,6 @@ async fn prepare_activity_scope(db: &AsyncDaemonDbHandle) -> Result<String, CliE
         })??;
     db.reconcile_agent_workspaces(&identity.daemon_id).await?;
     Ok(identity.daemon_id)
-}
-
-fn wake_managed_agent(
-    target: &AgentWorkspaceSignalTarget,
-    signal: &Signal,
-    dispatch: WakeDispatch<'_>,
-) {
-    let Some(runtime) = runtime::runtime_for_name(&target.runtime) else {
-        return;
-    };
-    let prompt = build_active_signal_prompt(signal);
-    match target.managed_agent_kind.as_str() {
-        "tui" => {
-            if let Some(manager) = dispatch.agent_tui
-                && let Err(error) = manager.prompt_tui(&target.managed_agent_id, &prompt)
-            {
-                tracing::warn!(%error, member_id = target.member_id, "durable signal TUI wake failed");
-            }
-        }
-        "acp" => {
-            if let Some(manager) = dispatch.acp_agent {
-                let signal_session_id = target
-                    .runtime_session_id
-                    .clone()
-                    .unwrap_or_else(|| target.workspace_id.clone());
-                manager.dispatch_wake_prompt(
-                    runtime,
-                    AcpWakePrompt {
-                        acp_id: target.managed_agent_id.clone(),
-                        orchestration_session_id: target.workspace_id.clone(),
-                        signal_session_id: signal_session_id.clone(),
-                        signal_dir: runtime.signal_dir(
-                            PathBuf::from(&target.project_dir).as_path(),
-                            &signal_session_id,
-                        ),
-                        project_dir: PathBuf::from(&target.project_dir),
-                        prompt,
-                        signal_id: signal.signal_id.clone(),
-                        agent_id: target.member_id.clone(),
-                    },
-                );
-            }
-        }
-        "codex" => {
-            if let Some(controller) = dispatch.codex
-                && let Err(error) =
-                    controller.steer(&target.managed_agent_id, &CodexSteerRequest { prompt })
-            {
-                tracing::warn!(%error, member_id = target.member_id, "durable signal Codex wake failed");
-            }
-        }
-        _ => {}
-    }
 }
 
 fn validate_signal_request(request: &AgentWorkspaceSignalSendRequest) -> Result<(), CliError> {

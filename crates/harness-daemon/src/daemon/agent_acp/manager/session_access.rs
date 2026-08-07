@@ -74,8 +74,13 @@ impl AcpAgentManagerHandle {
     /// a single live wake per signal even under a storm of `task.drop` calls.
     /// Coalesced wakes return immediately at `info!`. The agent will still
     /// see the file signal on its next poll.
+    /// Returns `true` when a wake started or was already in flight.
     #[cfg(feature = "daemon-runtime")]
-    pub fn dispatch_wake_prompt(&self, runtime: &'static dyn AgentRuntime, prompt: AcpWakePrompt) {
+    pub fn dispatch_wake_prompt(
+        &self,
+        runtime: &'static dyn AgentRuntime,
+        prompt: AcpWakePrompt,
+    ) -> bool {
         let session = match self.session(&prompt.acp_id) {
             Ok(session) => session,
             Err(error) => {
@@ -89,7 +94,7 @@ impl AcpAgentManagerHandle {
                         ("error", &error),
                     ],
                 );
-                return;
+                return false;
             }
         };
         if !self.try_reserve_wake(&prompt.acp_id, &prompt.signal_id) {
@@ -101,20 +106,26 @@ impl AcpAgentManagerHandle {
                     ("signal_id", &prompt.signal_id),
                 ],
             );
-            return;
+            return true;
         }
         let manager = self.clone();
         let acp_id_for_diag = prompt.acp_id.clone();
+        let signal_id_for_diag = prompt.signal_id.clone();
         let thread_name = format!("acp-wake-{}", prompt.acp_id);
-        if let Err(error) = thread::Builder::new()
+        match thread::Builder::new()
             .name(thread_name)
             .spawn(move || run_wake_prompt(&manager, runtime, &session, prompt))
         {
-            record_wake_event(
-                WakeEventLevel::Error,
-                "thread_spawn_failed",
-                &[("managed_agent_id", &acp_id_for_diag), ("error", &error)],
-            );
+            Ok(_) => true,
+            Err(error) => {
+                self.release_wake(&acp_id_for_diag, &signal_id_for_diag);
+                record_wake_event(
+                    WakeEventLevel::Error,
+                    "thread_spawn_failed",
+                    &[("managed_agent_id", &acp_id_for_diag), ("error", &error)],
+                );
+                false
+            }
         }
     }
 

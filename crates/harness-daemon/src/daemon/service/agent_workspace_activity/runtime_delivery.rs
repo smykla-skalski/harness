@@ -1,4 +1,6 @@
+use std::collections::HashSet;
 use std::path::PathBuf;
+use std::sync::{LazyLock, Mutex};
 
 use harness_agents::runtime;
 use harness_agents::runtime::signal::{
@@ -11,6 +13,9 @@ use harness_protocol::daemon::activity::AgentWorkspaceSignalRecord;
 use crate::daemon::db::prelude::*;
 use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
+static ACTIVE_SIGNAL_WAKES: LazyLock<Mutex<HashSet<String>>> =
+    LazyLock::new(|| Mutex::new(HashSet::new()));
+
 pub(super) async fn persist_runtime_acknowledgment(
     db: &AsyncDaemonDbHandle,
     daemon_id: &str,
@@ -18,7 +23,8 @@ pub(super) async fn persist_runtime_acknowledgment(
     member_id: &str,
     acknowledgment: &SignalAck,
 ) -> Result<AgentWorkspaceSignalRecord, CliError> {
-    db.acknowledge_agent_workspace_signal(
+    persist_durable_acknowledgment(
+        db,
         daemon_id,
         workspace_id,
         member_id,
@@ -40,7 +46,8 @@ pub(super) async fn record_failed_signal_delivery(
     signal_id: &str,
     delivery_error: &CliError,
 ) -> Result<(), CliError> {
-    db.acknowledge_agent_workspace_signal(
+    persist_durable_acknowledgment(
+        db,
         daemon_id,
         workspace_id,
         member_id,
@@ -53,6 +60,22 @@ pub(super) async fn record_failed_signal_delivery(
     )
     .await
     .map(|_| ())
+}
+
+pub(super) async fn persist_durable_acknowledgment(
+    db: &AsyncDaemonDbHandle,
+    daemon_id: &str,
+    workspace_id: &str,
+    member_id: &str,
+    acknowledgment: &AgentWorkspaceSignalAcknowledgment,
+) -> Result<AgentWorkspaceSignalRecord, CliError> {
+    let result = db
+        .acknowledge_agent_workspace_signal(daemon_id, workspace_id, member_id, acknowledgment)
+        .await;
+    if result.is_ok() {
+        release_signal_wake(&acknowledgment.signal_id);
+    }
+    result
 }
 
 pub(super) async fn settle_runtime_acknowledgment(
@@ -86,10 +109,7 @@ pub(super) async fn write_runtime_signal(
         ))
     })?;
     let project_dir = PathBuf::from(&target.project_dir);
-    let signal_session_id = target
-        .runtime_session_id
-        .clone()
-        .unwrap_or_else(|| target.workspace_id.clone());
+    let signal_session_id = runtime_signal_session_id(target);
     let signal = signal.clone();
     tokio::task::spawn_blocking(move || {
         runtime.ensure_signal(&project_dir, &signal_session_id, &signal)
@@ -108,10 +128,7 @@ async fn write_runtime_acknowledgment(
             target.runtime, target.member_id
         ))
     })?;
-    let signal_session_id = target
-        .runtime_session_id
-        .clone()
-        .unwrap_or_else(|| target.workspace_id.clone());
+    let signal_session_id = runtime_signal_session_id(target);
     let signal_dir = runtime.signal_dir(
         PathBuf::from(&target.project_dir).as_path(),
         &signal_session_id,
@@ -122,6 +139,51 @@ async fn write_runtime_acknowledgment(
         .map_err(|error| {
             CliErrorKind::workflow_io(format!("join durable signal acknowledgment: {error}"))
         })?
+}
+
+pub(super) fn runtime_acknowledgment(
+    target: &AgentWorkspaceSignalTarget,
+    signal_id: &str,
+    acknowledged_at: String,
+    result: AckResult,
+    details: Option<String>,
+) -> SignalAck {
+    SignalAck {
+        signal_id: signal_id.to_string(),
+        acknowledged_at,
+        result,
+        agent: runtime_signal_session_id(target),
+        session_id: runtime_orchestration_session_id(target),
+        details,
+    }
+}
+
+pub(super) fn runtime_signal_session_id(target: &AgentWorkspaceSignalTarget) -> String {
+    target
+        .runtime_session_id
+        .clone()
+        .unwrap_or_else(|| target.workspace_id.clone())
+}
+
+pub(super) fn runtime_orchestration_session_id(target: &AgentWorkspaceSignalTarget) -> String {
+    target
+        .source_session_id
+        .clone()
+        .unwrap_or_else(|| target.workspace_id.clone())
+}
+
+pub(super) fn reserve_signal_wake(signal_id: &str) -> bool {
+    let mut active = ACTIVE_SIGNAL_WAKES
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    active.insert(signal_id.to_string())
+}
+
+pub(super) fn release_signal_wake(signal_id: &str) {
+    let mut active = ACTIVE_SIGNAL_WAKES
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    active.remove(signal_id);
 }
 
 pub(super) fn scoped_signal_idempotency_key(
