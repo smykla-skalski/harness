@@ -54,7 +54,7 @@ pub(super) async fn join_worker_to_workspace(
 /// The membership row itself stays. Runtime stop and membership removal are
 /// separate results, and a worker that ran and was compensated is history worth
 /// keeping rather than a row to erase.
-pub(super) async fn settle_compensated_workspace_worker(
+pub(crate) async fn settle_compensated_workspace_worker(
     db: &AsyncDaemonDbHandle,
     applied: &DispatchAppliedTask,
     worker_id: &str,
