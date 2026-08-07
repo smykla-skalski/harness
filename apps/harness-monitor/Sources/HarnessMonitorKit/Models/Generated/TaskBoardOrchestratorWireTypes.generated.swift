@@ -350,13 +350,24 @@ public struct TaskBoardOrchestratorDispatchOutcomeWire: Codable, Equatable, Send
 
 public struct TaskBoardOrchestratorAppliedTaskWire: Codable, Equatable, Sendable {
   public var boardItemId: String
-  public var sessionId: String
+  public var sessionId: String?
+  public var workspaceId: String?
+  public var workingCopyId: String?
   public var workItemId: String
   public var itemTitle: String
 
-  public init(boardItemId: String, sessionId: String, workItemId: String, itemTitle: String) {
+  public init(
+    boardItemId: String,
+    sessionId: String? = nil,
+    workspaceId: String? = nil,
+    workingCopyId: String? = nil,
+    workItemId: String,
+    itemTitle: String
+  ) {
     self.boardItemId = boardItemId
     self.sessionId = sessionId
+    self.workspaceId = workspaceId
+    self.workingCopyId = workingCopyId
     self.workItemId = workItemId
     self.itemTitle = itemTitle
   }
@@ -364,6 +375,8 @@ public struct TaskBoardOrchestratorAppliedTaskWire: Codable, Equatable, Sendable
   enum CodingKeys: String, CodingKey {
     case boardItemId = "board_item_id"
     case sessionId = "session_id"
+    case workspaceId = "workspace_id"
+    case workingCopyId = "working_copy_id"
     case workItemId = "work_item_id"
     case itemTitle = "item_title"
   }

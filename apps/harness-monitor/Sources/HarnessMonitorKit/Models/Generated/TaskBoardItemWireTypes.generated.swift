@@ -27,6 +27,8 @@ public struct TaskBoardItemWire: Codable, Equatable, Sendable {
   public var workflow: TaskBoardWorkflowStateWire?
   public var sessionId: String?
   public var workItemId: String?
+  public var workspaceId: String?
+  public var workingCopyId: String?
   public var usage: TaskUsageWire
   public var parentItemId: String?
   public var childOrder: UInt32
@@ -61,6 +63,8 @@ public struct TaskBoardItemWire: Codable, Equatable, Sendable {
     workflow: TaskBoardWorkflowStateWire? = nil,
     sessionId: String? = nil,
     workItemId: String? = nil,
+    workspaceId: String? = nil,
+    workingCopyId: String? = nil,
     usage: TaskUsageWire = TaskUsageWire(),
     parentItemId: String? = nil,
     childOrder: UInt32 = 0,
@@ -94,6 +98,8 @@ public struct TaskBoardItemWire: Codable, Equatable, Sendable {
     self.workflow = workflow
     self.sessionId = sessionId
     self.workItemId = workItemId
+    self.workspaceId = workspaceId
+    self.workingCopyId = workingCopyId
     self.usage = usage
     self.parentItemId = parentItemId
     self.childOrder = childOrder
@@ -130,6 +136,8 @@ public struct TaskBoardItemWire: Codable, Equatable, Sendable {
     workflow = try container.decodeIfPresent(TaskBoardWorkflowStateWire.self, forKey: .workflow)
     sessionId = try container.decodeIfPresent(String.self, forKey: .sessionId)
     workItemId = try container.decodeIfPresent(String.self, forKey: .workItemId)
+    workspaceId = try container.decodeIfPresent(String.self, forKey: .workspaceId)
+    workingCopyId = try container.decodeIfPresent(String.self, forKey: .workingCopyId)
     usage = try container.decodeIfPresent(TaskUsageWire.self, forKey: .usage) ?? TaskUsageWire()
     parentItemId = try container.decodeIfPresent(String.self, forKey: .parentItemId)
     childOrder = try container.decodeIfPresent(UInt32.self, forKey: .childOrder) ?? 0
@@ -165,6 +173,8 @@ public struct TaskBoardItemWire: Codable, Equatable, Sendable {
     case workflow
     case sessionId = "session_id"
     case workItemId = "work_item_id"
+    case workspaceId = "workspace_id"
+    case workingCopyId = "working_copy_id"
     case usage
     case parentItemId = "parent_item_id"
     case childOrder = "child_order"
