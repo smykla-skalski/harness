@@ -271,6 +271,7 @@ async fn session_detachment_preserves_independent_operation_overrides() {
         )
         .await
         .expect("record runtime stop");
+    fixture.reconcile_activity(&workspace_id).await;
 
     query("DELETE FROM sessions WHERE session_id = 'session-operation-detach'")
         .execute(fixture.db.pool())

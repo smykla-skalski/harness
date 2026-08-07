@@ -116,11 +116,15 @@ async fn ownerless_workspace_availability_refreshes_both_directions() {
         false,
     )
     .await;
-    fixture
+    let workspace_id = fixture
         .db
         .reconcile_agent_workspaces(DAEMON_ID)
         .await
-        .expect("create workspace");
+        .expect("create workspace")
+        .workspaces[0]
+        .workspace_id
+        .clone();
+    fixture.reconcile_activity(&workspace_id).await;
 
     std::fs::remove_dir_all(&project.checkout_root).expect("remove checkout");
     query("DELETE FROM sessions WHERE session_id = 'session-ownerless-availability'")

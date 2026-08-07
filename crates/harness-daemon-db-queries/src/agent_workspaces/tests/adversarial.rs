@@ -16,16 +16,32 @@ async fn retiring_one_daemon_does_not_bless_another_daemons_corruption() {
         false,
     )
     .await;
-    fixture
+    let first_daemon_workspace_id = fixture
         .db
         .reconcile_agent_workspaces(DAEMON_ID)
         .await
-        .expect("create first daemon workspace");
-    fixture
+        .expect("create first daemon workspace")
+        .workspaces[0]
+        .workspace_id
+        .clone();
+    let other_daemon_workspace_id = fixture
         .db
         .reconcile_agent_workspaces(OTHER_DAEMON_ID)
         .await
-        .expect("create second daemon workspace");
+        .expect("create second daemon workspace")
+        .workspaces[0]
+        .workspace_id
+        .clone();
+    fixture.reconcile_activity(&first_daemon_workspace_id).await;
+    fixture
+        .db
+        .load_agent_workspace_activity(
+            OTHER_DAEMON_ID,
+            &other_daemon_workspace_id,
+            &TimelineWindowRequest::default(),
+        )
+        .await
+        .expect("reconcile second daemon activity");
     query(
         "UPDATE agent_workspaces
          SET context_root = '/tampered/other-daemon'
@@ -305,11 +321,15 @@ async fn tampered_workspace_is_not_blessed_when_its_session_is_deleted() {
         false,
     )
     .await;
-    fixture
+    let workspace_id = fixture
         .db
         .reconcile_agent_workspaces(DAEMON_ID)
         .await
-        .expect("create workspace");
+        .expect("create workspace")
+        .workspaces[0]
+        .workspace_id
+        .clone();
+    fixture.reconcile_activity(&workspace_id).await;
     query("UPDATE agent_workspaces SET context_root = '/tampered/before-delete'")
         .execute(fixture.db.pool())
         .await
@@ -351,11 +371,15 @@ async fn tampered_ownerless_workspace_is_hidden() {
         false,
     )
     .await;
-    fixture
+    let workspace_id = fixture
         .db
         .reconcile_agent_workspaces(DAEMON_ID)
         .await
-        .expect("create workspace");
+        .expect("create workspace")
+        .workspaces[0]
+        .workspace_id
+        .clone();
+    fixture.reconcile_activity(&workspace_id).await;
     query("DELETE FROM sessions WHERE session_id = 'session-ownerless-tamper'")
         .execute(fixture.db.pool())
         .await

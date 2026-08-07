@@ -6,11 +6,13 @@ use harness_protocol::daemon::summaries::{
     AgentWorkspaceAvailability, AgentWorkspaceConflictKind, AgentWorkspaceOrchestrationAuthority,
 };
 use harness_protocol::session::{CURRENT_VERSION, SessionState};
+use harness_protocol::timeline::TimelineWindowRequest;
 use serde_json::json;
 use sqlx::{SqlitePool, query, query_scalar};
 use tempfile::TempDir;
 
 use super::AsyncAgentWorkspaceQueries;
+use crate::AsyncAgentWorkspaceActivityQueries;
 
 const DAEMON_ID: &str = "daemon-test";
 const NOW: &str = "2026-08-06T10:00:00Z";
@@ -57,6 +59,7 @@ async fn reconciliation_is_restart_safe_and_workspace_survives_session_deletion(
         .expect("repeat reconciliation");
     assert_eq!(restarted.workspaces[0].workspace_id, workspace_id);
     assert_eq!(workspace_count(fixture.db.pool()).await, 1);
+    fixture.reconcile_activity(&workspace_id).await;
 
     query("DELETE FROM sessions WHERE session_id = 'session-a'")
         .execute(fixture.db.pool())
@@ -287,6 +290,17 @@ impl Fixture {
             is_worktree: false,
             worktree_name: None,
         }
+    }
+
+    async fn reconcile_activity(&self, workspace_id: &str) {
+        self.db
+            .load_agent_workspace_activity(
+                DAEMON_ID,
+                workspace_id,
+                &TimelineWindowRequest::default(),
+            )
+            .await
+            .expect("reconcile durable agent activity");
     }
 
     fn worktree_project(&self, id: &str) -> ProjectFixture {
