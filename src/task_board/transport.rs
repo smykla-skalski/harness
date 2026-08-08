@@ -29,6 +29,7 @@ mod orchestrator_tokens;
 mod planning;
 mod policy;
 mod policy_io;
+mod progress;
 mod sync;
 mod triage_escalation;
 
@@ -46,6 +47,7 @@ pub use policy::{
     TaskBoardPolicyJsonArgs, TaskBoardPolicyToggleArgs,
 };
 pub use policy_io::{TaskBoardPolicyDumpArgs, TaskBoardPolicyImportArgs};
+pub use progress::TaskBoardProgressCommand;
 pub use triage_escalation::TaskBoardTriageEscalationReportArgs;
 
 #[derive(Debug, Clone, Subcommand)]
@@ -81,6 +83,11 @@ pub enum TaskBoardCommand {
     DispatchDeliver(TaskBoardDispatchDeliverArgs),
     /// Evaluate linked session work and update board workflow state.
     Evaluate(TaskBoardEvaluateArgs),
+    /// Report and read worker progress on a dispatched item.
+    Progress {
+        #[command(subcommand)]
+        command: TaskBoardProgressCommand,
+    },
     /// Print task-board audit data.
     Audit(TaskBoardAuditArgs),
     /// Manage known projects.
@@ -313,6 +320,7 @@ impl Execute for TaskBoardCommand {
             Self::DispatchPick(args) => args.execute(context),
             Self::DispatchDeliver(args) => args.execute(context),
             Self::Evaluate(args) => args.execute(context),
+            Self::Progress { command } => command.execute(context),
             Self::Audit(args) => args.execute(context),
             Self::Project(args) => args.execute_project(context),
             Self::Machine(args) => args.execute_machine(context),
