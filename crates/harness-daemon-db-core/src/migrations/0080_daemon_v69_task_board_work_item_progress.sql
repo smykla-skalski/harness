@@ -25,7 +25,13 @@ CREATE TABLE IF NOT EXISTS task_board_work_item_progress (
     created_at       TEXT NOT NULL,
     updated_at       TEXT NOT NULL,
     completed_at     TEXT,
-    CHECK ((state IN ('blocked', 'done')) = (completed_at IS NOT NULL))
+    -- Set once the managed worker behind a settled work item has been stopped.
+    -- Settling the record and stopping the worker cannot be one atomic act, so
+    -- this is what makes the pair exactly-once: a crash between them leaves the
+    -- column NULL and the next report retries the stop instead of skipping it.
+    worker_settled_at TEXT,
+    CHECK ((state IN ('blocked', 'done')) = (completed_at IS NOT NULL)),
+    CHECK (worker_settled_at IS NULL OR completed_at IS NOT NULL)
 ) WITHOUT ROWID;
 
 CREATE INDEX IF NOT EXISTS idx_task_board_work_item_progress_item
@@ -54,7 +60,8 @@ CREATE TABLE IF NOT EXISTS task_board_work_item_checkpoints (
 -- statement replayable and never overwrites a record a worker has since moved.
 INSERT OR IGNORE INTO task_board_work_item_progress (
     work_item_id, item_id, execution_id, state, summary, blocked_reason,
-    item_revision, report_sequence, created_at, updated_at, completed_at
+    item_revision, report_sequence, created_at, updated_at, completed_at,
+    worker_settled_at
 )
 SELECT
     items.work_item_id,
@@ -79,6 +86,10 @@ SELECT
     0,
     items.created_at,
     items.updated_at,
+    CASE WHEN items.status IN ('done', 'failed') THEN items.updated_at END,
+    -- A work item that was already settled before the upgrade has no worker
+    -- left to stop, so it is marked settled rather than queued for a stop that
+    -- would target a run that ended long ago.
     CASE WHEN items.status IN ('done', 'failed') THEN items.updated_at END
 FROM task_board_items AS items
 WHERE items.work_item_id IS NOT NULL

@@ -95,12 +95,20 @@ fn backfill_carries_execution_binding_revision_and_block_reason() {
 
     run(&conn).expect("upgrade v68 database");
 
-    let row: (String, i64, String, String) = conn
+    let row: (String, i64, String, String, String) = conn
         .query_row(
-            "SELECT execution_id, item_revision, blocked_reason, completed_at
+            "SELECT execution_id, item_revision, blocked_reason, completed_at, worker_settled_at
              FROM task_board_work_item_progress WHERE work_item_id = 'work-1'",
             [],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            |row| {
+                Ok((
+                    row.get(0)?,
+                    row.get(1)?,
+                    row.get(2)?,
+                    row.get(3)?,
+                    row.get(4)?,
+                ))
+            },
         )
         .expect("load backfilled record");
     assert_eq!(
@@ -109,6 +117,7 @@ fn backfill_carries_execution_binding_revision_and_block_reason() {
             "workflow-1".into(),
             4,
             "no completion evidence".into(),
+            "2026-08-02T00:00:00Z".into(),
             "2026-08-02T00:00:00Z".into()
         )
     );
@@ -182,6 +191,24 @@ fn settled_records_must_carry_a_settlement_time() {
     );
 
     assert!(refused.is_err(), "settling without a time must be refused");
+}
+
+#[test]
+fn a_worker_settlement_time_requires_a_settled_record() {
+    let conn = seeded_connection();
+    insert_item(&conn, "item-1", "in_progress", "{}", "work-1");
+    run(&conn).expect("upgrade v68 database");
+
+    let refused = conn.execute(
+        "UPDATE task_board_work_item_progress
+         SET worker_settled_at = 'settled' WHERE work_item_id = 'work-1'",
+        [],
+    );
+
+    assert!(
+        refused.is_err(),
+        "settling a worker for unsettled work must be refused"
+    );
 }
 
 #[test]
