@@ -64,9 +64,6 @@ pub struct TaskBoardProgressCheckpointArgs {
     pub summary: String,
     #[arg(long, value_parser = clap::value_parser!(u8).range(0..=100))]
     pub progress: Option<u8>,
-    /// Report the worker as running rather than leaving the state alone.
-    #[arg(long)]
-    pub running: bool,
 }
 
 impl Execute for TaskBoardProgressCheckpointArgs {
@@ -75,7 +72,10 @@ impl Execute for TaskBoardProgressCheckpointArgs {
             &self.common,
             &TaskBoardWorkItemReportRequest {
                 actor: self.common.actor.clone(),
-                state: self.running.then_some(TaskBoardWorkItemState::Running),
+                // No state: the daemon reads a bare checkpoint as "still
+                // going" and promotes a pending or sent-back work item to
+                // running on its own.
+                state: None,
                 summary: Some(self.summary.clone()),
                 progress_percent: self.progress,
                 blocked_reason: None,

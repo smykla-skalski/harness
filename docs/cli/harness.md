@@ -1895,7 +1895,6 @@ Record a checkpoint against the dispatched work item
 * `--json`
 * `--summary <SUMMARY>` — What the worker has done since the last checkpoint
 * `--progress <PROGRESS>`
-* `--running` — Report the worker as running rather than leaving the state alone
 
 
 
