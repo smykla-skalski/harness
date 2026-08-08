@@ -266,20 +266,18 @@ impl TaskBoardReadOnlyRuntime for FakeReadOnlyRuntime {
         // its worktree. A workspace-owned attempt has no Session: the run names
         // itself the way `start_standalone_run_with_id` does, and takes the
         // checkout the attempt already records.
-        let resolved = match &self.durable_db {
+        let (session_id, project_dir) = match &self.durable_db {
             // A workspace owner is not a Session id at all, so resolution
             // rejects it outright rather than reporting it missing. Either way
             // there is no Session behind this attempt.
-            Some(db) => db.resolve_session(owner.owner_id).await.ok().flatten(),
-            None => None,
-        };
-        let (session_id, project_dir) = match (resolved, &self.durable_db) {
-            (Some(session), _) => (
-                owner.owner_id.to_string(),
-                session.state.worktree_path.to_string_lossy().into_owned(),
-            ),
-            (None, Some(_)) => (run_id.to_string(), owner.worktree.to_string()),
-            (None, None) => (owner.owner_id.to_string(), "/tmp/read-only-worktree".into()),
+            Some(db) => match db.resolve_session(owner.owner_id).await.ok().flatten() {
+                Some(session) => (
+                    owner.owner_id.to_string(),
+                    session.state.worktree_path.to_string_lossy().into_owned(),
+                ),
+                None => (run_id.to_string(), owner.worktree.to_string()),
+            },
+            None => (owner.owner_id.to_string(), "/tmp/read-only-worktree".into()),
         };
         let run = planned_run(&session_id, request, run_id, &project_dir, &result, status)?;
         if let Some(db) = &self.durable_db {

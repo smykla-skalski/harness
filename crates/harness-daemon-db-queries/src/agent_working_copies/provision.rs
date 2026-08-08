@@ -1,11 +1,11 @@
 use harness_daemon_db_core::db_error;
 use harness_kernel::errors::CliError;
-use harness_protocol::daemon::summaries::AgentWorkspaceAvailability;
 use harness_workspace::workspace::utc_now;
 use sqlx::{Sqlite, Transaction, query};
 
 use crate::agent_workspaces::availability::{RecordedCheckout, recorded_checkout_availability};
 use crate::agent_workspaces::identity::digest_fields;
+use crate::agent_workspaces::availability_label;
 use crate::agent_workspaces::shadow::{ShadowWorkspace, shadow_digest};
 
 use super::model::{ProvisionedWorkspaceCheckout, WorkspaceCheckoutRequest};
@@ -188,11 +188,4 @@ async fn existing_workspace_created_at(
         .await
         .map(|row| row.map(|row| row.0))
         .map_err(|error| db_error(format!("load provisioned workspace timestamp: {error}")))
-}
-
-const fn availability_label(availability: AgentWorkspaceAvailability) -> &'static str {
-    match availability {
-        AgentWorkspaceAvailability::Available => "available",
-        AgentWorkspaceAvailability::MissingWorktree => "missing_worktree",
-    }
 }

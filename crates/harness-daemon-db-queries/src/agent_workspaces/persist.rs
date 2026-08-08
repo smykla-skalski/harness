@@ -419,7 +419,7 @@ impl StoredWorkspaceRow {
     }
 }
 
-pub(super) const fn availability_label(availability: AgentWorkspaceAvailability) -> &'static str {
+pub(crate) const fn availability_label(availability: AgentWorkspaceAvailability) -> &'static str {
     match availability {
         AgentWorkspaceAvailability::Available => "available",
         AgentWorkspaceAvailability::MissingWorktree => "missing_worktree",

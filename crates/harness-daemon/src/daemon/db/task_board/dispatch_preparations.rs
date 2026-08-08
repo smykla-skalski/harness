@@ -6,6 +6,7 @@ use super::admission_reservations::persist_admission_snapshot_in_tx;
 use super::dispatch_workflow_launch::rebind_write_launch;
 use super::item_tx_ext::TaskBoardItemTxExt;
 use crate::daemon::db::prelude::*;
+use crate::task_board::dispatch_owner_id;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::infra::io;
 use crate::task_board::{
@@ -71,10 +72,11 @@ impl TaskBoardDispatchPreparation {
     /// and it is the right answer for a launch frozen mid-preparation. Total by
     /// construction: reservation always leaves one of the three set.
     pub(crate) fn launch_owner_id(&self) -> Option<&str> {
-        self.workspace_id
-            .as_deref()
-            .or(self.session_id.as_deref())
-            .or(self.working_copy_id.as_deref())
+        dispatch_owner_id(
+            self.workspace_id.as_deref(),
+            self.session_id.as_deref(),
+            self.working_copy_id.as_deref(),
+        )
     }
 }
 

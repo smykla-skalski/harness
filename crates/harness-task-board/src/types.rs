@@ -17,6 +17,7 @@ pub use super::item_fields::{
     ExternalRef, ExternalRefProvider, ExternalRefSyncState, PlanningState, TaskUsage,
 };
 pub use super::item_intent::{PrIntentSet, TaskBoardWorkflowKind};
+use super::dispatch::dispatch_owner_id;
 use super::lane::TaskBoardLaneOrigin;
 
 pub const CURRENT_TASK_BOARD_ITEM_VERSION: u32 = 1;
@@ -111,15 +112,14 @@ pub enum TaskBoardTombstoneCause {
 impl TaskBoardItem {
     /// The owner a dispatched item is linked to, most specific first.
     ///
-    /// Same order as `DispatchAppliedTask::launch_owner_id`, because a frozen
-    /// launch is validated by comparing the two; disagreeing would read an
-    /// untouched launch as changed.
+    /// One shared rule - see `dispatch_owner_id`.
     #[must_use]
     pub fn owner_id(&self) -> Option<&str> {
-        self.workspace_id
-            .as_deref()
-            .or(self.session_id.as_deref())
-            .or(self.working_copy_id.as_deref())
+        dispatch_owner_id(
+            self.workspace_id.as_deref(),
+            self.session_id.as_deref(),
+            self.working_copy_id.as_deref(),
+        )
     }
 
     #[must_use]

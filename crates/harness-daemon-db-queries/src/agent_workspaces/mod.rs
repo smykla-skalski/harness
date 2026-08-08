@@ -8,6 +8,7 @@ pub(crate) mod availability;
 mod candidate;
 pub(crate) mod identity;
 mod persist;
+pub(crate) use persist::availability_label;
 mod preflight;
 mod provenance;
 mod retire;

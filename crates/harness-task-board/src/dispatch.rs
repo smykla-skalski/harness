@@ -124,6 +124,22 @@ pub struct TaskBoardWriteWorkflowLaunch {
     pub plan_approval: TaskBoardPlanApprovalBinding,
 }
 
+/// The owner a dispatch links to, most specific first.
+///
+/// One rule rather than one per type: a frozen launch is validated by comparing
+/// the owner two of these report, so any disagreement would read an untouched
+/// launch as tampered with. A legacy dispatch names its Session, a fresh one
+/// names its workspace, and one frozen before preparation learned the workspace
+/// names the working copy it reserved. Reservation always leaves one set.
+#[must_use]
+pub fn dispatch_owner_id<'a>(
+    workspace_id: Option<&'a str>,
+    session_id: Option<&'a str>,
+    working_copy_id: Option<&'a str>,
+) -> Option<&'a str> {
+    workspace_id.or(session_id).or(working_copy_id)
+}
+
 impl DispatchAppliedTask {
     /// The owner a frozen workflow launch records against, most specific first.
     ///
@@ -135,10 +151,11 @@ impl DispatchAppliedTask {
     /// launch as tampered with.
     #[must_use]
     pub fn launch_owner_id(&self) -> Option<&str> {
-        self.workspace_id
-            .as_deref()
-            .or(self.session_id.as_deref())
-            .or(self.working_copy_id.as_deref())
+        dispatch_owner_id(
+            self.workspace_id.as_deref(),
+            self.session_id.as_deref(),
+            self.working_copy_id.as_deref(),
+        )
     }
 }
 

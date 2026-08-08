@@ -155,7 +155,7 @@ pub use dispatch::{
     DispatchAppliedTask, DispatchBlockReason, DispatchExecutionSummary, DispatchFailure,
     DispatchFailureKind, DispatchPlan, DispatchReadiness, EvaluatorIntent, FollowUpPhase,
     ReviewerIntent, SessionIntent, TaskBoardReadOnlyWorkflowLaunch, TaskBoardWriteWorkflowLaunch,
-    TaskCreationIntent, WorkerIntent,
+    TaskCreationIntent, WorkerIntent, dispatch_owner_id,
 };
 #[cfg(any(test, feature = "daemon-runtime"))]
 pub use dispatch::{
