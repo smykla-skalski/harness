@@ -315,7 +315,11 @@ async fn reserved_dependency_write(
         task_id: preparation.preparation.work_item_id.clone(),
         run_context: crate::task_board::TaskBoardReadOnlyRunContext {
             schema_version: crate::task_board::TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION,
-            session_id: preparation.preparation.launch_owner_id().expect("a prepared dispatch has an owner").to_string(),
+            session_id: preparation
+                .preparation
+                .launch_owner_id()
+                .expect("a prepared dispatch has an owner")
+                .to_string(),
             title: snapshot.item.title.clone(),
             body: snapshot.item.body.clone(),
             tags: snapshot.item.tags.clone(),
@@ -414,7 +418,11 @@ pub(super) async fn reserved_write_at(
         task_id: preparation.preparation.work_item_id.clone(),
         run_context: crate::task_board::TaskBoardReadOnlyRunContext {
             schema_version: crate::task_board::TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION,
-            session_id: preparation.preparation.launch_owner_id().expect("a prepared dispatch has an owner").to_string(),
+            session_id: preparation
+                .preparation
+                .launch_owner_id()
+                .expect("a prepared dispatch has an owner")
+                .to_string(),
             title: snapshot.item.title.clone(),
             body: snapshot.item.body.clone(),
             tags: snapshot.item.tags.clone(),

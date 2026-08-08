@@ -60,12 +60,7 @@ async fn resolve_dispatch_admission_start_in_tx<'c>(
     let (item, loaded_revision) = transaction
         .load_item_in_tx(&identity.item_id)
         .await?
-        .ok_or_else(|| {
-            db_error(format!(
-                "task-board item '{}' not found",
-                identity.item_id
-            ))
-        })?;
+        .ok_or_else(|| db_error(format!("task-board item '{}' not found", identity.item_id)))?;
     if loaded_revision != identity.item_revision {
         return Err(db_error(
             "task board admission item revision changed while loading",

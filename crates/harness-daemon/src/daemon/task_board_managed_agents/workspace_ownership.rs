@@ -172,4 +172,3 @@ pub(super) fn applied_worker_owner(applied: &DispatchAppliedTask, worker_id: &st
     }
     owners
 }
-

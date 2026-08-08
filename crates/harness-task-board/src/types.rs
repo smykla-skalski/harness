@@ -13,11 +13,11 @@ pub use harness_protocol::daemon::task_board::types::{
     AgentMode, TaskBoardItemKind, TaskBoardPriority, TaskBoardStatus, TaskBoardWorkflowStatus,
 };
 
+use super::dispatch::dispatch_owner_id;
 pub use super::item_fields::{
     ExternalRef, ExternalRefProvider, ExternalRefSyncState, PlanningState, TaskUsage,
 };
 pub use super::item_intent::{PrIntentSet, TaskBoardWorkflowKind};
-use super::dispatch::dispatch_owner_id;
 use super::lane::TaskBoardLaneOrigin;
 
 pub const CURRENT_TASK_BOARD_ITEM_VERSION: u32 = 1;

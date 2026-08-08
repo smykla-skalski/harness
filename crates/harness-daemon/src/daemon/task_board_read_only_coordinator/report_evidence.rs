@@ -86,8 +86,7 @@ pub(super) fn validate_run_binding(
     // attempt has no Session, so the run names itself the way
     // `start_standalone_run_with_id` stamps it. Both are the owner this attempt
     // froze; anything else belongs to another attempt.
-    let owner_matches =
-        run.session_id == session_id || run.session_id == attempt.idempotency_key;
+    let owner_matches = run.session_id == session_id || run.session_id == attempt.idempotency_key;
     let valid = run.run_id == attempt.idempotency_key
         && owner_matches
         && run.task_id == expected.task_id

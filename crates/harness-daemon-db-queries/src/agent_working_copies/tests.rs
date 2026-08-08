@@ -64,7 +64,12 @@ impl Fixture {
             daemon_id: DAEMON_ID.to_string(),
             project,
             working_copy_id: working_copy_id.to_string(),
-            origin_path: self.temp.path().join("origin").to_string_lossy().into_owned(),
+            origin_path: self
+                .temp
+                .path()
+                .join("origin")
+                .to_string_lossy()
+                .into_owned(),
             project_name: name.to_string(),
             worktree_path,
             branch_ref: format!("harness/{working_copy_id}"),
@@ -74,12 +79,18 @@ impl Fixture {
 
 // Both stand in for a `SchemaRepairHooks` field, so the fallible signature is
 // fixed by the hook type even though neither can fail.
-#[expect(clippy::unnecessary_wraps, reason = "signature is fixed by SchemaRepairHooks")]
+#[expect(
+    clippy::unnecessary_wraps,
+    reason = "signature is fixed by SchemaRepairHooks"
+)]
 fn noop_sync_session(_: &DaemonDb, _: &str, _: &SessionState) -> Result<(), CliError> {
     Ok(())
 }
 
-#[expect(clippy::unnecessary_wraps, reason = "signature is fixed by SchemaRepairHooks")]
+#[expect(
+    clippy::unnecessary_wraps,
+    reason = "signature is fixed by SchemaRepairHooks"
+)]
 fn noop_backfill(_: &DaemonDb) -> Result<(), CliError> {
     Ok(())
 }
@@ -266,12 +277,13 @@ async fn a_started_worker_joins_its_workspace_team_once() {
         .expect("re-join workspace team");
 
     assert_eq!(member_id, repeated);
-    let members =
-        query_scalar::<_, i64>("SELECT COUNT(*) FROM agent_workspace_members WHERE workspace_id = ?1")
-            .bind(&provisioned.workspace_id)
-            .fetch_one(fixture.db.pool())
-            .await
-            .expect("count members");
+    let members = query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM agent_workspace_members WHERE workspace_id = ?1",
+    )
+    .bind(&provisioned.workspace_id)
+    .fetch_one(fixture.db.pool())
+    .await
+    .expect("count members");
     assert_eq!(members, 1, "a reclaimed start must not add a second member");
     let lifecycle = query_scalar::<_, String>(
         "SELECT runtime_lifecycle FROM agent_workspace_members WHERE member_id = ?1",

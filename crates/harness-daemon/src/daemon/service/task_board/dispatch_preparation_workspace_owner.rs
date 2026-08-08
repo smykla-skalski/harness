@@ -64,7 +64,10 @@ pub(super) async fn prepare_workspace_owner(
     // failure, which keeps the retry from stacking a second checkout beside it.
     let branch = prepared.request.branch_ref.clone();
     let worktree = prepared.request.worktree_path.clone();
-    match db.provision_agent_workspace_checkout(&prepared.request).await {
+    match db
+        .provision_agent_workspace_checkout(&prepared.request)
+        .await
+    {
         Ok(provisioned) => Ok(DispatchOwner {
             branch,
             worktree,

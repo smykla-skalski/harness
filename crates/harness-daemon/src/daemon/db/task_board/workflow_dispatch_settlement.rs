@@ -298,7 +298,13 @@ async fn screen_workflow_dispatch_in_tx(
         .load_item_in_tx(&item_id)
         .await?
         .ok_or_else(|| db_error(format!("task-board item '{item_id}' not found")))?;
-    validate_claimed_identity(&item, session_id.as_deref(), &work_item_id, &execution_id, &applied)?;
+    validate_claimed_identity(
+        &item,
+        session_id.as_deref(),
+        &work_item_id,
+        &execution_id,
+        &applied,
+    )?;
     let (prepared_revision, configuration_revision) = workflow_start_fence(&applied)?
         .ok_or_else(|| db_error("workflow dispatch has no immutable start fence"))?;
     validate_worker_start_fence_in_tx(

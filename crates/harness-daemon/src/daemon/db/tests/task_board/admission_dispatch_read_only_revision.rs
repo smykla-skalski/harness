@@ -431,7 +431,10 @@ async fn reserved_read_only_unclaimed(
         prepared_item_revision: snapshot.item_revision,
         run_context: TaskBoardReadOnlyRunContext {
             schema_version: TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION,
-            session_id: preparation.launch_owner_id().expect("a prepared dispatch has an owner").to_string(),
+            session_id: preparation
+                .launch_owner_id()
+                .expect("a prepared dispatch has an owner")
+                .to_string(),
             title: snapshot.item.title,
             body: snapshot.item.body,
             tags: snapshot.item.tags,

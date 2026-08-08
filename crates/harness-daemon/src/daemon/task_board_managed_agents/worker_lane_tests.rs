@@ -20,7 +20,10 @@ async fn worker_start_waits_for_lane_before_preflight() {
     let intent_id = "dispatch-intent-test";
     let outer_guard = state
         .managed_agent_mutation_locks
-        .lock(&worker_lock_owner(&applied), &managed_worker_id(&applied, intent_id))
+        .lock(
+            &worker_lock_owner(&applied),
+            &managed_worker_id(&applied, intent_id),
+        )
         .await;
     let future = start_worker_for_applied_task(&state, &applied, intent_id, "stale-claim");
     tokio::pin!(future);
@@ -48,7 +51,12 @@ async fn deterministic_worker_evidence_precedes_claim_preflight() {
     let intent_id = "dispatch-intent-reclaimed";
     let worker_id = managed_worker_id(&applied, intent_id);
     seed_owner_session(&db, &applied).await;
-    let mut snapshot = codex_snapshot(CodexRunStatus::Running, applied.launch_owner_id().expect("a dispatched task has an owner"));
+    let mut snapshot = codex_snapshot(
+        CodexRunStatus::Running,
+        applied
+            .launch_owner_id()
+            .expect("a dispatched task has an owner"),
+    );
     snapshot.run_id.clone_from(&worker_id);
     snapshot.board_item_id = Some(applied.board_item_id.clone());
     snapshot.task_id = Some(applied.work_item_id.clone());

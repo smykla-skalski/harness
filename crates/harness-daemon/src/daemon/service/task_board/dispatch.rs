@@ -11,8 +11,7 @@ use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
 use crate::task_board::{
     DispatchAppliedTask, DispatchBlockReason, DispatchExecutionSummary, DispatchFailure,
     DispatchFailureKind, DispatchPlan, DispatchReadiness, SpawnGateSwitches, TaskBoardItem,
-    TaskBoardStatus,
-    build_dispatch_plans_with_policy, machine_mismatch_plan_with_policy,
+    TaskBoardStatus, build_dispatch_plans_with_policy, machine_mismatch_plan_with_policy,
 };
 #[cfg(test)]
 use crate::task_board::{

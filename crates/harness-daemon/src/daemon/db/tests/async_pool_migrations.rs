@@ -2,13 +2,12 @@ use sha2::{Digest as _, Sha384};
 use sqlx::query_scalar;
 use tempfile::tempdir;
 
-use super::async_pool_migration_support::restore_original_v34_upgrade_shape;
-use super::*;
 use super::async_pool_migration_checksums::{
     MODIFIED_V59_CHECKSUM, ORIGINAL_V34_CHECKSUM, ORIGINAL_V59_CHECKSUM,
     SHIPPED_MIGRATION_CHECKSUMS,
 };
-
+use super::async_pool_migration_support::restore_original_v34_upgrade_shape;
+use super::*;
 
 #[tokio::test]
 async fn connect_upgrades_applied_original_v34_migration() {
