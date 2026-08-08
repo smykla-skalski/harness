@@ -4,6 +4,7 @@ use crate::daemon::http::{DaemonHttpState, task_board_route_executor};
 use crate::daemon::protocol::{
     TASK_BOARD_TRIAGE_HISTORY_INVALID_PARAMS, TaskBoardGetItemRequest, TaskBoardListItemsRequest,
     TaskBoardTriageHistoryRequest, TaskBoardWorkItemReportCommand, WsRequest, WsResponse,
+    ws_methods,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_task_board_remote_viewer::{
@@ -17,6 +18,40 @@ use super::super::connection::ConnectionState;
 use super::super::dispatch::remote_viewer_projection_required;
 use super::super::mutations::{cli_error_response, dispatch_query_result};
 use super::{invalid_params, parse_control_plane_params, parse_params, parse_params_or_default};
+
+pub(super) async fn dispatch_method(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+    connection: &Arc<Mutex<ConnectionState>>,
+) -> Option<WsResponse> {
+    match request.method.as_str() {
+        ws_methods::TASK_BOARD_CAPABILITIES => {
+            Some(dispatch_task_board_capabilities(request, state).await)
+        }
+        ws_methods::TASK_BOARD_LIST => {
+            Some(dispatch_task_board_list(request, state, connection).await)
+        }
+        ws_methods::TASK_BOARD_GET => {
+            Some(dispatch_task_board_get(request, state, connection).await)
+        }
+        ws_methods::TASK_BOARD_REVIEW_REPORT_GET => {
+            Some(dispatch_task_board_review_report_get(request, state, connection).await)
+        }
+        ws_methods::TASK_BOARD_WORKFLOW_PROGRESS_GET => {
+            Some(dispatch_task_board_workflow_progress_get(request, state, connection).await)
+        }
+        ws_methods::TASK_BOARD_PROGRESS_GET => {
+            Some(dispatch_task_board_progress_get(request, state, connection).await)
+        }
+        ws_methods::TASK_BOARD_PROGRESS_REPORT => {
+            Some(Box::pin(dispatch_task_board_progress_report(request, state)).await)
+        }
+        ws_methods::TASK_BOARD_POSITION_GET => {
+            Some(dispatch_task_board_position_get(request, state, connection).await)
+        }
+        _ => None,
+    }
+}
 
 pub(super) async fn dispatch_task_board_capabilities(
     request: &WsRequest,
