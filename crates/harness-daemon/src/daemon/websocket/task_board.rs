@@ -101,7 +101,9 @@ pub(crate) async fn dispatch_task_board_method(
         ws_methods::TASK_BOARD_DISPATCH_PICK => {
             Some(dispatch::dispatch_task_board_dispatch_pick(request, state).await)
         }
-        ws_methods::TASK_BOARD_EVALUATE => Some(dispatch_task_board_evaluate(request, state).await),
+        ws_methods::TASK_BOARD_EVALUATE => {
+            Some(Box::pin(dispatch_task_board_evaluate(request, state)).await)
+        }
         ws_methods::TASK_BOARD_AUDIT => Some(dispatch_task_board_audit(request, state).await),
         ws_methods::TASK_BOARD_PROJECTS => Some(dispatch_task_board_projects(request, state).await),
         ws_methods::TASK_BOARD_PROJECTS_UPDATE => {
@@ -340,7 +342,7 @@ async fn dispatch_task_board_evaluate(request: &WsRequest, state: &DaemonHttpSta
     let Ok(body) = parse_params::<TaskBoardEvaluateRequest>(request) else {
         return invalid_params(request);
     };
-    let result = task_board_route_executor::evaluate(state, body).await;
+    let result = Box::pin(task_board_route_executor::evaluate(state, body)).await;
     record_task_board_audit_result(
         state,
         "task_board.evaluate",

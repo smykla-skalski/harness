@@ -5,7 +5,7 @@ use super::ITEMS_CHANGE_SCOPE;
 use super::admission_lifecycle::TaskBoardAdmissionCheck;
 use super::dispatch_admission_tx_ext::TaskBoardDispatchAdmissionTxExt;
 use super::dispatch_intents::{
-    ClaimedTaskBoardDispatch, TaskBoardDispatchClaimAction, decode_applied,
+    ClaimedTaskBoardDispatch, DispatchItemOwners, TaskBoardDispatchClaimAction, decode_applied,
     ensure_dispatch_item_startable,
 };
 use super::dispatch_workflow_launch::rebind_write_launch;
@@ -148,8 +148,7 @@ async fn load_held_claim_state_in_tx(
     validate_held_workflow_claim_revision(&applied, revision)?;
     ensure_dispatch_item_startable(
         &item,
-        &applied.session_id,
-        &applied.work_item_id,
+        DispatchItemOwners::of(&applied),
         applied.item.workflow.execution_id.as_deref(),
     )?;
     Ok(HeldClaimState {
@@ -409,7 +408,8 @@ fn ensure_held_linkage(
     item: &TaskBoardItem,
 ) -> Result<(), CliError> {
     let matches = applied.board_item_id == item.id
-        && item.session_id.as_deref() == Some(applied.session_id.as_str())
+        && item.session_id == applied.session_id
+        && item.workspace_id == applied.workspace_id
         && item.work_item_id.as_deref() == Some(applied.work_item_id.as_str())
         && item.workflow.execution_id == applied.item.workflow.execution_id;
     if matches {

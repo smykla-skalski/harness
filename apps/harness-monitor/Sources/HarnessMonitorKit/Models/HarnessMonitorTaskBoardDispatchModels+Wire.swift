@@ -147,6 +147,8 @@ extension TaskBoardDispatchAppliedTask {
     self.init(
       boardItemId: wire.boardItemId,
       sessionId: wire.sessionId,
+      workspaceId: wire.workspaceId,
+      workingCopyId: wire.workingCopyId,
       workItemId: wire.workItemId,
       item: TaskBoardItem(wire: wire.item)
     )

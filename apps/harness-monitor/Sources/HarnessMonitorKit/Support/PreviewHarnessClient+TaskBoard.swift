@@ -352,6 +352,8 @@ extension TaskBoardOrchestratorRunSummary {
           TaskBoardOrchestratorAppliedTask(
             boardItemId: $0.boardItemId,
             sessionId: $0.sessionId,
+            workspaceId: $0.workspaceId,
+            workingCopyId: $0.workingCopyId,
             workItemId: $0.workItemId,
             itemTitle: $0.item.title
           )

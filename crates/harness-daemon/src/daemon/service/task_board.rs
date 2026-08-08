@@ -48,6 +48,7 @@ use super::repository_sync_support::external_sync_config_for_repository;
 use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
 mod dispatch;
+mod dispatch_grants;
 mod dispatch_orchestrator;
 mod dispatch_preparation;
 mod policy_canvas;
@@ -59,7 +60,7 @@ mod read_only_workflow_launch;
 mod sync;
 mod write_workflow_launch;
 
-pub(crate) use dispatch::load_live_spawn_grants;
+pub(crate) use dispatch_grants::load_live_spawn_grants;
 pub(crate) use dispatch_orchestrator::dispatch_task_board_for_orchestrator_async;
 pub(crate) use dispatch_preparation::prepare_claimed_task_board_dispatch;
 pub(crate) use read_only_workflow_launch::validate_read_only_workflow_launch;

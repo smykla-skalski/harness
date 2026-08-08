@@ -60,7 +60,7 @@ async fn prepare_read_only_completion_fence(db: &AsyncDaemonDb) -> ReadOnlyCompl
         .await
         .expect("claim preparation")
         .expect("pending preparation");
-    let launch = read_only_launch(db, item_id, &preparation.preparation.session_id).await;
+    let launch = read_only_launch(db, item_id, preparation.preparation.launch_owner_id().expect("a prepared dispatch has an owner")).await;
     let applied = db
         .complete_task_board_dispatch_preparation_with_workflow(
             &preparation,

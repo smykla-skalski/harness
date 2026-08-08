@@ -97,6 +97,8 @@ pub fn task_board_orchestrator_applied_task_from_dispatch(
     TaskBoardOrchestratorAppliedTask {
         board_item_id: applied.board_item_id,
         session_id: applied.session_id,
+        workspace_id: applied.workspace_id,
+        working_copy_id: applied.working_copy_id,
         work_item_id: applied.work_item_id,
         item_title: applied.item.title,
     }
@@ -185,7 +187,9 @@ mod tests {
     fn applied_task_projection_keeps_the_title_and_drops_the_item() {
         let full = DispatchAppliedTask {
             board_item_id: "board-1".into(),
-            session_id: "session-1".into(),
+            session_id: Some("session-1".into()),
+            workspace_id: None,
+            working_copy_id: None,
             work_item_id: "work-1".into(),
             lifecycle: minimal_lifecycle(),
             item: sample_item("board-1"),
@@ -196,7 +200,7 @@ mod tests {
         let thin = task_board_orchestrator_applied_task_from_dispatch(full);
 
         assert_eq!(thin.board_item_id, "board-1");
-        assert_eq!(thin.session_id, "session-1");
+        assert_eq!(thin.session_id.as_deref(), Some("session-1"));
         assert_eq!(thin.work_item_id, "work-1");
         assert_eq!(thin.item_title, "board-1 title");
     }
@@ -273,7 +277,9 @@ mod tests {
                     plans: Vec::new(),
                     applied: vec![TaskBoardOrchestratorAppliedTask {
                         board_item_id: "board-1".into(),
-                        session_id: "session-1".into(),
+                        session_id: Some("session-1".into()),
+                        workspace_id: None,
+                        working_copy_id: None,
                         work_item_id: "work-1".into(),
                         item_title: "title".into(),
                     }],

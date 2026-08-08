@@ -64,15 +64,31 @@ public struct TaskBoardOrchestratorTickInfo: Codable, Equatable, Sendable {
 /// domain entity.
 public struct TaskBoardOrchestratorAppliedTask: Codable, Equatable, Identifiable, Sendable {
   public let boardItemId: String
-  public let sessionId: String
+  /// Legacy owner, present only for a dispatch that reclaimed an existing
+  /// Session. Fresh dispatch reports `workspaceId` and `workingCopyId` instead.
+  public let sessionId: String?
+  public let workspaceId: String?
+  public let workingCopyId: String?
   public let workItemId: String
   public let itemTitle: String
 
   public var id: String { boardItemId }
 
-  public init(boardItemId: String, sessionId: String, workItemId: String, itemTitle: String) {
+  /// Whichever owner this dispatch actually has.
+  public var ownerId: String? { workspaceId ?? sessionId }
+
+  public init(
+    boardItemId: String,
+    sessionId: String?,
+    workspaceId: String?,
+    workingCopyId: String?,
+    workItemId: String,
+    itemTitle: String
+  ) {
     self.boardItemId = boardItemId
     self.sessionId = sessionId
+    self.workspaceId = workspaceId
+    self.workingCopyId = workingCopyId
     self.workItemId = workItemId
     self.itemTitle = itemTitle
   }

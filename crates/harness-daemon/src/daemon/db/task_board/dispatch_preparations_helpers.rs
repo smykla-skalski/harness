@@ -129,7 +129,9 @@ pub(super) fn apply_preparation_to_item(
             .unwrap_or_else(|| format!("policy-trace-{}", Uuid::new_v4().simple())),
     );
     item.status = TaskBoardStatus::InProgress;
-    item.session_id = Some(preparation.session_id.clone());
+    item.session_id.clone_from(&preparation.session_id);
+    item.workspace_id.clone_from(&preparation.workspace_id);
+    item.working_copy_id.clone_from(&preparation.working_copy_id);
     item.work_item_id = Some(preparation.work_item_id.clone());
     item.updated_at = utc_now();
 }
@@ -232,13 +234,16 @@ pub(super) async fn insert_preparation(
     let now = utc_now();
     query(
         "INSERT INTO task_board_dispatch_intents (
-            intent_id, item_id, session_id, work_item_id, workflow_execution_id, payload_json,
+            intent_id, item_id, session_id, workspace_id, working_copy_id, work_item_id,
+            workflow_execution_id, payload_json,
             status, attempts, available_at, created_at, updated_at
-         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'preparing', 0, ?7, ?7, ?7)",
+         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'preparing', 0, ?9, ?9, ?9)",
     )
     .bind(intent_id)
     .bind(&preparation.board_item_id)
     .bind(&preparation.session_id)
+    .bind(&preparation.workspace_id)
+    .bind(&preparation.working_copy_id)
     .bind(&preparation.work_item_id)
     .bind(&preparation.workflow_execution_id)
     .bind(payload)

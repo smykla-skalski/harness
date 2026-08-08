@@ -58,6 +58,7 @@ const CURRENT_SCHEMA_TABLES: &[&str] = &[
     "agent_workspace_members",
     "agent_workspace_member_provenance",
     "agent_workspace_member_operations",
+    "agent_working_copies",
 ];
 
 const CURRENT_SCHEMA_POLICY_COLUMNS: &[(&str, &str)] = &[
@@ -87,6 +88,10 @@ const CURRENT_SCHEMA_POLICY_COLUMNS: &[(&str, &str)] = &[
     ("policy_decisions", "evaluated_at"),
     ("task_board_dispatch_intents", "consumed_approval_grant_id"),
     ("task_board_dispatch_intents", "compensation_pending"),
+    ("task_board_dispatch_intents", "workspace_id"),
+    ("task_board_dispatch_intents", "working_copy_id"),
+    ("task_board_items", "workspace_id"),
+    ("task_board_items", "working_copy_id"),
     ("task_board_items", "workflow_kind"),
     ("task_board_items", "execution_repository"),
     ("task_board_items", "estimated_tokens"),
@@ -102,6 +107,8 @@ const CURRENT_SCHEMA_RUN_COLUMNS: &[(&str, &str)] = &[
     ("codex_runs", "task_id"),
     ("codex_runs", "board_item_id"),
     ("codex_runs", "workflow_execution_id"),
+    ("codex_runs", "workspace_id"),
+    ("agent_tuis", "workspace_id"),
     ("agent_turn_runs", "runtime_turn_id"),
     ("task_board_ai_review_reports", "requested_runtime"),
     ("task_board_ai_review_reports", "actual_runtime"),
@@ -145,6 +152,12 @@ const CURRENT_SCHEMA_INDEXES: &[&str] = &[
     "idx_agent_workspace_member_provenance_source",
     "idx_agent_workspace_legacy_sessions_session",
     "idx_agent_workspace_member_operations_member",
+    "idx_agent_working_copies_active_path",
+    "idx_agent_working_copies_workspace",
+    "idx_agent_tuis_workspace_updated",
+    "idx_codex_runs_workspace_updated",
+    "idx_task_board_items_workspace",
+    "idx_task_board_dispatch_workspace_work_item",
 ];
 
 const CURRENT_SCHEMA_REMOTE_ACME_COLUMNS: &[(&str, &str)] = &[

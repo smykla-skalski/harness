@@ -121,12 +121,12 @@ fn print_dispatch_pick(response: &TaskBoardDispatchPickResponse) {
 
 fn print_dispatch_delivery(response: &TaskBoardDispatchDeliverResponse, dry_run: bool) {
     let disposition = if dry_run { "previewed" } else { "started" };
+    // A workspace-owned dispatch has no Session to name, so this reports
+    // whichever owner it actually landed under.
+    let owner = response.applied.launch_owner_id().unwrap_or("unowned");
     println!(
-        "task-board dispatch {}: {} -> session {} task {} ({disposition})",
-        response.intent_id,
-        response.applied.board_item_id,
-        response.applied.session_id,
-        response.applied.work_item_id
+        "task-board dispatch {}: {} -> owner {owner} task {} ({disposition})",
+        response.intent_id, response.applied.board_item_id, response.applied.work_item_id
     );
     if let Some(agent) = &response.started_agent {
         println!("started agent: {}", agent.agent_id());

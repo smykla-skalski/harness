@@ -246,7 +246,11 @@ extension PreviewHarnessClientState {
         applied.append(
           TaskBoardDispatchAppliedTask(
             boardItemId: appliedItem.id,
-            sessionId: appliedItem.sessionId ?? "preview-session-\(appliedItem.id)",
+            sessionId: appliedItem.sessionId,
+            workspaceId: appliedItem.workspaceId
+              ?? "preview-workspace-\(appliedItem.id)",
+            workingCopyId: appliedItem.workingCopyId
+              ?? "preview-working-copy-\(appliedItem.id)",
             workItemId: appliedItem.workItemId ?? "preview-task-\(appliedItem.id)",
             item: appliedItem
           )

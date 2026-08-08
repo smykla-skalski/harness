@@ -3,6 +3,11 @@ use tempfile::tempdir;
 use harness_daemon::daemon::db::{AsyncDaemonDb, AsyncDaemonDbConnect, DaemonDb, DaemonDbOpen};
 
 const DROP_V50_SQL: &str = "
+-- Downgrading renames `codex_runs` out of the way, and by v64 there are
+-- triggers that name it. Without `legacy_alter_table` the rename rewrites those
+-- trigger bodies to follow the scratch name, which then dangle when it is
+-- dropped - the fixture would corrupt the schema it is trying to age.
+PRAGMA legacy_alter_table = ON;
 ALTER TABLE codex_runs RENAME TO codex_runs_v50;
 CREATE TABLE codex_runs (
     run_id                  TEXT PRIMARY KEY,
@@ -47,7 +52,8 @@ CREATE INDEX idx_codex_runs_session_updated
     ON codex_runs(session_id, updated_at DESC);
 CREATE INDEX idx_codex_runs_status
     ON codex_runs(status);
-UPDATE schema_meta SET value = '49' WHERE key = 'version';";
+UPDATE schema_meta SET value = '49' WHERE key = 'version';
+PRAGMA legacy_alter_table = OFF;";
 
 /// Seeds one project, one session, and one `codex_runs` row with every
 /// column set to a value distinct from every other column, so a

@@ -2595,6 +2595,11 @@ const AGENT_TUI_MODEL_SOURCE: &str =
     include_str!("../crates/harness-protocol/src/managed_agents/tui.rs");
 const AGENT_TUI_RUNTIME_MODEL_SOURCE: &str =
     include_str!("../crates/harness-daemon/src/daemon/agent_tui/model.rs");
+// `AgentTuiLaunchProfile` moved into the managed-agents crate, and the runtime
+// model above only re-exports it. The emitter reads source text, so a re-export
+// is invisible to it and the type has to be scanned where it is defined.
+const AGENT_TUI_MANAGED_MODEL_SOURCE: &str =
+    include_str!("../crates/harness-daemon-managed-agents/src/model.rs");
 const AGENT_TUI_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/AgentTuiWireTypes.generated.swift";
 const AGENT_TUI_EMIT_ONLY: &[&str] = &[
     "TerminalScreenSnapshot",
@@ -3469,7 +3474,11 @@ fn modules() -> Vec<GeneratedModule> {
             output: AGENT_TUI_OUTPUT,
             description: "the Rust managed terminal agent protocol",
             defaults: &[AGENT_TUI_MODEL_SOURCE],
-            sources: &[AGENT_TUI_MODEL_SOURCE, AGENT_TUI_RUNTIME_MODEL_SOURCE],
+            sources: &[
+                AGENT_TUI_MODEL_SOURCE,
+                AGENT_TUI_RUNTIME_MODEL_SOURCE,
+                AGENT_TUI_MANAGED_MODEL_SOURCE,
+            ],
         },
         GeneratedModule {
             output: AGENT_TUI_INPUT_OUTPUT,

@@ -15,7 +15,7 @@ use crate::task_board::{
 };
 
 use super::start_authorization_test_support::StartAuthorizationPause;
-use super::test_support::{codex_snapshot, seed_session, test_http_state};
+use super::test_support::{codex_snapshot, seed_owner_session, test_http_state};
 use super::{
     codex_worker_request, managed_worker_id, settle_claimed_task_board_worker,
     start_worker_for_applied_task,
@@ -35,7 +35,7 @@ use read_only_start_revision_support::{
 async fn workflow_dispatch_persists_before_any_codex_start() {
     let (state, mut claim, _worktree) = Box::pin(claimed_read_only_dispatch()).await;
     let db = state.async_db.get().cloned().expect("test async db");
-    seed_session(&db, &claim.applied.session_id).await;
+    seed_owner_session(&db, &claim.applied).await;
 
     let settlement = settle_claimed_task_board_worker(&state, &db, &mut claim)
         .await
@@ -216,7 +216,8 @@ async fn exact_worker_is_compensated_after_settings_drift() {
     assert!(
         error
             .to_string()
-            .contains("configuration revision changed before worker start")
+            .contains("configuration revision changed before worker start"),
+        "unexpected refusal: {error}"
     );
     assert_eq!(codex_run_count(&db).await, 1);
     assert_eq!(workflow_execution_count(&db).await, 0);
@@ -250,7 +251,8 @@ async fn recovered_item_drift_persists_compensation_before_stopping_worker() {
     assert!(
         error
             .to_string()
-            .contains("item revision changed before worker start")
+            .contains("item revision changed before worker start"),
+        "unexpected refusal: {error}"
     );
     assert_eq!(workflow_execution_count(&db).await, 0);
     assert_eq!(intent_status(&db, &claim.intent_id).await, "failed");
@@ -403,19 +405,22 @@ async fn claimed_read_only_dispatch_with_policy(
         ReservedTaskBoardDispatch::Preparing { intent_id, .. } => intent_id,
         other => panic!("unexpected reservation: {other:?}"),
     };
-    let preparation = db
+    let mut preparation = db
         .claim_task_board_dispatch_preparation(&intent_id)
         .await
         .expect("claim preparation")
         .expect("pending preparation");
+    // Preparation provisions the workspace and hands publication the id it
+    // learned, so a fixture that publishes directly has to stamp it too or the
+    // applied task names no owner for the reclaim to match.
+    preparation.preparation.workspace_id = Some("agent-workspace-read-only-revision".into());
     let worktree_path = worktree.path().to_string_lossy().into_owned();
-    let launch = read_only_launch(
-        &db,
-        &preparation.preparation.session_id,
-        worktree.path(),
-        exact_head,
-    )
-    .await;
+    let owner = preparation
+        .preparation
+        .launch_owner_id()
+        .expect("a prepared dispatch has an owner")
+        .to_string();
+    let launch = read_only_launch(&db, &owner, worktree.path(), exact_head).await;
     let applied = db
         .complete_task_board_dispatch_preparation_with_workflow(
             &preparation,
@@ -480,7 +485,7 @@ async fn seed_exact_read_only_worker(
     claim: &ClaimedTaskBoardDispatch,
     status: CodexRunStatus,
 ) -> crate::daemon::protocol::CodexRunSnapshot {
-    seed_session(db, &claim.applied.session_id).await;
+    seed_owner_session(db, &claim.applied).await;
     let worker_id = managed_worker_id(&claim.applied, &claim.intent_id);
     let request = codex_worker_request(&claim.applied, &worker_id).expect("render worker request");
     let launch = claim
@@ -488,7 +493,11 @@ async fn seed_exact_read_only_worker(
         .read_only_workflow
         .as_ref()
         .expect("read-only launch");
-    let mut snapshot = codex_snapshot(status, &claim.applied.session_id);
+    let owner = claim
+        .applied
+        .launch_owner_id()
+        .expect("a dispatched task has an owner");
+    let mut snapshot = codex_snapshot(status, owner);
     snapshot.run_id = worker_id;
     snapshot.board_item_id = Some(claim.applied.board_item_id.clone());
     snapshot.workflow_execution_id = claim.applied.item.workflow.execution_id.clone();

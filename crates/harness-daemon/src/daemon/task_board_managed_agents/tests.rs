@@ -1,10 +1,5 @@
-use std::time::Duration;
-
-use tokio::time::timeout;
-
 use crate::daemon::agent_tui::AgentTuiStatus;
 use crate::daemon::protocol::{CodexRunStatus, ManagedAgentSnapshot};
-use crate::daemon::test_liveness::LIVENESS;
 use crate::session::types::SessionRole;
 use crate::task_board::{
     AgentMode, TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION, TaskBoardAttemptResultArtifact,
@@ -15,16 +10,16 @@ use crate::task_board::{
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
 
-use super::test_support::{
-    applied_task, codex_snapshot, seed_session, terminal_snapshot, test_http_state,
-};
+use super::test_support::{applied_task, codex_snapshot, terminal_snapshot};
 use super::{
-    begin_worker_compensation, codex_worker_id, codex_worker_request, exact_worker_not_found,
-    managed_admission_owner_id, managed_worker_id, recover_same_applied_worker,
-    resolve_start_failure, start_worker_for_applied_task, stop_worker_in_lane, terminal_worker_id,
+    codex_worker_id, codex_worker_request, exact_worker_not_found, managed_admission_owner_id,
+    managed_worker_id, recover_same_applied_worker, resolve_start_failure, terminal_worker_id,
     terminal_worker_request,
 };
-use crate::daemon::db::prelude::*;
+
+/// Identity the fixtures reclaim under. Only the workspace path accepts a
+/// worker naming itself, so a Session fixture is unaffected by the value.
+const WORKER_ID: &str = "codex-dispatch-intent-existing";
 
 #[path = "write_request_recovery_tests.rs"]
 mod write_request_recovery_tests;
@@ -314,7 +309,7 @@ fn terminal_and_failed_same_session_workers_are_recovered() {
     for snapshot in snapshots {
         let expected_id = snapshot.agent_id().to_string();
         let applied = applied_task(AgentMode::Headless);
-        let recovered = resolve_start_failure(start_failure(), Ok(Some(snapshot)), &applied)
+        let recovered = resolve_start_failure(start_failure(), Ok(Some(snapshot)), &applied, WORKER_ID)
             .expect("same-session durable worker evidence");
         assert_eq!(recovered.agent_id(), expected_id);
     }
@@ -326,7 +321,7 @@ fn deterministic_worker_from_another_session_fails_closed() {
         ManagedAgentSnapshot::Codex(codex_snapshot(CodexRunStatus::Running, "different-session"));
 
     let applied = applied_task(AgentMode::Headless);
-    let error = recover_same_applied_worker(snapshot, &applied)
+    let error = recover_same_applied_worker(snapshot, &applied, WORKER_ID)
         .expect_err("cross-session deterministic identity must conflict");
 
     assert_eq!(error.code(), "KSRCLI092");
@@ -339,7 +334,7 @@ fn read_only_recovery_rejects_a_conflicting_durable_run() {
     applied.read_only_workflow = Some(review_launch());
     let run_id = "codex-review-attempt";
     let request = codex_worker_request(&applied, run_id).expect("render review request");
-    let mut run = codex_snapshot(CodexRunStatus::Running, &applied.session_id);
+    let mut run = codex_snapshot(CodexRunStatus::Running, applied.launch_owner_id().expect("a dispatched task has an owner"));
     run.run_id = run_id.into();
     run.board_item_id = request.board_item_id;
     run.workflow_execution_id = request.workflow_execution_id;
@@ -357,16 +352,16 @@ fn read_only_recovery_rejects_a_conflicting_durable_run() {
         .clone();
     let matching = ManagedAgentSnapshot::Codex(run.clone());
 
-    recover_same_applied_worker(matching, &applied).expect("matching durable run");
+    recover_same_applied_worker(matching, &applied, WORKER_ID).expect("matching durable run");
 
     let mut wrong_worktree = run.clone();
     wrong_worktree.project_dir = "/tmp/other-worktree".into();
-    let error = recover_same_applied_worker(ManagedAgentSnapshot::Codex(wrong_worktree), &applied)
+    let error = recover_same_applied_worker(ManagedAgentSnapshot::Codex(wrong_worktree), &applied, WORKER_ID)
         .expect_err("conflicting worktree must fail");
     assert_eq!(error.code(), "KSRCLI092");
 
     run.workflow_execution_id = Some("workflow-other".into());
-    let error = recover_same_applied_worker(ManagedAgentSnapshot::Codex(run), &applied)
+    let error = recover_same_applied_worker(ManagedAgentSnapshot::Codex(run), &applied, WORKER_ID)
         .expect_err("conflicting run must fail");
     assert_eq!(error.code(), "KSRCLI092");
     assert!(error.message().contains("frozen workflow"));
@@ -396,7 +391,7 @@ fn only_exact_deterministic_lookup_miss_allows_start() {
 fn uncertain_probe_errors_are_not_rollback_safe() {
     let probe_error = CliErrorKind::workflow_io("managed worker lookup failed").into();
     let applied = applied_task(AgentMode::Headless);
-    let error = resolve_start_failure(start_failure(), Err(probe_error), &applied)
+    let error = resolve_start_failure(start_failure(), Err(probe_error), &applied, WORKER_ID)
         .expect_err("uncertain second probe must retain recovery ownership");
 
     assert!(!error.may_rollback());
@@ -406,113 +401,13 @@ fn uncertain_probe_errors_are_not_rollback_safe() {
 #[test]
 fn exact_post_start_miss_is_rollback_safe() {
     let applied = applied_task(AgentMode::Headless);
-    let error = resolve_start_failure(start_failure(), Ok(None), &applied)
+    let error = resolve_start_failure(start_failure(), Ok(None), &applied, WORKER_ID)
         .expect_err("exact second miss preserves the start failure");
 
     assert!(error.may_rollback());
     assert_eq!(error.into_cli_error().code(), "WORKFLOW_IO");
 }
 
-fn start_failure() -> CliError {
+pub(super) fn start_failure() -> CliError {
     CliErrorKind::workflow_io("managed worker start failed before persistence").into()
-}
-
-#[tokio::test]
-async fn worker_start_waits_for_lane_before_preflight() {
-    let state = test_http_state();
-    let applied = applied_task(AgentMode::Interactive);
-    let intent_id = "dispatch-intent-test";
-    let outer_guard = state
-        .managed_agent_mutation_locks
-        .lock(&applied.session_id, &managed_worker_id(&applied, intent_id))
-        .await;
-    let future = start_worker_for_applied_task(&state, &applied, intent_id, "stale-claim");
-    tokio::pin!(future);
-
-    assert!(
-        timeout(Duration::from_millis(50), future.as_mut())
-            .await
-            .is_err(),
-        "worker probe and preflight must wait for the deterministic worker lane",
-    );
-
-    drop(outer_guard);
-    let error = timeout(LIVENESS, future)
-        .await
-        .expect("worker start resumes once the lane is free")
-        .expect_err("test has no dispatch claim");
-    assert!(error.may_rollback());
-}
-
-#[tokio::test]
-async fn deterministic_worker_evidence_precedes_claim_preflight() {
-    let state = test_http_state();
-    let db = state.async_db.get().cloned().expect("test async db");
-    let applied = applied_task(AgentMode::Headless);
-    let intent_id = "dispatch-intent-reclaimed";
-    let worker_id = managed_worker_id(&applied, intent_id);
-    seed_session(&db, &applied.session_id).await;
-    let mut snapshot = codex_snapshot(CodexRunStatus::Running, &applied.session_id);
-    snapshot.run_id.clone_from(&worker_id);
-    snapshot.board_item_id = Some(applied.board_item_id.clone());
-    snapshot.task_id = Some(applied.work_item_id.clone());
-    snapshot.workflow_execution_id = applied.item.workflow.execution_id.clone();
-    snapshot.session_agent_id = None;
-    db.save_codex_run(&snapshot)
-        .await
-        .expect("persist deterministic worker evidence");
-
-    let recovered = start_worker_for_applied_task(&state, &applied, intent_id, "stale-claim")
-        .await
-        .expect("existing worker must be recovered before claim validation");
-
-    assert_eq!(recovered.agent_id(), worker_id);
-}
-
-#[tokio::test]
-async fn compensation_renews_claim_inside_worker_lane_before_stop() {
-    let state = test_http_state();
-    let db = state.async_db.get().cloned().expect("test async db");
-    let applied = applied_task(AgentMode::Interactive);
-    let intent_id = "dispatch-intent-compensation";
-    let worker_id = managed_worker_id(&applied, intent_id);
-    let outer_guard = state
-        .managed_agent_mutation_locks
-        .lock(&applied.session_id, &worker_id)
-        .await;
-    let future = begin_worker_compensation(
-        &state,
-        &db,
-        &applied,
-        intent_id,
-        "stale-claim",
-        "completion failed",
-    );
-    tokio::pin!(future);
-
-    assert!(
-        timeout(Duration::from_millis(50), future.as_mut())
-            .await
-            .is_err(),
-        "compensation must wait for the deterministic worker lane",
-    );
-
-    drop(outer_guard);
-    let error = timeout(LIVENESS, future)
-        .await
-        .expect("compensation resumes once the lane is free")
-        .expect_err("stale owner must fail before stop");
-    assert!(error.to_string().contains("lost its claim"));
-    assert!(!error.to_string().contains("terminal agent"));
-}
-
-#[tokio::test]
-async fn compensation_resume_accepts_a_worker_already_stopped_before_crash() {
-    let state = test_http_state();
-    let applied = applied_task(AgentMode::Interactive);
-    let worker_id = managed_worker_id(&applied, "dispatch-intent-crash-resume");
-
-    stop_worker_in_lane(&state, &applied, worker_id)
-        .await
-        .expect("missing deterministic worker proves the prior stop already completed");
 }

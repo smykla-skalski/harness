@@ -8,7 +8,7 @@ use crate::task_board::{
 };
 use harness_kernel::errors::CliError;
 
-use super::super::task_board_read_only_runtime::TaskBoardReadOnlyRuntime;
+use super::super::task_board_read_only_runtime::{TaskBoardReadOnlyRuntime, WorkflowRunOwner};
 use super::attempts::{invalid_transition, require_human};
 use super::reports::{load_codex_run, record_retry_or_human, transition_attempt};
 use super::requests::{attempt_run_identity, codex_attempt_request, run_context};
@@ -39,8 +39,12 @@ where
     let Some(claimed) = claim_report_side_effect(db, attempt, now).await? else {
         return Ok(None);
     };
-    let session_id = run_context(execution)?.session_id.as_str();
-    match start_codex_run(runtime, session_id, &request, &claimed.idempotency_key).await {
+    let context = run_context(execution)?;
+    let owner = WorkflowRunOwner {
+        owner_id: context.session_id.as_str(),
+        worktree: context.worktree.as_str(),
+    };
+    match start_codex_run(runtime, owner, &request, &claimed.idempotency_key).await {
         Ok(run) => Ok(Some(run)),
         Err(error) => {
             reconcile_report_start_error(db, runtime, execution, &claimed, &error, now).await
@@ -50,7 +54,7 @@ where
 
 async fn start_codex_run<R>(
     runtime: &R,
-    session_id: &str,
+    owner: WorkflowRunOwner<'_>,
     request: &CodexRunRequest,
     run_id: &str,
 ) -> Result<CodexRunSnapshot, CliError>
@@ -58,10 +62,10 @@ where
     R: TaskBoardReadOnlyRuntime,
 {
     match request.mode {
-        CodexRunMode::Report => runtime.start_report_run(session_id, request, run_id).await,
+        CodexRunMode::Report => runtime.start_report_run(owner, request, run_id).await,
         CodexRunMode::WorkspaceWrite => {
             runtime
-                .start_codex_workspace_run(session_id, request, run_id)
+                .start_codex_workspace_run(owner, request, run_id)
                 .await
         }
         CodexRunMode::Approval => Err(invalid_transition(

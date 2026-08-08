@@ -114,7 +114,9 @@ pub(super) fn applied_task(mode: AgentMode) -> DispatchAppliedTask {
     };
     DispatchAppliedTask {
         board_item_id: item.id.clone(),
-        session_id: "session-1".into(),
+        session_id: Some("session-1".into()),
+        workspace_id: None,
+        working_copy_id: None,
         work_item_id: "task-1".into(),
         lifecycle: dispatch_lifecycle_planned(
             &crate::task_board::WorkerIntent { mode },
@@ -131,6 +133,19 @@ pub(super) fn applied_task(mode: AgentMode) -> DispatchAppliedTask {
         item,
         read_only_workflow: None,
         write_workflow: None,
+    }
+}
+
+/// Seed the Session a dispatch reclaims, when it has one.
+///
+/// A workspace dispatch has no Session and `codex_runs.session_id` is nullable
+/// for exactly that case, so there is nothing to seed and nothing to assert.
+pub(super) async fn seed_owner_session(
+    db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
+    applied: &DispatchAppliedTask,
+) {
+    if let Some(session_id) = applied.session_id.as_deref() {
+        seed_session(db, session_id).await;
     }
 }
 
@@ -178,6 +193,7 @@ pub(super) fn terminal_snapshot(status: AgentTuiStatus, session_id: &str) -> Age
     AgentTuiSnapshot {
         tui_id: "agent-tui-dispatch-intent-existing".into(),
         session_id: session_id.into(),
+        workspace_id: None,
         agent_id: "worker-terminal".into(),
         runtime: "codex".into(),
         status,

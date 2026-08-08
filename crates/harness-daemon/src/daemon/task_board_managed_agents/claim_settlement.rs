@@ -5,8 +5,9 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 use super::{
     TaskBoardWorkerStartError, ensure_spawn_kill_switch_clear, launch_capability,
     managed_admission_owner_id, managed_worker_id, probe_existing_worker,
-    recover_same_applied_worker, start_worker_for_applied_task_in_lane, stop_worker_in_lane,
-    validate_workflow_launch,
+    recover_same_applied_worker, settle_compensated_workspace_worker,
+    start_worker_for_applied_task_in_lane, stop_worker_in_lane, validate_workflow_launch,
+    worker_lock_owner,
 };
 use crate::daemon::db::ClaimedTaskBoardDispatch;
 use crate::daemon::db::task_board::prelude::*;
@@ -23,7 +24,7 @@ pub(crate) async fn settle_claimed_task_board_worker(
     let worker_id = managed_worker_id(&claim.applied, &claim.intent_id);
     let _guard = state
         .managed_agent_mutation_locks
-        .lock(&claim.applied.session_id, &worker_id)
+        .lock(&worker_lock_owner(&claim.applied), &worker_id)
         .await;
     let worker = match start_worker_for_applied_task_in_lane(
         state,
@@ -94,7 +95,7 @@ async fn settle_workflow_before_start(
     let worker_id = managed_worker_id(&claim.applied, &claim.intent_id);
     let _guard = state
         .managed_agent_mutation_locks
-        .lock(&claim.applied.session_id, &worker_id)
+        .lock(&worker_lock_owner(&claim.applied), &worker_id)
         .await;
     let existing = probe_recovered_workflow_worker(state, claim, &worker_id).await?;
     if existing.is_none()
@@ -124,7 +125,7 @@ async fn probe_recovered_workflow_worker(
                 "workflow worker recovery probe was uncertain: {error}"
             ))
         })?
-        .map(|snapshot| recover_same_applied_worker(snapshot, &claim.applied))
+        .map(|snapshot| recover_same_applied_worker(snapshot, &claim.applied, worker_id))
         .transpose()?;
     Ok(existing)
 }
@@ -310,6 +311,10 @@ async fn compensate_settlement_failure(
     )
     .await
     .map_err(|compensation_error| settlement_compensation_error(&error, &compensation_error))?;
+    // The checkout goes last: the runtime is already stopped and the claim is
+    // finalized, so nothing is left holding the directory. Doing it earlier
+    // would pull the worktree out from under a worker still shutting down.
+    settle_compensated_workspace_worker(db, &claim.applied, worker_id, &error.to_string()).await;
     Err(error)
 }
 

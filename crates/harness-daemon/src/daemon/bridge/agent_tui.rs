@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use crate::daemon::agent_tui::{
     AgentTuiAttachState, AgentTuiInputWorker, AgentTuiProcess, AgentTuiSnapshot, AgentTuiStatus,
-    deliver_deferred_prompts, signal_readiness_ready, snapshot_from_process,
+    ManagedTerminalOwner, deliver_deferred_prompts, signal_readiness_ready, snapshot_from_process,
     spawn_agent_tui_process,
 };
 use crate::daemon::state::HostBridgeCapabilityManifest;
@@ -44,7 +44,10 @@ impl BridgeServer {
             return Ok(snapshot);
         }
         let process = spawn_agent_tui_process(
-            &spec.session_id,
+            spec.workspace_id.as_deref().map_or(
+                ManagedTerminalOwner::Session(&spec.session_id),
+                ManagedTerminalOwner::Workspace,
+            ),
             &spec.tui_id,
             spec.profile.clone(),
             &spec.project_dir,
@@ -274,6 +277,7 @@ mod tests {
         let transcript_path = tmp.join("transcript.raw");
         let launch_spec = AgentTuiStartSpec {
             session_id: "sess".into(),
+            workspace_id: None,
             agent_id: String::new(),
             tui_id: tui_id.into(),
             profile: profile.clone(),
@@ -433,6 +437,7 @@ mod tests {
             AgentTuiLaunchProfile::from_argv("codex", vec!["codex".into()]).expect("profile");
         let spec = AgentTuiStartSpec {
             session_id: "session-1".into(),
+            workspace_id: None,
             agent_id: String::new(),
             tui_id: "stable-tui".into(),
             profile: profile.clone(),
@@ -464,6 +469,7 @@ mod tests {
         let server = make_test_server(tmp.path());
         let spec = AgentTuiStartSpec {
             session_id: "session-concurrent".into(),
+            workspace_id: None,
             agent_id: String::new(),
             tui_id: "stable-concurrent-tui".into(),
             profile: AgentTuiLaunchProfile::from_argv(

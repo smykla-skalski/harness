@@ -107,7 +107,11 @@ async fn write_launch(
         task_id: preparation.preparation.work_item_id.clone(),
         run_context: TaskBoardReadOnlyRunContext {
             schema_version: TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION,
-            session_id: preparation.preparation.session_id.clone(),
+            session_id: preparation
+                .preparation
+                .launch_owner_id()
+                .unwrap_or_default()
+                .to_string(),
             title: item_snapshot.item.title,
             body: item_snapshot.item.body,
             tags: item_snapshot.item.tags,

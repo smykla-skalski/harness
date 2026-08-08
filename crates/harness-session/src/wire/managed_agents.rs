@@ -108,6 +108,7 @@ mod tests {
         let terminal = ManagedAgentSnapshot::Terminal(AgentTuiSnapshot {
             tui_id: "tui-1".into(),
             session_id: "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
+            workspace_id: None,
             agent_id: "worker-1".into(),
             runtime: "claude".into(),
             status: AgentTuiStatus::Running,

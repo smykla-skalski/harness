@@ -45,6 +45,7 @@ async fn get_managed_agents_merges_terminal_and_codex_snapshots_when_sync_db_is_
         .save_agent_tui(&AgentTuiSnapshot {
             tui_id: "agent-tui-3".into(),
             session_id: "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".into(),
+            workspace_id: None,
             agent_id: "codex-worker".into(),
             runtime: "codex".into(),
             status: AgentTuiStatus::Running,
@@ -149,6 +150,7 @@ async fn get_managed_agents_uses_async_db_when_sync_db_is_unavailable_for_termin
         .save_agent_tui(&AgentTuiSnapshot {
             tui_id: "agent-tui-5".into(),
             session_id: "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".into(),
+            workspace_id: None,
             agent_id: "codex-worker".into(),
             runtime: "codex".into(),
             status: AgentTuiStatus::Running,
@@ -200,6 +202,7 @@ async fn get_managed_agents_marks_orphaned_running_terminal_snapshots_inactive()
         .save_agent_tui(&AgentTuiSnapshot {
             tui_id: "agent-tui-orphaned".into(),
             session_id: "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".into(),
+            workspace_id: None,
             agent_id: String::new(),
             runtime: "codex".into(),
             status: AgentTuiStatus::Running,
@@ -259,6 +262,7 @@ async fn get_managed_agent_wraps_terminal_tui_when_sync_db_is_unavailable() {
         .save_agent_tui(&AgentTuiSnapshot {
             tui_id: "agent-tui-6".into(),
             session_id: "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".into(),
+            workspace_id: None,
             agent_id: "codex-worker".into(),
             runtime: "codex".into(),
             status: AgentTuiStatus::Stopped,

@@ -15,7 +15,7 @@ use crate::task_board::{
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::super::super::task_board_read_only_runtime::{
-    AgentTurnReportStart, TaskBoardPublishVerification, TaskBoardReadOnlyRuntime,
+    AgentTurnReportStart, TaskBoardPublishVerification, TaskBoardReadOnlyRuntime, WorkflowRunOwner,
 };
 use super::{BASE_HEAD, NOW};
 
@@ -261,11 +261,11 @@ impl TaskBoardReadOnlyRuntime for FakeWriteRuntime {
 
     async fn start_report_run(
         &self,
-        session_id: &str,
+        owner: WorkflowRunOwner<'_>,
         request: &CodexRunRequest,
         run_id: &str,
     ) -> Result<CodexRunSnapshot, CliError> {
-        self.start_run(session_id, request, run_id)
+        self.start_run(owner.owner_id, request, run_id)
     }
 
     async fn load_codex_workspace_run(
@@ -277,11 +277,11 @@ impl TaskBoardReadOnlyRuntime for FakeWriteRuntime {
 
     async fn start_codex_workspace_run(
         &self,
-        session_id: &str,
+        owner: WorkflowRunOwner<'_>,
         request: &CodexRunRequest,
         run_id: &str,
     ) -> Result<CodexRunSnapshot, CliError> {
-        self.start_run(session_id, request, run_id)
+        self.start_run(owner.owner_id, request, run_id)
     }
 
     async fn load_agent_turn_report_run(

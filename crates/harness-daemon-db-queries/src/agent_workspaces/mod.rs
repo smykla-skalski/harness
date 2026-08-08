@@ -4,14 +4,15 @@ use harness_daemon_db_core::AsyncDaemonDb;
 use harness_kernel::errors::CliError;
 use harness_protocol::daemon::summaries::AgentWorkspaceListResponse;
 
-mod availability;
+pub(crate) mod availability;
 mod candidate;
-mod identity;
+pub(crate) mod identity;
 mod persist;
+pub(crate) use persist::availability_label;
 mod preflight;
 mod provenance;
 mod retire;
-mod shadow;
+pub(crate) mod shadow;
 mod source;
 
 #[cfg(test)]

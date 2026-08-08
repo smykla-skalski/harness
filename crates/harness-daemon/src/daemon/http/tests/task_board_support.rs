@@ -71,6 +71,10 @@ pub(super) async fn dispatch_http_item(
 pub(super) async fn serve_http(
     state: crate::daemon::http::DaemonHttpState,
 ) -> (String, JoinHandle<()>) {
+    // A serving daemon mints its identity at startup, and dispatch needs it to
+    // key the workspace it provisions. Without it every dispatch refuses and the
+    // response carries no applied task at all.
+    crate::daemon::state::ensure_daemon_identity().expect("mint daemon identity");
     let app = super::super::daemon_http_router(state);
     let listener = TcpListener::bind("127.0.0.1:0")
         .await
@@ -131,6 +135,42 @@ pub(super) async fn get_json(client: &reqwest::Client, base_url: &str, path: &st
     let value = response.json::<Value>().await.expect("json response");
     assert_eq!(status, StatusCode::OK, "{path} returned {value}");
     value
+}
+
+/// Seed a board item already linked to a Session, the way items dispatched
+/// before durable workspaces existed still are. Evaluation reads a linked
+/// Session task to decide an item's outcome, so a flow that asserts on that
+/// outcome needs a legacy owner. A fresh dispatch has no Session task, and its
+/// Session-free replacement signal is `#1350`'s work.
+pub(super) async fn seed_legacy_session_board_item(
+    state: &crate::daemon::http::DaemonHttpState,
+    id: &str,
+    title: &str,
+    project_dir: &Path,
+) -> String {
+    Box::pin(seed_ready_board_item(state, id, title)).await;
+    let async_db = state.async_db.get().expect("async db");
+    let session = crate::daemon::service::start_session_direct_async(
+        &crate::daemon::protocol::SessionStartRequest {
+            title: title.to_string(),
+            context: "Started before workspaces existed".into(),
+            session_id: None,
+            project_dir: project_dir.to_string_lossy().into_owned(),
+            policy_preset: None,
+            base_ref: None,
+        },
+        async_db.as_ref(),
+    )
+    .await
+    .expect("start the legacy session");
+    async_db
+        .update_task_board_item(id, |item| {
+            item.session_id = Some(session.session_id.clone());
+            Ok(true)
+        })
+        .await
+        .expect("link the legacy session");
+    session.session_id
 }
 
 pub(super) async fn seed_ready_board_item(

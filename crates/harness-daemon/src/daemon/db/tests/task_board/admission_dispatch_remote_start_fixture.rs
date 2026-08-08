@@ -62,7 +62,7 @@ pub(crate) async fn prepare_remote_offer_with_retry(
         .expect("source item snapshot");
     launch.source_item_revision = item_snapshot.item_revision;
     launch.prepared_item_revision = item_snapshot.item_revision;
-    launch.run_context.session_id = preparation.preparation.session_id.clone();
+    launch.run_context.session_id = preparation.preparation.launch_owner_id().expect("a prepared dispatch has an owner").to_string();
     let applied = db
         .complete_task_board_dispatch_preparation_with_workflow(
             &preparation,

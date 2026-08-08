@@ -62,7 +62,17 @@ pub struct DispatchExecutionSummary {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct DispatchAppliedTask {
     pub board_item_id: String,
-    pub session_id: String,
+    /// Legacy owner, present only when this dispatch reclaimed the Session a
+    /// pre-workspace board item was already linked to.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session_id: Option<String>,
+    /// Durable workspace the started worker belongs to. Set for every fresh
+    /// dispatch; absent only on a legacy item still running under its Session.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace_id: Option<String>,
+    /// Checkout the daemon created for this dispatch.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub working_copy_id: Option<String>,
     pub work_item_id: String,
     pub lifecycle: DispatchLifecycle,
     pub item: TaskBoardItem,
@@ -112,6 +122,41 @@ pub struct TaskBoardWriteWorkflowLaunch {
     pub base_head_revision: String,
     pub planning_result: TaskBoardPlanningResult,
     pub plan_approval: TaskBoardPlanApprovalBinding,
+}
+
+/// The owner a dispatch links to, most specific first.
+///
+/// One rule rather than one per type: a frozen launch is validated by comparing
+/// the owner two of these report, so any disagreement would read an untouched
+/// launch as tampered with. A legacy dispatch names its Session, a fresh one
+/// names its workspace, and one frozen before preparation learned the workspace
+/// names the working copy it reserved. Reservation always leaves one set.
+#[must_use]
+pub fn dispatch_owner_id<'a>(
+    workspace_id: Option<&'a str>,
+    session_id: Option<&'a str>,
+    working_copy_id: Option<&'a str>,
+) -> Option<&'a str> {
+    workspace_id.or(session_id).or(working_copy_id)
+}
+
+impl DispatchAppliedTask {
+    /// The owner a frozen workflow launch records against, most specific first.
+    ///
+    /// Mirrors the preparation's rule exactly, because the launch is frozen from
+    /// the preparation and validated against the applied task: a legacy dispatch
+    /// names its Session, a fresh one names its workspace, and one whose launch
+    /// was frozen before preparation learned the workspace names the working
+    /// copy it reserved. Disagreeing with that order would read every such
+    /// launch as tampered with.
+    #[must_use]
+    pub fn launch_owner_id(&self) -> Option<&str> {
+        dispatch_owner_id(
+            self.workspace_id.as_deref(),
+            self.session_id.as_deref(),
+            self.working_copy_id.as_deref(),
+        )
+    }
 }
 
 impl DispatchExecutionSummary {

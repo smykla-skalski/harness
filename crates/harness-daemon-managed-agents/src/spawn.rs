@@ -24,8 +24,45 @@ use crate::{AgentTuiInput, AgentTuiKey, READINESS_TIMEOUT};
 /// # Errors
 /// Returns a workflow I/O or parse error when runtime bootstrap, PTY
 /// allocation, or process spawning fails.
+/// Who a managed terminal answers to, and therefore which owner id its process
+/// sees.
+///
+/// The distinction is not cosmetic: `HARNESS_SESSION_ID` is what the hook
+/// runtime uses to register the runtime session against a real Session row.
+/// Handing it a workspace id would make a Session-less worker try to mutate a
+/// Session that does not exist, so a workspace-owned terminal exports its own
+/// variable and the hook's Session path stays a no-op for it.
+#[derive(Debug, Clone, Copy)]
+pub enum ManagedTerminalOwner<'a> {
+    Session(&'a str),
+    Workspace(&'a str),
+}
+
+impl<'a> ManagedTerminalOwner<'a> {
+    const fn env_key(self) -> &'static str {
+        match self {
+            Self::Session(_) => "HARNESS_SESSION_ID",
+            Self::Workspace(_) => "HARNESS_WORKSPACE_ID",
+        }
+    }
+
+    const fn id(self) -> &'a str {
+        match self {
+            Self::Session(id) | Self::Workspace(id) => id,
+        }
+    }
+}
+
+/// Start a terminal agent under `owner` and return the running process.
+///
+/// The owner decides which identity the child sees: a Session-owned terminal
+/// exports the Session, a workspace-owned one exports its workspace.
+///
+/// # Errors
+/// Returns [`CliError`] when the runtime bootstrap fails or the terminal
+/// process cannot be started.
 pub fn spawn_agent_tui_process(
-    session_id: &str,
+    owner: ManagedTerminalOwner<'_>,
     tui_id: &str,
     profile: AgentTuiLaunchProfile,
     project_dir: &Path,
@@ -35,7 +72,7 @@ pub fn spawn_agent_tui_process(
 ) -> Result<AgentTuiProcess, CliError> {
     ensure_runtime_bootstrap(&profile.runtime, project_dir)?;
     let mut env = BTreeMap::new();
-    env.insert("HARNESS_SESSION_ID".to_string(), session_id.to_string());
+    env.insert(owner.env_key().to_string(), owner.id().to_string());
     env.insert("HARNESS_AGENT_TUI_ID".to_string(), tui_id.to_string());
     let runtime = runtime_for_name(&profile.runtime);
     if let Some(effort) = effort.filter(|value| !value.is_empty())

@@ -15873,7 +15873,8 @@
             "$ref": "#/components/schemas/TerminalScreenSnapshot"
           },
           "session_id": {
-            "type": "string"
+            "type": "string",
+            "description": "Owner identity for display and correlation. A workspace-owned terminal\ncarries its `workspace_id` here, the same way a standalone Codex run\ncarries its own run id: every consumer keeps one field to key on, and\nthe durable owner is the one below."
           },
           "signal": {
             "type": [
@@ -15895,6 +15896,13 @@
           },
           "updated_at": {
             "type": "string"
+          },
+          "workspace_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Set when this terminal belongs to a durable workspace rather than a\nSession. Persistence writes a NULL `session_id` column in that case,\nbecause there is no Session row for the foreign key to point at."
           }
         }
       },
@@ -17712,7 +17720,6 @@
         "type": "object",
         "required": [
           "board_item_id",
-          "session_id",
           "work_item_id",
           "lifecycle",
           "item"
@@ -17738,10 +17745,28 @@
             ]
           },
           "session_id": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Legacy owner, present only when this dispatch reclaimed the Session a\npre-workspace board item was already linked to."
           },
           "work_item_id": {
             "type": "string"
+          },
+          "working_copy_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Checkout the daemon created for this dispatch."
+          },
+          "workspace_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Durable workspace the started worker belongs to. Set for every fresh\ndispatch; absent only on a legacy item still running under its Session."
           },
           "write_workflow": {
             "oneOf": [
@@ -31875,7 +31900,8 @@
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "Legacy owner. Set only on items dispatched before the workspace owners\nbelow existed; a fresh dispatch leaves it empty and fills those instead."
           },
           "source_project_id": {
             "type": [
@@ -31930,6 +31956,20 @@
           },
           "workflow_kind": {
             "$ref": "#/components/schemas/TaskBoardWorkflowKind"
+          },
+          "working_copy_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Checkout the daemon created for that workspace to run this item in."
+          },
+          "workspace_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Durable workspace the dispatched worker belongs to."
           }
         }
       },
@@ -32237,7 +32277,6 @@
         "description": "Thin mirror of `DispatchAppliedTask`: drops the embedded `TaskBoardItem`\n(keeping only its title, the one field real consumers read off it) and\nthe `lifecycle`/`read_only_workflow`/`write_workflow` fields, which are\ndaemon-internal worker-claim bookkeeping that Swift already omits on\ndecode for the direct dispatch endpoint.",
         "required": [
           "board_item_id",
-          "session_id",
           "work_item_id",
           "item_title"
         ],
@@ -32249,10 +32288,26 @@
             "type": "string"
           },
           "session_id": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Legacy owner, present only for a dispatch that reclaimed an existing\nSession. Fresh dispatch reports the workspace owners below instead."
           },
           "work_item_id": {
             "type": "string"
+          },
+          "working_copy_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspace_id": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },

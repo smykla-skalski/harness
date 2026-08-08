@@ -3,8 +3,9 @@ use tempfile::tempdir;
 
 use super::*;
 use crate::reviews::{
-    ReviewActionResult, ReviewCheckStatus, ReviewItemFlags, ReviewMergeableState,
-    ReviewReviewStatus,
+    ReviewActionKind, ReviewActionOutcome, ReviewActionResult, ReviewCheckStatus, ReviewItem,
+    ReviewItemFlags, ReviewMergeableState, ReviewPullRequestState, ReviewReviewStatus,
+    ReviewsActionResponse,
 };
 
 #[test]

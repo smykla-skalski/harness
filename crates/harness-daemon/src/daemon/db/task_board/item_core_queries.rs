@@ -209,28 +209,28 @@ impl ItemCoreQueries for AsyncDaemonDb {
         &self,
         item: TaskBoardItem,
     ) -> Result<TaskBoardMutation, CliError> {
-        items::create::create_task_board_item(self, item).await
+        Box::pin(items::create::create_task_board_item(self, item)).await
     }
 
     async fn create_task_board_item_with_triage(
         &self,
         item: TaskBoardItem,
     ) -> Result<TaskBoardMutation, CliError> {
-        items::create::create_task_board_item_with_triage(self, item).await
+        Box::pin(items::create::create_task_board_item_with_triage(self, item)).await
     }
 
     async fn create_task_board_item_at_requested_status(
         &self,
         item: TaskBoardItem,
     ) -> Result<TaskBoardMutation, CliError> {
-        items::create::create_task_board_item_at_requested_status(self, item).await
+        Box::pin(items::create::create_task_board_item_at_requested_status(self, item)).await
     }
 
     async fn create_task_board_item_with_provider_triage(
         &self,
         item: TaskBoardItem,
     ) -> Result<TaskBoardMutation, CliError> {
-        items::create::create_task_board_item_with_provider_triage(self, item).await
+        Box::pin(items::create::create_task_board_item_with_provider_triage(self, item)).await
     }
 
     async fn task_board_items_snapshot(

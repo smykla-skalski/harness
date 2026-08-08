@@ -185,7 +185,8 @@ impl DaemonDb {
         self.apply_pending_migrations_v61(version_number)?;
         self.apply_pending_migrations_v62(version_number)?;
         self.apply_pending_migrations_v63(version_number)?;
-        self.apply_pending_migrations_v64(version_number)
+        self.apply_pending_migrations_v64(version_number)?;
+        self.apply_pending_migrations_v65(version_number)
     }
 
     #[expect(
@@ -451,6 +452,13 @@ impl DaemonDb {
     fn apply_pending_migrations_v64(&self, version_number: u8) -> Result<(), CliError> {
         if version_number <= 63 {
             harness_db_schema::schema_v64::run(&self.conn)?;
+        }
+        Ok(())
+    }
+
+    fn apply_pending_migrations_v65(&self, version_number: u8) -> Result<(), CliError> {
+        if version_number <= 64 {
+            harness_db_schema::schema_v65::run(&self.conn)?;
         }
         Ok(())
     }

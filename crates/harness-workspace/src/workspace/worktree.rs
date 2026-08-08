@@ -1,4 +1,4 @@
-//! Git worktree lifecycle for per-session workspaces.
+//! Git worktree lifecycle for daemon-managed checkouts.
 
 use std::collections::BTreeSet;
 use std::fs;
@@ -12,7 +12,7 @@ use crate::git::GitRepository;
 use crate::git::mutation::{create_linked_worktree, delete_local_branch, remove_linked_worktree};
 use crate::sandbox::hold_worktree_origin_grant;
 
-use super::layout::SessionLayout;
+use super::layout::CheckoutLayout;
 
 #[derive(Debug, Error)]
 pub enum WorktreeError {
@@ -36,9 +36,9 @@ impl WorktreeController {
         clippy::cognitive_complexity,
         reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
     )]
-    pub fn create(
+    pub fn create<L: CheckoutLayout + ?Sized>(
         origin: &Path,
-        layout: &SessionLayout,
+        layout: &L,
         base_ref: Option<&str>,
     ) -> Result<(), WorktreeError> {
         let repository = GitRepository::discover(origin)
@@ -51,11 +51,11 @@ impl WorktreeController {
             .resolve_revision_to_commit(&resolved_ref)
             .map_err(|error| WorktreeError::CreateFailed(error.to_string()))?;
         let branch = layout.branch_ref();
-        fs::create_dir_all(layout.session_root())?;
+        fs::create_dir_all(layout.checkout_root())?;
         // NOTE: callers must serialize concurrent create() against the same origin — git's own index.lock surfaces as CreateFailed under contention.
         create_linked_worktree(
             repository.path(),
-            &layout.session_id,
+            layout.checkout_name(),
             &layout.workspace(),
             &branch,
             &base_commit,
@@ -86,21 +86,27 @@ impl WorktreeController {
         clippy::cognitive_complexity,
         reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
     )]
-    pub fn destroy(origin: &Path, layout: &SessionLayout) -> Result<(), WorktreeError> {
+    pub fn destroy<L: CheckoutLayout + ?Sized>(
+        origin: &Path,
+        layout: &L,
+    ) -> Result<(), WorktreeError> {
         let _origin_grant = hold_worktree_origin_grant(&layout.workspace());
         let repository = GitRepository::discover(origin)
             .map_err(|error| WorktreeError::RemoveFailed(error.to_string()))?;
         run_worktree_remove(repository.path(), layout)?;
         run_branch_delete(repository.path(), &layout.branch_ref())?;
-        if let Err(err) = fs::remove_dir_all(layout.session_root()) {
-            warn!(%err, path = %layout.session_root().display(), "session root cleanup failed");
+        if let Err(err) = fs::remove_dir_all(layout.checkout_root()) {
+            warn!(%err, path = %layout.checkout_root().display(), "checkout root cleanup failed");
         }
         Ok(())
     }
 }
 
-fn run_worktree_remove(origin: &Path, layout: &SessionLayout) -> Result<(), WorktreeError> {
-    remove_linked_worktree(origin, &layout.session_id, &layout.workspace())
+fn run_worktree_remove<L: CheckoutLayout + ?Sized>(
+    origin: &Path,
+    layout: &L,
+) -> Result<(), WorktreeError> {
+    remove_linked_worktree(origin, layout.checkout_name(), &layout.workspace())
         .map_err(|error| WorktreeError::RemoveFailed(error.to_string()))
 }
 

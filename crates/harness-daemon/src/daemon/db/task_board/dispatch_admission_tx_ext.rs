@@ -92,7 +92,7 @@ pub(in crate::daemon::db::task_board) trait TaskBoardDispatchAdmissionTxExt {
         &mut self,
         intent_id: &str,
         claim_token: &str,
-    ) -> Result<(String, String, String, String), CliError>;
+    ) -> Result<(String, Option<String>, String, String), CliError>;
 
     async fn refuse_pending_admission_in_tx(
         &mut self,
@@ -190,7 +190,7 @@ impl TaskBoardDispatchAdmissionTxExt for Transaction<'_, Sqlite> {
         &mut self,
         intent_id: &str,
         claim_token: &str,
-    ) -> Result<(String, String, String, String), CliError> {
+    ) -> Result<(String, Option<String>, String, String), CliError> {
         super::dispatch_intents::claimed_intent_identity(self, intent_id, claim_token).await
     }
 

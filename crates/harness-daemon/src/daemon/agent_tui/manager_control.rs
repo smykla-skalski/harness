@@ -235,6 +235,10 @@ impl AgentTuiManagerHandle {
             let profile =
                 AgentTuiLaunchProfile::from_argv(&snapshot.runtime, snapshot.argv.clone())?;
             let snapshot_context = AgentTuiSnapshotContext {
+                // Carried through, not defaulted: this rebuilds the context from a
+                // live snapshot, and dropping the workspace here would unown a
+                // running terminal on its next refresh.
+                workspace_id: snapshot.workspace_id.as_deref(),
                 session_id: &snapshot.session_id,
                 agent_id: &snapshot.agent_id,
                 tui_id: &snapshot.tui_id,

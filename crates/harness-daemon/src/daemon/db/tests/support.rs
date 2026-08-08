@@ -2,9 +2,9 @@ use super::*;
 
 mod extended_fixtures;
 pub(super) use extended_fixtures::{
-    agent_columns, min_runtime_budget_ms, performance_session_id, sample_conversation_event,
-    sample_resolved_session, seeded_performance_db, session_agent_identity_rows,
-    simulate_pre_v11_agents_table,
+    agent_columns, codex_run_columns, min_runtime_budget_ms, performance_session_id,
+    sample_conversation_event, sample_resolved_session, seeded_performance_db,
+    session_agent_identity_rows, simulate_pre_v11_agents_table, simulate_pre_v13_codex_runs_table,
 };
 
 pub(super) fn sample_signal_record(expires_at: &str) -> SessionSignalRecord {
@@ -305,6 +305,7 @@ pub(super) fn sample_agent_tui(tui_id: &str, updated_at: &str) -> AgentTuiSnapsh
     AgentTuiSnapshot {
         tui_id: tui_id.into(),
         session_id: "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".into(),
+        workspace_id: None,
         agent_id: "claude-leader".into(),
         runtime: "copilot".into(),
         status: AgentTuiStatus::Running,

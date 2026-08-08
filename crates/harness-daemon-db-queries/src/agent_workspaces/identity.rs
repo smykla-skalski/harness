@@ -52,7 +52,7 @@ pub(super) fn source_snapshot_changed(
         })
 }
 
-pub(super) fn digest_fields<'a>(fields: impl IntoIterator<Item = &'a str>) -> String {
+pub(crate) fn digest_fields<'a>(fields: impl IntoIterator<Item = &'a str>) -> String {
     let mut hasher = Sha256::new();
     for field in fields {
         hasher.update(field.len().to_be_bytes());

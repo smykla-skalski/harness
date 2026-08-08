@@ -133,11 +133,11 @@ pub(crate) async fn validate_read_only_workflow_launch(
         || settings.settings.policy_version != launch.policy_version
         || reviewers != launch.resolved_reviewers
         || item_snapshot.item_revision != launch.prepared_item_revision
-        || launch.run_context.session_id != applied.session_id
+        || Some(launch.run_context.session_id.as_str()) != applied.launch_owner_id()
         || launch.run_context.title != item.title
         || launch.run_context.body != item.body
         || launch.run_context.tags != item.tags
-        || item.session_id.as_deref() != Some(launch.run_context.session_id.as_str())
+        || item.owner_id() != Some(launch.run_context.session_id.as_str())
         || item.workflow.worktree.as_deref() != Some(launch.run_context.worktree.as_str())
     {
         return Err(invalid_transition(

@@ -219,7 +219,7 @@ pub fn worker_prompt(
             board_item_id: &applied.board_item_id,
             work_item_id: &applied.work_item_id,
             worktree: applied.item.workflow.worktree.as_deref(),
-            session_id: Some(&applied.session_id),
+            session_id: applied.session_id.as_deref(),
             managed_run_id: Some(managed_run_id),
             status: applied.item.status,
         },

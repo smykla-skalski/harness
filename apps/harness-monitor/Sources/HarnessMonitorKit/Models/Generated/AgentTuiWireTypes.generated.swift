@@ -182,6 +182,7 @@ public struct AgentTuiListResponseWire: Codable, Equatable, Sendable {
 public struct AgentTuiSnapshotWire: Codable, Equatable, Sendable {
   public var tuiId: String
   public var sessionId: String
+  public var workspaceId: String?
   public var agentId: String
   public var runtime: String
   public var status: AgentTuiStatusWire
@@ -199,6 +200,7 @@ public struct AgentTuiSnapshotWire: Codable, Equatable, Sendable {
   public init(
     tuiId: String,
     sessionId: String,
+    workspaceId: String? = nil,
     agentId: String,
     runtime: String,
     status: AgentTuiStatusWire,
@@ -215,6 +217,7 @@ public struct AgentTuiSnapshotWire: Codable, Equatable, Sendable {
   ) {
     self.tuiId = tuiId
     self.sessionId = sessionId
+    self.workspaceId = workspaceId
     self.agentId = agentId
     self.runtime = runtime
     self.status = status
@@ -233,6 +236,7 @@ public struct AgentTuiSnapshotWire: Codable, Equatable, Sendable {
   enum CodingKeys: String, CodingKey {
     case tuiId = "tui_id"
     case sessionId = "session_id"
+    case workspaceId = "workspace_id"
     case agentId = "agent_id"
     case runtime
     case status

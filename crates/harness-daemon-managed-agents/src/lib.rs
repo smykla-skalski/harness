@@ -36,7 +36,7 @@ pub use readiness::signal_readiness_ready;
 pub use screen::TerminalScreenParser;
 pub use spawn::{
     deliver_deferred_prompts, ensure_runtime_bootstrap, resolved_command_argv, send_initial_prompt,
-    spawn_agent_tui_process, wait_for_readiness,
+    ManagedTerminalOwner, spawn_agent_tui_process, wait_for_readiness,
 };
 pub use storage::AsyncAgentTuiStorage;
 pub use support::lock;

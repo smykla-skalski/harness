@@ -7,7 +7,9 @@ use crate::daemon::protocol::http_paths;
 use crate::task_board::TaskBoardStatus;
 use crate::task_board::policy_graph::PolicyCanvasWorkspace;
 
-use super::task_board_managed_worker_assertions::assert_codex_worker_started;
+use super::task_board_managed_worker_assertions::{
+    assert_codex_worker_started, assert_no_workspace_worker,
+};
 use super::task_board_support::*;
 use super::*;
 use crate::daemon::reviews_store::PolicyGraphQueries;
@@ -111,20 +113,13 @@ async fn run_task_board_step_mode_hold(sandbox: &Path) {
 
     let response = dispatch_http_item(&client, &base_url, "board-step-held", &project_dir).await;
     let applied = first_applied(&response);
-    let session_id = required_string(applied, "session_id");
+    let workspace_id = required_string(applied, "workspace_id");
 
     assert_eq!(
         applied["item"]["workflow"]["current_step_id"].as_str(),
         Some("awaiting_delivery")
     );
-    assert!(
-        state
-            .codex_controller
-            .list_runs(&session_id)
-            .expect("list held runs")
-            .runs
-            .is_empty()
-    );
+    assert_no_workspace_worker(&state, &workspace_id).await;
     let status = get_json(
         &client,
         &base_url,
@@ -161,12 +156,7 @@ async fn run_task_board_step_mode_hold(sandbox: &Path) {
         delivered["applied"]["item"]["workflow"]["current_step_id"].as_str(),
         Some("worker_running")
     );
-    assert_codex_worker_started(
-        &state,
-        &session_id,
-        "board-step-held",
-        &required_string(applied, "work_item_id"),
-    );
+    assert_codex_worker_started(&state, applied, "board-step-held").await;
 
     Box::pin(seed_ready_board_item(
         &state,
@@ -279,10 +269,13 @@ async fn run_task_board_http_item_scope_flow(
     state: &crate::daemon::http::DaemonHttpState,
     project_dir: &Path,
 ) {
-    Box::pin(seed_ready_board_item(
+    // A legacy owner, because the outcome this flow asserts after stopping the
+    // worker is decided by evaluating a linked Session task.
+    Box::pin(seed_legacy_session_board_item(
         state,
         "board-http-dispatch",
         "HTTP dispatch item",
+        project_dir,
     ))
     .await;
     Box::pin(seed_ready_board_item(
@@ -293,8 +286,6 @@ async fn run_task_board_http_item_scope_flow(
     .await;
     let dispatch = dispatch_http_item(client, base_url, "board-http-dispatch", project_dir).await;
     let applied = first_applied(&dispatch);
-    let session_id = required_string(applied, "session_id");
-    let work_item_id = required_string(applied, "work_item_id");
     assert_eq!(
         applied["board_item_id"].as_str(),
         Some("board-http-dispatch")
@@ -304,8 +295,7 @@ async fn run_task_board_http_item_scope_flow(
         applied["item"]["workflow"]["status"].as_str(),
         Some("running")
     );
-    let managed_run_id =
-        assert_codex_worker_started(state, &session_id, "board-http-dispatch", &work_item_id);
+    let managed_run_id = assert_codex_worker_started(state, applied, "board-http-dispatch").await;
     assert_board_item_unlinked(state, "board-http-dispatch-other").await;
     let other_dispatch =
         dispatch_http_item(client, base_url, "board-http-dispatch-other", project_dir).await;
@@ -353,10 +343,13 @@ async fn run_task_board_http_run_once_flow(
     state: &crate::daemon::http::DaemonHttpState,
     project_dir: &Path,
 ) {
-    Box::pin(seed_ready_board_item(
+    // A legacy owner, because run-once reports how many items evaluation could
+    // read, and evaluation reads a linked Session task.
+    Box::pin(seed_legacy_session_board_item(
         state,
         "board-http-run-once",
         "HTTP run once item",
+        project_dir,
     ))
     .await;
     Box::pin(seed_ready_board_item(
@@ -400,12 +393,7 @@ async fn run_task_board_http_run_once_flow(
             .is_some_and(|trace_ids| !trace_ids.is_empty())
     );
     let applied = &run_once["last_run"]["dispatch"]["applied"][0];
-    let _managed_run_id = assert_codex_worker_started(
-        state,
-        &required_string(applied, "session_id"),
-        "board-http-run-once",
-        &required_string(applied, "work_item_id"),
-    );
+    let _managed_run_id = assert_codex_worker_started(state, applied, "board-http-run-once").await;
     assert_board_item_unlinked(state, "board-http-run-once-other").await;
 }
 

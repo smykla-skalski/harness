@@ -134,7 +134,16 @@ pub struct AgentTuiListResponse {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct AgentTuiSnapshot {
     pub tui_id: String,
+    /// Owner identity for display and correlation. A workspace-owned terminal
+    /// carries its `workspace_id` here, the same way a standalone Codex run
+    /// carries its own run id: every consumer keeps one field to key on, and
+    /// the durable owner is the one below.
     pub session_id: String,
+    /// Set when this terminal belongs to a durable workspace rather than a
+    /// Session. Persistence writes a NULL `session_id` column in that case,
+    /// because there is no Session row for the foreign key to point at.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace_id: Option<String>,
     pub agent_id: String,
     pub runtime: String,
     pub status: AgentTuiStatus,

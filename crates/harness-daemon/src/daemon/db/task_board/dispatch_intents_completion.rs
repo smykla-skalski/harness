@@ -15,7 +15,7 @@ use super::super::items::bump_change_in_tx;
 use super::super::lane_order::{
     LaneTransitionKind, record_lane_transition_audit_in_tx, replace_with_lane_transition_in_tx,
 };
-use super::ensure_dispatch_item_startable;
+use super::{DispatchItemOwners, ensure_dispatch_item_startable};
 use crate::daemon::db::{CliError, db_error, utc_now};
 use crate::task_board::{DispatchAppliedTask, TaskBoardItem, TaskBoardWorkflowStatus};
 
@@ -43,7 +43,8 @@ pub(super) async fn screen_dispatch_completion_in_tx(
         .load_item_in_tx(&item_id)
         .await?
         .ok_or_else(|| db_error(format!("task-board item '{item_id}' not found")))?;
-    let still_linked = item.session_id.as_deref() == Some(session_id.as_str())
+    let still_linked = item.session_id == session_id
+        && item.workspace_id == applied.workspace_id
         && item.work_item_id.as_deref() == Some(work_item_id.as_str())
         && item.workflow.execution_id.as_deref() == Some(execution_id.as_str());
     if !still_linked {
@@ -52,7 +53,7 @@ pub(super) async fn screen_dispatch_completion_in_tx(
         )));
     }
     validate_dispatch_start_fence_in_tx(transaction, &applied, revision).await?;
-    ensure_dispatch_item_startable(&item, &session_id, &work_item_id, Some(&execution_id))?;
+    ensure_dispatch_item_startable(&item, DispatchItemOwners::of(&applied), Some(&execution_id))?;
     Ok(Box::new(ScreenedDispatchCompletion {
         item,
         revision,

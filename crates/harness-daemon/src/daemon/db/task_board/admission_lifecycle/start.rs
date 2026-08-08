@@ -1,6 +1,7 @@
 use sqlx::{Sqlite, Transaction, query_as, query_scalar};
 
 use super::super::dispatch_admission_tx_ext::TaskBoardDispatchAdmissionTxExt;
+use super::super::dispatch_intents::DispatchItemOwners;
 use super::super::item_tx_ext::TaskBoardItemTxExt;
 use super::TaskBoardAdmissionCheck;
 use crate::daemon::db::prelude::*;
@@ -55,13 +56,17 @@ async fn resolve_dispatch_admission_start_in_tx<'c>(
     ),
     CliError,
 > {
-    let (item_id, item_revision, session_id, work_item_id, execution_id) =
-        claimed_item_identity(&mut transaction, intent_id, claim_token).await?;
+    let identity = claimed_item_identity(&mut transaction, intent_id, claim_token).await?;
     let (item, loaded_revision) = transaction
-        .load_item_in_tx(&item_id)
+        .load_item_in_tx(&identity.item_id)
         .await?
-        .ok_or_else(|| db_error(format!("task-board item '{item_id}' not found")))?;
-    if loaded_revision != item_revision {
+        .ok_or_else(|| {
+            db_error(format!(
+                "task-board item '{}' not found",
+                identity.item_id
+            ))
+        })?;
+    if loaded_revision != identity.item_revision {
         return Err(db_error(
             "task board admission item revision changed while loading",
         ));
@@ -71,9 +76,12 @@ async fn resolve_dispatch_admission_start_in_tx<'c>(
         .await?;
     super::super::dispatch_intents::ensure_dispatch_item_startable(
         &item,
-        &session_id,
-        &work_item_id,
-        Some(&execution_id),
+        DispatchItemOwners {
+            session_id: identity.session_id.as_deref(),
+            workspace_id: identity.workspace_id.as_deref(),
+            work_item_id: &identity.work_item_id,
+        },
+        Some(&identity.execution_id),
     )?;
     let admission = transaction
         .revalidate_dispatch_admission_in_tx(intent_id, &item, loaded_revision)
@@ -121,10 +129,10 @@ async fn claimed_item_identity(
     transaction: &mut Transaction<'_, Sqlite>,
     intent_id: &str,
     claim_token: &str,
-) -> Result<(String, i64, String, String, String), CliError> {
-    let (item_id, session_id, work_item_id, execution_id) =
-        query_as::<_, (String, String, String, String)>(
-            "SELECT item_id, session_id, work_item_id, workflow_execution_id
+) -> Result<ClaimedItemIdentity, CliError> {
+    let (item_id, session_id, workspace_id, work_item_id, execution_id) =
+        query_as::<_, (String, Option<String>, Option<String>, String, String)>(
+            "SELECT item_id, session_id, workspace_id, work_item_id, workflow_execution_id
          FROM task_board_dispatch_intents
          WHERE intent_id = ?1 AND claim_token = ?2 AND status = 'starting'",
         )
@@ -144,11 +152,24 @@ async fn claimed_item_identity(
             .fetch_one(transaction.as_mut())
             .await
             .map_err(|error| db_error(format!("load claimed task board item revision: {error}")))?;
-    Ok((
+    Ok(ClaimedItemIdentity {
         item_id,
         item_revision,
         session_id,
+        workspace_id,
         work_item_id,
         execution_id,
-    ))
+    })
+}
+
+/// What the claimed intent row says this dispatch is for. A struct rather than
+/// a tuple because the two owner fields read identically at a call site and
+/// swapping them silently would let a workspace dispatch match on a Session.
+struct ClaimedItemIdentity {
+    item_id: String,
+    item_revision: i64,
+    session_id: Option<String>,
+    workspace_id: Option<String>,
+    work_item_id: String,
+    execution_id: String,
 }

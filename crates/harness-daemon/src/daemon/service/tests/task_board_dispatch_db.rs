@@ -1,7 +1,8 @@
 use super::*;
 
 use crate::daemon::db::{ReservedTaskBoardDispatch, approved_write_item};
-use crate::daemon::protocol::SessionStartRequest;
+use crate::daemon::state::ensure_daemon_identity;
+use harness_daemon_db_queries::AsyncAgentWorkingCopyQueries;
 use std::collections::HashMap;
 
 use crate::daemon::db::prelude::*;
@@ -13,10 +14,19 @@ use crate::task_board::{
     TaskBoardWorkflowKind, build_dispatch_plans_with_policy,
 };
 
+/// Mint the daemon identity a serving daemon establishes at startup.
+///
+/// Provisioning a workspace needs it: the workspace key is per daemon, and a
+/// workspace minted under a stand-in id would be invisible to the
+/// reconciliation that lists it.
+fn seed_daemon_identity() {
+    ensure_daemon_identity().expect("mint daemon identity");
+}
+
 struct CrashedDispatchPreparation {
     db: crate::daemon::db_handle::AsyncDaemonDbHandle,
     first_claim_token: String,
-    session_id: String,
+    working_copy_id: String,
     work_item_id: String,
 }
 
@@ -27,6 +37,7 @@ async fn dispatch_resume_prepare_and_simulate_crash(
         .parent()
         .expect("project parent")
         .join("dispatch.sqlite");
+    seed_daemon_identity();
     let db = crate::daemon::db::AsyncDaemonDb::connect(&db_path)
         .await
         .expect("open async daemon db");
@@ -80,47 +91,22 @@ async fn dispatch_resume_prepare_and_simulate_crash(
             panic!("default admission blocked dispatch")
         }
     };
+    assert!(
+        preparation.session_id.is_none(),
+        "a fresh dispatch reserves no Session"
+    );
+    let working_copy_id = preparation
+        .working_copy_id
+        .clone()
+        .expect("fresh dispatch reserves a working copy");
     let first_claim = db
         .claim_task_board_dispatch_preparation(&intent_id)
         .await
         .expect("claim preparation")
         .expect("pending preparation");
 
-    let crate::task_board::SessionIntent::Create { title, context, .. } = &preparation.plan.session
-    else {
-        panic!("new task board item should create a session");
-    };
-    start_session_direct_async(
-        &SessionStartRequest {
-            title: title.clone(),
-            context: context.clone().unwrap_or_else(|| title.clone()),
-            session_id: Some(preparation.session_id.clone()),
-            project_dir: project.to_string_lossy().into_owned(),
-            policy_preset: None,
-            base_ref: None,
-        },
-        &db,
-    )
-    .await
-    .expect("create reserved session before simulated crash");
-    assert!(
-        db.delete_session_row(&preparation.session_id)
-            .await
-            .expect("remove database row for crash simulation")
-    );
-    assert!(
-        db.resolve_session(&preparation.session_id)
-            .await
-            .expect("verify missing database row")
-            .is_none()
-    );
-    assert!(
-        crate::session::storage::layout_from_project_dir(project, &preparation.session_id)
-            .expect("session layout")
-            .state_file()
-            .is_file(),
-        "the crash fixture must retain file/worktree artifacts"
-    );
+    // Crash the holder mid-preparation by expiring its claim; the reclaim below
+    // must resume onto the same reserved working copy rather than mint another.
     sqlx::query(
         "UPDATE task_board_dispatch_intents
          SET claimed_at = '1970-01-01T00:00:00Z' WHERE intent_id = ?1",
@@ -133,7 +119,7 @@ async fn dispatch_resume_prepare_and_simulate_crash(
     CrashedDispatchPreparation {
         db,
         first_claim_token: first_claim.claim_token,
-        session_id: preparation.session_id,
+        working_copy_id,
         work_item_id: preparation.work_item_id,
     }
 }
@@ -152,42 +138,178 @@ async fn dispatch_resume_reclaim_and_assert(crashed: CrashedDispatchPreparation)
     ))
     .await
     .expect("resume preparation");
-    assert_eq!(applied.session_id, crashed.session_id);
+
+    assert_eq!(applied.session_id, None);
+    assert_eq!(
+        applied.working_copy_id.as_deref(),
+        Some(crashed.working_copy_id.as_str()),
+        "the resumed preparation must reuse the reserved working copy"
+    );
+    let workspace_id = applied
+        .workspace_id
+        .clone()
+        .expect("a started dispatch belongs to a workspace");
     assert_eq!(applied.work_item_id, crashed.work_item_id);
 
-    let resolved = db
-        .resolve_session(&crashed.session_id)
+    let sessions = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM sessions")
+        .fetch_one(db.pool())
         .await
-        .expect("resolve session")
-        .expect("session exists");
-    assert_eq!(resolved.state.tasks.len(), 1);
-    assert!(resolved.state.tasks.contains_key(&crashed.work_item_id));
+        .expect("count sessions");
+    assert_eq!(sessions, 0, "starting a worker must create no Session row");
+    let tasks = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM tasks")
+        .fetch_one(db.pool())
+        .await
+        .expect("count session tasks");
+    assert_eq!(tasks, 0, "starting a worker must create no Session task");
+
     let linked = db
         .task_board_item("dispatch-crash-recovery")
         .await
         .expect("load linked item");
+    assert_eq!(linked.session_id, None);
+    assert_eq!(linked.workspace_id.as_deref(), Some(workspace_id.as_str()));
     assert_eq!(
-        linked.session_id.as_deref(),
-        Some(crashed.session_id.as_str())
+        linked.working_copy_id.as_deref(),
+        Some(crashed.working_copy_id.as_str())
     );
     assert_eq!(
         linked.work_item_id.as_deref(),
         Some(crashed.work_item_id.as_str())
     );
-    assert_eq!(
-        linked.workflow.branch.as_deref(),
-        Some(resolved.state.branch_ref.as_str())
-    );
-    let canonical_worktree =
-        std::fs::canonicalize(&resolved.state.worktree_path).expect("canonical resolved worktree");
+
+    let recorded = db
+        .load_agent_working_copy(&crashed.working_copy_id)
+        .await
+        .expect("load recorded working copy")
+        .expect("the dispatch recorded its checkout");
+    assert_eq!(recorded.workspace_id, workspace_id);
+    assert!(!recorded.released);
     assert_eq!(
         linked.workflow.worktree.as_deref(),
-        canonical_worktree.to_str()
+        Some(recorded.worktree_path.as_str()),
+        "the ticket must point at the checkout the daemon actually made"
+    );
+    assert_eq!(
+        linked.workflow.branch.as_deref(),
+        Some(recorded.branch_ref.as_str())
+    );
+    assert!(
+        std::path::Path::new(&recorded.worktree_path).is_dir(),
+        "the recorded checkout must exist on disk"
     );
 }
 
+/// A board item linked to a Session before workspaces existed must keep
+/// dispatching through that Session. Its work is already running there, and
+/// re-owning it mid-flight would strand the agents that joined it.
 #[test]
-fn prepared_dispatch_resumes_without_duplicate_session_or_task() {
+fn a_legacy_session_linked_item_still_dispatches_through_its_session() {
+    with_temp_project(|project| {
+        let runtime = tokio::runtime::Runtime::new().expect("runtime");
+        runtime.block_on(async {
+            seed_daemon_identity();
+            let db = crate::daemon::db::AsyncDaemonDb::connect(
+                &project
+                    .parent()
+                    .expect("project parent")
+                    .join("legacy.sqlite"),
+            )
+            .await
+            .expect("open async daemon db");
+            let db = AsyncDaemonDbHandle(db);
+            let session = crate::daemon::service::start_session_direct_async(
+                &crate::daemon::protocol::SessionStartRequest {
+                    title: "Legacy owner".into(),
+                    context: "Started before workspaces existed".into(),
+                    session_id: None,
+                    project_dir: project.to_string_lossy().into_owned(),
+                    policy_preset: None,
+                    base_ref: None,
+                },
+                &db,
+            )
+            .await
+            .expect("start the legacy session");
+
+            let mut settings = db
+                .task_board_orchestrator_settings()
+                .await
+                .expect("load orchestrator settings");
+            settings.github_project = TaskBoardGitHubProjectConfig::default();
+            db.replace_task_board_orchestrator_settings(&settings)
+                .await
+                .expect("configure write publication");
+            let mut item = approved_write_item(TaskBoardItem::new(
+                "dispatch-legacy-session".into(),
+                "Keep the legacy owner".into(),
+                "Dispatch against an existing Session".into(),
+                "2026-08-07T10:00:00Z".into(),
+            ));
+            item.execution_repository = Some("example/compass".into());
+            item.session_id = Some(session.session_id.clone());
+            db.create_task_board_item(item.clone())
+                .await
+                .expect("create legacy-linked item");
+            let item = db
+                .task_board_item("dispatch-legacy-session")
+                .await
+                .expect("load legacy-linked item");
+            let plan = build_dispatch_plans_with_policy(
+                &[item],
+                None,
+                None,
+                crate::task_board::SpawnGateSwitches::default(),
+                &HashMap::new(),
+            )
+            .remove(0);
+            let reserved = db
+                .reserve_task_board_dispatch(
+                    &plan,
+                    crate::session::types::CONTROL_PLANE_ACTOR_ID,
+                    None,
+                    false,
+                )
+                .await
+                .expect("reserve the legacy dispatch");
+            let intent_id = match reserved {
+                ReservedTaskBoardDispatch::Preparing { intent_id, .. } => intent_id,
+                other => panic!("unexpected reservation: {other:?}"),
+            };
+            let claim = db
+                .claim_task_board_dispatch_preparation(&intent_id)
+                .await
+                .expect("claim the legacy preparation")
+                .expect("pending legacy preparation");
+            let applied = Box::pin(temp_env::async_with_vars(
+                [(HARNESS_GITHUB_TOKEN_ENV, Some("fixture-token"))],
+                task_board::prepare_claimed_task_board_dispatch(&db, &claim),
+            ))
+            .await
+            .expect("prepare the legacy dispatch");
+
+            assert_eq!(applied.session_id.as_deref(), Some(session.session_id.as_str()));
+            assert_eq!(applied.workspace_id, None);
+            assert_eq!(applied.working_copy_id, None);
+            let copies = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM agent_working_copies")
+                .fetch_one(db.pool())
+                .await
+                .expect("count working copies");
+            assert_eq!(copies, 0, "a legacy dispatch provisions no working copy");
+            let resolved = db
+                .resolve_session(&session.session_id)
+                .await
+                .expect("resolve legacy session")
+                .expect("legacy session exists");
+            assert!(
+                resolved.state.tasks.contains_key(&applied.work_item_id),
+                "the legacy path still creates the Session task its worker reports into"
+            );
+        });
+    });
+}
+
+#[test]
+fn prepared_dispatch_resumes_onto_one_workspace_and_no_session() {
     with_temp_project(|project| {
         let runtime = tokio::runtime::Runtime::new().expect("runtime");
         runtime.block_on(async {
@@ -202,6 +324,7 @@ fn read_only_dispatch_rejects_aba_after_claim_before_late_head_resolution() {
     with_temp_project(|project| {
         let runtime = tokio::runtime::Runtime::new().expect("runtime");
         runtime.block_on(async {
+            seed_daemon_identity();
             let db = crate::daemon::db::AsyncDaemonDb::connect(
                 &project
                     .parent()

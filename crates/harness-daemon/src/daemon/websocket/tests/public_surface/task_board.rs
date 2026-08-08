@@ -69,16 +69,21 @@ async fn run_websocket_task_board_item_scope_flow(
     connection: &Arc<Mutex<ConnectionState>>,
     project_dir: &std::path::Path,
 ) {
-    Box::pin(seed_ready_board_item(
+    // Both items carry a legacy Session link, because the completion this flow
+    // asserts is driven by marking that Session's task done. A fresh dispatch
+    // has no Session task; its completion signal is `#1350`'s work.
+    Box::pin(seed_legacy_session_board_item(
         state,
         "board-ws-dispatch",
         "WS dispatch item",
+        project_dir,
     ))
     .await;
-    Box::pin(seed_ready_board_item(
+    Box::pin(seed_legacy_session_board_item(
         state,
         "board-ws-dispatch-other",
         "WS dispatch other item",
+        project_dir,
     ))
     .await;
     let dispatch_response =
@@ -135,10 +140,13 @@ async fn run_websocket_task_board_run_once_flow(
     connection: &Arc<Mutex<ConnectionState>>,
     project_dir: &std::path::Path,
 ) {
-    Box::pin(seed_ready_board_item(
+    // A legacy owner, because run-once reports how many items evaluation could
+    // read, and evaluation reads a linked Session task.
+    Box::pin(seed_legacy_session_board_item(
         state,
         "board-ws-run-once",
         "WS run once item",
+        project_dir,
     ))
     .await;
     Box::pin(seed_ready_board_item(
@@ -292,7 +300,7 @@ fn response_result(response: &WsResponse) -> &Value {
     response.result.as_ref().expect("websocket result")
 }
 
-async fn seed_ready_board_item(state: &DaemonHttpState, id: &str, title: &str) {
+fn ready_board_item(id: &str, title: &str) -> TaskBoardItem {
     let mut item = TaskBoardItem::new(
         id.to_string(),
         title.to_string(),
@@ -302,14 +310,50 @@ async fn seed_ready_board_item(state: &DaemonHttpState, id: &str, title: &str) {
     item.status = TaskBoardStatus::Todo;
     item.workflow_kind = crate::task_board::TaskBoardWorkflowKind::Unknown;
     let item = submit_plan(&item, "Use task dispatch.").apply_to(&item);
-    let item = approve_plan(&item, "lead", "2026-05-14T01:00:00Z").apply_to(&item);
+    approve_plan(&item, "lead", "2026-05-14T01:00:00Z").apply_to(&item)
+}
+
+async fn seed_ready_board_item(state: &DaemonHttpState, id: &str, title: &str) {
     state
         .async_db
         .get()
         .expect("async db")
-        .create_task_board_item(item)
+        .create_task_board_item(ready_board_item(id, title))
         .await
         .expect("create item");
+}
+
+/// Seed a board item that is already linked to a Session, the way items
+/// dispatched before durable workspaces existed still are. Their worker keeps
+/// reporting through a Session task, which is what the completion assertions
+/// below drive.
+async fn seed_legacy_session_board_item(
+    state: &DaemonHttpState,
+    id: &str,
+    title: &str,
+    project_dir: &std::path::Path,
+) -> String {
+    let async_db = state.async_db.get().expect("async db");
+    let session = crate::daemon::service::start_session_direct_async(
+        &crate::daemon::protocol::SessionStartRequest {
+            title: title.to_string(),
+            context: "Started before workspaces existed".into(),
+            session_id: None,
+            project_dir: project_dir.to_string_lossy().into_owned(),
+            policy_preset: None,
+            base_ref: None,
+        },
+        async_db.as_ref(),
+    )
+    .await
+    .expect("start the legacy session");
+    let mut item = ready_board_item(id, title);
+    item.session_id = Some(session.session_id.clone());
+    async_db
+        .create_task_board_item(item)
+        .await
+        .expect("create the legacy-linked item");
+    session.session_id
 }
 
 fn first_applied(value: &Value) -> &Value {

@@ -20,7 +20,7 @@ impl CodexControllerHandle {
             ))
         })?;
         for recovery in db.task_board_admission_worker_recoveries().await? {
-            self.reconcile_one_admission_worker(db.as_ref(), &recovery)
+            Box::pin(self.reconcile_one_admission_worker(db.as_ref(), &recovery))
                 .await?;
         }
         Ok(())
@@ -48,7 +48,7 @@ impl CodexControllerHandle {
         if let Some(run) = db.codex_run(&recovery.managed_worker_id).await? {
             return self.reconcile_existing_admission_run(db, run).await;
         }
-        self.reconcile_missing_admission_run(db, recovery).await
+        Box::pin(self.reconcile_missing_admission_run(db, recovery)).await
     }
 
     async fn reconcile_existing_admission_run(
@@ -82,21 +82,21 @@ impl CodexControllerHandle {
             return Ok(());
         };
         let publish_result = self.publish_missing_admission_recovery(db, &outcome).await;
-        let evaluation_result = daemon_service::evaluate_task_board_async(
+        let evaluation_result = Box::pin(daemon_service::evaluate_task_board_async(
             &TaskBoardEvaluateRequest {
                 item_id: Some(outcome.item_id.clone()),
                 status: None,
                 dry_run: false,
             },
             db,
-        )
+        ))
         .await;
         publish_result?;
         evaluation_result?;
         tracing::warn!(
             managed_worker_id = %recovery.managed_worker_id,
             item_id = %outcome.item_id,
-            session_id = %outcome.session_id,
+            session_id = ?outcome.session_id,
             concurrency_released = outcome.concurrency_released,
             session_changed = outcome.session_changed,
             "reconciled committed task board admission without a durable Codex run",
@@ -109,19 +109,18 @@ impl CodexControllerHandle {
         db: &AsyncDaemonDbHandle,
         outcome: &TaskBoardAdmissionMissingRunRecovery,
     ) -> Result<(), CliError> {
-        if !outcome.session_changed {
+        // `session_changed` can only be true for a legacy dispatch, since the
+        // Session-task block is what sets it; a workspace recovery has no
+        // Session mirror, change scope, or snapshot to publish.
+        let Some(session_id) = outcome.session_id.as_deref().filter(|_| outcome.session_changed)
+        else {
             return Ok(());
-        }
-        let mirror_result =
-            daemon_service::sync_file_state_from_async_db(db, &outcome.session_id).await;
-        let session_change_result = db.bump_change(&outcome.session_id).await;
+        };
+        let mirror_result = daemon_service::sync_file_state_from_async_db(db, session_id).await;
+        let session_change_result = db.bump_change(session_id).await;
         let global_change_result = db.bump_change("global").await;
-        daemon_service::broadcast_session_snapshot_async(
-            &self.state.sender,
-            &outcome.session_id,
-            Some(db),
-        )
-        .await;
+        daemon_service::broadcast_session_snapshot_async(&self.state.sender, session_id, Some(db))
+            .await;
         mirror_result?;
         session_change_result?;
         global_change_result

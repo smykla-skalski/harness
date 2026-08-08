@@ -11,15 +11,18 @@ use crate::daemon::http::{
 };
 use crate::daemon::protocol::ManagedAgentSnapshot;
 use crate::daemon::reviews_store::PolicyGraphQueries;
+#[cfg(test)]
+use crate::task_board::{codex_worker_id, terminal_worker_id};
 use crate::task_board::{
-    AgentMode, DispatchAppliedTask, TaskBoardLaunchCapability, codex_worker_id, managed_worker_id,
-    terminal_worker_id,
+    AgentMode, DispatchAppliedTask, TaskBoardLaunchCapability, managed_worker_id,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 const DISPATCH_CLAIM_HEARTBEAT_INTERVAL: Duration = Duration::from_secs(10);
+const DISPATCH_WORKER_RUNTIME: &str = "codex";
 
 mod requests;
+#[cfg(test)]
 use requests::{codex_worker_request, terminal_worker_request};
 
 mod workflow_launch;
@@ -27,6 +30,14 @@ use workflow_launch::{validate_recovered_workflow_worker, validate_workflow_laun
 
 mod claim_settlement;
 pub(crate) use claim_settlement::settle_claimed_task_board_worker;
+
+mod workspace_ownership;
+use workspace_ownership::{applied_worker_owner, join_worker_to_workspace};
+pub(crate) use workspace_ownership::worker_lock_owner;
+pub(crate) use workspace_ownership::settle_compensated_workspace_worker;
+
+mod worker_start;
+use worker_start::{start_codex_worker, start_interactive_worker};
 
 pub(crate) struct TaskBoardDispatchClaimHeartbeat {
     task: JoinHandle<()>,
@@ -110,11 +121,11 @@ async fn start_worker_for_applied_task(
     dispatch_intent_id: &str,
     claim_token: &str,
 ) -> Result<ManagedAgentSnapshot, TaskBoardWorkerStartError> {
-    let session_id = applied.session_id.clone();
+    let owner = worker_lock_owner(applied);
     let worker_id = managed_worker_id(applied, dispatch_intent_id);
     let _guard = state
         .managed_agent_mutation_locks
-        .lock(&session_id, &worker_id)
+        .lock(&owner, &worker_id)
         .await;
     start_worker_for_applied_task_in_lane(
         state,
@@ -140,7 +151,7 @@ async fn start_worker_for_applied_task_in_lane(
         .await
         .map_err(TaskBoardWorkerStartError::uncertain)?;
     if let Some(snapshot) = existing {
-        return recover_same_applied_worker(snapshot, applied)
+        return recover_same_applied_worker(snapshot, applied, worker_id)
             .map_err(TaskBoardWorkerStartError::uncertain);
     }
     // Fail-closed recheck at the shared worker-start seam: this guards the
@@ -176,16 +187,17 @@ async fn start_or_recover_worker(
         Err(error) => error,
     };
     let probe = probe_existing_worker(state, applied, worker_id).await;
-    resolve_start_failure(start_error, probe, applied)
+    resolve_start_failure(start_error, probe, applied, worker_id)
 }
 
 fn resolve_start_failure(
     start_error: CliError,
     probe: Result<Option<ManagedAgentSnapshot>, CliError>,
     applied: &DispatchAppliedTask,
+    worker_id: &str,
 ) -> Result<ManagedAgentSnapshot, TaskBoardWorkerStartError> {
     match probe {
-        Ok(Some(snapshot)) => recover_same_applied_worker(snapshot, applied)
+        Ok(Some(snapshot)) => recover_same_applied_worker(snapshot, applied, worker_id)
             .map_err(TaskBoardWorkerStartError::uncertain),
         Ok(None) => Err(TaskBoardWorkerStartError::from(start_error)),
         Err(probe_error) => Err(TaskBoardWorkerStartError::uncertain_after_start(
@@ -234,11 +246,11 @@ async fn compensate_worker_for_applied_task(
     claim_token: &str,
     reason: Option<&str>,
 ) -> Result<(), CliError> {
-    let session_id = applied.session_id.clone();
+    let owner = worker_lock_owner(applied);
     let managed_worker_id = managed_worker_id(applied, dispatch_intent_id);
     let _guard = state
         .managed_agent_mutation_locks
-        .lock(&session_id, &managed_worker_id)
+        .lock(&owner, &managed_worker_id)
         .await;
     if let Some(reason) = reason {
         db.begin_task_board_dispatch_compensation(
@@ -252,7 +264,18 @@ async fn compensate_worker_for_applied_task(
         db.renew_task_board_dispatch_claim(dispatch_intent_id, claim_token)
             .await?;
     }
-    stop_worker_in_lane(state, applied, managed_worker_id).await
+    let worker_id = managed_worker_id.clone();
+    stop_worker_in_lane(state, applied, managed_worker_id).await?;
+    // Only after the runtime is down: releasing while a worker is still shutting
+    // down would let the next dispatch claim a directory this one is still in.
+    settle_compensated_workspace_worker(
+        db,
+        applied,
+        &worker_id,
+        reason.unwrap_or("task-board dispatch compensated"),
+    )
+    .await;
+    Ok(())
 }
 
 async fn stop_worker_in_lane(
@@ -323,13 +346,22 @@ fn exact_worker_not_found(error: &CliError, mode: AgentMode, worker_id: &str) ->
 fn recover_same_applied_worker(
     snapshot: ManagedAgentSnapshot,
     applied: &DispatchAppliedTask,
+    worker_id: &str,
 ) -> Result<ManagedAgentSnapshot, CliError> {
-    if snapshot.session_id() != applied.session_id {
+    // A workspace-owned runtime reports its workspace where a session id would
+    // go, and a standalone Codex run reports its own run id. Both are the owner
+    // the reclaim has to match; comparing anything else would hand this dispatch
+    // a worker that belongs to another one.
+    let expected = applied_worker_owner(applied, worker_id);
+    if !expected
+        .iter()
+        .any(|owner| owner.as_str() == snapshot.session_id())
+    {
         return Err(CliErrorKind::session_agent_conflict(format!(
-            "managed worker '{}' belongs to session '{}', not reclaimed session '{}'",
+            "managed worker '{}' belongs to '{}', not reclaimed owner '{}'",
             snapshot.agent_id(),
             snapshot.session_id(),
-            applied.session_id,
+            expected.join("' or '"),
         ))
         .into());
     }
@@ -350,7 +382,18 @@ async fn start_worker_by_mode(
             start_codex_worker(state, applied, dispatch_intent_id).await
         }
     }?;
-    crate::daemon::automation_kill_switch::fence_started_managed_agent(state, snapshot).await
+    let snapshot =
+        crate::daemon::automation_kill_switch::fence_started_managed_agent(state, snapshot).await?;
+    // Every start path funnels through here - direct, workflow, and recovery -
+    // so this is the one place that sees a worker come into existence and can
+    // record its membership exactly once.
+    join_worker_to_workspace(
+        require_async_db(state, "task-board worker workspace join")?,
+        applied,
+        &managed_worker_id(applied, dispatch_intent_id),
+    )
+    .await?;
+    Ok(snapshot)
 }
 
 /// Block the worker start when the persisted automation kill switch is engaged. The
@@ -382,38 +425,6 @@ fn warn_kill_switch_at_start(board_item_id: &str) {
         board_item_id = %board_item_id,
         "automation kill switch engaged at worker start; refusing to launch worker",
     );
-}
-
-async fn start_codex_worker(
-    state: &DaemonHttpState,
-    applied: &DispatchAppliedTask,
-    dispatch_intent_id: &str,
-) -> Result<ManagedAgentSnapshot, CliError> {
-    let session_id = applied.session_id.clone();
-    let run_id = codex_worker_id(dispatch_intent_id);
-    let request = codex_worker_request(applied, &run_id)?;
-    run_codex_agent_blocking(state, "task-board worker start", move |controller| {
-        controller
-            .start_run_with_id(&session_id, &request, run_id)
-            .map(ManagedAgentSnapshot::Codex)
-    })
-    .await
-}
-
-async fn start_interactive_worker(
-    state: &DaemonHttpState,
-    applied: &DispatchAppliedTask,
-    dispatch_intent_id: &str,
-) -> Result<ManagedAgentSnapshot, CliError> {
-    let session_id = applied.session_id.clone();
-    let tui_id = terminal_worker_id(dispatch_intent_id);
-    let request = terminal_worker_request(applied, &tui_id)?;
-    run_terminal_agent_blocking(state, "task-board worker start", move |manager| {
-        manager
-            .start_with_id(&session_id, &request, tui_id)
-            .map(ManagedAgentSnapshot::Terminal)
-    })
-    .await
 }
 
 const fn launch_capability(mode: AgentMode) -> Option<TaskBoardLaunchCapability> {
@@ -449,6 +460,10 @@ mod start_authorization_test_support;
 #[cfg(test)]
 #[path = "task_board_managed_agents/tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "task_board_managed_agents/worker_lane_tests.rs"]
+mod worker_lane_tests;
 
 #[cfg(test)]
 #[path = "task_board_managed_agents/read_only_start_revision_tests.rs"]

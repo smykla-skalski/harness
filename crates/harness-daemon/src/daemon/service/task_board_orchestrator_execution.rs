@@ -56,14 +56,14 @@ pub(super) async fn run_evaluation_phase(
     let mut combined = TaskBoardEvaluationSummary::default();
     for item_id in &prepared.candidate_item_ids {
         ensure_active(session).await?;
-        let summary = evaluate_task_board_async(
+        let summary = Box::pin(evaluate_task_board_async(
             &TaskBoardEvaluateRequest {
                 item_id: Some(item_id.clone()),
                 status: None,
                 dry_run: prepared.input.dry_run,
             },
             db,
-        )
+        ))
         .await?;
         merge_evaluation(&mut combined, summary);
     }

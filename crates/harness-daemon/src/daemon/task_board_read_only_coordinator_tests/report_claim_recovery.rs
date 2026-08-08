@@ -234,7 +234,12 @@ async fn prepared_initial_report_survives_restart_and_starts_once() {
         .await
         .expect("load restarted workflow")
         .expect("restarted workflow");
-    assert_eq!(started.attempts[0].state, TaskBoardAttemptState::Running);
+    assert_eq!(
+        started.attempts[0].state,
+        TaskBoardAttemptState::Running,
+        "attempt did not start: {:?}",
+        started.attempts[0].error
+    );
     assert_eq!(
         started
             .ownership

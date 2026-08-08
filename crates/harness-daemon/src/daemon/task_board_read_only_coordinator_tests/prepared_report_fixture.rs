@@ -50,17 +50,28 @@ pub(super) async fn seed_dispatched_initial_report(label: &str) -> Fixture {
         crate::daemon::db::ReservedTaskBoardDispatch::Preparing { intent_id, .. } => intent_id,
         other => panic!("unexpected dispatched report reservation: {other:?}"),
     };
-    let preparation = test
+    let mut preparation = test
         .db
         .claim_task_board_dispatch_preparation(&intent_id)
         .await
         .expect("claim dispatched report preparation")
         .expect("pending dispatched report preparation");
+    // Preparation provisions the workspace and hands publication the id it
+    // learned, so a fixture that publishes directly has to stamp it too or the
+    // applied task names no owner for the worker start to match.
+    preparation.preparation.workspace_id = Some(format!("agent-workspace-{label}"));
     let fixture_root = test.path.parent().expect("prepared report fixture root");
+    // The Session here only supplies a real worktree to complete against; the
+    // dispatch itself is workspace-owned, so the launch records that owner.
+    let owner = preparation
+        .preparation
+        .launch_owner_id()
+        .expect("a prepared dispatch has an owner")
+        .to_string();
     let session =
-        start_dispatch_session(&test.db, fixture_root, &preparation.preparation.session_id).await;
+        start_dispatch_session(&test.db, fixture_root, &uuid::Uuid::new_v4().to_string()).await;
     let worktree = session.worktree_path.to_string_lossy().into_owned();
-    let launch = launch(&test.db, &item_id, &session).await;
+    let launch = launch(&test.db, &item_id, &session, &owner).await;
     let applied = test
         .db
         .complete_task_board_dispatch_preparation_with_workflow(
@@ -151,6 +162,7 @@ async fn launch(
     db: &AsyncDaemonDbHandle,
     item_id: &str,
     session: &SessionState,
+    owner: &str,
 ) -> TaskBoardReadOnlyWorkflowLaunch {
     let snapshot = db
         .task_board_item_snapshot(item_id)
@@ -175,7 +187,7 @@ async fn launch(
         prepared_item_revision: snapshot.item_revision,
         run_context: TaskBoardReadOnlyRunContext {
             schema_version: TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION,
-            session_id: session.session_id.clone(),
+            session_id: owner.to_string(),
             title: snapshot.item.title,
             body: snapshot.item.body,
             tags: snapshot.item.tags,

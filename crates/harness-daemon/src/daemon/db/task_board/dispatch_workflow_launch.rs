@@ -169,7 +169,9 @@ fn prepare_read_only(
     }
     launch.run_context = TaskBoardReadOnlyRunContext {
         schema_version: TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION,
-        session_id: preparation.session_id.clone(),
+        // Whichever owner this preparation reserved. Named `session_id` on the
+        // wire for compatibility; a fresh dispatch records its workspace here.
+        session_id: preparation.launch_owner_id().unwrap_or_default().to_string(),
         title: item.title.clone(),
         body: item.body.clone(),
         tags: item.tags.clone(),
