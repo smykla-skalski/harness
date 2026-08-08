@@ -5,10 +5,7 @@ use crate::daemon::db::prelude::*;
 use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::http::{DaemonHttpState, run_codex_agent_blocking};
 use crate::daemon::protocol::{CodexRunMode, CodexRunRequest, CodexRunSnapshot};
-use crate::reviews::{
-    ReviewActionKind, ReviewActionOutcome, ReviewItem, ReviewPullRequestState,
-    ReviewsActionResponse, ReviewsApproveRequest, ReviewsApproveRequestSource,
-};
+use crate::reviews::{ReviewsApproveRequest, ReviewsApproveRequestSource};
 use crate::task_board::{
     TaskBoardImplementationResult, TaskBoardLifecycleOutcome, TaskBoardWorkflowExecutionRecord,
     TaskBoardWorkflowKind,
