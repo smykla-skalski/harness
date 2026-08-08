@@ -5,6 +5,7 @@ use harness_session::types::{ReviewVerdict, TaskStatus, WorkItem};
 use super::types::{
     TaskBoardItem, TaskBoardStatus, TaskBoardWorkflowState, TaskBoardWorkflowStatus,
 };
+use super::work_item_progress::{TaskBoardWorkItemProgress, TaskBoardWorkItemState};
 
 // `TaskBoardEvaluationOutcome`/`EvaluationSignalFailure` relocated to
 // `harness_protocol::daemon::task_board::evaluation` (#1145): pure data,
@@ -45,21 +46,17 @@ pub struct TaskBoardEvaluationRecord {
     pub board_status: Option<TaskBoardStatus>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub workflow_status: Option<TaskBoardWorkflowStatus>,
+    /// The durable work-item state the board evaluated. Present for every
+    /// dispatched item; `task_status` above is present only for the ones a
+    /// legacy Session task was translated from.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub work_item_state: Option<TaskBoardWorkItemState>,
     #[serde(default)]
     pub updated: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub item: Option<TaskBoardItem>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TaskBoardEvaluationDecision {
-    pub outcome: TaskBoardEvaluationOutcome,
-    pub task_status: TaskStatus,
-    pub status: TaskBoardStatus,
-    pub workflow: TaskBoardWorkflowState,
-    pub reason: Option<String>,
 }
 
 impl TaskBoardEvaluationSummary {
@@ -101,59 +98,89 @@ impl TaskBoardEvaluationSummary {
     }
 }
 
+/// Translates one legacy Session task into the work-item state the board owns.
+///
+/// This is the whole compatibility bridge: a Session-linked item still learns
+/// its progress from its Session task, but that reading is fed through the same
+/// durable record every sessionless worker reports into, rather than projected
+/// onto the item behind the record's back. Nothing here creates a Session task.
 #[must_use]
-pub fn evaluate_task_board_item(
-    item: &TaskBoardItem,
-    task: &WorkItem,
-) -> TaskBoardEvaluationDecision {
+pub fn work_item_state_from_session_task(task: &WorkItem) -> TaskBoardWorkItemState {
     match task.status {
-        TaskStatus::Open => running_decision(
-            item,
-            task,
-            TaskBoardEvaluationOutcome::WorkerPending,
-            TaskBoardStatus::InProgress,
-            pending_worker_step(item),
-            None,
-        ),
-        TaskStatus::InProgress => running_decision(
-            item,
-            task,
-            TaskBoardEvaluationOutcome::WorkerRunning,
-            TaskBoardStatus::InProgress,
-            "worker",
-            None,
-        ),
-        TaskStatus::AwaitingReview => running_decision(
-            item,
-            task,
-            TaskBoardEvaluationOutcome::ReviewPending,
-            TaskBoardStatus::ToReview,
-            "review_pending",
-            None,
-        ),
-        TaskStatus::InReview => in_review_decision(item, task),
-        TaskStatus::Done => terminal_decision(
-            item,
-            task,
-            TaskBoardEvaluationOutcome::Completed,
-            TaskBoardStatus::Done,
-            TaskBoardWorkflowStatus::Completed,
-            "completed",
-            None,
-        ),
-        TaskStatus::Blocked => terminal_decision(
-            item,
-            task,
-            TaskBoardEvaluationOutcome::Blocked,
-            TaskBoardStatus::Failed,
-            TaskBoardWorkflowStatus::Failed,
-            "blocked",
-            Some(
-                task.blocked_reason
-                    .clone()
-                    .unwrap_or_else(|| "session task blocked".to_string()),
-            ),
-        ),
+        TaskStatus::Open => TaskBoardWorkItemState::Pending,
+        TaskStatus::InProgress => TaskBoardWorkItemState::Running,
+        TaskStatus::AwaitingReview => TaskBoardWorkItemState::AwaitingReview,
+        TaskStatus::InReview if changes_were_requested(task) => {
+            TaskBoardWorkItemState::ChangesRequested
+        }
+        TaskStatus::InReview => TaskBoardWorkItemState::InReview,
+        TaskStatus::Done => TaskBoardWorkItemState::Done,
+        TaskStatus::Blocked => TaskBoardWorkItemState::Blocked,
+    }
+}
+
+/// The reason a translated Session task carries into the record: whatever
+/// blocked it, or the review consensus that sent it back to the worker.
+#[must_use]
+pub fn work_item_reason_from_session_task(task: &WorkItem) -> Option<String> {
+    if task.status == TaskStatus::Blocked {
+        return Some(
+            task.blocked_reason
+                .clone()
+                .unwrap_or_else(|| "session task blocked".to_string()),
+        );
+    }
+    changes_were_requested(task)
+        .then(|| {
+            task.consensus
+                .as_ref()
+                .map(|consensus| consensus.summary.clone())
+        })
+        .flatten()
+        .filter(|summary| !summary.is_empty())
+}
+
+fn changes_were_requested(task: &WorkItem) -> bool {
+    task.consensus
+        .as_ref()
+        .is_some_and(|consensus| !matches!(consensus.verdict, ReviewVerdict::Approve))
+}
+
+/// The evaluation outcome one work-item state reports.
+#[must_use]
+pub fn outcome_for_work_item_state(state: TaskBoardWorkItemState) -> TaskBoardEvaluationOutcome {
+    match state {
+        TaskBoardWorkItemState::Pending => TaskBoardEvaluationOutcome::WorkerPending,
+        TaskBoardWorkItemState::Running => TaskBoardEvaluationOutcome::WorkerRunning,
+        TaskBoardWorkItemState::AwaitingReview => TaskBoardEvaluationOutcome::ReviewPending,
+        TaskBoardWorkItemState::InReview => TaskBoardEvaluationOutcome::ReviewRunning,
+        TaskBoardWorkItemState::ChangesRequested => {
+            TaskBoardEvaluationOutcome::ReviewChangesRequested
+        }
+        TaskBoardWorkItemState::Blocked => TaskBoardEvaluationOutcome::Blocked,
+        TaskBoardWorkItemState::Done => TaskBoardEvaluationOutcome::Completed,
+    }
+}
+
+/// Builds the evaluation record for one item straight from its durable
+/// progress, for an item that has no Session task to read.
+#[must_use]
+pub fn record_from_work_item_progress(
+    item: &TaskBoardItem,
+    progress: &TaskBoardWorkItemProgress,
+) -> TaskBoardEvaluationRecord {
+    TaskBoardEvaluationRecord {
+        board_item_id: item.id.clone(),
+        session_id: item.session_id.clone(),
+        work_item_id: item.work_item_id.clone(),
+        outcome: outcome_for_work_item_state(progress.state),
+        task_status: None,
+        board_status: Some(progress.state.board_status()),
+        workflow_status: Some(progress.state.workflow_status()),
+        work_item_state: Some(progress.state),
+        updated: false,
+        reason: progress.blocked_reason.clone(),
+        item: None,
     }
 }
 
@@ -187,30 +214,10 @@ pub fn skipped_unlinked_record(item: &TaskBoardItem) -> TaskBoardEvaluationRecor
         task_status: None,
         board_status: Some(item.status),
         workflow_status: Some(item.workflow.status),
+        work_item_state: None,
         updated: false,
         reason: Some("board item is not linked to a session task".to_string()),
         item: None,
-    }
-}
-
-#[must_use]
-pub fn record_from_decision(
-    item: &TaskBoardItem,
-    decision: &TaskBoardEvaluationDecision,
-    updated: bool,
-    updated_item: Option<TaskBoardItem>,
-) -> TaskBoardEvaluationRecord {
-    TaskBoardEvaluationRecord {
-        board_item_id: item.id.clone(),
-        session_id: item.session_id.clone(),
-        work_item_id: item.work_item_id.clone(),
-        outcome: decision.outcome,
-        task_status: Some(decision.task_status),
-        board_status: Some(decision.status),
-        workflow_status: Some(decision.workflow.status),
-        updated,
-        reason: decision.reason.clone(),
-        item: updated_item,
     }
 }
 
@@ -221,78 +228,6 @@ pub fn failed_workflow(item: &TaskBoardItem, step: &str, reason: String) -> Task
     workflow.current_step_id = Some(step.to_string());
     workflow.last_error = Some(reason);
     workflow
-}
-
-fn running_decision(
-    item: &TaskBoardItem,
-    task: &WorkItem,
-    outcome: TaskBoardEvaluationOutcome,
-    status: TaskBoardStatus,
-    step: &str,
-    reason: Option<String>,
-) -> TaskBoardEvaluationDecision {
-    terminal_decision(
-        item,
-        task,
-        outcome,
-        status,
-        TaskBoardWorkflowStatus::Running,
-        step,
-        reason,
-    )
-}
-
-fn pending_worker_step(item: &TaskBoardItem) -> &'static str {
-    if item.workflow.current_step_id.as_deref() == Some("awaiting_delivery") {
-        "awaiting_delivery"
-    } else {
-        "worker_pending"
-    }
-}
-
-fn in_review_decision(item: &TaskBoardItem, task: &WorkItem) -> TaskBoardEvaluationDecision {
-    if let Some(consensus) = &task.consensus
-        && !matches!(consensus.verdict, ReviewVerdict::Approve)
-    {
-        return running_decision(
-            item,
-            task,
-            TaskBoardEvaluationOutcome::ReviewChangesRequested,
-            TaskBoardStatus::InReview,
-            "review_changes_requested",
-            (!consensus.summary.is_empty()).then(|| consensus.summary.clone()),
-        );
-    }
-    running_decision(
-        item,
-        task,
-        TaskBoardEvaluationOutcome::ReviewRunning,
-        TaskBoardStatus::InReview,
-        "review",
-        None,
-    )
-}
-
-fn terminal_decision(
-    item: &TaskBoardItem,
-    task: &WorkItem,
-    outcome: TaskBoardEvaluationOutcome,
-    status: TaskBoardStatus,
-    workflow_status: TaskBoardWorkflowStatus,
-    step: &str,
-    reason: Option<String>,
-) -> TaskBoardEvaluationDecision {
-    let mut workflow = item.workflow.clone();
-    workflow.status = workflow_status;
-    workflow.current_step_id = Some(step.to_string());
-    workflow.last_error.clone_from(&reason);
-    TaskBoardEvaluationDecision {
-        outcome,
-        task_status: task.status,
-        status,
-        workflow,
-        reason,
-    }
 }
 
 fn missing_record(
@@ -310,6 +245,7 @@ fn missing_record(
         task_status: None,
         board_status: Some(TaskBoardStatus::Failed),
         workflow_status: Some(workflow.status),
+        work_item_state: None,
         updated: false,
         reason: Some(reason),
         item: None,
@@ -367,74 +303,30 @@ mod tests {
     }
 
     #[test]
-    fn completed_task_closes_board_workflow() {
-        let decision = evaluate_task_board_item(&item(), &task(TaskStatus::Done));
+    fn every_session_task_status_translates_to_a_work_item_state() {
+        let cases = [
+            (TaskStatus::Open, TaskBoardWorkItemState::Pending),
+            (TaskStatus::InProgress, TaskBoardWorkItemState::Running),
+            (
+                TaskStatus::AwaitingReview,
+                TaskBoardWorkItemState::AwaitingReview,
+            ),
+            (TaskStatus::InReview, TaskBoardWorkItemState::InReview),
+            (TaskStatus::Done, TaskBoardWorkItemState::Done),
+            (TaskStatus::Blocked, TaskBoardWorkItemState::Blocked),
+        ];
 
-        assert_completed_decision_outcome(&decision);
-        assert_completed_decision_workflow(&decision);
-    }
-
-    fn assert_completed_decision_outcome(decision: &TaskBoardEvaluationDecision) {
-        assert_eq!(decision.outcome, TaskBoardEvaluationOutcome::Completed);
-        assert_eq!(decision.status, TaskBoardStatus::Done);
-        assert_eq!(decision.workflow.status, TaskBoardWorkflowStatus::Completed);
-        assert_eq!(
-            decision.workflow.current_step_id.as_deref(),
-            Some("completed")
-        );
-    }
-
-    fn assert_completed_decision_workflow(decision: &TaskBoardEvaluationDecision) {
-        assert_eq!(
-            decision.workflow.execution_id.as_deref(),
-            Some("workflow-1")
-        );
-        assert_eq!(decision.workflow.attempts, 2);
-        assert_eq!(decision.workflow.policy_trace_ids, ["trace-1"]);
-        assert!(decision.workflow.last_error.is_none());
+        for (status, expected) in cases {
+            assert_eq!(
+                work_item_state_from_session_task(&task(status)),
+                expected,
+                "{status:?}"
+            );
+        }
     }
 
     #[test]
-    fn open_task_preserves_held_delivery_step() {
-        let mut item = item();
-        item.status = TaskBoardStatus::InProgress;
-        item.workflow.status = TaskBoardWorkflowStatus::Running;
-        item.workflow.current_step_id = Some("awaiting_delivery".to_string());
-
-        let decision = evaluate_task_board_item(&item, &task(TaskStatus::Open));
-
-        assert_eq!(decision.outcome, TaskBoardEvaluationOutcome::WorkerPending);
-        assert_eq!(decision.status, TaskBoardStatus::InProgress);
-        assert_eq!(decision.workflow.status, TaskBoardWorkflowStatus::Running);
-        assert_eq!(
-            decision.workflow.current_step_id.as_deref(),
-            Some("awaiting_delivery")
-        );
-    }
-
-    #[test]
-    fn blocked_task_marks_board_failed_with_reason() {
-        let mut task = task(TaskStatus::Blocked);
-        task.blocked_reason = Some("needs human decision".to_string());
-
-        let decision = evaluate_task_board_item(&item(), &task);
-
-        assert_eq!(decision.outcome, TaskBoardEvaluationOutcome::Blocked);
-        assert_eq!(decision.status, TaskBoardStatus::Failed);
-        assert_eq!(decision.workflow.status, TaskBoardWorkflowStatus::Failed);
-        assert_eq!(
-            decision.workflow.current_step_id.as_deref(),
-            Some("blocked")
-        );
-        assert_eq!(decision.reason.as_deref(), Some("needs human decision"));
-        assert_eq!(
-            decision.workflow.last_error.as_deref(),
-            Some("needs human decision")
-        );
-    }
-
-    #[test]
-    fn review_change_consensus_stays_in_review() {
+    fn a_review_asking_for_changes_returns_work_to_the_worker() {
         let mut task = task(TaskStatus::InReview);
         task.consensus = Some(ReviewConsensus {
             verdict: ReviewVerdict::RequestChanges,
@@ -444,18 +336,116 @@ mod tests {
             reviewer_agent_ids: vec!["reviewer-1".to_string()],
         });
 
-        let decision = evaluate_task_board_item(&item(), &task);
+        assert_eq!(
+            work_item_state_from_session_task(&task),
+            TaskBoardWorkItemState::ChangesRequested
+        );
+        assert_eq!(
+            work_item_reason_from_session_task(&task).as_deref(),
+            Some("Needs one fix")
+        );
+    }
+
+    #[test]
+    fn an_approving_review_leaves_the_work_item_in_review() {
+        let mut task = task(TaskStatus::InReview);
+        task.consensus = Some(ReviewConsensus {
+            verdict: ReviewVerdict::Approve,
+            summary: "Looks good".to_string(),
+            points: Vec::new(),
+            closed_at: "2026-05-14T00:01:00Z".to_string(),
+            reviewer_agent_ids: vec!["reviewer-1".to_string()],
+        });
 
         assert_eq!(
-            decision.outcome,
-            TaskBoardEvaluationOutcome::ReviewChangesRequested
+            work_item_state_from_session_task(&task),
+            TaskBoardWorkItemState::InReview
         );
-        assert_eq!(decision.status, TaskBoardStatus::InReview);
-        assert_eq!(decision.workflow.status, TaskBoardWorkflowStatus::Running);
+        assert!(work_item_reason_from_session_task(&task).is_none());
+    }
+
+    #[test]
+    fn a_blocked_task_carries_its_reason_across() {
+        let mut task = task(TaskStatus::Blocked);
+        task.blocked_reason = Some("needs a human decision".to_string());
+
         assert_eq!(
-            decision.workflow.current_step_id.as_deref(),
-            Some("review_changes_requested")
+            work_item_reason_from_session_task(&task).as_deref(),
+            Some("needs a human decision")
         );
-        assert_eq!(decision.reason.as_deref(), Some("Needs one fix"));
+    }
+
+    #[test]
+    fn a_blocked_task_without_a_reason_still_reports_one() {
+        assert_eq!(
+            work_item_reason_from_session_task(&task(TaskStatus::Blocked)).as_deref(),
+            Some("session task blocked")
+        );
+    }
+
+    #[test]
+    fn every_work_item_state_maps_to_an_evaluation_outcome() {
+        let cases = [
+            (
+                TaskBoardWorkItemState::Pending,
+                TaskBoardEvaluationOutcome::WorkerPending,
+            ),
+            (
+                TaskBoardWorkItemState::Running,
+                TaskBoardEvaluationOutcome::WorkerRunning,
+            ),
+            (
+                TaskBoardWorkItemState::AwaitingReview,
+                TaskBoardEvaluationOutcome::ReviewPending,
+            ),
+            (
+                TaskBoardWorkItemState::InReview,
+                TaskBoardEvaluationOutcome::ReviewRunning,
+            ),
+            (
+                TaskBoardWorkItemState::ChangesRequested,
+                TaskBoardEvaluationOutcome::ReviewChangesRequested,
+            ),
+            (
+                TaskBoardWorkItemState::Blocked,
+                TaskBoardEvaluationOutcome::Blocked,
+            ),
+            (
+                TaskBoardWorkItemState::Done,
+                TaskBoardEvaluationOutcome::Completed,
+            ),
+        ];
+
+        for (state, expected) in cases {
+            assert_eq!(outcome_for_work_item_state(state), expected, "{state:?}");
+        }
+    }
+
+    #[test]
+    fn a_record_built_from_progress_reports_the_durable_state() {
+        let item = item();
+        let mut progress = TaskBoardWorkItemProgress::new(
+            item.id.clone(),
+            "task-board-1".to_string(),
+            Some("workflow-1".to_string()),
+            "2026-05-14T00:00:00Z".to_string(),
+        );
+        progress.state = TaskBoardWorkItemState::Blocked;
+        progress.blocked_reason = Some("worktree unchanged".to_string());
+
+        let record = record_from_work_item_progress(&item, &progress);
+
+        assert_eq!(record.outcome, TaskBoardEvaluationOutcome::Blocked);
+        assert_eq!(record.board_status, Some(TaskBoardStatus::Failed));
+        assert_eq!(
+            record.workflow_status,
+            Some(TaskBoardWorkflowStatus::Failed)
+        );
+        assert_eq!(
+            record.work_item_state,
+            Some(TaskBoardWorkItemState::Blocked)
+        );
+        assert_eq!(record.task_status, None);
+        assert_eq!(record.reason.as_deref(), Some("worktree unchanged"));
     }
 }

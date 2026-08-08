@@ -169,10 +169,10 @@ pub use dispatch::{
     filter_for_local_machine, machine_mismatch_plan_with_policy_root,
 };
 pub use evaluation::{
-    EvaluationSignalFailure, TaskBoardEvaluationDecision, TaskBoardEvaluationOutcome,
-    TaskBoardEvaluationRecord, TaskBoardEvaluationSummary, evaluate_task_board_item,
-    failed_workflow, missing_session_record, missing_task_record, record_from_decision,
-    skipped_unlinked_record,
+    EvaluationSignalFailure, TaskBoardEvaluationOutcome, TaskBoardEvaluationRecord,
+    TaskBoardEvaluationSummary, failed_workflow, missing_session_record, missing_task_record,
+    outcome_for_work_item_state, record_from_work_item_progress, skipped_unlinked_record,
+    work_item_reason_from_session_task, work_item_state_from_session_task,
 };
 pub use git_identity_defaults::{
     TaskBoardEnvDefaults, TaskBoardGhCliDefaults, TaskBoardGitConfigDefaults,

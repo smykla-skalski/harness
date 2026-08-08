@@ -9,8 +9,10 @@ use sqlx::{Sqlite, Transaction, query, query_as};
 use uuid::Uuid;
 
 use super::ITEMS_CHANGE_SCOPE;
+use super::dispatch_admission_tx_ext::TaskBoardDispatchAdmissionTxExt;
 use super::item_tx_ext::TaskBoardItemTxExt;
 use super::items::bump_change_in_tx;
+use super::lane_order::{LaneTransitionKind, replace_with_lane_transition_in_tx};
 use super::work_item_progress_rows::load_progress_in_tx;
 use crate::daemon::db::prelude::*;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
@@ -258,11 +260,15 @@ async fn write_progress_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     progress: &TaskBoardWorkItemProgress,
 ) -> Result<(), CliError> {
+    // `worker_settled_at` is cleared alongside `completed_at`: reopening blocked
+    // work means the next settlement owes its own stop, and the table's own
+    // CHECK refuses a settlement time without a completion time anyway.
     query(
         "UPDATE task_board_work_item_progress
          SET execution_id = ?2, state = ?3, progress_percent = ?4, summary = ?5,
              blocked_reason = ?6, attempt_id = ?7, item_revision = ?8,
-             report_sequence = ?9, updated_at = ?10, completed_at = ?11
+             report_sequence = ?9, updated_at = ?10, completed_at = ?11,
+             worker_settled_at = CASE WHEN ?11 IS NULL THEN NULL ELSE worker_settled_at END
          WHERE work_item_id = ?1",
     )
     .bind(&progress.work_item_id)
@@ -294,12 +300,24 @@ async fn write_progress_in_tx(
 /// Writes the lane the record now implies onto the board item, in the same
 /// transaction. A projection that changes nothing skips the write so a pure
 /// checkpoint does not churn the item's revision or its change feed.
+///
+/// An item with a dispatch still in flight keeps its lane: dispatch owns the
+/// item's workflow stamp through that window, and projecting over it would
+/// fight the admission it is mid-way through writing. The record still advances
+/// - it is the authority - and the next report or dispatch completion lands the
+/// lane once the reservation clears.
 async fn project_item_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     item: TaskBoardItem,
     item_revision: i64,
     progress: &TaskBoardWorkItemProgress,
 ) -> Result<TaskBoardItem, CliError> {
+    if transaction
+        .has_active_dispatch_reservation_in_tx(&item.id)
+        .await?
+    {
+        return Ok(item);
+    }
     let mut projected = item.clone();
     projected.status = progress.state.board_status();
     projected.workflow = progress.project_workflow(&item.workflow);
@@ -310,11 +328,19 @@ async fn project_item_in_tx(
     transaction
         .apply_task_board_item_status_transition_in_tx(&projected)
         .await?;
-    transaction
-        .replace_item_in_tx(&projected, item_revision)
-        .await?;
+    // The lane writer owns the revision bump and the lane-transition record, so
+    // a projected move is indistinguishable from any other automatic one and a
+    // revision-fenced reader sees it.
+    let transition = if projected.status == item.status {
+        LaneTransitionKind::Generic
+    } else {
+        LaneTransitionKind::Automatic
+    };
+    let write =
+        replace_with_lane_transition_in_tx(transaction, item, item_revision, projected, transition)
+            .await?;
     bump_change_in_tx(transaction, ITEMS_CHANGE_SCOPE).await?;
-    Ok(projected)
+    Ok(write.item)
 }
 
 fn finish_result(
@@ -330,7 +356,7 @@ fn finish_result(
             current: progress, ..
         } => progress,
     };
-    let pending_worker_settlement = (progress.state.is_terminal() && worker_settled_at.is_none())
+    let pending_worker_settlement = (progress.state.is_settled() && worker_settled_at.is_none())
         .then(|| progress.attempt_id.clone())
         .flatten();
     TaskBoardWorkItemReportResult {

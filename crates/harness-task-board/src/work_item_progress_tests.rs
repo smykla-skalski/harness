@@ -151,16 +151,26 @@ fn repeated_report_cannot_move_settled_work_backward() {
 }
 
 #[test]
-fn blocked_work_is_settled_too() {
+fn blocked_work_settles_its_worker_without_freezing_the_record() {
     let blocked = applied(&progress(), &report(Some(TaskBoardWorkItemState::Blocked)));
 
-    let outcome = apply_work_item_report(&blocked, &report(Some(TaskBoardWorkItemState::Done)));
-
+    assert!(blocked.state.is_settled());
+    assert!(!blocked.state.is_terminal());
     assert_eq!(
-        outcome.rejection(),
-        Some(TaskBoardWorkItemReportRejection::Terminal)
+        blocked.completed_at.as_deref(),
+        Some("2026-08-08T00:01:00Z")
     );
-    assert_eq!(outcome.progress().state, TaskBoardWorkItemState::Blocked);
+}
+
+#[test]
+fn unblocking_reopens_the_record_and_drops_its_settlement_stamp() {
+    let blocked = applied(&progress(), &report(Some(TaskBoardWorkItemState::Blocked)));
+
+    let resumed = applied(&blocked, &report(Some(TaskBoardWorkItemState::Running)));
+
+    assert_eq!(resumed.state, TaskBoardWorkItemState::Running);
+    assert!(resumed.completed_at.is_none());
+    assert!(resumed.blocked_reason.is_none());
 }
 
 #[test]

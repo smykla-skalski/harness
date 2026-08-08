@@ -32,12 +32,25 @@ pub enum TaskBoardWorkItemState {
 }
 
 impl TaskBoardWorkItemState {
-    /// Whether the work item has settled. A settled work item never moves
-    /// again: a re-dispatch mints a new work item rather than reopening this
-    /// one, so a late or duplicated report has nothing legitimate to change.
+    /// Whether the worker behind this work item has stopped running. Both
+    /// completing and giving up settle it, and both owe the managed agent a
+    /// stop; only one of them freezes the record.
+    #[must_use]
+    pub const fn is_settled(self) -> bool {
+        matches!(self, Self::Blocked | Self::Done)
+    }
+
+    /// Whether the work item is frozen against further reports.
+    ///
+    /// Only completion freezes. Blocked work has stalled rather than finished:
+    /// a human unblocking it, or a legacy Session task moving back out of
+    /// `Blocked`, is a legitimate move the board has to follow. A completed
+    /// work item never moves again - a re-dispatch mints a new work item rather
+    /// than reopening this one - so a late or duplicated report has nothing
+    /// legitimate left to change.
     #[must_use]
     pub const fn is_terminal(self) -> bool {
-        matches!(self, Self::Blocked | Self::Done)
+        matches!(self, Self::Done)
     }
 
     /// The lane the board shows while the work item is in this state.
@@ -316,9 +329,12 @@ pub fn apply_work_item_report(
     overwrite_reported_fields(&mut updated, report);
     updated.blocked_reason = blocked_reason_for(&updated, report);
     push_checkpoint(&mut updated, report);
-    if updated.state.is_terminal() {
-        updated.completed_at = Some(report.recorded_at.clone());
-    }
+    // Reopening blocked work drops the settlement stamp with it, so the record
+    // never claims a stop time for a worker the board is about to run again.
+    updated.completed_at = updated
+        .state
+        .is_settled()
+        .then(|| report.recorded_at.clone());
     TaskBoardWorkItemReportOutcome::Applied(updated)
 }
 

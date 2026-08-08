@@ -265,6 +265,55 @@ async fn an_unfinished_stop_is_still_owed_after_a_repeat_report() {
 }
 
 #[tokio::test]
+async fn reopening_blocked_work_clears_its_settlement_and_owes_a_fresh_stop() {
+    let fixture = fixture().await;
+    seed_intent(&fixture, "dispatch-intent-1").await;
+    let mut blocked = request(&fixture, Some(TaskBoardWorkItemState::Blocked));
+    blocked.blocked_reason = Some("needs a human decision".to_string());
+    fixture
+        .db
+        .report_task_board_work_item_progress(&blocked)
+        .await
+        .expect("block the work item");
+    fixture
+        .db
+        .settle_task_board_work_item_worker(&fixture.work_item_id)
+        .await
+        .expect("settle the worker");
+
+    let resumed = fixture
+        .db
+        .report_task_board_work_item_progress(&request(
+            &fixture,
+            Some(TaskBoardWorkItemState::Running),
+        ))
+        .await
+        .expect("reopen the work item");
+
+    assert!(resumed.applied);
+    assert!(resumed.progress.completed_at.is_none());
+    assert!(resumed.pending_worker_settlement.is_none());
+    assert_eq!(resumed.item.status, TaskBoardStatus::InProgress);
+
+    let reblocked = fixture
+        .db
+        .report_task_board_work_item_progress(&blocked_again(&fixture))
+        .await
+        .expect("block the work item again");
+
+    assert_eq!(
+        reblocked.pending_worker_settlement.as_deref(),
+        Some("codex-dispatch-intent-1")
+    );
+}
+
+fn blocked_again(fixture: &Fixture) -> TaskBoardWorkItemReportRequest {
+    let mut request = request(fixture, Some(TaskBoardWorkItemState::Blocked));
+    request.blocked_reason = Some("still stuck".to_string());
+    request
+}
+
+#[tokio::test]
 async fn a_settled_item_never_leaves_its_terminal_lane() {
     let fixture = fixture().await;
     fixture
@@ -392,6 +441,16 @@ async fn reading_an_undispatched_item_returns_no_record() {
 #[tokio::test]
 async fn a_pure_checkpoint_does_not_churn_the_item_revision() {
     let fixture = fixture().await;
+    // Land the lane the record implies first: the fixture item still carries the
+    // dispatch step, so the first report legitimately moves it.
+    fixture
+        .db
+        .report_task_board_work_item_progress(&request(
+            &fixture,
+            Some(TaskBoardWorkItemState::Running),
+        ))
+        .await
+        .expect("land the lane");
     let before = fixture
         .db
         .task_board_item_snapshot(&fixture.item_id)
