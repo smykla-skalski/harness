@@ -16,6 +16,8 @@ extension PreviewHarnessClientTaskBoardTests {
     #expect(updated.lanePosition == 3)
     #expect(updated.laneOrigin == .manual(actor: "daemon-control"))
     #expect(updated.laneSetAt == "2026-07-22T14:00:00Z")
+    #expect(updated.workspaceId == "workspace-1")
+    #expect(updated.workingCopyId == "working-copy-1")
   }
 
   @Test("Preview client returns task board audit and catalog summaries")
@@ -163,6 +165,8 @@ extension PreviewHarnessClientTaskBoardTests {
       workflow: nil,
       sessionId: nil,
       workItemId: nil,
+      workspaceId: "workspace-1",
+      workingCopyId: "working-copy-1",
       usage: TaskBoardUsage(),
       lanePosition: lanePosition,
       laneOrigin: laneOrigin,

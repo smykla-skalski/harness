@@ -108,6 +108,8 @@ extension TaskBoardItem {
       workflow: wire.workflow.map(TaskBoardWorkflowState.init(wire:)),
       sessionId: wire.sessionId,
       workItemId: wire.workItemId,
+      workspaceId: wire.workspaceId,
+      workingCopyId: wire.workingCopyId,
       usage: TaskBoardUsage(wire: wire.usage),
       parentItemId: wire.parentItemId,
       childOrder: wire.childOrder,

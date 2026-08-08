@@ -22,6 +22,8 @@ extension TaskBoardItem {
     case workflow
     case sessionId
     case workItemId
+    case workspaceId
+    case workingCopyId
     case usage
     case parentItemId
     case childOrder
@@ -63,6 +65,8 @@ extension TaskBoardItem {
     self.workflow = try container.decodeIfPresent(TaskBoardWorkflowState.self, forKey: .workflow)
     self.sessionId = try container.decodeIfPresent(String.self, forKey: .sessionId)
     self.workItemId = try container.decodeIfPresent(String.self, forKey: .workItemId)
+    self.workspaceId = try container.decodeIfPresent(String.self, forKey: .workspaceId)
+    self.workingCopyId = try container.decodeIfPresent(String.self, forKey: .workingCopyId)
     self.usage = try container.decode(TaskBoardUsage.self, forKey: .usage)
     self.parentItemId = try container.decodeIfPresent(String.self, forKey: .parentItemId)
     self.childOrder = try container.decodeIfPresent(UInt32.self, forKey: .childOrder) ?? 0

@@ -41,7 +41,9 @@ extension HarnessMonitorStoreTaskBoardStatusUpdateTests {
     executionRepository: String? = nil,
     workflow: TaskBoardWorkflowState? = nil,
     sessionId: String? = nil,
-    workItemId: String? = nil
+    workItemId: String? = nil,
+    workspaceId: String? = nil,
+    workingCopyId: String? = nil
   ) -> TaskBoardItem {
     TaskBoardItem(
       schemaVersion: 1,
@@ -61,6 +63,8 @@ extension HarnessMonitorStoreTaskBoardStatusUpdateTests {
       workflow: workflow,
       sessionId: sessionId,
       workItemId: workItemId,
+      workspaceId: workspaceId,
+      workingCopyId: workingCopyId,
       usage: TaskBoardUsage(),
       lanePosition: lanePosition,
       laneOrigin: laneOrigin,

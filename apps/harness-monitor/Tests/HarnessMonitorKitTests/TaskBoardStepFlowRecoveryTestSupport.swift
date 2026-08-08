@@ -111,6 +111,8 @@ extension TaskBoardStepFlowRecoveryTests {
     TaskBoardDispatchAppliedTask(
       boardItemId: item.id,
       sessionId: item.sessionId ?? "session-1",
+      workspaceId: item.workspaceId,
+      workingCopyId: item.workingCopyId,
       workItemId: item.workItemId ?? "work-1",
       item: item
     )

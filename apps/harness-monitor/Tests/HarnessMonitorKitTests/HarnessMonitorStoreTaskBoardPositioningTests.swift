@@ -14,7 +14,9 @@ struct HarnessMonitorStoreTaskBoardPositioningTests {
         id: "moving",
         status: .todo,
         sourceProjectId: "project-source",
-        executionRepository: "acme/widget"
+        executionRepository: "acme/widget",
+        workspaceId: "workspace-1",
+        workingCopyId: "working-copy-1"
       ),
       taskBoardItem(id: "umbrella", status: .planning, kind: .umbrella),
       taskBoardItem(id: "anchor", status: .planning),
@@ -37,6 +39,10 @@ struct HarnessMonitorStoreTaskBoardPositioningTests {
       destination.items.first(where: { $0.id == "moving" })?.sourceProjectId == "project-source")
     #expect(
       destination.items.first(where: { $0.id == "moving" })?.executionRepository == "acme/widget"
+    )
+    #expect(destination.items.first(where: { $0.id == "moving" })?.workspaceId == "workspace-1")
+    #expect(
+      destination.items.first(where: { $0.id == "moving" })?.workingCopyId == "working-copy-1"
     )
     #expect(
       client.recordedCallsIgnoringProjectCatalogReads() == [
@@ -358,6 +364,8 @@ struct HarnessMonitorStoreTaskBoardPositioningTests {
     kind: TaskBoardItemKind = .task,
     sourceProjectId: String? = nil,
     executionRepository: String? = nil,
+    workspaceId: String? = nil,
+    workingCopyId: String? = nil,
     title: String? = nil
   ) -> TaskBoardItem {
     TaskBoardItem(
@@ -378,6 +386,8 @@ struct HarnessMonitorStoreTaskBoardPositioningTests {
       workflow: nil,
       sessionId: nil,
       workItemId: nil,
+      workspaceId: workspaceId,
+      workingCopyId: workingCopyId,
       usage: TaskBoardUsage(),
       lanePosition: nil,
       laneOrigin: nil,
