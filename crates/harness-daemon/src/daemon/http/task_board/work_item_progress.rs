@@ -10,6 +10,7 @@ use crate::daemon::protocol::{
     TaskBoardWorkItemProgressResponse, TaskBoardWorkItemReportRequest,
     TaskBoardWorkItemReportResponse, http_paths,
 };
+use harness_task_board_remote_viewer::project_task_board_work_item_progress;
 
 use super::super::DaemonHttpState;
 use super::super::response::timed_json;
@@ -32,11 +33,13 @@ pub(super) async fn get_task_board_item_progress(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
 ) -> Response {
-    let (start, request_id, _viewer) = match authenticated_task_board_read(&headers, &state) {
+    let (start, request_id, viewer) = match authenticated_task_board_read(&headers, &state) {
         Ok(parts) => parts,
         Err(response) => return *response,
     };
-    let result = task_board_route_executor::get_item_work_item_progress(&state, &item_id).await;
+    let result = task_board_route_executor::get_item_work_item_progress(&state, &item_id)
+        .await
+        .map(|response| project_task_board_work_item_progress(response, viewer));
     timed_json(
         "GET",
         http_paths::TASK_BOARD_ITEM_PROGRESS,

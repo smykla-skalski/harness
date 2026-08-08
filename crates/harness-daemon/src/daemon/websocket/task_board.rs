@@ -145,7 +145,7 @@ async fn dispatch_read_method(
             Some(read::dispatch_task_board_workflow_progress_get(request, state, connection).await)
         }
         ws_methods::TASK_BOARD_PROGRESS_GET => {
-            Some(read::dispatch_task_board_progress_get(request, state).await)
+            Some(read::dispatch_task_board_progress_get(request, state, connection).await)
         }
         ws_methods::TASK_BOARD_PROGRESS_REPORT => {
             Some(read::dispatch_task_board_progress_report(request, state).await)

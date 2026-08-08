@@ -11,7 +11,7 @@ use crate::work_item_progress::{
 /// The attempt identity and the work-item revision are deliberately absent: the
 /// daemon stamps both from the item's own dispatch, so a review handoff carries
 /// the attempt the board really started rather than one the worker named.
-#[derive(Debug, Clone, Default, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardWorkItemReportRequest {
     /// Who is reporting. Defaults to the control plane when omitted.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -34,7 +34,7 @@ pub struct TaskBoardWorkItemReportRequest {
 
 /// The RPC form of a report, which has to name its item in the payload because
 /// there is no path to carry it.
-#[derive(Debug, Clone, Default, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardWorkItemReportCommand {
     pub id: String,
     #[serde(flatten)]
@@ -42,7 +42,7 @@ pub struct TaskBoardWorkItemReportCommand {
 }
 
 /// The record after one report, and whether the report moved it.
-#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardWorkItemReportResponse {
     pub applied: bool,
     /// Why an unapplied report was ignored. A rejection is a visible no-op
@@ -56,7 +56,7 @@ pub struct TaskBoardWorkItemReportResponse {
 }
 
 /// The durable worker progress for one board item, absent until dispatch.
-#[derive(Debug, Clone, Default, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardWorkItemProgressResponse {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub progress: Option<TaskBoardWorkItemProgress>,
