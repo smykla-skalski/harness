@@ -106,6 +106,11 @@ fn normalized(value: &Value) -> Value {
     progress["work_item_id"] = json!("normalized-work-item");
     progress["created_at"] = json!("normalized-time");
     progress["updated_at"] = json!("normalized-time");
+    // Each item carries its own revision counter and the two parity items reach
+    // this point through their own mutation histories. That is board state, not
+    // a transport difference, the same reason `normalized_item` erases lane
+    // slots.
+    progress["item_revision"] = json!(0);
     if let Some(checkpoints) = progress
         .get_mut("checkpoints")
         .and_then(Value::as_array_mut)

@@ -246,8 +246,15 @@ async fn an_unchanged_review_handoff_schedules_nothing() {
         .await
         .expect("rerun the handoff");
 
-    assert!(repeat.updated, "a fresh sequence still advances the record");
-    assert!(should_materialize_reviewer_signal(&task, &repeat));
+    // The record still advances - every evaluation pass takes a fresh sequence -
+    // but the item is already in the review lane, so nothing moved and the
+    // reviewer is not signalled again. Without that distinction every pass over
+    // an awaiting-review item would re-spawn its reviewer.
+    assert!(
+        !repeat.updated,
+        "an unmoved item must not report as updated"
+    );
+    assert!(!should_materialize_reviewer_signal(&task, &repeat));
 }
 
 #[tokio::test]
