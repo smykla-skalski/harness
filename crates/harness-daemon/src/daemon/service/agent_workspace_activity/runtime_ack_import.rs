@@ -1,15 +1,13 @@
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use harness_agents::runtime;
-use harness_daemon_db_queries::AgentWorkspaceSignalAcknowledgment;
+use harness_daemon_db_queries::{AgentWorkspaceSignalAcknowledgment, AgentWorkspaceSignalRoute};
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_protocol::daemon::activity::AgentWorkspaceMemberActivityResponse;
 
 use super::super::sync_support::read_runtime_acknowledgments_async;
-use super::{
-    AsyncDaemonDbHandle, persist_durable_acknowledgment, prepare_activity_scope,
-    runtime_signal_session_id,
-};
+use super::{AsyncDaemonDbHandle, persist_durable_acknowledgment, prepare_activity_scope};
 use crate::daemon::db::prelude::*;
 
 pub(super) async fn reconcile_runtime_acknowledgments_for_read(
@@ -48,45 +46,39 @@ pub(super) async fn record_native_runtime_acknowledgment_from_session_route(
     else {
         return Ok(false);
     };
-    import_native_runtime_acknowledgment(
-        db,
-        &daemon_id,
-        &route.workspace_id,
-        &route.member_id,
-        signal_id,
-    )
-    .await?;
+    import_native_runtime_acknowledgment(db, &daemon_id, &route).await?;
     Ok(true)
 }
 
 async fn import_native_runtime_acknowledgment(
     db: &AsyncDaemonDbHandle,
     daemon_id: &str,
-    workspace_id: &str,
-    member_id: &str,
-    signal_id: &str,
+    route: &AgentWorkspaceSignalRoute,
 ) -> Result<(), CliError> {
     let activity = db
-        .load_agent_workspace_member_activity(daemon_id, workspace_id, member_id)
+        .load_agent_workspace_member_activity(daemon_id, &route.workspace_id, &route.member_id)
         .await?;
     let signal = activity
         .signals
         .iter()
-        .find(|record| record.signal.signal_id == signal_id)
+        .find(|record| record.signal.signal_id == route.signal_id)
         .ok_or_else(|| {
             CliErrorKind::workflow_io(format!(
-                "native signal '{signal_id}' disappeared from its durable route"
+                "native signal '{}' disappeared from its durable route",
+                route.signal_id
             ))
         })?;
     if signal.acknowledgment.is_some() {
         return Ok(());
     }
-    if !reconcile_runtime_acknowledgments(db, daemon_id, &activity, Some(signal_id)).await? {
+    let Some(acknowledgment) = read_route_acknowledgment(route).await? else {
         return Err(CliErrorKind::workflow_io(format!(
-            "native signal '{signal_id}' has no runtime acknowledgment to import"
+            "native signal '{}' has no runtime acknowledgment to import",
+            route.signal_id
         ))
         .into());
-    }
+    };
+    persist_acknowledgment(db, daemon_id, route, acknowledgment).await?;
     Ok(())
 }
 
@@ -102,54 +94,88 @@ async fn reconcile_runtime_acknowledgments(
     }) {
         return Ok(false);
     }
-    let target = db
-        .load_agent_workspace_signal_cleanup_target(
+    let routes = db
+        .load_pending_agent_workspace_signal_routes(
             daemon_id,
             &response.workspace_id,
             &response.member_id,
         )
         .await?;
-    let runtime = runtime::runtime_for_name(&target.runtime).ok_or_else(|| {
-        CliErrorKind::workflow_io(format!(
-            "runtime '{}' cannot import durable acknowledgments",
-            target.runtime
-        ))
-    })?;
-    let signal_session_id = runtime_signal_session_id(&target);
-    let mut acknowledgments = read_runtime_acknowledgments_async(
-        runtime,
-        PathBuf::from(&target.project_dir),
-        signal_session_id,
-        "durable agent activity",
-    )
-    .await?;
-    acknowledgments.sort_by(|left, right| {
-        (&left.acknowledged_at, &left.signal_id).cmp(&(&right.acknowledged_at, &right.signal_id))
-    });
-    let mut changed = false;
-    for acknowledgment in acknowledgments {
-        let is_pending = response.signals.iter().any(|record| {
-            record.signal.signal_id == acknowledgment.signal_id
-                && record.acknowledgment.is_none()
-                && signal_filter.is_none_or(|filter| acknowledgment.signal_id == filter)
-        });
-        if !is_pending {
+    let mut routes_by_runtime = BTreeMap::new();
+    for route in routes {
+        if signal_filter.is_some_and(|filter| route.signal_id != filter) {
             continue;
         }
-        persist_durable_acknowledgment(
-            db,
-            daemon_id,
-            &response.workspace_id,
-            &response.member_id,
-            &AgentWorkspaceSignalAcknowledgment {
-                signal_id: acknowledgment.signal_id,
-                result: acknowledgment.result,
-                details: acknowledgment.details,
-                acknowledged_at: Some(acknowledgment.acknowledged_at),
-            },
-        )
-        .await?;
-        changed = true;
+        routes_by_runtime
+            .entry((
+                route.runtime.clone(),
+                route.runtime_session_id.clone(),
+                route.project_dir.clone(),
+            ))
+            .or_insert_with(BTreeMap::new)
+            .insert(route.signal_id.clone(), route);
+    }
+    let mut changed = false;
+    for routes in routes_by_runtime.into_values() {
+        let Some(sample_route) = routes.values().next() else {
+            continue;
+        };
+        for acknowledgment in read_route_acknowledgments(sample_route).await? {
+            let Some(route) = routes.get(&acknowledgment.signal_id) else {
+                continue;
+            };
+            persist_acknowledgment(db, daemon_id, route, acknowledgment).await?;
+            changed = true;
+        }
     }
     Ok(changed)
+}
+
+async fn read_route_acknowledgment(
+    route: &AgentWorkspaceSignalRoute,
+) -> Result<Option<harness_protocol::agent::SignalAck>, CliError> {
+    Ok(read_route_acknowledgments(route)
+        .await?
+        .into_iter()
+        .find(|acknowledgment| acknowledgment.signal_id == route.signal_id))
+}
+
+async fn read_route_acknowledgments(
+    route: &AgentWorkspaceSignalRoute,
+) -> Result<Vec<harness_protocol::agent::SignalAck>, CliError> {
+    let runtime = runtime::runtime_for_name(&route.runtime).ok_or_else(|| {
+        CliErrorKind::workflow_io(format!(
+            "runtime '{}' cannot import durable acknowledgments",
+            route.runtime
+        ))
+    })?;
+    read_runtime_acknowledgments_async(
+        runtime,
+        PathBuf::from(&route.project_dir),
+        route.runtime_session_id.clone(),
+        "durable agent activity",
+    )
+    .await
+}
+
+async fn persist_acknowledgment(
+    db: &AsyncDaemonDbHandle,
+    daemon_id: &str,
+    route: &AgentWorkspaceSignalRoute,
+    acknowledgment: harness_protocol::agent::SignalAck,
+) -> Result<(), CliError> {
+    persist_durable_acknowledgment(
+        db,
+        daemon_id,
+        &route.workspace_id,
+        &route.member_id,
+        &AgentWorkspaceSignalAcknowledgment {
+            signal_id: acknowledgment.signal_id,
+            result: acknowledgment.result,
+            details: acknowledgment.details,
+            acknowledged_at: Some(acknowledgment.acknowledged_at),
+        },
+    )
+    .await
+    .map(|_| ())
 }

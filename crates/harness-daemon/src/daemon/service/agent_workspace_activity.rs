@@ -20,8 +20,8 @@ mod wake_delivery;
 
 use runtime_delivery::{
     persist_durable_acknowledgment, persist_runtime_acknowledgment, record_failed_signal_delivery,
-    runtime_acknowledgment, runtime_signal_session_id, scoped_signal_idempotency_key,
-    settle_expired_runtime_signal, settle_runtime_acknowledgment, write_runtime_signal,
+    runtime_acknowledgment, scoped_signal_idempotency_key, settle_expired_runtime_signal,
+    settle_runtime_acknowledgment, write_runtime_signal,
 };
 use wake_delivery::wake_managed_agent;
 
@@ -122,30 +122,35 @@ pub(crate) async fn send_agent_workspace_signal_async(
         &request.idempotency_key,
     ));
     let insertion = db
-        .insert_agent_workspace_signal(
+        .insert_agent_workspace_signal(&daemon_id, workspace_id, member_id, &target, &signal)
+        .await?;
+    if !insertion.inserted && insertion.record.acknowledgment.is_some() {
+        return Ok(insertion.record);
+    }
+    let target = if insertion.inserted {
+        target
+    } else {
+        stored_delivery_target(
+            db,
+            &daemon_id,
+            &target,
+            workspace_id,
+            member_id,
+            &insertion.record.signal.signal_id,
+        )
+        .await?
+    };
+    if !insertion.inserted && insertion.record.status == SessionSignalStatus::Expired {
+        let acknowledgment =
+            settle_expired_runtime_signal(&target, &insertion.record.signal).await?;
+        return persist_runtime_acknowledgment(
+            db,
             &daemon_id,
             workspace_id,
             member_id,
-            &target.runtime,
-            &signal,
+            &acknowledgment,
         )
-        .await?;
-    if !insertion.inserted {
-        if insertion.record.acknowledgment.is_some() {
-            return Ok(insertion.record);
-        }
-        if insertion.record.status == SessionSignalStatus::Expired {
-            let acknowledgment =
-                settle_expired_runtime_signal(&target, &insertion.record.signal).await?;
-            return persist_runtime_acknowledgment(
-                db,
-                &daemon_id,
-                workspace_id,
-                member_id,
-                &acknowledgment,
-            )
-            .await;
-        }
+        .await;
     }
     let record = insertion.record;
     let runtime_state = match write_runtime_signal(&target, &record.signal).await {
@@ -173,6 +178,37 @@ pub(crate) async fn send_agent_workspace_signal_async(
                 .await
         }
     }
+}
+
+async fn stored_delivery_target(
+    db: &AsyncDaemonDbHandle,
+    daemon_id: &str,
+    current: &harness_daemon_db_queries::AgentWorkspaceSignalTarget,
+    workspace_id: &str,
+    member_id: &str,
+    signal_id: &str,
+) -> Result<harness_daemon_db_queries::AgentWorkspaceSignalTarget, CliError> {
+    let route = db
+        .load_pending_agent_workspace_signal_routes(daemon_id, workspace_id, member_id)
+        .await?
+        .into_iter()
+        .find(|route| route.signal_id == signal_id)
+        .ok_or_else(|| {
+            CliErrorKind::workflow_io(format!(
+                "native signal '{signal_id}' has no persisted delivery route"
+            ))
+        })?;
+    Ok(harness_daemon_db_queries::AgentWorkspaceSignalTarget {
+        workspace_id: route.workspace_id,
+        member_id: route.member_id,
+        runtime: route.runtime,
+        managed_agent_kind: current.managed_agent_kind.clone(),
+        managed_agent_id: current.managed_agent_id.clone(),
+        runtime_session_id: Some(route.runtime_session_id),
+        project_dir: route.project_dir,
+        source_session_id: Some(route.source_session_id),
+        source_agent_id: Some(route.source_agent_id),
+    })
 }
 
 /// Record an acknowledgment addressed by workspace and durable member.

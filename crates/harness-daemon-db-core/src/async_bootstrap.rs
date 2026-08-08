@@ -141,6 +141,8 @@ const fn migration_effect_column(migration_version: i64) -> Option<(&'static str
         69 => Some(("task_board_items", "workspace_id")),
         72 => Some(("agent_workspace_signals", "idempotency_key")),
         74 => Some(("agent_workspace_signals", "wake_claimed_at")),
+        76 => Some(("agent_workspace_signals", "delivery_runtime_session_id")),
+        77 => Some(("agent_workspace_signals", "delivery_project_dir")),
         _ => None,
     }
 }
@@ -236,6 +238,8 @@ const fn migration_floor_version(migration_version: i64) -> u64 {
         71 => 66,
         // v67 adds signal idempotency and a managed-agent wake claim, then stamps the schema.
         72..=75 => 67,
+        // v68 snapshots the exact runtime route used for each native signal.
+        76..=79 => 68,
         _ => u64::MAX,
     }
 }

@@ -121,6 +121,8 @@ const CURRENT_SCHEMA_RUN_COLUMNS: &[(&str, &str)] = &[
     ("task_board_ai_review_reports", "actual_runtime"),
     ("agent_workspace_signals", "idempotency_key"),
     ("agent_workspace_signals", "wake_claimed_at"),
+    ("agent_workspace_signals", "delivery_runtime_session_id"),
+    ("agent_workspace_signals", "delivery_project_dir"),
 ];
 
 const DEPRECATED_SCHEMA_POLICY_COLUMNS: &[(&str, &str)] =

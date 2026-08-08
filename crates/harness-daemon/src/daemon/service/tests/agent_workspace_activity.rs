@@ -32,6 +32,24 @@ fn workspace_signal_delivery_and_runtime_ack_do_not_require_a_session_route() {
     });
 }
 
+#[test]
+fn delayed_native_ack_uses_original_delivery_after_session_rebind() {
+    with_temp_project(|project| {
+        temp_env::with_var(
+            "CODEX_SESSION_ID",
+            Some("workspace-activity-worker"),
+            || {
+                let runtime = tokio::runtime::Runtime::new().expect("runtime");
+                runtime.block_on(async {
+                    let fixture = seed_workspace_activity_member(project).await;
+                    native_ack_route::assert_delayed_ack_after_session_rebind(project, &fixture)
+                        .await;
+                });
+            },
+        );
+    });
+}
+
 struct WorkspaceActivityFixture {
     db: AsyncDaemonDbHandle,
     session_id: &'static str,

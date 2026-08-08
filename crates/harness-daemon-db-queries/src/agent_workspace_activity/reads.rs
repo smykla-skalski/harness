@@ -47,6 +47,7 @@ struct SignalRow {
     status: String,
     signal_json: String,
     ack_json: Option<String>,
+    origin_kind: String,
     source_session_id: Option<String>,
     source_agent_id: Option<String>,
 }
@@ -150,7 +151,7 @@ pub(super) async fn load_member_activity(
     .map(ConversationRow::into_record)
     .collect::<Result<Vec<_>, _>>()?;
     let signals = query_as::<_, SignalRow>(
-        "SELECT workspace_id, member_id, runtime, status, signal_json, ack_json,
+        "SELECT workspace_id, member_id, runtime, status, signal_json, ack_json, origin_kind,
                 source_session_id, source_agent_id
          FROM agent_workspace_signals
          WHERE workspace_id = ?1 AND member_id = ?2
@@ -184,7 +185,7 @@ pub(super) async fn load_signal_record(
     signal_id: &str,
 ) -> Result<AgentWorkspaceSignalRecord, CliError> {
     query_as::<_, SignalRow>(
-        "SELECT workspace_id, member_id, runtime, status, signal_json, ack_json,
+        "SELECT workspace_id, member_id, runtime, status, signal_json, ack_json, origin_kind,
                 source_session_id, source_agent_id
          FROM agent_workspace_signals
          WHERE workspace_id = ?1 AND member_id = ?2 AND signal_id = ?3",
@@ -387,6 +388,11 @@ impl SignalRow {
             .map(|json| parse_json(json, "durable signal acknowledgment"))
             .transpose()?;
         let stored = parse_signal_status(&self.status)?;
+        let (legacy_session_id, legacy_agent_id) = if self.origin_kind == "legacy" {
+            (self.source_session_id, self.source_agent_id)
+        } else {
+            (None, None)
+        };
         Ok(AgentWorkspaceSignalRecord {
             workspace_id: self.workspace_id,
             member_id: self.member_id.clone(),
@@ -398,8 +404,8 @@ impl SignalRow {
             status: derive_effective_signal_status(stored, &signal),
             signal,
             acknowledgment,
-            legacy_session_id: self.source_session_id,
-            legacy_agent_id: self.source_agent_id,
+            legacy_session_id,
+            legacy_agent_id,
         })
     }
 }

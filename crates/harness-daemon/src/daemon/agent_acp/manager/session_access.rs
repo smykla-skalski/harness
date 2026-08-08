@@ -33,6 +33,7 @@ pub struct AcpWakePrompt {
     pub project_dir: PathBuf,
     pub prompt: String,
     pub signal_id: String,
+    pub signal_expires_at: String,
     pub agent_id: String,
     pub workspace_id: Option<String>,
     pub member_id: Option<String>,
@@ -236,6 +237,7 @@ fn run_wake_prompt(
         project_dir,
         prompt: prompt_text,
         signal_id,
+        signal_expires_at,
         agent_id,
         workspace_id,
         member_id,
@@ -276,6 +278,7 @@ fn run_wake_prompt(
                 &signal_session_id,
                 &signal_dir,
                 &signal_id,
+                &signal_expires_at,
                 &agent_id,
                 &acp_id,
             ) {
@@ -371,13 +374,18 @@ fn record_wake_accept(
     signal_session_id: &str,
     signal_dir: &Path,
     signal_id: &str,
+    signal_expires_at: &str,
     agent_id: &str,
     acp_id: &str,
 ) -> Option<SignalAck> {
     let ack = SignalAck {
         signal_id: signal_id.to_string(),
         acknowledged_at: utc_now(),
-        result: AckResult::Accepted,
+        result: if harness_session::service::signal_is_expired(signal_expires_at) {
+            AckResult::Expired
+        } else {
+            AckResult::Accepted
+        },
         agent: signal_session_id.to_string(),
         session_id: orchestration_session_id.to_string(),
         details: Some("acp wake prompt acknowledged via session/prompt".into()),

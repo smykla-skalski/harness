@@ -102,6 +102,7 @@ fn wake_acp(
             project_dir: PathBuf::from(&target.project_dir),
             prompt: prompt.to_string(),
             signal_id: signal.signal_id.clone(),
+            signal_expires_at: signal.expires_at.clone(),
             agent_id: target.member_id.clone(),
             workspace_id: Some(target.workspace_id.clone()),
             member_id: Some(target.member_id.clone()),

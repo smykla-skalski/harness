@@ -11,6 +11,7 @@ use sqlx::{Sqlite, Transaction};
 
 mod reads;
 mod reconcile;
+mod signal_routes;
 mod signals;
 mod types;
 
@@ -76,6 +77,17 @@ pub trait AsyncAgentWorkspaceActivityQueries: Send + Sync {
         signal_id: &str,
     ) -> impl Future<Output = Result<Option<AgentWorkspaceSignalRoute>, CliError>> + Send;
 
+    /// Load each pending native signal's immutable runtime delivery route.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when the member scope or route data cannot be read.
+    fn load_pending_agent_workspace_signal_routes(
+        &self,
+        daemon_id: &str,
+        workspace_id: &str,
+        member_id: &str,
+    ) -> impl Future<Output = Result<Vec<AgentWorkspaceSignalRoute>, CliError>> + Send;
+
     /// Persist a workspace-owned signal before runtime delivery.
     ///
     /// # Errors
@@ -85,7 +97,7 @@ pub trait AsyncAgentWorkspaceActivityQueries: Send + Sync {
         daemon_id: &str,
         workspace_id: &str,
         member_id: &str,
-        runtime: &str,
+        target: &AgentWorkspaceSignalTarget,
         signal: &harness_protocol::agent::Signal,
     ) -> impl Future<Output = Result<AgentWorkspaceSignalInsertion, CliError>> + Send;
 
@@ -199,7 +211,7 @@ impl AsyncAgentWorkspaceActivityQueries for AsyncDaemonDb {
         signal_id: &str,
     ) -> Result<Option<AgentWorkspaceSignalRoute>, CliError> {
         let mut transaction = begin_activity_transaction(self, "signal route read").await?;
-        let route = signals::load_signal_route(
+        let route = signal_routes::load_signal_route(
             &mut transaction,
             daemon_id,
             source_session_id,
@@ -211,18 +223,33 @@ impl AsyncAgentWorkspaceActivityQueries for AsyncDaemonDb {
         Ok(route)
     }
 
+    async fn load_pending_agent_workspace_signal_routes(
+        &self,
+        daemon_id: &str,
+        workspace_id: &str,
+        member_id: &str,
+    ) -> Result<Vec<AgentWorkspaceSignalRoute>, CliError> {
+        let mut transaction = begin_activity_transaction(self, "pending signal route read").await?;
+        ensure_workspace_scope(&mut transaction, daemon_id, workspace_id).await?;
+        let routes =
+            signal_routes::load_pending_signal_routes(&mut transaction, workspace_id, member_id)
+                .await?;
+        commit_activity_transaction(transaction, "pending signal route read").await?;
+        Ok(routes)
+    }
+
     async fn insert_agent_workspace_signal(
         &self,
         daemon_id: &str,
         workspace_id: &str,
         member_id: &str,
-        runtime: &str,
+        target: &AgentWorkspaceSignalTarget,
         signal: &harness_protocol::agent::Signal,
     ) -> Result<AgentWorkspaceSignalInsertion, CliError> {
         let mut transaction = begin_activity_transaction(self, "signal insert").await?;
         ensure_workspace_scope(&mut transaction, daemon_id, workspace_id).await?;
         let insertion =
-            signals::insert_signal(&mut transaction, workspace_id, member_id, runtime, signal)
+            signals::insert_signal(&mut transaction, workspace_id, member_id, target, signal)
                 .await?;
         commit_activity_transaction(transaction, "signal insert").await?;
         Ok(insertion)

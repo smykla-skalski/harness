@@ -36,9 +36,14 @@ async fn signal_wake_claim_is_a_tokenized_lease() {
         &member_id,
         NOW,
     );
+    let target = fixture
+        .db
+        .load_agent_workspace_signal_target(DAEMON_ID, &workspace_id, &member_id)
+        .await
+        .expect("load signal wake target");
     fixture
         .db
-        .insert_agent_workspace_signal(DAEMON_ID, &workspace_id, &member_id, "codex", &signal)
+        .insert_agent_workspace_signal(DAEMON_ID, &workspace_id, &member_id, &target, &signal)
         .await
         .expect("insert signal for wake claim");
 
