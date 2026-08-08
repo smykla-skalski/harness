@@ -4,7 +4,7 @@ use tempfile::{TempDir, tempdir};
 
 use super::item_core_queries::ItemCoreQueries;
 use super::work_item_progress::TaskBoardWorkItemReportRequest;
-use super::work_item_progress_queries::WorkItemProgressQueries;
+use super::work_item_progress_queries::{TaskBoardRuntimeTerminalReport, WorkItemProgressQueries};
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::task_board::{
@@ -247,7 +247,10 @@ async fn completion_settles_the_item_and_owes_one_worker_stop() {
     );
     assert!(result.progress.completed_at.is_some());
     assert_eq!(
-        result.pending_worker_settlement.as_deref(),
+        result
+            .pending_worker_settlement
+            .as_ref()
+            .map(|settlement| settlement.worker_id.as_str()),
         Some("codex-dispatch-intent-1")
     );
 }
@@ -266,6 +269,31 @@ async fn workflow_owned_completion_requires_the_workflow_result_contract() {
         ))
         .await
         .expect_err("workflow-owned completion must be refused");
+
+    assert!(error.to_string().contains("workflow result contract"));
+}
+
+#[tokio::test]
+async fn prepared_workflow_owns_terminal_progress_before_its_execution_row_exists() {
+    let fixture = fixture().await;
+    seed_intent(&fixture, "dispatch-intent-prepared-workflow").await;
+    query(
+        "UPDATE task_board_dispatch_intents
+         SET payload_json = '{\"write_workflow\":{}}'
+         WHERE intent_id = 'dispatch-intent-prepared-workflow'",
+    )
+    .execute(fixture.db.pool())
+    .await
+    .expect("mark intent as workflow-owned");
+
+    let error = fixture
+        .db
+        .report_task_board_work_item_progress(&request(
+            &fixture,
+            Some(TaskBoardWorkItemState::Done),
+        ))
+        .await
+        .expect_err("prepared workflow terminal report must be refused");
 
     assert!(error.to_string().contains("workflow result contract"));
 }
@@ -329,13 +357,16 @@ async fn an_unfinished_stop_is_still_owed_after_a_repeat_report() {
 
     assert!(!repeat.applied);
     assert_eq!(
-        repeat.pending_worker_settlement.as_deref(),
+        repeat
+            .pending_worker_settlement
+            .as_ref()
+            .map(|settlement| settlement.worker_id.as_str()),
         Some("codex-dispatch-intent-1")
     );
 }
 
 #[tokio::test]
-async fn reopening_blocked_work_clears_its_settlement_and_owes_a_fresh_stop() {
+async fn blocked_work_requires_a_new_dispatch_before_it_can_run_again() {
     let fixture = fixture().await;
     seed_intent(&fixture, "dispatch-intent-1").await;
     let mut blocked = request(&fixture, Some(TaskBoardWorkItemState::Blocked));
@@ -358,27 +389,51 @@ async fn reopening_blocked_work_clears_its_settlement_and_owes_a_fresh_stop() {
             Some(TaskBoardWorkItemState::Running),
         ))
         .await
-        .expect("reopen the work item");
+        .expect("refuse reopening the work item");
 
-    assert!(resumed.applied);
-    assert!(resumed.progress.completed_at.is_none());
-    assert!(resumed.pending_worker_settlement.is_none());
-    assert_eq!(resumed.item.status, TaskBoardStatus::InProgress);
-
-    let reblocked = fixture
-        .db
-        .report_task_board_work_item_progress(&blocked_again(&fixture))
-        .await
-        .expect("block the work item again");
-
+    assert!(!resumed.applied);
     assert_eq!(
-        reblocked.pending_worker_settlement.as_deref(),
-        Some("codex-dispatch-intent-1")
+        resumed.rejection,
+        Some(TaskBoardWorkItemReportRejection::Terminal)
     );
+    assert!(resumed.progress.completed_at.is_some());
+    assert!(resumed.pending_worker_settlement.is_none());
+    assert_eq!(resumed.item.status, TaskBoardStatus::Failed);
 }
 
-fn blocked_again(fixture: &Fixture) -> TaskBoardWorkItemReportRequest {
-    let mut request = request(fixture, Some(TaskBoardWorkItemState::Blocked));
-    request.blocked_reason = Some("still stuck".to_string());
-    request
+#[tokio::test]
+async fn worker_settlement_uses_the_dispatch_time_agent_mode() {
+    let fixture = fixture().await;
+    seed_intent(&fixture, "dispatch-intent-1").await;
+    fixture
+        .db
+        .report_task_board_work_item_progress(&request(
+            &fixture,
+            Some(TaskBoardWorkItemState::Running),
+        ))
+        .await
+        .expect("start progress");
+    fixture
+        .db
+        .update_task_board_item(&fixture.item_id, |item| {
+            item.agent_mode = AgentMode::Interactive;
+            Ok(true)
+        })
+        .await
+        .expect("change mutable item mode");
+
+    let result = fixture
+        .db
+        .report_task_board_work_item_progress(&request(
+            &fixture,
+            Some(TaskBoardWorkItemState::Done),
+        ))
+        .await
+        .expect("settle progress");
+
+    let settlement = result
+        .pending_worker_settlement
+        .expect("worker stop remains due");
+    assert_eq!(settlement.agent_mode, AgentMode::Headless);
+    assert_eq!(settlement.worker_id, "codex-dispatch-intent-1");
 }

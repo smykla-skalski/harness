@@ -35,6 +35,6 @@ pub(crate) use super::remote_source_bundle_queries::RemoteSourceBundleQueries;
 pub(crate) use super::scheduler::queries::TaskBoardAutomationSchedulerQueries;
 pub(crate) use super::triage_queries::TriageQueries;
 pub(crate) use super::work_item_progress_queries::{
-    TaskBoardPendingWorkerSettlement, WorkItemProgressQueries,
+    TaskBoardPendingWorkerSettlement, TaskBoardRuntimeTerminalReport, WorkItemProgressQueries,
 };
 pub(crate) use super::workflow_execution_queries::WorkflowExecutionQueries;

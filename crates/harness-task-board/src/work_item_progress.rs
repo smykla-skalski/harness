@@ -12,6 +12,8 @@ use super::types::{TaskBoardStatus, TaskBoardWorkflowState, TaskBoardWorkflowSta
 /// Longest checkpoint summary the board keeps. A worker that reports a whole
 /// transcript would otherwise grow the row without bound.
 pub const TASK_BOARD_WORK_ITEM_SUMMARY_LIMIT: usize = 2_000;
+/// Largest report fence representable by the durable `SQLite` row.
+pub const TASK_BOARD_WORK_ITEM_REPORT_SEQUENCE_MAX: u64 = i64::MAX as u64;
 
 /// Where a dispatched work item stands, owned by the board rather than by a
 /// Session task.
@@ -52,15 +54,12 @@ impl TaskBoardWorkItemState {
 
     /// Whether the work item is frozen against further reports.
     ///
-    /// Only completion freezes. Blocked work has stalled rather than finished:
-    /// a human unblocking it, or a legacy Session task moving back out of
-    /// `Blocked`, is a legitimate move the board has to follow. A completed
-    /// work item never moves again - a re-dispatch mints a new work item rather
-    /// than reopening this one - so a late or duplicated report has nothing
-    /// legitimate left to change.
+    /// Both terminal outcomes stop the worker. Resuming either one would need
+    /// a new worker, so re-dispatch mints a new work item instead of reopening
+    /// a record whose managed worker has already been settled.
     #[must_use]
     pub const fn is_terminal(self) -> bool {
-        matches!(self, Self::Done)
+        self.is_settled()
     }
 
     /// The lane the board shows while the work item is in this state.
@@ -261,6 +260,8 @@ pub enum TaskBoardWorkItemReportRejection {
     Terminal,
     /// The report's ordering fence is not newer than the recorded one.
     StaleSequence,
+    /// No representable ordering fence remains for another non-terminal report.
+    SequenceExhausted,
 }
 
 impl TaskBoardWorkItemReportRejection {
@@ -269,6 +270,7 @@ impl TaskBoardWorkItemReportRejection {
         match self {
             Self::Terminal => "work item already settled; report ignored",
             Self::StaleSequence => "report is older than the recorded progress; report ignored",
+            Self::SequenceExhausted => "work item report sequence is exhausted; report ignored",
         }
     }
 }
@@ -311,10 +313,10 @@ impl TaskBoardWorkItemReportOutcome {
 
 /// Applies one worker report to the durable record.
 ///
-/// Two rules keep repeated and out-of-order reports honest, and they are the
-/// only ones: a settled work item is frozen, and a report must carry an
-/// ordering fence newer than the recorded one. Everything else - including a
-/// reviewer sending the work back to the worker - is a legitimate move.
+/// A settled work item is frozen, a report must carry a newer ordering fence,
+/// and only an implicit terminal report may consume the final durable fence.
+/// Everything else - including a reviewer sending the work back to the worker
+/// - is a legitimate move.
 #[must_use]
 pub fn apply_work_item_report(
     current: &TaskBoardWorkItemProgress,
@@ -326,11 +328,35 @@ pub fn apply_work_item_report(
             rejection: TaskBoardWorkItemReportRejection::Terminal,
         };
     }
-    let sequence = report.sequence.unwrap_or(current.report_sequence + 1);
+    let Some(sequence) = report
+        .sequence
+        .or_else(|| current.report_sequence.checked_add(1))
+    else {
+        return TaskBoardWorkItemReportOutcome::Ignored {
+            current: current.clone(),
+            rejection: TaskBoardWorkItemReportRejection::SequenceExhausted,
+        };
+    };
     if sequence <= current.report_sequence {
         return TaskBoardWorkItemReportOutcome::Ignored {
             current: current.clone(),
             rejection: TaskBoardWorkItemReportRejection::StaleSequence,
+        };
+    }
+    let next_state = report.state.unwrap_or_else(|| {
+        if promotes_to_running(current.state) {
+            TaskBoardWorkItemState::Running
+        } else {
+            current.state
+        }
+    });
+    let consumes_terminal_fence = report.sequence.is_none()
+        && sequence == TASK_BOARD_WORK_ITEM_REPORT_SEQUENCE_MAX
+        && next_state.is_terminal();
+    if sequence >= TASK_BOARD_WORK_ITEM_REPORT_SEQUENCE_MAX && !consumes_terminal_fence {
+        return TaskBoardWorkItemReportOutcome::Ignored {
+            current: current.clone(),
+            rejection: TaskBoardWorkItemReportRejection::SequenceExhausted,
         };
     }
     let mut updated = current.clone();
@@ -339,8 +365,6 @@ pub fn apply_work_item_report(
     overwrite_reported_fields(&mut updated, report);
     updated.blocked_reason = blocked_reason_for(&updated, report);
     push_checkpoint(&mut updated, report);
-    // Reopening blocked work drops the settlement stamp with it, so the record
-    // never claims a stop time for a worker the board is about to run again.
     updated.completed_at = updated
         .state
         .is_settled()

@@ -14,6 +14,9 @@ use crate::task_board::{
     build_dispatch_plans_with_policy,
 };
 
+#[path = "dispatch_progress_race.rs"]
+mod progress_race_tests;
+
 #[tokio::test]
 async fn task_board_dispatch_intents_survive_until_worker_outcome() {
     let dir = tempdir().expect("tempdir");

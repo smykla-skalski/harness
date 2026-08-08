@@ -24,6 +24,9 @@ use super::manager::{ActiveAgentTui, AgentTuiManagerHandle};
 use super::model::session_disconnect_reason;
 use super::support::{agent_id_for_tui, lock_db};
 use crate::daemon::db::prelude::*;
+use crate::daemon::db::task_board::prelude::{
+    TaskBoardRuntimeTerminalReport, WorkItemProgressQueries,
+};
 use crate::daemon::db_handle::{AsyncDaemonDbHandle, DaemonDbOwnedHandle};
 use harness_daemon_managed_agents::{AgentTuiSnapshot, AgentTuiStatus, lock};
 
@@ -386,19 +389,37 @@ impl AgentTuiManagerHandle {
         }
     }
 
-    fn reconcile_terminal_agent_state(&self, snapshot: &AgentTuiSnapshot) -> Result<(), CliError> {
+    pub(super) fn reconcile_terminal_agent_state(
+        &self,
+        snapshot: &AgentTuiSnapshot,
+    ) -> Result<(), CliError> {
         let Some(reason) = session_disconnect_reason(snapshot.status) else {
             return Ok(());
         };
-        if snapshot.agent_id.is_empty() {
-            return Ok(());
-        }
 
         let session_id = snapshot.session_id.clone();
         let agent_id = snapshot.agent_id.clone();
+        let attempt_id = snapshot.tui_id.clone();
+        let workspace_terminal = snapshot.workspace_id.is_some() && agent_id.is_empty();
+        let terminal_reason = workspace_terminal_reason(snapshot, reason);
         let sender = self.state.sender.clone();
         let reason_owned = reason.to_string();
         if let Some(result) = self.run_with_async_db(|async_db| async move {
+            if workspace_terminal {
+                async_db
+                    .project_task_board_runtime_terminal_for_attempt(
+                        &attempt_id,
+                        &TaskBoardRuntimeTerminalReport {
+                            state: crate::task_board::TaskBoardWorkItemState::Blocked,
+                            summary: None,
+                            blocked_reason: Some(terminal_reason),
+                        },
+                    )
+                    .await?;
+            }
+            if agent_id.is_empty() {
+                return Ok(());
+            }
             let disconnected =
                 disconnect_agent_direct_async(&session_id, &agent_id, &reason_owned, &async_db)
                     .await?;
@@ -408,6 +429,10 @@ impl AgentTuiManagerHandle {
             Ok(())
         }) {
             return result;
+        }
+
+        if snapshot.agent_id.is_empty() {
+            return Ok(());
         }
 
         let db = self.db()?;
@@ -422,4 +447,17 @@ impl AgentTuiManagerHandle {
         }
         Ok(())
     }
+}
+
+fn workspace_terminal_reason(snapshot: &AgentTuiSnapshot, fallback: &str) -> String {
+    let detail = snapshot
+        .error
+        .as_deref()
+        .or(snapshot.signal.as_deref())
+        .map(str::trim)
+        .filter(|detail| !detail.is_empty());
+    detail.map_or_else(
+        || format!("{fallback} before reporting completion"),
+        |detail| format!("{fallback} before reporting completion: {detail}"),
+    )
 }

@@ -36002,7 +36002,8 @@
         "description": "Why a report left the record untouched.",
         "enum": [
           "terminal",
-          "stale_sequence"
+          "stale_sequence",
+          "sequence_exhausted"
         ]
       },
       "TaskBoardWorkItemReportRequest": {

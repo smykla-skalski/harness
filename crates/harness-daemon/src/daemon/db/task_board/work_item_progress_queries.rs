@@ -3,9 +3,9 @@
 //! Daemon callers import this trait through `task_board::prelude`.
 
 use super::work_item_progress::{TaskBoardWorkItemReportRequest, TaskBoardWorkItemReportResult};
-use super::{work_item_progress, work_item_progress_settlement};
+use super::{work_item_progress, work_item_progress_settlement, work_item_progress_terminal};
 use crate::daemon::db::{AsyncDaemonDb, CliError};
-use crate::task_board::{AgentMode, TaskBoardWorkItemProgress};
+use crate::task_board::{AgentMode, TaskBoardWorkItemProgress, TaskBoardWorkItemState};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TaskBoardPendingWorkerSettlement {
@@ -13,6 +13,13 @@ pub(crate) struct TaskBoardPendingWorkerSettlement {
     pub(crate) work_item_id: String,
     pub(crate) worker_id: String,
     pub(crate) agent_mode: AgentMode,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct TaskBoardRuntimeTerminalReport {
+    pub(crate) state: TaskBoardWorkItemState,
+    pub(crate) summary: Option<String>,
+    pub(crate) blocked_reason: Option<String>,
 }
 
 pub(crate) trait WorkItemProgressQueries: Send + Sync {
@@ -64,6 +71,28 @@ pub(crate) trait WorkItemProgressQueries: Send + Sync {
         board_item_id: &str,
         work_item_id: &str,
     ) -> Result<bool, CliError>;
+
+    /// Project one exact runtime's terminal outcome onto a sessionless work item.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when the item or progress row cannot be read or written.
+    async fn project_task_board_runtime_terminal(
+        &self,
+        board_item_id: &str,
+        work_item_id: &str,
+        attempt_id: &str,
+        report: &TaskBoardRuntimeTerminalReport,
+    ) -> Result<bool, CliError>;
+
+    /// Project a terminal outcome by the interactive runtime's durable attempt id.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when the attempt is ambiguous or cannot be written.
+    async fn project_task_board_runtime_terminal_for_attempt(
+        &self,
+        attempt_id: &str,
+        report: &TaskBoardRuntimeTerminalReport,
+    ) -> Result<bool, CliError>;
 }
 
 impl WorkItemProgressQueries for AsyncDaemonDb {
@@ -111,6 +140,34 @@ impl WorkItemProgressQueries for AsyncDaemonDb {
             self,
             board_item_id,
             work_item_id,
+        )
+        .await
+    }
+
+    async fn project_task_board_runtime_terminal(
+        &self,
+        board_item_id: &str,
+        work_item_id: &str,
+        attempt_id: &str,
+        report: &TaskBoardRuntimeTerminalReport,
+    ) -> Result<bool, CliError> {
+        work_item_progress_terminal::project_task_board_runtime_terminal(
+            self,
+            board_item_id,
+            work_item_id,
+            attempt_id,
+            report,
+        )
+        .await
+    }
+
+    async fn project_task_board_runtime_terminal_for_attempt(
+        &self,
+        attempt_id: &str,
+        report: &TaskBoardRuntimeTerminalReport,
+    ) -> Result<bool, CliError> {
+        work_item_progress_terminal::project_task_board_runtime_terminal_for_attempt(
+            self, attempt_id, report,
         )
         .await
     }

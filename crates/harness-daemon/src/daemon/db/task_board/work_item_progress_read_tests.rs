@@ -56,6 +56,130 @@ async fn an_unrepresentable_report_fence_is_refused() {
 }
 
 #[tokio::test]
+async fn the_largest_database_fence_is_reserved_for_terminal_settlement() {
+    let fixture = fixture().await;
+    let mut request = request(&fixture, Some(TaskBoardWorkItemState::Done));
+    request.sequence = Some(i64::MAX as u64);
+
+    let error = fixture
+        .db
+        .report_task_board_work_item_progress(&request)
+        .await
+        .expect_err("the terminal fence is not client assignable");
+
+    assert!(error.to_string().contains("out of range"));
+    assert!(
+        fixture
+            .db
+            .task_board_work_item_progress(&fixture.item_id)
+            .await
+            .expect("read progress")
+            .is_none()
+    );
+}
+
+#[tokio::test]
+async fn the_last_implicit_fence_can_settle_the_record() {
+    let fixture = fixture().await;
+    let mut running = request(&fixture, Some(TaskBoardWorkItemState::Running));
+    running.sequence = Some(i64::MAX as u64 - 1);
+    fixture
+        .db
+        .report_task_board_work_item_progress(&running)
+        .await
+        .expect("record the last client fence");
+
+    let settled = fixture
+        .db
+        .report_task_board_work_item_progress(&request(
+            &fixture,
+            Some(TaskBoardWorkItemState::Done),
+        ))
+        .await
+        .expect("use the reserved terminal fence");
+
+    assert!(settled.applied);
+    assert_eq!(settled.progress.report_sequence, i64::MAX as u64);
+    assert_eq!(settled.progress.state, TaskBoardWorkItemState::Done);
+}
+
+#[tokio::test]
+async fn runtime_terminal_callback_preserves_review_owned_states() {
+    for state in [
+        TaskBoardWorkItemState::InReview,
+        TaskBoardWorkItemState::ChangesRequested,
+    ] {
+        let fixture = fixture().await;
+        seed_intent(&fixture, "dispatch-intent-review").await;
+        fixture
+            .db
+            .report_task_board_work_item_progress(&request(&fixture, Some(state)))
+            .await
+            .expect("move progress into review");
+
+        let changed = fixture
+            .db
+            .project_task_board_runtime_terminal(
+                &fixture.item_id,
+                &fixture.work_item_id,
+                "codex-dispatch-intent-review",
+                &TaskBoardRuntimeTerminalReport {
+                    state: TaskBoardWorkItemState::AwaitingReview,
+                    summary: Some("late runtime completion".into()),
+                    blocked_reason: None,
+                },
+            )
+            .await
+            .expect("project delayed runtime callback");
+
+        assert!(!changed, "{state:?}");
+        let progress = fixture
+            .db
+            .task_board_work_item_progress(&fixture.item_id)
+            .await
+            .expect("read progress")
+            .expect("progress exists");
+        assert_eq!(progress.state, state);
+    }
+}
+
+#[tokio::test]
+async fn interactive_runtime_exit_blocks_its_exact_pending_attempt() {
+    let fixture = fixture_with_mode(AgentMode::Interactive).await;
+    seed_intent(&fixture, "dispatch-intent-tui-exit").await;
+    fixture
+        .db
+        .report_task_board_work_item_progress(&request(
+            &fixture,
+            Some(TaskBoardWorkItemState::Running),
+        ))
+        .await
+        .expect("seed interactive progress");
+
+    let changed = fixture
+        .db
+        .project_task_board_runtime_terminal_for_attempt(
+            "agent-tui-dispatch-intent-tui-exit",
+            &TaskBoardRuntimeTerminalReport {
+                state: TaskBoardWorkItemState::Blocked,
+                summary: None,
+                blocked_reason: Some("terminal exited without completion evidence".into()),
+            },
+        )
+        .await
+        .expect("project interactive exit");
+
+    assert!(changed);
+    let progress = fixture
+        .db
+        .task_board_work_item_progress(&fixture.item_id)
+        .await
+        .expect("read progress")
+        .expect("progress exists");
+    assert_eq!(progress.state, TaskBoardWorkItemState::Blocked);
+}
+
+#[tokio::test]
 async fn a_bare_checkpoint_marks_the_item_running() {
     let fixture = fixture().await;
     let mut request = request(&fixture, None);

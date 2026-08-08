@@ -61,18 +61,8 @@ pub(crate) async fn report_task_board_work_item_progress_db(
             sequence: request.sequence,
         })
         .await?;
-    if let Some(worker_id) = result.pending_worker_settlement.as_deref() {
-        settle_pending_worker(
-            state,
-            db,
-            &TaskBoardPendingWorkerSettlement {
-                board_item_id: result.item.id.clone(),
-                work_item_id: result.progress.work_item_id.clone(),
-                worker_id: worker_id.to_string(),
-                agent_mode: result.item.agent_mode,
-            },
-        )
-        .await;
+    if let Some(settlement) = result.pending_worker_settlement.as_ref() {
+        settle_pending_worker(state, db, settlement).await;
     }
     Ok(TaskBoardWorkItemReportResponse {
         applied: result.applied,

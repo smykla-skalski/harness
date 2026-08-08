@@ -166,7 +166,7 @@ pub(super) fn label<T: Serialize>(value: T, context: &str) -> Result<String, Cli
         .ok_or_else(|| db_error(format!("serialize {context}: expected string")))
 }
 
-fn parse_label<T: DeserializeOwned>(value: &str, context: &str) -> Result<T, CliError> {
+pub(super) fn parse_label<T: DeserializeOwned>(value: &str, context: &str) -> Result<T, CliError> {
     serde_json::from_value(Value::String(value.to_owned()))
         .map_err(|error| db_error(format!("parse {context}: {error}")))
 }

@@ -4,14 +4,21 @@ use sqlx::{FromRow, Sqlite, Transaction, query_as};
 
 use crate::daemon::db::{CliError, db_error};
 use crate::task_board::{
-    TaskBoardWorkItemCheckpoint, TaskBoardWorkItemProgress, TaskBoardWorkItemState,
+    AgentMode, TaskBoardWorkItemCheckpoint, TaskBoardWorkItemProgress, TaskBoardWorkItemState,
 };
+
+pub(super) struct LoadedWorkItemProgress {
+    pub(super) progress: TaskBoardWorkItemProgress,
+    pub(super) worker_settled_at: Option<String>,
+    pub(super) agent_mode: AgentMode,
+}
 
 #[derive(FromRow)]
 pub(super) struct WorkItemProgressRow {
     pub(super) work_item_id: String,
     pub(super) item_id: String,
     pub(super) execution_id: Option<String>,
+    pub(super) agent_mode: String,
     pub(super) state: String,
     pub(super) progress_percent: Option<i64>,
     pub(super) summary: Option<String>,
@@ -36,7 +43,7 @@ struct WorkItemCheckpointRow {
     recorded_at: String,
 }
 
-const SELECT_PROGRESS_SQL: &str = "SELECT work_item_id, item_id, execution_id, state,
+const SELECT_PROGRESS_SQL: &str = "SELECT work_item_id, item_id, execution_id, agent_mode, state,
         progress_percent, summary, blocked_reason, attempt_id, item_revision,
         report_sequence, created_at, updated_at, completed_at, worker_settled_at
      FROM task_board_work_item_progress
@@ -53,7 +60,7 @@ pub(super) async fn load_progress_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     item_id: &str,
     work_item_id: &str,
-) -> Result<Option<(TaskBoardWorkItemProgress, Option<String>)>, CliError> {
+) -> Result<Option<LoadedWorkItemProgress>, CliError> {
     let Some(row) = query_as::<_, WorkItemProgressRow>(SELECT_PROGRESS_SQL)
         .bind(item_id)
         .bind(work_item_id)
@@ -74,10 +81,12 @@ pub(super) async fn load_progress_in_tx(
             ))
         })?;
     let worker_settled_at = row.worker_settled_at.clone();
-    Ok(Some((
-        progress_from_rows(row, checkpoints),
+    let agent_mode = super::mapper::parse_label(&row.agent_mode, "work item progress agent mode")?;
+    Ok(Some(LoadedWorkItemProgress {
+        progress: progress_from_rows(row, checkpoints),
         worker_settled_at,
-    )))
+        agent_mode,
+    }))
 }
 
 fn progress_from_rows(

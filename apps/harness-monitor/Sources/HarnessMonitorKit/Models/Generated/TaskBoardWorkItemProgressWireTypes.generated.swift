@@ -141,6 +141,7 @@ public struct TaskBoardWorkItemProgress: Codable, Equatable, Sendable {
 public enum TaskBoardWorkItemReportRejection: String, Codable, Equatable, Sendable, CaseIterable, Identifiable {
   case terminal = "terminal"
   case staleSequence = "stale_sequence"
+  case sequenceExhausted = "sequence_exhausted"
 
   public var id: String { rawValue }
 }

@@ -13,13 +13,14 @@ use super::dispatch_admission_tx_ext::TaskBoardDispatchAdmissionTxExt;
 use super::item_tx_ext::TaskBoardItemTxExt;
 use super::items::bump_change_in_tx;
 use super::lane_order::{LaneTransitionKind, replace_with_lane_transition_in_tx};
-use super::work_item_progress_rows::load_progress_in_tx;
+use super::work_item_progress_queries::TaskBoardPendingWorkerSettlement;
+use super::work_item_progress_rows::{LoadedWorkItemProgress, load_progress_in_tx};
 use crate::daemon::db::prelude::*;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
 use crate::task_board::{
-    AgentMode, TaskBoardItem, TaskBoardWorkItemProgress, TaskBoardWorkItemReport,
-    TaskBoardWorkItemReportOutcome, TaskBoardWorkItemReportRejection, TaskBoardWorkItemState,
-    apply_work_item_report, codex_worker_id, terminal_worker_id,
+    AgentMode, TASK_BOARD_WORK_ITEM_REPORT_SEQUENCE_MAX, TaskBoardItem, TaskBoardWorkItemProgress,
+    TaskBoardWorkItemReport, TaskBoardWorkItemReportOutcome, TaskBoardWorkItemReportRejection,
+    TaskBoardWorkItemState, apply_work_item_report, codex_worker_id, terminal_worker_id,
 };
 use harness_kernel::errors::CliErrorKind;
 
@@ -51,7 +52,7 @@ pub(crate) struct TaskBoardWorkItemReportResult {
     /// The managed worker still owed a stop. Present only while the work item
     /// is settled and its worker has not been marked settled yet, so the stop
     /// runs exactly once across retries and daemon restarts.
-    pub(crate) pending_worker_settlement: Option<String>,
+    pub(crate) pending_worker_settlement: Option<TaskBoardPendingWorkerSettlement>,
 }
 
 pub(crate) async fn task_board_work_item_progress(
@@ -73,7 +74,7 @@ pub(crate) async fn task_board_work_item_progress(
     let progress = match item.work_item_id.as_deref() {
         Some(work_item_id) => load_progress_in_tx(&mut transaction, &item.id, work_item_id)
             .await?
-            .map(|(progress, _)| progress),
+            .map(|loaded| loaded.progress),
         None => None,
     };
     transaction
@@ -119,8 +120,8 @@ pub(crate) async fn report_task_board_work_item_progress(
         current
     } else {
         let attempt_id = resolve_attempt_id_in_tx(&mut transaction, &item, &work_item_id).await?;
-        (
-            insert_initial_progress_in_tx(
+        LoadedWorkItemProgress {
+            progress: insert_initial_progress_in_tx(
                 &mut transaction,
                 &item,
                 &work_item_id,
@@ -128,10 +129,15 @@ pub(crate) async fn report_task_board_work_item_progress(
                 &now,
             )
             .await?,
-            None,
-        )
+            worker_settled_at: None,
+            agent_mode: item.agent_mode,
+        }
     };
-    let (current, worker_settled_at) = current;
+    let LoadedWorkItemProgress {
+        progress: current,
+        worker_settled_at,
+        agent_mode,
+    } = current;
     reject_workflow_owned_settlement_in_tx(&mut transaction, &current, request.state).await?;
     let report = stamped_report(
         request,
@@ -151,6 +157,7 @@ pub(crate) async fn report_task_board_work_item_progress(
         projection,
         outcome,
         worker_settled_at.as_deref(),
+        agent_mode,
     ))
 }
 
@@ -191,19 +198,14 @@ async fn reject_workflow_owned_settlement_in_tx(
     if !requested_state.is_some_and(TaskBoardWorkItemState::is_settled) {
         return Ok(());
     }
-    let Some(execution_id) = progress.execution_id.as_deref() else {
-        return Ok(());
-    };
-    let (exists,) = query_as::<_, (bool,)>(
-        "SELECT EXISTS(
-             SELECT 1 FROM task_board_workflow_executions WHERE execution_id = ?1
-         )",
+    if super::work_item_progress_settlement::task_board_work_item_is_workflow_owned_in_tx(
+        transaction,
+        &progress.board_item_id,
+        &progress.work_item_id,
     )
-    .bind(execution_id)
-    .fetch_one(transaction.as_mut())
-    .await
-    .map_err(|error| db_error(format!("inspect work item workflow execution: {error}")))?;
-    if exists {
+    .await?
+    {
+        let execution_id = progress.execution_id.as_deref().unwrap_or("unknown");
         return Err(CliErrorKind::invalid_transition(format!(
             "work item '{}' belongs to workflow execution '{execution_id}'; the workflow result contract must settle it",
             progress.work_item_id
@@ -220,7 +222,7 @@ fn validated_sequence(sequence: Option<u64>) -> Result<Option<u64>, CliError> {
     let Some(sequence) = sequence else {
         return Ok(None);
     };
-    if i64::try_from(sequence).is_err() {
+    if sequence >= TASK_BOARD_WORK_ITEM_REPORT_SEQUENCE_MAX {
         return Err(CliErrorKind::invalid_transition(format!(
             "task-board work item report sequence {sequence} is out of range"
         ))
@@ -291,12 +293,12 @@ pub(in crate::daemon::db::task_board) async fn insert_initial_progress_in_tx(
 }
 
 /// The board item after a report, and whether the report moved it.
-struct ProjectedItem {
-    item: TaskBoardItem,
+pub(super) struct ProjectedItem {
+    pub(super) item: TaskBoardItem,
     changed: bool,
 }
 
-async fn persist_outcome_in_tx(
+pub(super) async fn persist_outcome_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     item: TaskBoardItem,
     item_revision: i64,
@@ -401,7 +403,7 @@ fn sequence_column(sequence: u64) -> Result<i64, CliError> {
 /// fight the admission it is mid-way through writing. The record still advances
 /// - it is the authority - and the next report or dispatch completion lands the
 ///   lane once the reservation clears.
-async fn project_item_in_tx(
+pub(super) async fn project_item_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     item: TaskBoardItem,
     item_revision: i64,
@@ -451,6 +453,7 @@ fn finish_result(
     projection: ProjectedItem,
     outcome: TaskBoardWorkItemReportOutcome,
     worker_settled_at: Option<&str>,
+    agent_mode: AgentMode,
 ) -> TaskBoardWorkItemReportResult {
     let applied = outcome.applied();
     let rejection = outcome.rejection();
@@ -461,7 +464,17 @@ fn finish_result(
         } => progress,
     };
     let pending_worker_settlement = (progress.state.is_settled() && worker_settled_at.is_none())
-        .then(|| progress.attempt_id.clone())
+        .then(|| {
+            progress
+                .attempt_id
+                .as_ref()
+                .map(|worker_id| TaskBoardPendingWorkerSettlement {
+                    board_item_id: progress.board_item_id.clone(),
+                    work_item_id: progress.work_item_id.clone(),
+                    worker_id: worker_id.clone(),
+                    agent_mode,
+                })
+        })
         .flatten();
     TaskBoardWorkItemReportResult {
         progress,

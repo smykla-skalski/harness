@@ -312,9 +312,10 @@ pub use types::{
     TaskBoardWorkflowStatus,
 };
 pub use work_item_progress::{
-    TASK_BOARD_WORK_ITEM_SUMMARY_LIMIT, TaskBoardWorkItemCheckpoint, TaskBoardWorkItemProgress,
-    TaskBoardWorkItemReport, TaskBoardWorkItemReportOutcome, TaskBoardWorkItemReportRejection,
-    TaskBoardWorkItemState, apply_work_item_report,
+    TASK_BOARD_WORK_ITEM_REPORT_SEQUENCE_MAX, TASK_BOARD_WORK_ITEM_SUMMARY_LIMIT,
+    TaskBoardWorkItemCheckpoint, TaskBoardWorkItemProgress, TaskBoardWorkItemReport,
+    TaskBoardWorkItemReportOutcome, TaskBoardWorkItemReportRejection, TaskBoardWorkItemState,
+    apply_work_item_report,
 };
 pub use worker_prompt::{
     WorkerPromptContext, codex_worker_id, managed_worker_id, plan_worker_prompt,

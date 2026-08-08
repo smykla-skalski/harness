@@ -1,5 +1,8 @@
 use super::*;
 
+#[path = "work_item_progress_sequence_tests.rs"]
+mod sequence_tests;
+
 fn progress() -> TaskBoardWorkItemProgress {
     TaskBoardWorkItemProgress::new(
         "board-1".to_string(),
@@ -151,11 +154,11 @@ fn repeated_report_cannot_move_settled_work_backward() {
 }
 
 #[test]
-fn blocked_work_settles_its_worker_without_freezing_the_record() {
+fn blocked_work_settles_its_worker_and_freezes_the_record() {
     let blocked = applied(&progress(), &report(Some(TaskBoardWorkItemState::Blocked)));
 
     assert!(blocked.state.is_settled());
-    assert!(!blocked.state.is_terminal());
+    assert!(blocked.state.is_terminal());
     assert_eq!(
         blocked.completed_at.as_deref(),
         Some("2026-08-08T00:01:00Z")
@@ -163,14 +166,16 @@ fn blocked_work_settles_its_worker_without_freezing_the_record() {
 }
 
 #[test]
-fn unblocking_reopens_the_record_and_drops_its_settlement_stamp() {
+fn unblocking_requires_a_new_work_item() {
     let blocked = applied(&progress(), &report(Some(TaskBoardWorkItemState::Blocked)));
 
-    let resumed = applied(&blocked, &report(Some(TaskBoardWorkItemState::Running)));
+    let outcome = apply_work_item_report(&blocked, &report(Some(TaskBoardWorkItemState::Running)));
 
-    assert_eq!(resumed.state, TaskBoardWorkItemState::Running);
-    assert!(resumed.completed_at.is_none());
-    assert!(resumed.blocked_reason.is_none());
+    assert_eq!(
+        outcome.rejection(),
+        Some(TaskBoardWorkItemReportRejection::Terminal)
+    );
+    assert_eq!(outcome.progress(), &blocked);
 }
 
 #[test]
@@ -255,38 +260,6 @@ fn only_stalled_states_carry_a_reason() {
     ] {
         assert!(!state.carries_reason(), "{state:?}");
     }
-}
-
-#[test]
-fn out_of_order_report_is_refused() {
-    let mut first = report(Some(TaskBoardWorkItemState::Running));
-    first.sequence = Some(5);
-    let mut stale = report(Some(TaskBoardWorkItemState::AwaitingReview));
-    stale.sequence = Some(3);
-
-    let outcome = apply_work_item_report(&applied(&progress(), &first), &stale);
-
-    assert_eq!(
-        outcome.rejection(),
-        Some(TaskBoardWorkItemReportRejection::StaleSequence)
-    );
-    assert_eq!(outcome.progress().state, TaskBoardWorkItemState::Running);
-    assert_eq!(outcome.progress().report_sequence, 5);
-}
-
-#[test]
-fn replayed_sequence_is_refused() {
-    let mut first = report(Some(TaskBoardWorkItemState::Running));
-    first.sequence = Some(1);
-    let applied_once = applied(&progress(), &first);
-
-    let outcome = apply_work_item_report(&applied_once, &first);
-
-    assert_eq!(
-        outcome.rejection(),
-        Some(TaskBoardWorkItemReportRejection::StaleSequence)
-    );
-    assert_eq!(outcome.progress().checkpoints.len(), 0);
 }
 
 #[test]

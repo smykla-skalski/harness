@@ -19,6 +19,10 @@ use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
 use crate::daemon::db::task_board::workflow_execution_queries::WorkflowExecutionQueries;
 pub(super) use in_tx::project_terminal_execution_in_tx;
 
+#[cfg(test)]
+#[path = "workflow_terminal_progress_tests.rs"]
+mod progress_tests;
+
 #[derive(Debug)]
 pub(crate) struct TaskBoardWorkflowTerminalProjection {
     pub(crate) item: TaskBoardItem,
@@ -122,7 +126,7 @@ mod tests {
         TaskBoardWorkflowStatus, TaskBoardWorkflowTransitionState, resolve_task_board_reviewers,
     };
 
-    const NOW: &str = "2026-07-17T10:00:00Z";
+    pub(super) const NOW: &str = "2026-07-17T10:00:00Z";
 
     #[tokio::test]
     async fn terminal_projection_updates_item_and_releases_admission_once() {
@@ -309,7 +313,9 @@ mod tests {
         }
     }
 
-    async fn seeded_terminal_execution(correct_identity: bool) -> (AsyncDaemonDb, String) {
+    pub(super) async fn seeded_terminal_execution(
+        correct_identity: bool,
+    ) -> (AsyncDaemonDb, String) {
         Box::pin(seeded_execution(correct_identity, true)).await
     }
 
@@ -338,9 +344,22 @@ mod tests {
         });
         item.workflow.status = TaskBoardWorkflowStatus::Running;
         item.workflow.current_step_id = Some("review".into());
+        item.work_item_id = Some("work-terminal".into());
         db.create_task_board_item(item)
             .await
             .expect("create task-board item");
+        sqlx::query(
+            "INSERT INTO task_board_work_item_progress (
+                 item_id, work_item_id, execution_id, agent_mode, state, attempt_id,
+                 report_sequence, created_at, updated_at
+             ) VALUES ('terminal-item', 'work-terminal', ?1, 'headless', 'running',
+                       'workflow-terminal-worker', 1, ?2, ?2)",
+        )
+        .bind(&execution_id)
+        .bind(NOW)
+        .execute(db.pool())
+        .await
+        .expect("insert workflow progress");
         let mut execution = terminal_execution(&execution_id, "terminal-item", 1);
         if !terminal {
             execution.transition.phase = Some(TaskBoardExecutionPhase::Review);
