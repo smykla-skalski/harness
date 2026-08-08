@@ -6,9 +6,11 @@
 -- authority for what a worker is doing.
 
 CREATE TABLE IF NOT EXISTS task_board_work_item_progress (
-    work_item_id     TEXT PRIMARY KEY,
     item_id          TEXT NOT NULL REFERENCES task_board_items(item_id) ON DELETE CASCADE,
+    work_item_id     TEXT NOT NULL,
     execution_id     TEXT,
+    agent_mode       TEXT NOT NULL CHECK (agent_mode IN (
+                         'headless', 'interactive', 'planning', 'evaluate')),
     state            TEXT NOT NULL CHECK (state IN (
                          'pending', 'running', 'awaiting_review', 'in_review',
                          'changes_requested', 'blocked', 'done')),
@@ -31,17 +33,18 @@ CREATE TABLE IF NOT EXISTS task_board_work_item_progress (
     -- column NULL and the next report retries the stop instead of skipping it.
     worker_settled_at TEXT,
     CHECK ((state IN ('blocked', 'done')) = (completed_at IS NOT NULL)),
-    CHECK (worker_settled_at IS NULL OR completed_at IS NOT NULL)
+    CHECK (worker_settled_at IS NULL OR completed_at IS NOT NULL),
+    PRIMARY KEY (item_id, work_item_id)
 ) WITHOUT ROWID;
 
-CREATE INDEX IF NOT EXISTS idx_task_board_work_item_progress_item
-    ON task_board_work_item_progress(item_id);
+CREATE INDEX IF NOT EXISTS idx_task_board_work_item_progress_work_item
+    ON task_board_work_item_progress(work_item_id);
 CREATE INDEX IF NOT EXISTS idx_task_board_work_item_progress_execution
     ON task_board_work_item_progress(execution_id);
 
 CREATE TABLE IF NOT EXISTS task_board_work_item_checkpoints (
-    work_item_id     TEXT NOT NULL REFERENCES task_board_work_item_progress(work_item_id)
-                         ON DELETE CASCADE,
+    item_id          TEXT NOT NULL,
+    work_item_id     TEXT NOT NULL,
     sequence         INTEGER NOT NULL CHECK (sequence > 0),
     checkpoint_id    TEXT NOT NULL UNIQUE,
     actor            TEXT NOT NULL,
@@ -51,7 +54,10 @@ CREATE TABLE IF NOT EXISTS task_board_work_item_checkpoints (
                          OR (progress_percent >= 0 AND progress_percent <= 100)),
     attempt_id       TEXT,
     recorded_at      TEXT NOT NULL,
-    PRIMARY KEY (work_item_id, sequence)
+    PRIMARY KEY (item_id, work_item_id, sequence),
+    FOREIGN KEY (item_id, work_item_id)
+        REFERENCES task_board_work_item_progress(item_id, work_item_id)
+        ON DELETE CASCADE
 ) WITHOUT ROWID;
 
 -- Seed one record per already-dispatched item from the lane it currently
@@ -59,14 +65,15 @@ CREATE TABLE IF NOT EXISTS task_board_work_item_checkpoints (
 -- than resetting every running item to pending. `INSERT OR IGNORE` keeps the
 -- statement replayable and never overwrites a record a worker has since moved.
 INSERT OR IGNORE INTO task_board_work_item_progress (
-    work_item_id, item_id, execution_id, state, summary, blocked_reason,
-    item_revision, report_sequence, created_at, updated_at, completed_at,
-    worker_settled_at
+    item_id, work_item_id, execution_id, agent_mode, state, summary,
+    blocked_reason, attempt_id, item_revision, report_sequence, created_at,
+    updated_at, completed_at, worker_settled_at
 )
 SELECT
-    items.work_item_id,
     items.item_id,
+    items.work_item_id,
     json_extract(items.workflow_json, '$.execution_id'),
+    items.agent_mode,
     CASE items.status
         WHEN 'done' THEN 'done'
         WHEN 'failed' THEN 'blocked'
@@ -82,6 +89,11 @@ SELECT
     END,
     NULL,
     json_extract(items.workflow_json, '$.last_error'),
+    CASE
+        WHEN intents.intent_id IS NULL THEN NULL
+        WHEN items.agent_mode = 'interactive' THEN 'agent-tui-' || intents.intent_id
+        ELSE 'codex-' || intents.intent_id
+    END,
     items.revision,
     0,
     items.created_at,
@@ -92,6 +104,15 @@ SELECT
     -- would target a run that ended long ago.
     CASE WHEN items.status IN ('done', 'failed') THEN items.updated_at END
 FROM task_board_items AS items
+LEFT JOIN task_board_dispatch_intents AS intents
+  ON intents.intent_id = (
+      SELECT latest.intent_id
+      FROM task_board_dispatch_intents AS latest
+      WHERE latest.item_id = items.item_id
+        AND latest.work_item_id = items.work_item_id
+      ORDER BY latest.created_at DESC, latest.intent_id DESC
+      LIMIT 1
+  )
 WHERE items.work_item_id IS NOT NULL
   AND items.deleted_at IS NULL;
 

@@ -36,6 +36,7 @@ pub(super) async fn link_work_items(db: &AsyncDaemonDb) {
 
 pub(super) async fn assert_report_and_read_agree(client: &reqwest::Client, base_url: &str) {
     let report = json!({
+        "work_item_id": "task-board-parity-http",
         "state": "running",
         "summary": "wrote the failing test",
         "progress_percent": 40
@@ -49,6 +50,7 @@ pub(super) async fn assert_report_and_read_agree(client: &reqwest::Client, base_
     .await;
     let mut ws_payload = report;
     ws_payload["id"] = json!("parity-ws");
+    ws_payload["work_item_id"] = json!("task-board-parity-ws");
     let ws_report = ws_result(
         base_url,
         "req-task-board-progress-report",

@@ -1,3 +1,4 @@
+use harness_daemon_db_queries::AsyncChangeTrackingQueries;
 use sqlx::query;
 use tempfile::{TempDir, tempdir};
 
@@ -10,6 +11,9 @@ use crate::task_board::{
     AgentMode, TaskBoardItem, TaskBoardStatus, TaskBoardWorkItemReportRejection,
     TaskBoardWorkItemState, TaskBoardWorkflowStatus,
 };
+
+#[path = "work_item_progress_read_tests.rs"]
+mod read_tests;
 
 struct Fixture {
     _dir: TempDir,
@@ -66,12 +70,28 @@ async fn seed_intent(fixture: &Fixture, intent_id: &str) {
     .expect("seed dispatch intent");
 }
 
+async fn seed_workflow_execution(fixture: &Fixture) {
+    query(
+        "INSERT INTO task_board_workflow_executions (
+             execution_id, item_id, workflow_kind, phase, state, item_revision,
+             configuration_revision, snapshot_json, resolved_reviewer_json,
+             diagnostics_json, resource_ownership_json, created_at, updated_at
+         ) VALUES ('workflow-1', ?1, 'pr_fix', 'executing', 'running', 1, 1,
+                   '{}', '{}', '{}', '{}', 'now', 'now')",
+    )
+    .bind(&fixture.item_id)
+    .execute(fixture.db.pool())
+    .await
+    .expect("seed workflow execution");
+}
+
 fn request(
     fixture: &Fixture,
     state: Option<TaskBoardWorkItemState>,
 ) -> TaskBoardWorkItemReportRequest {
     TaskBoardWorkItemReportRequest {
         board_item_id: fixture.item_id.clone(),
+        work_item_id: fixture.work_item_id.clone(),
         actor: "agent-1".to_string(),
         state,
         summary: None,
@@ -129,6 +149,38 @@ async fn reporting_for_an_undispatched_item_is_refused() {
     assert!(
         error.to_string().contains("no dispatched work item"),
         "unexpected error: {error}"
+    );
+}
+
+#[tokio::test]
+async fn a_report_from_an_old_dispatch_cannot_mutate_the_current_work_item() {
+    let fixture = fixture().await;
+    fixture
+        .db
+        .update_task_board_item(&fixture.item_id, |item| {
+            item.work_item_id = Some("task-board-2".to_string());
+            Ok(true)
+        })
+        .await
+        .expect("redispatch item");
+
+    let error = fixture
+        .db
+        .report_task_board_work_item_progress(&request(
+            &fixture,
+            Some(TaskBoardWorkItemState::Done),
+        ))
+        .await
+        .expect_err("stale dispatch report must be refused");
+
+    assert!(error.to_string().contains("not 'task-board-1'"));
+    assert!(
+        fixture
+            .db
+            .task_board_work_item_progress(&fixture.item_id)
+            .await
+            .expect("read current progress")
+            .is_none()
     );
 }
 
@@ -201,6 +253,24 @@ async fn completion_settles_the_item_and_owes_one_worker_stop() {
 }
 
 #[tokio::test]
+async fn workflow_owned_completion_requires_the_workflow_result_contract() {
+    let fixture = fixture().await;
+    seed_intent(&fixture, "dispatch-intent-1").await;
+    seed_workflow_execution(&fixture).await;
+
+    let error = fixture
+        .db
+        .report_task_board_work_item_progress(&request(
+            &fixture,
+            Some(TaskBoardWorkItemState::Done),
+        ))
+        .await
+        .expect_err("workflow-owned completion must be refused");
+
+    assert!(error.to_string().contains("workflow result contract"));
+}
+
+#[tokio::test]
 async fn a_settled_worker_is_never_owed_a_second_stop() {
     let fixture = fixture().await;
     seed_intent(&fixture, "dispatch-intent-1").await;
@@ -214,7 +284,7 @@ async fn a_settled_worker_is_never_owed_a_second_stop() {
         .expect("settle the work item");
     fixture
         .db
-        .settle_task_board_work_item_worker(&fixture.work_item_id)
+        .settle_task_board_work_item_worker(&fixture.item_id, &fixture.work_item_id)
         .await
         .expect("settle the worker");
 
@@ -277,7 +347,7 @@ async fn reopening_blocked_work_clears_its_settlement_and_owes_a_fresh_stop() {
         .expect("block the work item");
     fixture
         .db
-        .settle_task_board_work_item_worker(&fixture.work_item_id)
+        .settle_task_board_work_item_worker(&fixture.item_id, &fixture.work_item_id)
         .await
         .expect("settle the worker");
 
@@ -311,233 +381,4 @@ fn blocked_again(fixture: &Fixture) -> TaskBoardWorkItemReportRequest {
     let mut request = request(fixture, Some(TaskBoardWorkItemState::Blocked));
     request.blocked_reason = Some("still stuck".to_string());
     request
-}
-
-#[tokio::test]
-async fn a_settled_item_never_leaves_its_terminal_lane() {
-    let fixture = fixture().await;
-    fixture
-        .db
-        .report_task_board_work_item_progress(&request(
-            &fixture,
-            Some(TaskBoardWorkItemState::Done),
-        ))
-        .await
-        .expect("settle the work item");
-
-    fixture
-        .db
-        .report_task_board_work_item_progress(&request(
-            &fixture,
-            Some(TaskBoardWorkItemState::Running),
-        ))
-        .await
-        .expect("repeat the report");
-
-    let item = fixture
-        .db
-        .task_board_item(&fixture.item_id)
-        .await
-        .expect("load item");
-    assert_eq!(item.status, TaskBoardStatus::Done);
-}
-
-#[tokio::test]
-async fn an_unrepresentable_report_fence_is_refused() {
-    let fixture = fixture().await;
-    let mut request = request(&fixture, None);
-    request.summary = Some("still working".to_string());
-    request.sequence = Some(u64::MAX);
-
-    let error = fixture
-        .db
-        .report_task_board_work_item_progress(&request)
-        .await
-        .expect_err("an out-of-range fence must be refused");
-
-    assert!(
-        error.to_string().contains("out of range"),
-        "unexpected error: {error}"
-    );
-    assert!(
-        fixture
-            .db
-            .task_board_work_item_progress(&fixture.item_id)
-            .await
-            .expect("read progress")
-            .is_none(),
-        "a refused report must not create a record"
-    );
-}
-
-#[tokio::test]
-async fn a_bare_checkpoint_marks_the_item_running() {
-    let fixture = fixture().await;
-    let mut request = request(&fixture, None);
-    request.summary = Some("started".to_string());
-
-    let result = fixture
-        .db
-        .report_task_board_work_item_progress(&request)
-        .await
-        .expect("record a checkpoint");
-
-    assert_eq!(result.progress.state, TaskBoardWorkItemState::Running);
-    assert_eq!(
-        result.item.workflow.current_step_id.as_deref(),
-        Some("worker")
-    );
-}
-
-#[tokio::test]
-async fn an_out_of_order_report_leaves_the_record_untouched() {
-    let fixture = fixture().await;
-    let mut first = request(&fixture, Some(TaskBoardWorkItemState::Running));
-    first.sequence = Some(4);
-    first.summary = Some("current".to_string());
-    fixture
-        .db
-        .report_task_board_work_item_progress(&first)
-        .await
-        .expect("first report");
-    let mut stale = request(&fixture, Some(TaskBoardWorkItemState::AwaitingReview));
-    stale.sequence = Some(2);
-    stale.summary = Some("stale".to_string());
-
-    let result = fixture
-        .db
-        .report_task_board_work_item_progress(&stale)
-        .await
-        .expect("stale report");
-
-    assert_eq!(
-        result.rejection,
-        Some(TaskBoardWorkItemReportRejection::StaleSequence)
-    );
-    assert_eq!(result.progress.state, TaskBoardWorkItemState::Running);
-    assert_eq!(result.progress.checkpoints.len(), 1);
-    assert_eq!(result.item.status, TaskBoardStatus::InProgress);
-}
-
-#[tokio::test]
-async fn checkpoints_persist_in_order_across_reports() {
-    let fixture = fixture().await;
-    for summary in ["first", "second", "third"] {
-        let mut request = request(&fixture, None);
-        request.summary = Some(summary.to_string());
-        fixture
-            .db
-            .report_task_board_work_item_progress(&request)
-            .await
-            .expect("record checkpoint");
-    }
-
-    let progress = fixture
-        .db
-        .task_board_work_item_progress(&fixture.item_id)
-        .await
-        .expect("read progress")
-        .expect("record exists");
-
-    let summaries: Vec<&str> = progress
-        .checkpoints
-        .iter()
-        .map(|checkpoint| checkpoint.summary.as_str())
-        .collect();
-    assert_eq!(summaries, ["first", "second", "third"]);
-    assert_eq!(progress.report_sequence, 3);
-}
-
-#[tokio::test]
-async fn reading_an_unknown_item_is_refused() {
-    let fixture = fixture().await;
-
-    let error = fixture
-        .db
-        .task_board_work_item_progress("board-missing")
-        .await
-        .expect_err("unknown item must be refused");
-
-    assert!(
-        error.to_string().contains("not found"),
-        "unexpected error: {error}"
-    );
-}
-
-#[tokio::test]
-async fn reading_an_undispatched_item_returns_no_record() {
-    let fixture = fixture().await;
-    fixture
-        .db
-        .update_task_board_item(&fixture.item_id, |item| {
-            item.work_item_id = None;
-            Ok(true)
-        })
-        .await
-        .expect("clear the work item");
-
-    let progress = fixture
-        .db
-        .task_board_work_item_progress(&fixture.item_id)
-        .await
-        .expect("read progress");
-
-    assert!(progress.is_none());
-}
-
-#[tokio::test]
-async fn a_pure_checkpoint_does_not_churn_the_item_revision() {
-    let fixture = fixture().await;
-    // Land the lane the record implies first: the fixture item still carries the
-    // dispatch step, so the first report legitimately moves it.
-    fixture
-        .db
-        .report_task_board_work_item_progress(&request(
-            &fixture,
-            Some(TaskBoardWorkItemState::Running),
-        ))
-        .await
-        .expect("land the lane");
-    let before = fixture
-        .db
-        .task_board_item_snapshot(&fixture.item_id)
-        .await
-        .expect("load snapshot")
-        .item_revision;
-    let mut request = request(&fixture, None);
-    request.summary = Some("still working".to_string());
-
-    fixture
-        .db
-        .report_task_board_work_item_progress(&request)
-        .await
-        .expect("record checkpoint");
-
-    let after = fixture
-        .db
-        .task_board_item_snapshot(&fixture.item_id)
-        .await
-        .expect("load snapshot")
-        .item_revision;
-    assert_eq!(before, after);
-}
-
-#[tokio::test]
-async fn blocking_surfaces_the_reason_on_the_board_item() {
-    let fixture = fixture().await;
-    let mut request = request(&fixture, Some(TaskBoardWorkItemState::Blocked));
-    request.blocked_reason = Some("needs a human decision".to_string());
-
-    let result = fixture
-        .db
-        .report_task_board_work_item_progress(&request)
-        .await
-        .expect("block the work item");
-
-    assert_eq!(result.item.status, TaskBoardStatus::Failed);
-    assert_eq!(result.item.workflow.status, TaskBoardWorkflowStatus::Failed);
-    assert_eq!(
-        result.item.workflow.last_error.as_deref(),
-        Some("needs a human decision")
-    );
 }

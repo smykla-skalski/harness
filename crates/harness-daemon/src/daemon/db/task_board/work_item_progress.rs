@@ -28,6 +28,7 @@ use harness_kernel::errors::CliErrorKind;
 #[derive(Debug, Clone)]
 pub(crate) struct TaskBoardWorkItemReportRequest {
     pub(crate) board_item_id: String,
+    pub(crate) work_item_id: String,
     pub(crate) actor: String,
     pub(crate) state: Option<TaskBoardWorkItemState>,
     pub(crate) summary: Option<String>,
@@ -70,7 +71,7 @@ pub(crate) async fn task_board_work_item_progress(
         .await?
         .ok_or_else(|| db_error(format!("task-board item '{board_item_id}' not found")))?;
     let progress = match item.work_item_id.as_deref() {
-        Some(work_item_id) => load_progress_in_tx(&mut transaction, work_item_id)
+        Some(work_item_id) => load_progress_in_tx(&mut transaction, &item.id, work_item_id)
             .await?
             .map(|(progress, _)| progress),
         None => None,
@@ -104,18 +105,41 @@ pub(crate) async fn report_task_board_work_item_progress(
             request.board_item_id
         )))
     })?;
+    if work_item_id != request.work_item_id {
+        return Err(CliError::from(CliErrorKind::invalid_transition(format!(
+            "task-board item '{}' is dispatched as work item '{}', not '{}'",
+            request.board_item_id, work_item_id, request.work_item_id
+        ))));
+    }
     let requested_sequence = validated_sequence(request.sequence)?;
     let now = utc_now();
-    let current = match load_progress_in_tx(&mut transaction, &work_item_id).await? {
-        Some((progress, settled)) => (progress, settled),
-        None => (
-            insert_initial_progress_in_tx(&mut transaction, &item, &work_item_id, &now).await?,
+    let current = if let Some(current) =
+        load_progress_in_tx(&mut transaction, &item.id, &work_item_id).await?
+    {
+        current
+    } else {
+        let attempt_id = resolve_attempt_id_in_tx(&mut transaction, &item, &work_item_id).await?;
+        (
+            insert_initial_progress_in_tx(
+                &mut transaction,
+                &item,
+                &work_item_id,
+                attempt_id.as_deref(),
+                &now,
+            )
+            .await?,
             None,
-        ),
+        )
     };
     let (current, worker_settled_at) = current;
-    let attempt_id = resolve_attempt_id_in_tx(&mut transaction, &item, &work_item_id).await?;
-    let report = stamped_report(request, requested_sequence, attempt_id, item_revision, &now);
+    reject_workflow_owned_settlement_in_tx(&mut transaction, &current, request.state).await?;
+    let report = stamped_report(
+        request,
+        requested_sequence,
+        current.attempt_id.clone(),
+        item_revision,
+        &now,
+    );
     let outcome = apply_work_item_report(&current, &report);
     let projection =
         persist_outcome_in_tx(&mut transaction, item, item_revision, &outcome, &report).await?;
@@ -128,25 +152,6 @@ pub(crate) async fn report_task_board_work_item_progress(
         outcome,
         worker_settled_at.as_deref(),
     ))
-}
-
-/// Marks a settled work item's worker as stopped so no later report tries to
-/// stop it again.
-pub(crate) async fn settle_task_board_work_item_worker(
-    db: &AsyncDaemonDb,
-    work_item_id: &str,
-) -> Result<(), CliError> {
-    query(
-        "UPDATE task_board_work_item_progress
-         SET worker_settled_at = ?2
-         WHERE work_item_id = ?1 AND completed_at IS NOT NULL AND worker_settled_at IS NULL",
-    )
-    .bind(work_item_id)
-    .bind(utc_now())
-    .execute(db.pool())
-    .await
-    .map_err(|error| db_error(format!("settle work item worker '{work_item_id}': {error}")))?;
-    Ok(())
 }
 
 /// The attempt identity is read from the item's own dispatch rather than taken
@@ -176,6 +181,36 @@ fn worker_id_for(agent_mode: AgentMode, intent_id: &str) -> String {
     } else {
         codex_worker_id(intent_id)
     }
+}
+
+async fn reject_workflow_owned_settlement_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    progress: &TaskBoardWorkItemProgress,
+    requested_state: Option<TaskBoardWorkItemState>,
+) -> Result<(), CliError> {
+    if !requested_state.is_some_and(TaskBoardWorkItemState::is_settled) {
+        return Ok(());
+    }
+    let Some(execution_id) = progress.execution_id.as_deref() else {
+        return Ok(());
+    };
+    let (exists,) = query_as::<_, (bool,)>(
+        "SELECT EXISTS(
+             SELECT 1 FROM task_board_workflow_executions WHERE execution_id = ?1
+         )",
+    )
+    .bind(execution_id)
+    .fetch_one(transaction.as_mut())
+    .await
+    .map_err(|error| db_error(format!("inspect work item workflow execution: {error}")))?;
+    if exists {
+        return Err(CliErrorKind::invalid_transition(format!(
+            "work item '{}' belongs to workflow execution '{execution_id}'; the workflow result contract must settle it",
+            progress.work_item_id
+        ))
+        .into());
+    }
+    Ok(())
 }
 
 /// The ordering fence has to survive a round trip through the row's signed
@@ -215,27 +250,35 @@ fn stamped_report(
     }
 }
 
-async fn insert_initial_progress_in_tx(
+pub(in crate::daemon::db::task_board) async fn insert_initial_progress_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     item: &TaskBoardItem,
     work_item_id: &str,
+    attempt_id: Option<&str>,
     now: &str,
 ) -> Result<TaskBoardWorkItemProgress, CliError> {
-    let progress = TaskBoardWorkItemProgress::new(
+    let mut progress = TaskBoardWorkItemProgress::new(
         item.id.clone(),
         work_item_id.to_string(),
         item.workflow.execution_id.clone(),
         now.to_string(),
     );
+    progress.attempt_id = attempt_id.map(str::to_owned);
     query(
         "INSERT INTO task_board_work_item_progress (
-             work_item_id, item_id, execution_id, state, report_sequence, created_at, updated_at
-         ) VALUES (?1, ?2, ?3, ?4, 0, ?5, ?5)",
+             item_id, work_item_id, execution_id, agent_mode, state, attempt_id,
+             report_sequence, created_at, updated_at
+         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, ?7, ?7)",
     )
-    .bind(work_item_id)
     .bind(&item.id)
+    .bind(work_item_id)
     .bind(item.workflow.execution_id.as_deref())
+    .bind(super::mapper::label(
+        item.agent_mode,
+        "task board agent mode",
+    )?)
     .bind(progress.state.as_str())
+    .bind(attempt_id)
     .bind(now)
     .execute(transaction.as_mut())
     .await
@@ -272,10 +315,11 @@ async fn persist_outcome_in_tx(
     {
         query(
             "INSERT INTO task_board_work_item_checkpoints (
-                 work_item_id, sequence, checkpoint_id, actor, summary,
+                 item_id, work_item_id, sequence, checkpoint_id, actor, summary,
                  progress_percent, attempt_id, recorded_at
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
         )
+        .bind(&progress.board_item_id)
         .bind(&progress.work_item_id)
         .bind(i64::try_from(checkpoint.sequence).unwrap_or(i64::MAX))
         .bind(&checkpoint.checkpoint_id)
@@ -288,7 +332,11 @@ async fn persist_outcome_in_tx(
         .await
         .map_err(|error| db_error(format!("record work item checkpoint: {error}")))?;
     }
-    project_item_in_tx(transaction, item, item_revision, progress).await
+    let projection = project_item_in_tx(transaction, item, item_revision, progress).await?;
+    if !projection.changed {
+        bump_change_in_tx(transaction, ITEMS_CHANGE_SCOPE).await?;
+    }
+    Ok(projection)
 }
 
 async fn write_progress_in_tx(
@@ -300,12 +348,13 @@ async fn write_progress_in_tx(
     // CHECK refuses a settlement time without a completion time anyway.
     query(
         "UPDATE task_board_work_item_progress
-         SET execution_id = ?2, state = ?3, progress_percent = ?4, summary = ?5,
-             blocked_reason = ?6, attempt_id = ?7, item_revision = ?8,
-             report_sequence = ?9, updated_at = ?10, completed_at = ?11,
-             worker_settled_at = CASE WHEN ?11 IS NULL THEN NULL ELSE worker_settled_at END
-         WHERE work_item_id = ?1",
+         SET execution_id = ?3, state = ?4, progress_percent = ?5, summary = ?6,
+             blocked_reason = ?7, attempt_id = ?8, item_revision = ?9,
+             report_sequence = ?10, updated_at = ?11, completed_at = ?12,
+             worker_settled_at = CASE WHEN ?12 IS NULL THEN NULL ELSE worker_settled_at END
+         WHERE item_id = ?1 AND work_item_id = ?2",
     )
+    .bind(&progress.board_item_id)
     .bind(&progress.work_item_id)
     .bind(progress.execution_id.as_deref())
     .bind(progress.state.as_str())
@@ -351,7 +400,7 @@ fn sequence_column(sequence: u64) -> Result<i64, CliError> {
 /// item's workflow stamp through that window, and projecting over it would
 /// fight the admission it is mid-way through writing. The record still advances
 /// - it is the authority - and the next report or dispatch completion lands the
-/// lane once the reservation clears.
+///   lane once the reservation clears.
 async fn project_item_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     item: TaskBoardItem,

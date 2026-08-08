@@ -45,6 +45,9 @@ pub struct TaskBoardProgressCommonArgs {
     /// Task-board item identifier.
     #[arg(long = "item-id", visible_alias = "id")]
     pub item_id: String,
+    /// Dispatched work-item identifier shown in the worker prompt.
+    #[arg(long = "work-item-id")]
+    pub work_item_id: String,
     /// The agent reporting. Defaults to the calling principal.
     #[arg(long)]
     pub actor: Option<String>,
@@ -71,6 +74,7 @@ impl Execute for TaskBoardProgressCheckpointArgs {
         report(
             &self.common,
             &TaskBoardWorkItemReportRequest {
+                work_item_id: self.common.work_item_id.clone(),
                 actor: self.common.actor.clone(),
                 // No state: the daemon reads a bare checkpoint as "still
                 // going" and promotes a pending or sent-back work item to
@@ -99,6 +103,7 @@ impl Execute for TaskBoardProgressSubmitArgs {
         report(
             &self.common,
             &TaskBoardWorkItemReportRequest {
+                work_item_id: self.common.work_item_id.clone(),
                 actor: self.common.actor.clone(),
                 state: Some(TaskBoardWorkItemState::AwaitingReview),
                 summary: self.summary.clone(),
@@ -123,6 +128,7 @@ impl Execute for TaskBoardProgressCompleteArgs {
         report(
             &self.common,
             &TaskBoardWorkItemReportRequest {
+                work_item_id: self.common.work_item_id.clone(),
                 actor: self.common.actor.clone(),
                 state: Some(TaskBoardWorkItemState::Done),
                 summary: self.summary.clone(),
@@ -148,6 +154,7 @@ impl Execute for TaskBoardProgressBlockArgs {
         report(
             &self.common,
             &TaskBoardWorkItemReportRequest {
+                work_item_id: self.common.work_item_id.clone(),
                 actor: self.common.actor.clone(),
                 state: Some(TaskBoardWorkItemState::Blocked),
                 summary: None,

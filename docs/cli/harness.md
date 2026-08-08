@@ -1885,11 +1885,12 @@ Report and read worker progress on a dispatched item
 
 Record a checkpoint against the dispatched work item
 
-**Usage:** `harness task-board progress checkpoint [OPTIONS] --item-id <ITEM_ID> --summary <SUMMARY>`
+**Usage:** `harness task-board progress checkpoint [OPTIONS] --item-id <ITEM_ID> --work-item-id <WORK_ITEM_ID> --summary <SUMMARY>`
 
 ###### **Options:**
 
 * `--item-id <ITEM_ID>` [alias: `id`] — Task-board item identifier
+* `--work-item-id <WORK_ITEM_ID>` — Dispatched work-item identifier shown in the worker prompt
 * `--actor <ACTOR>` — The agent reporting. Defaults to the calling principal
 * `--sequence <SEQUENCE>` — Ordering fence; must be greater than the last accepted report
 * `--json`
@@ -1902,11 +1903,12 @@ Record a checkpoint against the dispatched work item
 
 Hand the work item to review, keeping the attempt that produced it
 
-**Usage:** `harness task-board progress submit-for-review [OPTIONS] --item-id <ITEM_ID>`
+**Usage:** `harness task-board progress submit-for-review [OPTIONS] --item-id <ITEM_ID> --work-item-id <WORK_ITEM_ID>`
 
 ###### **Options:**
 
 * `--item-id <ITEM_ID>` [alias: `id`] — Task-board item identifier
+* `--work-item-id <WORK_ITEM_ID>` — Dispatched work-item identifier shown in the worker prompt
 * `--actor <ACTOR>` — The agent reporting. Defaults to the calling principal
 * `--sequence <SEQUENCE>` — Ordering fence; must be greater than the last accepted report
 * `--json`
@@ -1918,11 +1920,12 @@ Hand the work item to review, keeping the attempt that produced it
 
 Report the work item as finished
 
-**Usage:** `harness task-board progress complete [OPTIONS] --item-id <ITEM_ID>`
+**Usage:** `harness task-board progress complete [OPTIONS] --item-id <ITEM_ID> --work-item-id <WORK_ITEM_ID>`
 
 ###### **Options:**
 
 * `--item-id <ITEM_ID>` [alias: `id`] — Task-board item identifier
+* `--work-item-id <WORK_ITEM_ID>` — Dispatched work-item identifier shown in the worker prompt
 * `--actor <ACTOR>` — The agent reporting. Defaults to the calling principal
 * `--sequence <SEQUENCE>` — Ordering fence; must be greater than the last accepted report
 * `--json`
@@ -1934,11 +1937,12 @@ Report the work item as finished
 
 Report the work item as stalled and needing a human
 
-**Usage:** `harness task-board progress block [OPTIONS] --item-id <ITEM_ID> --reason <REASON>`
+**Usage:** `harness task-board progress block [OPTIONS] --item-id <ITEM_ID> --work-item-id <WORK_ITEM_ID> --reason <REASON>`
 
 ###### **Options:**
 
 * `--item-id <ITEM_ID>` [alias: `id`] — Task-board item identifier
+* `--work-item-id <WORK_ITEM_ID>` — Dispatched work-item identifier shown in the worker prompt
 * `--actor <ACTOR>` — The agent reporting. Defaults to the calling principal
 * `--sequence <SEQUENCE>` — Ordering fence; must be greater than the last accepted report
 * `--json`

@@ -2,18 +2,25 @@ use crate::daemon::protocol::CodexRunStatus;
 use crate::daemon::protocol::{CodexRunRequest, CodexRunSnapshot, TaskBoardEvaluateRequest};
 use crate::daemon::service as daemon_service;
 use crate::session::service as session_service;
-use crate::session::types::{AgentStatus, ManagedAgentRef, SessionState, TaskStatus};
+use crate::session::types::{
+    AgentStatus, CONTROL_PLANE_ACTOR_ID, ManagedAgentRef, SessionState, TaskStatus,
+};
 use crate::workspace::utc_now;
-use harness_kernel::errors::CliError;
+use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::handle::{CodexControllerHandle, lock_db};
-use super::handle_orchestration_lifecycle::apply_bound_task_terminal_transition;
+use super::handle_orchestration_lifecycle::{
+    SessionlessWorkItemTerminalReport, apply_bound_task_terminal_transition,
+    sessionless_work_item_terminal_report,
+};
 use super::orchestration::{
     orchestration_status_for_codex_run, rollback_codex_registration,
     update_codex_orchestration_status,
 };
 use super::orchestration_registration::{RegisteredOrchestrationAgent, RegistrationMutation};
 use crate::daemon::db::prelude::*;
+use crate::daemon::db::task_board::prelude::WorkItemProgressQueries;
+use crate::daemon::db::task_board::work_item_progress::TaskBoardWorkItemReportRequest;
 
 fn should_reconcile_board_item(
     state: &SessionState,
@@ -29,6 +36,65 @@ fn should_reconcile_board_item(
             .as_deref()
             .and_then(|task_id| state.tasks.get(task_id))
             .is_some_and(|task| task.status != TaskStatus::InProgress)
+}
+
+async fn persist_sessionless_work_item_terminal_async(
+    db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
+    board_item_id: &str,
+    work_item_id: &str,
+    report: SessionlessWorkItemTerminalReport,
+) -> Result<bool, CliError> {
+    let current = db.task_board_work_item_progress(board_item_id).await?;
+    if current
+        .as_ref()
+        .is_some_and(|progress| progress.work_item_id != work_item_id)
+    {
+        return Ok(false);
+    }
+    if db
+        .task_board_work_item_is_workflow_owned(board_item_id, work_item_id)
+        .await?
+    {
+        return Ok(false);
+    }
+    if current
+        .as_ref()
+        .is_some_and(|progress| terminal_report_matches(progress, &report))
+    {
+        return Ok(false);
+    }
+    let sequence = current
+        .as_ref()
+        .map(|progress| {
+            progress.report_sequence.checked_add(1).ok_or_else(|| {
+                CliError::from(CliErrorKind::invalid_transition(
+                    "task-board work item report sequence is exhausted",
+                ))
+            })
+        })
+        .transpose()?;
+    let outcome = db
+        .report_task_board_work_item_progress(&TaskBoardWorkItemReportRequest {
+            board_item_id: board_item_id.to_string(),
+            work_item_id: work_item_id.to_string(),
+            actor: CONTROL_PLANE_ACTOR_ID.to_string(),
+            state: Some(report.state),
+            summary: report.summary,
+            progress_percent: None,
+            blocked_reason: report.blocked_reason,
+            sequence,
+        })
+        .await?;
+    Ok(outcome.applied)
+}
+
+fn terminal_report_matches(
+    progress: &crate::task_board::TaskBoardWorkItemProgress,
+    report: &SessionlessWorkItemTerminalReport,
+) -> bool {
+    progress.state == report.state
+        && progress.summary == report.summary
+        && progress.blocked_reason == report.blocked_reason
 }
 
 impl CodexControllerHandle {
@@ -68,7 +134,7 @@ impl CodexControllerHandle {
         status: AgentStatus,
     ) -> Result<bool, CliError> {
         let Some(session_agent_id) = run.session_agent_id.clone() else {
-            return Ok(false);
+            return self.persist_sessionless_work_item_terminal(run);
         };
         let managed_agent = ManagedAgentRef::codex(run.run_id.as_str());
         if let Some(result) = self.persist_orchestration_status_async(
@@ -80,6 +146,26 @@ impl CodexControllerHandle {
             return result;
         }
         self.persist_orchestration_status_sync(run, &session_agent_id, &managed_agent, status)
+    }
+
+    fn persist_sessionless_work_item_terminal(
+        &self,
+        run: &CodexRunSnapshot,
+    ) -> Result<bool, CliError> {
+        let (Some(board_item_id), Some(work_item_id), Some(report)) = (
+            run.board_item_id.clone(),
+            run.task_id.clone(),
+            sessionless_work_item_terminal_report(run),
+        ) else {
+            return Ok(false);
+        };
+        let Some(result) = self.run_with_async_db(|db| async move {
+            persist_sessionless_work_item_terminal_async(&db, &board_item_id, &work_item_id, report)
+                .await
+        }) else {
+            return Ok(false);
+        };
+        result
     }
 
     fn persist_orchestration_status_async(

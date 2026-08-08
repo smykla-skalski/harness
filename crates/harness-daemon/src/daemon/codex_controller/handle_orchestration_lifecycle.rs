@@ -2,8 +2,39 @@ use crate::daemon::protocol::{CodexRunSnapshot, CodexRunStatus};
 use crate::session::service as session_service;
 use crate::session::types::{CONTROL_PLANE_ACTOR_ID, SessionState, TaskStatus};
 use harness_kernel::errors::CliError;
+use harness_task_board::TaskBoardWorkItemState;
 
 const TASK_SUBMISSION_SUMMARY_LIMIT: usize = 2_000;
+
+pub(super) struct SessionlessWorkItemTerminalReport {
+    pub(super) state: TaskBoardWorkItemState,
+    pub(super) summary: Option<String>,
+    pub(super) blocked_reason: Option<String>,
+}
+
+pub(super) fn sessionless_work_item_terminal_report(
+    run: &CodexRunSnapshot,
+) -> Option<SessionlessWorkItemTerminalReport> {
+    match run.status {
+        CodexRunStatus::Completed
+            if super::completion_evidence::worktree_changed_since_baseline(run) =>
+        {
+            Some(SessionlessWorkItemTerminalReport {
+                state: TaskBoardWorkItemState::AwaitingReview,
+                summary: Some(completion_summary(run.final_message.as_deref())),
+                blocked_reason: None,
+            })
+        }
+        CodexRunStatus::Completed | CodexRunStatus::Failed | CodexRunStatus::Cancelled => {
+            Some(SessionlessWorkItemTerminalReport {
+                state: TaskBoardWorkItemState::Blocked,
+                summary: None,
+                blocked_reason: Some(terminal_failure_reason(run)),
+            })
+        }
+        CodexRunStatus::Queued | CodexRunStatus::Running | CodexRunStatus::WaitingApproval => None,
+    }
+}
 
 #[expect(
     clippy::cognitive_complexity,

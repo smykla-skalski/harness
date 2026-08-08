@@ -11,6 +11,9 @@ use crate::task_board::{
 use super::*;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 
+#[path = "task_board_evaluation_settlement_tests.rs"]
+mod settlement_tests;
+
 const NOW: &str = "2026-05-14T00:00:00Z";
 
 struct Fixture {
@@ -378,6 +381,7 @@ async fn a_sessionless_item_reports_its_durable_record_without_writing() {
         .db
         .report_task_board_work_item_progress(&TaskBoardWorkItemReportRequest {
             board_item_id: item.id.clone(),
+            work_item_id: item.work_item_id.clone().expect("dispatched work item"),
             actor: "agent-1".to_string(),
             state: Some(TaskBoardWorkItemState::AwaitingReview),
             summary: Some("ready for review".to_string()),

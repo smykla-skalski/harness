@@ -12,6 +12,7 @@ use crate::daemon::db::{
 };
 use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::http::DaemonHttpState;
+use crate::daemon::service::settle_pending_worker;
 use crate::daemon::service::task_board::prepare_claimed_task_board_dispatch;
 use crate::daemon::task_board_managed_agents::{
     maintain_task_board_dispatch_claim, resume_worker_compensation,
@@ -70,6 +71,7 @@ async fn recover_pending_dispatches(state: &DaemonHttpState, db: &AsyncDaemonDbH
     {
         warn!(%error, "policy automation control enforcement failed");
     }
+    recover_pending_worker_settlements(state, db).await;
     if let Err(error) = Box::pin(super::recover_remote_assignments_before_local_work(
         state, db,
     ))
@@ -114,6 +116,22 @@ async fn recover_pending_dispatches(state: &DaemonHttpState, db: &AsyncDaemonDbH
     }
     if let Err(error) = Box::pin(reconcile_task_board_read_only_workflows(state, db)).await {
         warn!(%error, "read-only workflow recovery failed");
+    }
+}
+
+async fn recover_pending_worker_settlements(state: &DaemonHttpState, db: &AsyncDaemonDbHandle) {
+    let settlements = match db
+        .pending_task_board_work_item_worker_settlements(MAX_RECOVERIES_PER_TICK)
+        .await
+    {
+        Ok(settlements) => settlements,
+        Err(error) => {
+            warn!(%error, "work item worker settlement recovery failed");
+            return;
+        }
+    };
+    for settlement in settlements {
+        settle_pending_worker(state, db, &settlement).await;
     }
 }
 

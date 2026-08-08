@@ -40,20 +40,22 @@ const SELECT_PROGRESS_SQL: &str = "SELECT work_item_id, item_id, execution_id, s
         progress_percent, summary, blocked_reason, attempt_id, item_revision,
         report_sequence, created_at, updated_at, completed_at, worker_settled_at
      FROM task_board_work_item_progress
-     WHERE work_item_id = ?1";
+     WHERE item_id = ?1 AND work_item_id = ?2";
 
 const SELECT_CHECKPOINTS_SQL: &str = "SELECT checkpoint_id, sequence, actor, summary,
         progress_percent, attempt_id, recorded_at
      FROM task_board_work_item_checkpoints
-     WHERE work_item_id = ?1
+     WHERE item_id = ?1 AND work_item_id = ?2
      ORDER BY sequence";
 
 /// Loads one progress record and its checkpoint log inside a transaction.
 pub(super) async fn load_progress_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
+    item_id: &str,
     work_item_id: &str,
 ) -> Result<Option<(TaskBoardWorkItemProgress, Option<String>)>, CliError> {
     let Some(row) = query_as::<_, WorkItemProgressRow>(SELECT_PROGRESS_SQL)
+        .bind(item_id)
         .bind(work_item_id)
         .fetch_optional(transaction.as_mut())
         .await
@@ -62,6 +64,7 @@ pub(super) async fn load_progress_in_tx(
         return Ok(None);
     };
     let checkpoints = query_as::<_, WorkItemCheckpointRow>(SELECT_CHECKPOINTS_SQL)
+        .bind(item_id)
         .bind(work_item_id)
         .fetch_all(transaction.as_mut())
         .await

@@ -44,7 +44,11 @@ pub fn render_worker_prompt(
         ("status", format!("{:?}", context.status)),
         (
             "lifecycle_section",
-            lifecycle_section(context.session_id, context.board_item_id),
+            lifecycle_section(
+                context.session_id,
+                context.board_item_id,
+                context.work_item_id,
+            ),
         ),
     ]);
     for fact in optional_facts(item, context) {
@@ -149,13 +153,13 @@ impl Fact {
 /// Every worker reports against its board item, whether or not a legacy Session
 /// still owns it: the board is the one durable record either way, and a Session
 /// task that exists is translated into the same record by evaluation.
-fn lifecycle_section(_session_id: Option<&str>, board_item_id: &str) -> String {
+fn lifecycle_section(_session_id: Option<&str>, board_item_id: &str, work_item_id: &str) -> String {
     let mut section = String::from(
         "\n\nLifecycle:\nImplement the requested work, keep changes scoped, and run the smallest relevant validation.",
     );
     write!(
         section,
-        "\n1. Report progress with `harness task-board progress checkpoint --item-id {board_item_id} --summary \"<summary>\" --progress <0-100>`.\n2. Submit with `harness task-board progress submit-for-review --item-id {board_item_id} --summary \"<summary>\"`.\n3. If the work cannot continue, run `harness task-board progress block --item-id {board_item_id} --reason \"<reason>\"` instead of stopping silently.\nRead the record back at any time with `harness task-board progress show --item-id {board_item_id}`. The controller also settles this item when the managed run completes and is the authoritative safety net."
+        "\n1. Report progress with `harness task-board progress checkpoint --item-id {board_item_id} --work-item-id {work_item_id} --summary \"<summary>\" --progress <0-100>`.\n2. Submit with `harness task-board progress submit-for-review --item-id {board_item_id} --work-item-id {work_item_id} --summary \"<summary>\"`.\n3. If the work cannot continue, run `harness task-board progress block --item-id {board_item_id} --work-item-id {work_item_id} --reason \"<reason>\"` instead of stopping silently.\nRead the record back at any time with `harness task-board progress show --item-id {board_item_id}`. The controller also settles this item when the managed run completes and is the authoritative safety net."
     )
     .expect("writing to a string cannot fail");
     section

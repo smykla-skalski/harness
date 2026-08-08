@@ -56,11 +56,16 @@ final class TaskBoardWorkerProgressState {
     itemID = item.id
     token += 1
     let loadToken = token
-    loadState = .loading
+    let previousLoadState = loadState
+    if case .loaded = loadState {
+      // Keep the last resolved value visible during a revision-driven refresh.
+    } else {
+      loadState = .loading
+    }
     let response = await store?.taskBoardItemProgress(id: item.id)
     guard itemID == item.id, token == loadToken else { return }
     guard !Task.isCancelled else {
-      loadState = .idle
+      loadState = previousLoadState
       return
     }
     loadState = response.map { .loaded(Self.presentation(for: $0)) } ?? .failed

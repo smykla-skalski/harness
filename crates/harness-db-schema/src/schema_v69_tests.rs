@@ -6,12 +6,19 @@ const SEED_V68_SQL: &str = "PRAGMA foreign_keys = ON;
      CREATE TABLE task_board_items (
          item_id       TEXT PRIMARY KEY,
          status        TEXT NOT NULL,
+         agent_mode    TEXT NOT NULL,
          workflow_json TEXT NOT NULL,
          work_item_id  TEXT,
          revision      INTEGER NOT NULL DEFAULT 1,
          created_at    TEXT NOT NULL,
          updated_at    TEXT NOT NULL,
          deleted_at    TEXT
+     );
+     CREATE TABLE task_board_dispatch_intents (
+         intent_id   TEXT PRIMARY KEY,
+         item_id     TEXT NOT NULL,
+         work_item_id TEXT NOT NULL,
+         created_at  TEXT NOT NULL
      );";
 
 fn seeded_connection() -> Connection {
@@ -23,8 +30,10 @@ fn seeded_connection() -> Connection {
 fn insert_item(conn: &Connection, item_id: &str, status: &str, workflow: &str, work_item: &str) {
     conn.execute(
         "INSERT INTO task_board_items (
-             item_id, status, workflow_json, work_item_id, revision, created_at, updated_at
-         ) VALUES (?1, ?2, ?3, ?4, 4, '2026-08-01T00:00:00Z', '2026-08-02T00:00:00Z')",
+             item_id, status, agent_mode, workflow_json, work_item_id, revision,
+             created_at, updated_at
+         ) VALUES (?1, ?2, 'headless', ?3, ?4, 4,
+                   '2026-08-01T00:00:00Z', '2026-08-02T00:00:00Z')",
         rusqlite::params![item_id, status, workflow, work_item],
     )
     .expect("insert task-board item");
@@ -83,6 +92,33 @@ fn upgrade_backfills_every_dispatched_lane_and_replays() {
 }
 
 #[test]
+fn backfill_keeps_same_named_tasks_from_different_items_isolated() {
+    let conn = seeded_connection();
+    insert_item(&conn, "item-1", "in_progress", "{}", "task-1");
+    insert_item(&conn, "item-2", "to_review", "{}", "task-1");
+
+    run(&conn).expect("upgrade v68 database");
+
+    let count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM task_board_work_item_progress WHERE work_item_id = 'task-1'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("count same-named work items");
+    assert_eq!(count, 2);
+    let item_2_state: String = conn
+        .query_row(
+            "SELECT state FROM task_board_work_item_progress
+             WHERE item_id = 'item-2' AND work_item_id = 'task-1'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("load second work item");
+    assert_eq!(item_2_state, "awaiting_review");
+}
+
+#[test]
 fn backfill_carries_execution_binding_revision_and_block_reason() {
     let conn = seeded_connection();
     insert_item(
@@ -128,16 +164,18 @@ fn backfill_skips_undispatched_and_deleted_items() {
     let conn = seeded_connection();
     conn.execute(
         "INSERT INTO task_board_items (
-             item_id, status, workflow_json, work_item_id, revision, created_at, updated_at
-         ) VALUES ('item-1', 'todo', '{}', NULL, 1, 'created', 'updated')",
+             item_id, status, agent_mode, workflow_json, work_item_id, revision,
+             created_at, updated_at
+         ) VALUES ('item-1', 'todo', 'headless', '{}', NULL, 1, 'created', 'updated')",
         [],
     )
     .expect("insert undispatched item");
     conn.execute(
         "INSERT INTO task_board_items (
-             item_id, status, workflow_json, work_item_id, revision,
+             item_id, status, agent_mode, workflow_json, work_item_id, revision,
              created_at, updated_at, deleted_at
-         ) VALUES ('item-2', 'done', '{}', 'work-2', 1, 'created', 'updated', 'deleted')",
+         ) VALUES ('item-2', 'done', 'headless', '{}', 'work-2', 1,
+                   'created', 'updated', 'deleted')",
         [],
     )
     .expect("insert deleted item");
@@ -218,8 +256,8 @@ fn checkpoints_cascade_with_their_work_item() {
     run(&conn).expect("upgrade v68 database");
     conn.execute(
         "INSERT INTO task_board_work_item_checkpoints (
-             work_item_id, sequence, checkpoint_id, actor, summary, recorded_at
-         ) VALUES ('work-1', 1, 'checkpoint-1', 'agent-1', 'first', 'recorded')",
+             item_id, work_item_id, sequence, checkpoint_id, actor, summary, recorded_at
+         ) VALUES ('item-1', 'work-1', 1, 'checkpoint-1', 'agent-1', 'first', 'recorded')",
         [],
     )
     .expect("insert checkpoint");

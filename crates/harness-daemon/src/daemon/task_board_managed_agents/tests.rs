@@ -60,16 +60,12 @@ fn codex_worker_request_carries_task_board_identity() {
             .prompt
             .contains("Managed run id:\ncodex-dispatch-intent-1")
     );
-    assert!(
-        request
-            .prompt
-            .contains("harness task-board progress checkpoint --item-id board-1")
-    );
-    assert!(
-        request
-            .prompt
-            .contains("harness task-board progress submit-for-review --item-id board-1")
-    );
+    assert!(request.prompt.contains(
+        "harness task-board progress checkpoint --item-id board-1 --work-item-id task-1",
+    ));
+    assert!(request.prompt.contains(
+        "harness task-board progress submit-for-review --item-id board-1 --work-item-id task-1",
+    ));
     assert!(request.prompt.contains("authoritative safety net"));
 }
 

@@ -36008,6 +36008,9 @@
       "TaskBoardWorkItemReportRequest": {
         "type": "object",
         "description": "What a worker reports against its dispatched work item.\n\nThe attempt identity and the work-item revision are deliberately absent: the\ndaemon stamps both from the item's own dispatch, so a review handoff carries\nthe attempt the board really started rather than one the worker named.",
+        "required": [
+          "work_item_id"
+        ],
         "properties": {
           "actor": {
             "type": [
@@ -36056,6 +36059,10 @@
               "string",
               "null"
             ]
+          },
+          "work_item_id": {
+            "type": "string",
+            "description": "Immutable identity of the dispatch producing this report."
           }
         }
       },

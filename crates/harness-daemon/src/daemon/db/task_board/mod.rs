@@ -166,6 +166,7 @@ mod scheduler;
 pub(crate) mod work_item_progress;
 mod work_item_progress_queries;
 mod work_item_progress_rows;
+mod work_item_progress_settlement;
 #[cfg(test)]
 mod work_item_progress_tests;
 mod workflow_dispatch;

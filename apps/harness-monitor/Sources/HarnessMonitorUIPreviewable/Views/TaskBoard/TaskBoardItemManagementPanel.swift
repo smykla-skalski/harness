@@ -55,7 +55,8 @@ struct TaskBoardItemManagementPanel: View {
     return TaskBoardWorkerProgressLoadKey(
       itemID: item.id,
       workItemID: workItemID,
-      updatedAt: item.updatedAt
+      updatedAt: item.updatedAt,
+      taskBoardRevision: actions.store?.contentUI.dashboard.taskBoardRevision ?? 0
     )
   }
 

@@ -396,6 +396,7 @@ pub use task_board_runtime::{
 };
 pub(crate) use task_board_work_item_progress::{
     get_task_board_work_item_progress_db, report_task_board_work_item_progress_db,
+    settle_pending_worker,
 };
 pub use task_board_working_copies::{
     WorkingCopyGcReport, delete_task_board_working_copy, list_task_board_working_copies,

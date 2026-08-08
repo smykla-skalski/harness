@@ -181,6 +181,7 @@ async fn translate_session_task(
     let result = db
         .report_task_board_work_item_progress(&TaskBoardWorkItemReportRequest {
             board_item_id: item.id.clone(),
+            work_item_id: task.task_id.clone(),
             actor: CONTROL_PLANE_ACTOR_ID.to_string(),
             state: Some(state),
             summary: None,

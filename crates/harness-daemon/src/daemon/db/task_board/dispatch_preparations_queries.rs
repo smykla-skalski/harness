@@ -10,7 +10,7 @@
 //! stays in the parent file because it is the entry point every reader looks
 //! for first.
 
-use sqlx::{query, query_as};
+use sqlx::{Sqlite, Transaction, query, query_as};
 
 use super::super::ITEMS_CHANGE_SCOPE;
 use super::super::dispatch_admission_tx_ext::TaskBoardDispatchAdmissionTxExt;
@@ -35,6 +35,7 @@ use crate::daemon::db::prelude::*;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
 use crate::task_board::{
     DispatchAppliedTask, TaskBoardReadOnlyWorkflowLaunch, TaskBoardWriteWorkflowLaunch,
+    managed_worker_id,
 };
 use harness_kernel::errors::CliErrorKind;
 
@@ -141,6 +142,24 @@ pub(in crate::daemon::db::task_board) async fn complete_task_board_dispatch_prep
         .await
 }
 
+async fn insert_initial_dispatch_progress_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    applied: &DispatchAppliedTask,
+    intent_id: &str,
+    now: &str,
+) -> Result<(), CliError> {
+    let worker_id = managed_worker_id(applied, intent_id);
+    super::super::work_item_progress::insert_initial_progress_in_tx(
+        transaction,
+        &applied.item,
+        &applied.work_item_id,
+        Some(&worker_id),
+        now,
+    )
+    .await?;
+    Ok(())
+}
+
 #[expect(
     clippy::cognitive_complexity,
     reason = "dispatch completion must keep item linking and intent publication atomic"
@@ -207,6 +226,9 @@ pub(in crate::daemon::db::task_board) async fn complete_task_board_dispatch_prep
         read_only_workflow,
         write_workflow,
     };
+    let now = utc_now();
+    insert_initial_dispatch_progress_in_tx(&mut transaction, &applied, &claim.intent_id, &now)
+        .await?;
     let payload = serde_json::to_string(&applied)
         .map_err(|error| db_error(format!("serialize prepared task board dispatch: {error}")))?;
     let published_status = if preparation.hold_worker {
@@ -225,7 +247,7 @@ pub(in crate::daemon::db::task_board) async fn complete_task_board_dispatch_prep
     .bind(&claim.claim_token)
     .bind(payload)
     .bind(published_status)
-    .bind(utc_now())
+    .bind(&now)
     .bind(if preparation.hold_worker {
         None
     } else {

@@ -49,6 +49,7 @@ pub(crate) async fn report_task_board_work_item_progress_db(
     let result = db
         .report_task_board_work_item_progress(&DbReportRequest {
             board_item_id: board_item_id.to_string(),
+            work_item_id: request.work_item_id.clone(),
             actor: request
                 .actor
                 .clone()
@@ -61,12 +62,15 @@ pub(crate) async fn report_task_board_work_item_progress_db(
         })
         .await?;
     if let Some(worker_id) = result.pending_worker_settlement.as_deref() {
-        settle_worker(
+        settle_pending_worker(
             state,
             db,
-            &result.progress.work_item_id,
-            worker_id,
-            &result.item,
+            &TaskBoardPendingWorkerSettlement {
+                board_item_id: result.item.id.clone(),
+                work_item_id: result.progress.work_item_id.clone(),
+                worker_id: worker_id.to_string(),
+                agent_mode: result.item.agent_mode,
+            },
         )
         .await;
     }
@@ -88,35 +92,36 @@ pub(crate) async fn report_task_board_work_item_progress_db(
     clippy::cognitive_complexity,
     reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
 )]
-async fn settle_worker(
+pub(crate) async fn settle_pending_worker(
     state: &DaemonHttpState,
     db: &AsyncDaemonDbHandle,
-    work_item_id: &str,
-    worker_id: &str,
-    item: &crate::task_board::TaskBoardItem,
+    settlement: &TaskBoardPendingWorkerSettlement,
 ) {
     if let Err(error) = stop_managed_worker(
         state,
-        item.agent_mode,
-        worker_id.to_string(),
+        settlement.agent_mode,
+        settlement.worker_id.clone(),
         "task-board work item settlement",
     )
     .await
     {
         warn!(
-            board_item_id = %item.id,
-            work_item_id,
-            worker_id,
+            board_item_id = %settlement.board_item_id,
+            work_item_id = %settlement.work_item_id,
+            worker_id = %settlement.worker_id,
             error = %error,
             "task-board work item settled but its worker could not be stopped"
         );
         return;
     }
-    if let Err(error) = db.settle_task_board_work_item_worker(work_item_id).await {
+    if let Err(error) = db
+        .settle_task_board_work_item_worker(&settlement.board_item_id, &settlement.work_item_id)
+        .await
+    {
         warn!(
-            board_item_id = %item.id,
-            work_item_id,
-            worker_id,
+            board_item_id = %settlement.board_item_id,
+            work_item_id = %settlement.work_item_id,
+            worker_id = %settlement.worker_id,
             error = %error,
             "task-board work item worker stopped but the settlement could not be recorded"
         );

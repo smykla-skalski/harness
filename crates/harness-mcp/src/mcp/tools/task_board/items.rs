@@ -219,6 +219,7 @@ fn progress_report_schema() -> Value {
         "type": "object",
         "properties": {
             "id": { "type": "string" },
+            "work_item_id": { "type": "string" },
             "state": {
                 "type": "string",
                 "enum": [
@@ -231,7 +232,7 @@ fn progress_report_schema() -> Value {
             "blocked_reason": { "type": "string" },
             "sequence": { "type": "integer", "minimum": 1 }
         },
-        "required": ["id"],
+        "required": ["id", "work_item_id"],
         "additionalProperties": false
     })
 }
@@ -357,7 +358,7 @@ mod tests {
     use super::{
         TASK_BOARD_LIST_MAX_CURSOR_CHARS, TASK_BOARD_LIST_MAX_LIMIT,
         TASK_BOARD_LIST_MAX_QUERY_CHARS, TASK_BOARD_LIST_MAX_TAGS, create_schema, list_schema,
-        update_schema,
+        progress_report_schema, update_schema,
     };
 
     /// A `minLength` of 1 would still advertise a whitespace-only title as
@@ -429,6 +430,17 @@ mod tests {
         assert_eq!(
             schema["allOf"][1]["not"]["required"],
             json!(["estimated_cost_microusd", "clear_estimated_cost_microusd"])
+        );
+    }
+
+    #[test]
+    fn progress_report_requires_the_exact_dispatch_identity() {
+        let schema = progress_report_schema();
+
+        assert_eq!(schema["required"], json!(["id", "work_item_id"]));
+        assert_eq!(
+            schema["properties"]["work_item_id"]["type"],
+            json!("string")
         );
     }
 }

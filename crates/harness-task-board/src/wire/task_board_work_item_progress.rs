@@ -13,6 +13,8 @@ use crate::work_item_progress::{
 /// the attempt the board really started rather than one the worker named.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskBoardWorkItemReportRequest {
+    /// Immutable identity of the dispatch producing this report.
+    pub work_item_id: String,
     /// Who is reporting. Defaults to the control plane when omitted.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub actor: Option<String>,

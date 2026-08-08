@@ -146,6 +146,7 @@ public enum TaskBoardWorkItemReportRejection: String, Codable, Equatable, Sendab
 }
 
 public struct TaskBoardWorkItemReportRequest: Codable, Equatable, Sendable {
+  public var workItemId: String
   public var actor: String?
   public var state: TaskBoardWorkItemState?
   public var summary: String?
@@ -154,6 +155,7 @@ public struct TaskBoardWorkItemReportRequest: Codable, Equatable, Sendable {
   public var sequence: UInt64?
 
   public init(
+    workItemId: String = "",
     actor: String? = nil,
     state: TaskBoardWorkItemState? = nil,
     summary: String? = nil,
@@ -161,6 +163,7 @@ public struct TaskBoardWorkItemReportRequest: Codable, Equatable, Sendable {
     blockedReason: String? = nil,
     sequence: UInt64? = nil
   ) {
+    self.workItemId = workItemId
     self.actor = actor
     self.state = state
     self.summary = summary
@@ -170,6 +173,7 @@ public struct TaskBoardWorkItemReportRequest: Codable, Equatable, Sendable {
   }
 
   enum CodingKeys: String, CodingKey {
+    case workItemId = "work_item_id"
     case actor
     case state
     case summary
