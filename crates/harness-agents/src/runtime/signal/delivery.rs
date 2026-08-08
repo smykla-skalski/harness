@@ -5,9 +5,10 @@ use harness_infra::persistence::flock::{FlockErrorContext, with_exclusive_flock}
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::acknowledgment::{
-    AckPaths, move_pending_if_present, read_existing_ack, write_new_ack_locked,
+    AckPaths, move_pending_if_present, pending_signal_exists, read_existing_ack,
+    write_new_ack_locked,
 };
-use super::{Signal, SignalAck, write_signal_file};
+use super::{AckResult, Signal, SignalAck, write_signal_file};
 
 /// Result of reconciling one durable signal with its runtime file queue.
 #[derive(Debug, Clone)]
@@ -37,6 +38,15 @@ pub fn ensure_signal_file(signal_dir: &Path, signal: &Signal) -> Result<SignalFi
         FlockErrorContext::new("signal delivery"),
         || {
             if let Some(acknowledgment) = read_existing_ack(&paths, &signal.signal_id)? {
+                // Terminal only once the payload has left `pending`. A prepared
+                // acceptance whose payload is still there belongs to an attempt
+                // that never got its output to the agent, so retiring it would
+                // destroy the delivery the hook's claim path exists to recover.
+                // A prepared rejection has nothing left to deliver, so it
+                // settles here rather than becoming pending again.
+                if acknowledgment.result == AckResult::Accepted && pending_signal_exists(&paths)? {
+                    return Ok(SignalFileState::Pending);
+                }
                 move_pending_if_present(&paths)?;
                 return Ok(SignalFileState::Acknowledged(acknowledgment));
             }
