@@ -290,3 +290,71 @@ pub(crate) fn sample_resolved_session(
         state,
     }
 }
+
+pub(crate) fn codex_run_columns(conn: &Connection) -> Vec<String> {
+    conn.prepare("PRAGMA table_info(codex_runs)")
+        .expect("prepare codex_runs table info")
+        .query_map([], |row| row.get(1))
+        .expect("query codex_runs table info")
+        .collect::<Result<Vec<_>, _>>()
+        .expect("collect codex_runs table columns")
+}
+
+pub(crate) fn simulate_pre_v13_codex_runs_table(conn: &Connection) {
+    conn.execute_batch(
+        // A database this old predates the v64 team triggers, and they read
+        // columns the aged table gives up - `task_id` only arrives at v32. Every
+        // later ALTER reparses each trigger body, so leaving them behind breaks
+        // the replay at v23 instead. The repair chain puts them back on the way
+        // up.
+        "DROP TRIGGER IF EXISTS agent_workspace_team_source_codex_insert;
+         DROP TRIGGER IF EXISTS agent_workspace_team_source_codex_update;
+         DROP TRIGGER IF EXISTS agent_workspace_team_source_codex_delete;
+         DROP TRIGGER IF EXISTS agent_workspace_team_detach_session;
+         DROP INDEX IF EXISTS idx_codex_runs_session_updated;
+         DROP INDEX IF EXISTS idx_codex_runs_status;
+         DROP TABLE codex_runs;
+         CREATE TABLE codex_runs (
+             run_id                 TEXT PRIMARY KEY,
+             session_id             TEXT NOT NULL REFERENCES sessions(session_id) ON DELETE CASCADE,
+             project_dir            TEXT NOT NULL,
+             thread_id              TEXT,
+             turn_id                TEXT,
+             mode                   TEXT NOT NULL,
+             status                 TEXT NOT NULL,
+             prompt                 TEXT NOT NULL,
+             latest_summary         TEXT,
+             final_message          TEXT,
+             error                  TEXT,
+             pending_approvals_json TEXT NOT NULL DEFAULT '[]',
+             created_at             TEXT NOT NULL,
+             updated_at             TEXT NOT NULL
+         ) WITHOUT ROWID;
+         CREATE INDEX idx_codex_runs_session_updated
+             ON codex_runs(session_id, updated_at DESC);
+         CREATE INDEX idx_codex_runs_status
+             ON codex_runs(status);
+         INSERT INTO codex_runs (
+             run_id, session_id, project_dir, thread_id, turn_id, mode, status,
+             prompt, latest_summary, final_message, error, pending_approvals_json,
+             created_at, updated_at
+         ) VALUES (
+             'codex-run-legacy',
+             'f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4',
+             '/tmp/harness',
+             'thread-legacy',
+             'turn-legacy',
+             'approval',
+             'completed',
+             'Investigate the suite.',
+             'Done',
+             'Fixed.',
+             NULL,
+             '[]',
+             '2026-04-09T09:00:00Z',
+             '2026-04-09T09:05:00Z'
+         );
+         UPDATE schema_meta SET value = '12' WHERE key = 'version';",
+    )
+    .expect("simulate pre-v13 codex_runs table");
+}

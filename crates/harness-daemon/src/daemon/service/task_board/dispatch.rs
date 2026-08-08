@@ -29,6 +29,7 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 use super::super::task_board_db::task_board_host_local_db;
 #[cfg(test)]
 use super::super::{create_task, start_session_direct};
+use super::dispatch_grants::{filter_for_machine, load_live_spawn_grants};
 use super::dispatch_preparation::reserve_and_prepare_task_board_dispatch;
 use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db_handle::AsyncDaemonDbHandle;
@@ -460,52 +461,6 @@ async fn build_dispatch_plans_for_items_async(
         )
     }));
     Ok(plans)
-}
-
-/// Load the live (unconsumed) spawn approval grant for every item under
-/// evaluation, keyed by board item id. Only meaningful when a live enforced
-/// graph exists (a grant is keyed to that graph's revision); returns an empty
-/// map otherwise so no injection happens on the built-in fallback path.
-pub(crate) async fn load_live_spawn_grants(
-    db: &AsyncDaemonDbHandle,
-    policy: Option<(&str, &PolicyGraph)>,
-    kept: &[TaskBoardItem],
-    rejected: &[(TaskBoardItem, Machine)],
-) -> Result<HashMap<String, PolicyApprovalGrant>, CliError> {
-    let mut grants = HashMap::new();
-    let Some((_canvas_id, document)) = policy else {
-        return Ok(grants);
-    };
-    let revision = document.revision;
-    let items = kept.iter().chain(rejected.iter().map(|(item, _)| item));
-    for item in items {
-        if let Some(grant) = db
-            .live_approval_grant(&item.id, PolicyAction::SpawnAgent, revision)
-            .await?
-        {
-            grants.insert(item.id.clone(), grant);
-        }
-    }
-    Ok(grants)
-}
-
-fn filter_for_machine(
-    items: Vec<TaskBoardItem>,
-    machine: Option<&Machine>,
-) -> (Vec<TaskBoardItem>, Vec<(TaskBoardItem, Machine)>) {
-    let Some(machine) = machine else {
-        return (items, Vec::new());
-    };
-    let mut kept = Vec::with_capacity(items.len());
-    let mut rejected = Vec::new();
-    for item in items {
-        if machine.accepts_any(&item.target_project_types) {
-            kept.push(item);
-        } else {
-            rejected.push((item, machine.clone()));
-        }
-    }
-    (kept, rejected)
 }
 
 #[cfg(test)]

@@ -462,6 +462,10 @@ mod start_authorization_test_support;
 mod tests;
 
 #[cfg(test)]
+#[path = "task_board_managed_agents/worker_lane_tests.rs"]
+mod worker_lane_tests;
+
+#[cfg(test)]
 #[path = "task_board_managed_agents/read_only_start_revision_tests.rs"]
 mod read_only_start_revision_tests;
 
