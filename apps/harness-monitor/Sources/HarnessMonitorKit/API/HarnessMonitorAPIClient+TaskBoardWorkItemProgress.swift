@@ -1,14 +1,13 @@
 import Foundation
 
 extension HarnessMonitorAPIClient {
-  public func taskBoardItemReviewReport(id: String) async throws
-    -> TaskBoardAiReviewReportResponse
+  public func taskBoardItemProgress(id: String) async throws
+    -> TaskBoardWorkItemProgressResponse
   {
     let id = try taskBoardPathSegment(id)
     return try await get(
-      "/v1/task-board/items/\(id)/review-report",
+      "/v1/task-board/items/\(id)/progress",
       decoder: PolicyWireCoding.decoder
     )
   }
-
 }

@@ -81,6 +81,7 @@ public struct TaskBoardEvaluationRecordWire: Codable, Equatable, Sendable {
   public var taskStatus: TaskStatus?
   public var boardStatus: TaskBoardStatus?
   public var workflowStatus: TaskBoardWorkflowStatusWire?
+  public var workItemState: TaskBoardWorkItemState?
   public var updated: Bool
   public var reason: String?
   public var item: TaskBoardItemWire?
@@ -93,6 +94,7 @@ public struct TaskBoardEvaluationRecordWire: Codable, Equatable, Sendable {
     taskStatus: TaskStatus? = nil,
     boardStatus: TaskBoardStatus? = nil,
     workflowStatus: TaskBoardWorkflowStatusWire? = nil,
+    workItemState: TaskBoardWorkItemState? = nil,
     updated: Bool = false,
     reason: String? = nil,
     item: TaskBoardItemWire? = nil
@@ -104,6 +106,7 @@ public struct TaskBoardEvaluationRecordWire: Codable, Equatable, Sendable {
     self.taskStatus = taskStatus
     self.boardStatus = boardStatus
     self.workflowStatus = workflowStatus
+    self.workItemState = workItemState
     self.updated = updated
     self.reason = reason
     self.item = item
@@ -118,6 +121,7 @@ public struct TaskBoardEvaluationRecordWire: Codable, Equatable, Sendable {
     taskStatus = try container.decodeIfPresent(TaskStatus.self, forKey: .taskStatus)
     boardStatus = try container.decodeIfPresent(TaskBoardStatus.self, forKey: .boardStatus)
     workflowStatus = try container.decodeIfPresent(TaskBoardWorkflowStatusWire.self, forKey: .workflowStatus)
+    workItemState = try container.decodeIfPresent(TaskBoardWorkItemState.self, forKey: .workItemState)
     updated = try container.decodeIfPresent(Bool.self, forKey: .updated) ?? false
     reason = try container.decodeIfPresent(String.self, forKey: .reason)
     item = try container.decodeIfPresent(TaskBoardItemWire.self, forKey: .item)
@@ -131,6 +135,7 @@ public struct TaskBoardEvaluationRecordWire: Codable, Equatable, Sendable {
     case taskStatus = "task_status"
     case boardStatus = "board_status"
     case workflowStatus = "workflow_status"
+    case workItemState = "work_item_state"
     case updated
     case reason
     case item

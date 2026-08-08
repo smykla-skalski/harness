@@ -20,6 +20,7 @@ struct TaskBoardItemManagementPanel: View {
   @State private var triageInspector = TaskBoardTriageInspectorState()
   @State private var reviewReportState = TaskBoardReviewReportState()
   @State private var workflowProgressState = TaskBoardWorkflowProgressState()
+  @State private var workerProgressState = TaskBoardWorkerProgressState()
   @Environment(\.fontScale)
   var fontScale
   @Environment(\.dismiss)
@@ -45,6 +46,15 @@ struct TaskBoardItemManagementPanel: View {
     return TaskBoardWorkflowProgressLoadKey(
       itemID: item.id,
       executionID: item.workflow?.executionId,
+      updatedAt: item.updatedAt
+    )
+  }
+
+  private var workerProgressLoadKey: TaskBoardWorkerProgressLoadKey? {
+    guard let item, let workItemID = item.workItemId, item.showsWorkerProgress else { return nil }
+    return TaskBoardWorkerProgressLoadKey(
+      itemID: item.id,
+      workItemID: workItemID,
       updatedAt: item.updatedAt
     )
   }
@@ -131,6 +141,13 @@ struct TaskBoardItemManagementPanel: View {
             state: workflowProgressState
           )
         }
+        if workerProgressLoadKey != nil {
+          TaskBoardItemWorkerProgressSection(
+            item: item,
+            actions: actions,
+            state: workerProgressState
+          )
+        }
         if item.showsReviewReport {
           TaskBoardItemReviewReportSection(
             item: item,
@@ -166,6 +183,10 @@ struct TaskBoardItemManagementPanel: View {
     .task(id: workflowProgressLoadKey) {
       guard let item, workflowProgressLoadKey != nil else { return }
       await workflowProgressState.load(item: item, actions: actions)
+    }
+    .task(id: workerProgressLoadKey) {
+      guard let item, workerProgressLoadKey != nil else { return }
+      await workerProgressState.load(item: item, actions: actions)
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("harness.task-board.manage-item.\(item?.id ?? "new")")
