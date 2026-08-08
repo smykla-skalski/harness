@@ -1,37 +1,56 @@
-use tempfile::tempdir;
+use tempfile::{TempDir, tempdir};
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::session::types::{TaskQueuePolicy, TaskSeverity, TaskSource, TaskStatus};
-use crate::task_board::{TaskBoardEvaluationOutcome, TaskBoardWorkflowStatus};
-use harness_kernel::errors::CliErrorKind;
+use crate::task_board::{
+    TaskBoardEvaluationOutcome, TaskBoardWorkItemState, TaskBoardWorkflowStatus,
+};
 
 use super::*;
 use crate::daemon::db_open::AsyncDaemonDbConnect;
 
 const NOW: &str = "2026-05-14T00:00:00Z";
 
-fn create_linked_item(store: &TaskBoardStore, id: &str, status: TaskBoardStatus) -> TaskBoardItem {
+struct Fixture {
+    _dir: TempDir,
+    db: AsyncDaemonDbHandle,
+}
+
+async fn fixture() -> Fixture {
+    let dir = tempdir().expect("tempdir");
+    let db = AsyncDaemonDbHandle(
+        AsyncDaemonDb::connect(&dir.path().join("harness.db"))
+            .await
+            .expect("open database"),
+    );
+    Fixture { _dir: dir, db }
+}
+
+async fn create_item(fixture: &Fixture, id: &str, session_id: Option<&str>) -> TaskBoardItem {
     let mut item = TaskBoardItem::new(
         id.to_string(),
         "Board item".to_string(),
         "Body".to_string(),
         NOW.to_string(),
     );
-    item.status = status;
-    item.session_id = Some("session-1".to_string());
-    item.work_item_id = Some("work-1".to_string());
+    item.status = TaskBoardStatus::InProgress;
+    item.session_id = session_id.map(ToString::to_string);
+    item.work_item_id = Some(format!("work-{id}"));
     item.workflow.execution_id = Some("workflow-1".to_string());
     item.workflow.status = TaskBoardWorkflowStatus::Running;
     item.workflow.current_step_id = Some("dispatch".to_string());
     item.workflow.attempts = 1;
-    store
-        .create("Board item", "Body", item)
+    fixture
+        .db
+        .create_task_board_item(item)
+        .await
         .expect("create item")
+        .item
 }
 
 fn work_item(status: TaskStatus) -> WorkItem {
     WorkItem {
-        task_id: "work-1".to_string(),
+        task_id: "work-board-1".to_string(),
         title: "Session task".to_string(),
         context: None,
         severity: TaskSeverity::Medium,
@@ -66,10 +85,11 @@ async fn seed_active_dispatch_reservation(db: &AsyncDaemonDbHandle, item_id: &st
              intent_id, item_id, session_id, work_item_id, workflow_execution_id,
              payload_json, status, attempts, available_at, claim_token, claimed_at,
              created_at, updated_at
-         ) VALUES ('intent-1', ?1, 'session-1', 'work-1', 'workflow-1', '{}',
-                   'pending', 0, ?2, NULL, NULL, ?2, ?2)",
+         ) VALUES ('intent-1', ?1, 'session-1', ?2, 'workflow-1', '{}',
+                   'pending', 0, ?3, NULL, NULL, ?3, ?3)",
     )
     .bind(item_id)
+    .bind(format!("work-{item_id}"))
     .bind(NOW)
     .execute(db.pool())
     .await
@@ -77,111 +97,23 @@ async fn seed_active_dispatch_reservation(db: &AsyncDaemonDbHandle, item_id: &st
 }
 
 #[tokio::test]
-async fn async_evaluation_preserves_an_item_until_its_dispatch_claims() {
-    let temp = tempdir().expect("tempdir");
-    let db = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
+async fn a_translated_session_task_moves_the_item_through_the_durable_record() {
+    let fixture = fixture().await;
+    let item = create_item(&fixture, "board-1", Some("session-1")).await;
+
+    let record = translate_session_task(&fixture.db, &item, &work_item(TaskStatus::Done), false)
         .await
-        .expect("open database");
-    let db = AsyncDaemonDbHandle(db);
-    let mut item = TaskBoardItem::new(
-        "board-reserved".to_string(),
-        "Board item".to_string(),
-        "Body".to_string(),
-        NOW.to_string(),
-    );
-    item.status = TaskBoardStatus::InProgress;
-    item.session_id = Some("session-1".to_string());
-    item.work_item_id = Some("work-1".to_string());
-    item.workflow.execution_id = Some("workflow-1".to_string());
-    item.workflow.status = TaskBoardWorkflowStatus::Running;
-    item.workflow.current_step_id = Some("dispatch".to_string());
-    db.create_task_board_item(item)
-        .await
-        .expect("create linked item");
-    let before = db
-        .task_board_item_snapshot("board-reserved")
-        .await
-        .expect("load item before evaluation");
-    seed_active_dispatch_reservation(&db, "board-reserved").await;
+        .expect("translate the session task");
 
-    let record = evaluate_linked_item_async(&db, &before.item, &work_item(TaskStatus::Open), false)
-        .await
-        .expect("evaluate reserved item");
-
-    assert!(!record.updated, "evaluation must defer its item write");
-    let reserved = db
-        .task_board_item_snapshot("board-reserved")
-        .await
-        .expect("reload reserved item");
-    assert_eq!(reserved.item_revision, before.item_revision);
-    assert_eq!(reserved.item, before.item);
-
-    sqlx::query(
-        "UPDATE task_board_dispatch_intents
-         SET status = 'completed', completed_at = ?1
-         WHERE intent_id = 'intent-1'",
-    )
-    .bind(NOW)
-    .execute(db.pool())
-    .await
-    .expect("complete dispatch reservation");
-    let record =
-        evaluate_linked_item_async(&db, &reserved.item, &work_item(TaskStatus::Open), false)
-            .await
-            .expect("evaluate claimed item");
-
-    assert!(
-        record.updated,
-        "evaluation resumes after the claim fence clears"
-    );
-    let evaluated = db
-        .task_board_item_snapshot("board-reserved")
-        .await
-        .expect("reload evaluated item");
-    assert_eq!(evaluated.item_revision, before.item_revision + 1);
-    assert_eq!(
-        evaluated.item.workflow.current_step_id.as_deref(),
-        Some("worker_pending")
-    );
-}
-
-#[test]
-fn linked_item_update_persists_task_decision() {
-    let temp = tempdir().expect("tempdir");
-    let store = TaskBoardStore::new(temp.path().join("task-board"));
-    let item = create_linked_item(&store, "board-1", TaskBoardStatus::InProgress);
-
-    let summary = evaluate_items_with_loader(
-        &store,
-        &[item],
-        false,
-        |session_id, work_item_id| {
-            assert_eq!(session_id, "session-1");
-            assert_eq!(work_item_id, "work-1");
-            Ok(Some(work_item(TaskStatus::Done)))
-        },
-        |_, _, _| Ok(()),
-    )
-    .expect("evaluate item");
-
-    assert_eq!(summary.total, 1);
-    assert_eq!(summary.evaluated, 1);
-    assert_eq!(summary.completed, 1);
-    assert_eq!(summary.updated, 1);
-    let record = &summary.records[0];
-    assert_eq!(record.outcome, TaskBoardEvaluationOutcome::Completed);
     assert!(record.updated);
-    assert_eq!(record.board_status, Some(TaskBoardStatus::Done));
-    assert_eq!(
-        record.workflow_status,
-        Some(TaskBoardWorkflowStatus::Completed)
-    );
-    assert_eq!(
-        record.item.as_ref().map(|updated| updated.status),
-        Some(TaskBoardStatus::Done)
-    );
-
-    let stored = store.get("board-1").expect("load updated item");
+    assert_eq!(record.outcome, TaskBoardEvaluationOutcome::Completed);
+    assert_eq!(record.task_status, Some(TaskStatus::Done));
+    assert_eq!(record.work_item_state, Some(TaskBoardWorkItemState::Done));
+    let stored = fixture
+        .db
+        .task_board_item(&item.id)
+        .await
+        .expect("reload item");
     assert_eq!(stored.status, TaskBoardStatus::Done);
     assert_eq!(stored.workflow.status, TaskBoardWorkflowStatus::Completed);
     assert_eq!(
@@ -191,114 +123,104 @@ fn linked_item_update_persists_task_decision() {
     assert_eq!(stored.workflow.execution_id.as_deref(), Some("workflow-1"));
 }
 
-#[test]
-fn missing_session_marks_linked_item_blocked() {
-    let temp = tempdir().expect("tempdir");
-    let store = TaskBoardStore::new(temp.path().join("task-board"));
-    let item = create_linked_item(&store, "board-1", TaskBoardStatus::InProgress);
+#[tokio::test]
+async fn translation_creates_no_session_task() {
+    let fixture = fixture().await;
+    let item = create_item(&fixture, "board-1", Some("session-1")).await;
 
-    let summary = evaluate_items_with_loader(
-        &store,
-        &[item],
+    translate_session_task(
+        &fixture.db,
+        &item,
+        &work_item(TaskStatus::InProgress),
         false,
-        |_, _| Err(CliErrorKind::workflow_io("session unavailable").into()),
-        |_, _, _| Ok(()),
     )
-    .expect("evaluate item");
+    .await
+    .expect("translate the session task");
 
-    assert_eq!(summary.total, 1);
-    assert_eq!(summary.failed, 1);
-    assert_eq!(summary.updated, 1);
-    let record = &summary.records[0];
-    assert_eq!(record.outcome, TaskBoardEvaluationOutcome::MissingSession);
-    assert!(record.updated);
-    assert_eq!(
-        record.reason.as_deref(),
-        Some("[WORKFLOW_IO] session unavailable")
-    );
-    assert_eq!(record.board_status, Some(TaskBoardStatus::Failed));
-    assert_eq!(
-        record.workflow_status,
-        Some(TaskBoardWorkflowStatus::Failed)
-    );
+    let tasks: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM tasks")
+        .fetch_one(fixture.db.pool())
+        .await
+        .expect("count session tasks");
+    assert_eq!(tasks, 0, "translation must not mint a Session task");
+}
 
-    let stored = store.get("board-1").expect("load failed item");
-    assert_eq!(stored.status, TaskBoardStatus::Failed);
-    assert_eq!(stored.workflow.status, TaskBoardWorkflowStatus::Failed);
-    assert_eq!(
-        stored.workflow.current_step_id.as_deref(),
-        Some("missing_session")
-    );
-    assert_eq!(
-        stored.workflow.last_error.as_deref(),
-        Some("[WORKFLOW_IO] session unavailable")
+#[tokio::test]
+async fn rerunning_translation_on_settled_work_reports_it_unchanged() {
+    let fixture = fixture().await;
+    let item = create_item(&fixture, "board-1", Some("session-1")).await;
+    translate_session_task(&fixture.db, &item, &work_item(TaskStatus::Done), false)
+        .await
+        .expect("settle the work item");
+    let settled = fixture
+        .db
+        .task_board_item(&item.id)
+        .await
+        .expect("reload item");
+
+    let record = translate_session_task(
+        &fixture.db,
+        &settled,
+        &work_item(TaskStatus::InProgress),
+        false,
+    )
+    .await
+    .expect("rerun the translation");
+
+    assert!(!record.updated, "settled work must report as unchanged");
+    assert_eq!(record.outcome, TaskBoardEvaluationOutcome::Completed);
+    let stored = fixture
+        .db
+        .task_board_item(&item.id)
+        .await
+        .expect("reload item");
+    assert_eq!(stored.status, TaskBoardStatus::Done);
+}
+
+#[tokio::test]
+async fn a_dry_run_translation_leaves_the_item_and_record_alone() {
+    let fixture = fixture().await;
+    let item = create_item(&fixture, "board-1", Some("session-1")).await;
+
+    let record = translate_session_task(&fixture.db, &item, &work_item(TaskStatus::Done), true)
+        .await
+        .expect("translate as a dry run");
+
+    assert!(!record.updated);
+    assert_eq!(record.outcome, TaskBoardEvaluationOutcome::Completed);
+    assert_eq!(record.board_status, Some(TaskBoardStatus::Done));
+    assert!(record.item.is_none());
+    let stored = fixture
+        .db
+        .task_board_item(&item.id)
+        .await
+        .expect("reload item");
+    assert_eq!(stored.status, TaskBoardStatus::InProgress);
+    assert!(
+        fixture
+            .db
+            .task_board_work_item_progress(&item.id)
+            .await
+            .expect("read progress")
+            .is_none()
     );
 }
 
-#[test]
-fn missing_task_marks_linked_item_blocked() {
-    let temp = tempdir().expect("tempdir");
-    let store = TaskBoardStore::new(temp.path().join("task-board"));
-    let item = create_linked_item(&store, "board-1", TaskBoardStatus::InProgress);
+#[tokio::test]
+async fn a_review_handoff_is_what_schedules_the_reviewer_signal() {
+    let fixture = fixture().await;
+    let item = create_item(&fixture, "board-1", Some("session-1")).await;
+    let task = work_item(TaskStatus::AwaitingReview);
 
-    let summary =
-        evaluate_items_with_loader(&store, &[item], false, |_, _| Ok(None), |_, _, _| Ok(()))
-            .expect("evaluate item");
+    let record = translate_session_task(&fixture.db, &item, &task, false)
+        .await
+        .expect("hand off for review");
 
-    assert_eq!(summary.total, 1);
-    assert_eq!(summary.failed, 1);
-    assert_eq!(summary.updated, 1);
-    let record = &summary.records[0];
-    assert_eq!(record.outcome, TaskBoardEvaluationOutcome::MissingTask);
-    assert!(record.updated);
-    assert_eq!(
-        record.reason.as_deref(),
-        Some("session task 'work-1' was not found")
-    );
-    assert_eq!(record.board_status, Some(TaskBoardStatus::Failed));
-    assert_eq!(
-        record.workflow_status,
-        Some(TaskBoardWorkflowStatus::Failed)
-    );
-
-    let stored = store.get("board-1").expect("load failed item");
-    assert_eq!(stored.status, TaskBoardStatus::Failed);
-    assert_eq!(stored.workflow.status, TaskBoardWorkflowStatus::Failed);
-    assert_eq!(
-        stored.workflow.current_step_id.as_deref(),
-        Some("missing_task")
-    );
-    assert_eq!(
-        stored.workflow.last_error.as_deref(),
-        Some("session task 'work-1' was not found")
-    );
-}
-
-#[test]
-fn review_pending_update_schedules_reviewer_signal() {
-    let temp = tempdir().expect("tempdir");
-    let store = TaskBoardStore::new(temp.path().join("task-board"));
-    let item = create_linked_item(&store, "board-1", TaskBoardStatus::InProgress);
-    let mut scheduled = false;
-
-    let summary = evaluate_items_with_loader(
-        &store,
-        &[item],
-        false,
-        |_, _| Ok(Some(work_item(TaskStatus::AwaitingReview))),
-        |_, task, record| {
-            assert_eq!(task.status, TaskStatus::AwaitingReview);
-            assert_eq!(record.outcome, TaskBoardEvaluationOutcome::ReviewPending);
-            assert!(record.updated);
-            scheduled = true;
-            Ok(())
-        },
-    )
-    .expect("evaluate item");
-
-    assert!(scheduled);
-    assert_eq!(summary.reviewing, 1);
-    let stored = store.get("board-1").expect("load updated item");
+    assert!(should_materialize_reviewer_signal(&task, &record));
+    let stored = fixture
+        .db
+        .task_board_item(&item.id)
+        .await
+        .expect("reload item");
     assert_eq!(stored.status, TaskBoardStatus::ToReview);
     assert_eq!(
         stored.workflow.current_step_id.as_deref(),
@@ -306,91 +228,217 @@ fn review_pending_update_schedules_reviewer_signal() {
     );
 }
 
-#[test]
-fn reviewer_signal_failure_keeps_record_in_summary() {
-    let temp = tempdir().expect("tempdir");
-    let store = TaskBoardStore::new(temp.path().join("task-board"));
-    let item_a = create_linked_item(&store, "board-a", TaskBoardStatus::InProgress);
-    let mut item_b = create_linked_item(&store, "board-b", TaskBoardStatus::InProgress);
-    // Distinct task ids so the loader can decide which to "fail" the signal on.
-    item_b.session_id = Some("session-b".into());
-    item_b.work_item_id = Some("work-b".into());
-    let _ = store.update(
-        "board-b",
-        TaskBoardItemPatch {
-            session_id: crate::task_board::store::OptionalFieldPatch::Set("session-b".into()),
-            work_item_id: crate::task_board::store::OptionalFieldPatch::Set("work-b".into()),
-            ..TaskBoardItemPatch::default()
-        },
-    );
-    let item_b = store.get("board-b").expect("reload b");
+#[tokio::test]
+async fn an_unchanged_review_handoff_schedules_nothing() {
+    let fixture = fixture().await;
+    let item = create_item(&fixture, "board-1", Some("session-1")).await;
+    let task = work_item(TaskStatus::AwaitingReview);
+    translate_session_task(&fixture.db, &item, &task, false)
+        .await
+        .expect("hand off for review");
+    let handed_off = fixture
+        .db
+        .task_board_item(&item.id)
+        .await
+        .expect("reload item");
 
-    let summary = evaluate_items_with_loader(
-        &store,
-        &[item_a, item_b],
-        false,
-        |_, _| Ok(Some(work_item(TaskStatus::AwaitingReview))),
-        |item, _, _| {
-            if item.id == "board-b" {
-                Err(CliErrorKind::workflow_io("signal write failed").into())
-            } else {
-                Ok(())
-            }
-        },
+    let repeat = translate_session_task(&fixture.db, &handed_off, &task, false)
+        .await
+        .expect("rerun the handoff");
+
+    assert!(repeat.updated, "a fresh sequence still advances the record");
+    assert!(should_materialize_reviewer_signal(&task, &repeat));
+}
+
+#[tokio::test]
+async fn evaluation_defers_its_item_write_until_the_dispatch_claims() {
+    let fixture = fixture().await;
+    let item = create_item(&fixture, "board-1", Some("session-1")).await;
+    let before = fixture
+        .db
+        .task_board_item_snapshot(&item.id)
+        .await
+        .expect("load item before evaluation");
+    seed_active_dispatch_reservation(&fixture.db, &item.id).await;
+
+    translate_session_task(&fixture.db, &item, &work_item(TaskStatus::Open), false)
+        .await
+        .expect("evaluate the reserved item");
+
+    let reserved = fixture
+        .db
+        .task_board_item_snapshot(&item.id)
+        .await
+        .expect("reload reserved item");
+    assert_eq!(reserved.item_revision, before.item_revision);
+    assert_eq!(reserved.item, before.item);
+
+    sqlx::query(
+        "UPDATE task_board_dispatch_intents
+         SET status = 'completed', completed_at = ?1 WHERE intent_id = 'intent-1'",
     )
-    .expect("evaluate items");
+    .bind(NOW)
+    .execute(fixture.db.pool())
+    .await
+    .expect("complete dispatch reservation");
+    translate_session_task(
+        &fixture.db,
+        &reserved.item,
+        &work_item(TaskStatus::Open),
+        false,
+    )
+    .await
+    .expect("evaluate the claimed item");
 
-    // Both records must be present even though item-b's signal failed.
-    assert_eq!(summary.total, 2, "summary kept both records");
-    assert_eq!(summary.reviewing, 2);
-    let ids: Vec<&str> = summary
-        .records
-        .iter()
-        .map(|record| record.board_item_id.as_str())
-        .collect();
-    assert!(ids.contains(&"board-a"));
-    assert!(ids.contains(&"board-b"));
+    let evaluated = fixture
+        .db
+        .task_board_item_snapshot(&item.id)
+        .await
+        .expect("reload evaluated item");
+    assert_eq!(evaluated.item_revision, before.item_revision + 1);
     assert_eq!(
-        summary.signal_failures.len(),
-        1,
-        "exactly one signal failure recorded"
-    );
-    assert_eq!(summary.signal_failures[0].board_item_id, "board-b");
-    assert!(
-        summary.signal_failures[0]
-            .message
-            .contains("signal write failed")
+        evaluated.item.workflow.current_step_id.as_deref(),
+        Some("worker_pending")
     );
 }
 
-#[test]
-fn dry_run_leaves_sync_item_unchanged() {
-    let temp = tempdir().expect("tempdir");
-    let store = TaskBoardStore::new(temp.path().join("task-board"));
-    let item = create_linked_item(&store, "board-1", TaskBoardStatus::InProgress);
-    let before = store.get("board-1").expect("load original item");
+#[tokio::test]
+async fn a_sessionless_item_reports_its_durable_record_without_writing() {
+    let fixture = fixture().await;
+    let item = create_item(&fixture, "board-1", None).await;
+    fixture
+        .db
+        .report_task_board_work_item_progress(&TaskBoardWorkItemReportRequest {
+            board_item_id: item.id.clone(),
+            actor: "agent-1".to_string(),
+            state: Some(TaskBoardWorkItemState::AwaitingReview),
+            summary: Some("ready for review".to_string()),
+            progress_percent: None,
+            blocked_reason: None,
+            sequence: None,
+        })
+        .await
+        .expect("report progress");
+    let before = fixture
+        .db
+        .task_board_item_snapshot(&item.id)
+        .await
+        .expect("load item after the report");
 
-    let summary = evaluate_items_with_loader(
-        &store,
-        &[item],
-        true,
-        |_, _| Ok(Some(work_item(TaskStatus::Done))),
-        |_, _, _| Ok(()),
+    let record = sessionless_record(&fixture.db, &before.item)
+        .await
+        .expect("evaluate the sessionless item");
+
+    assert_eq!(record.outcome, TaskBoardEvaluationOutcome::ReviewPending);
+    assert_eq!(record.task_status, None);
+    assert_eq!(
+        record.work_item_state,
+        Some(TaskBoardWorkItemState::AwaitingReview)
+    );
+    assert!(!record.updated);
+    let after = fixture
+        .db
+        .task_board_item_snapshot(&item.id)
+        .await
+        .expect("reload item");
+    assert_eq!(after.item_revision, before.item_revision);
+}
+
+#[tokio::test]
+async fn a_sessionless_item_that_never_reported_is_skipped() {
+    let fixture = fixture().await;
+    let item = create_item(&fixture, "board-1", None).await;
+
+    let record = sessionless_record(&fixture.db, &item)
+        .await
+        .expect("evaluate the sessionless item");
+
+    assert_eq!(record.outcome, TaskBoardEvaluationOutcome::SkippedUnlinked);
+}
+
+#[tokio::test]
+async fn an_undispatched_item_is_skipped() {
+    let fixture = fixture().await;
+    let item = create_item(&fixture, "board-1", None).await;
+    fixture
+        .db
+        .update_task_board_item(&item.id, |item| {
+            item.work_item_id = None;
+            Ok(true)
+        })
+        .await
+        .expect("clear the work item");
+
+    let summary = evaluate_task_board_async(
+        &TaskBoardEvaluateRequest {
+            item_id: Some(item.id.clone()),
+            ..TaskBoardEvaluateRequest::default()
+        },
+        &fixture.db,
     )
-    .expect("evaluate item");
+    .await
+    .expect("evaluate the board");
 
     assert_eq!(summary.total, 1);
-    assert_eq!(summary.evaluated, 1);
-    assert_eq!(summary.completed, 1);
-    assert_eq!(summary.updated, 0);
-    let record = &summary.records[0];
-    assert_eq!(record.outcome, TaskBoardEvaluationOutcome::Completed);
-    assert!(!record.updated);
-    assert_eq!(record.board_status, Some(TaskBoardStatus::Done));
-    assert!(record.item.is_none());
+    assert_eq!(summary.skipped, 1);
+    assert_eq!(
+        summary.records[0].outcome,
+        TaskBoardEvaluationOutcome::SkippedUnlinked
+    );
+}
 
-    let after = store.get("board-1").expect("load item after dry run");
-    assert_eq!(after.status, before.status);
-    assert_eq!(after.workflow, before.workflow);
-    assert_eq!(after.updated_at, before.updated_at);
+#[tokio::test]
+async fn a_missing_session_marks_its_linked_item_failed() {
+    let fixture = fixture().await;
+    let item = create_item(&fixture, "board-1", Some("session-missing")).await;
+
+    let summary = evaluate_task_board_async(
+        &TaskBoardEvaluateRequest {
+            item_id: Some(item.id.clone()),
+            ..TaskBoardEvaluateRequest::default()
+        },
+        &fixture.db,
+    )
+    .await
+    .expect("evaluate the board");
+
+    let record = &summary.records[0];
+    assert_eq!(record.outcome, TaskBoardEvaluationOutcome::MissingSession);
+    assert!(record.updated);
+    assert_eq!(record.board_status, Some(TaskBoardStatus::Failed));
+    let stored = fixture
+        .db
+        .task_board_item(&item.id)
+        .await
+        .expect("reload item");
+    assert_eq!(stored.status, TaskBoardStatus::Failed);
+    assert_eq!(
+        stored.workflow.current_step_id.as_deref(),
+        Some("missing_session")
+    );
+}
+
+#[tokio::test]
+async fn a_missing_session_leaves_the_item_alone_on_a_dry_run() {
+    let fixture = fixture().await;
+    let item = create_item(&fixture, "board-1", Some("session-missing")).await;
+
+    let summary = evaluate_task_board_async(
+        &TaskBoardEvaluateRequest {
+            item_id: Some(item.id.clone()),
+            dry_run: true,
+            ..TaskBoardEvaluateRequest::default()
+        },
+        &fixture.db,
+    )
+    .await
+    .expect("evaluate the board");
+
+    assert!(!summary.records[0].updated);
+    let stored = fixture
+        .db
+        .task_board_item(&item.id)
+        .await
+        .expect("reload item");
+    assert_eq!(stored.status, TaskBoardStatus::InProgress);
 }

@@ -365,8 +365,6 @@ pub(crate) use task_board_db::{
     task_board_sync_status_db, touch_task_board_host_local_db, update_task_board_item_db,
     update_task_board_project_db,
 };
-#[cfg(test)]
-pub use task_board_evaluation::evaluate_task_board;
 pub(crate) use task_board_evaluation::evaluate_task_board_async;
 #[cfg(test)]
 pub use task_board_host::{

@@ -31994,6 +31994,17 @@
               "null"
             ]
           },
+          "work_item_state": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TaskBoardWorkItemState",
+                "description": "The durable work-item state the board evaluated. Present for every\ndispatched item; `task_status` above is present only for the ones a\nlegacy Session task was translated from."
+              }
+            ]
+          },
           "workflow_status": {
             "oneOf": [
               {
