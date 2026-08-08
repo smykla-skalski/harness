@@ -49,6 +49,7 @@ async fn historical_session_delete_preserves_late_registration() {
         .reconcile_agent_workspace_team(DAEMON_ID, &workspace_id)
         .await
         .expect("reconcile late historical registration");
+    fixture.reconcile_activity(&workspace_id).await;
     query("DELETE FROM sessions WHERE session_id = 'session-historical'")
         .execute(fixture.db.pool())
         .await
@@ -126,6 +127,7 @@ async fn reconciliation_preserves_deleted_session_provenance_for_shared_member()
         .reconcile_agent_workspace_team(DAEMON_ID, &workspace_id)
         .await
         .expect("create shared durable member");
+    fixture.reconcile_activity(&workspace_id).await;
 
     query("DELETE FROM sessions WHERE session_id = 'session-deleted'")
         .execute(fixture.db.pool())
@@ -166,6 +168,12 @@ async fn session_delete_rejects_malformed_registration_before_artifact_cleanup()
             "binding-malformed",
         )
         .await;
+    fixture
+        .db
+        .reconcile_agent_workspace_team(DAEMON_ID, &workspace_id)
+        .await
+        .expect("reconcile valid registration");
+    fixture.reconcile_activity(&workspace_id).await;
     query(
         "UPDATE agents SET managed_agent_kind = 'unknown', role = 'unknown'
          WHERE session_id = 'session-malformed-delete'",
@@ -206,6 +214,12 @@ async fn session_delete_rejects_conflicting_runtime_bindings() {
             "binding-left",
         )
         .await;
+    fixture
+        .db
+        .reconcile_agent_workspace_team(DAEMON_ID, &workspace_id)
+        .await
+        .expect("reconcile unambiguous registration");
+    fixture.reconcile_activity(&workspace_id).await;
     fixture
         .seed_agent(
             "session-conflicting-delete",
@@ -295,6 +309,7 @@ async fn session_delete_preserves_runtime_failure_evidence() {
         .reconcile_agent_workspace_team(DAEMON_ID, &workspace_id)
         .await
         .expect("persist team before Session deletion");
+    fixture.reconcile_activity(&workspace_id).await;
 
     query("DELETE FROM sessions WHERE session_id = ?1")
         .bind(session_id)
@@ -480,6 +495,7 @@ async fn detached_team_settles_after_workspace_provenance_cleanup() {
         .reconcile_agent_workspace_team(DAEMON_ID, &workspace_id)
         .await
         .expect("create durable team");
+    fixture.reconcile_activity(&workspace_id).await;
     query("DELETE FROM sessions WHERE session_id = 'session-detached-clean'")
         .execute(fixture.db.pool())
         .await

@@ -10,6 +10,9 @@ use sqlx::{query, query_scalar};
 use super::{AsyncAgentWorkspaceTeamOperationQueries, AsyncAgentWorkspaceTeamQueries};
 use crate::AsyncAgentWorkspaceQueries;
 
+mod activity;
+mod activity_signal_claims;
+mod activity_streams;
 mod deletion_safety;
 mod operation_precedence;
 mod operation_scope;
@@ -202,6 +205,7 @@ async fn session_delete_preserves_latest_team_and_runtime_binding() {
         .reconcile_agent_workspace_team(DAEMON_ID, &workspace_id)
         .await
         .expect("reconcile latest runtime binding");
+    fixture.reconcile_activity(&workspace_id).await;
 
     query("DELETE FROM sessions WHERE session_id = 'session-delete'")
         .execute(fixture.db.pool())

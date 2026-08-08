@@ -99,6 +99,19 @@ pub trait AgentRuntime: Send + Sync {
         signal: &Signal,
     ) -> Result<PathBuf, CliError>;
 
+    /// Repair a missing pending file without reviving an acknowledged signal.
+    ///
+    /// # Errors
+    /// Returns `CliError` on filesystem failures.
+    fn ensure_signal(
+        &self,
+        project_dir: &Path,
+        session_id: &str,
+        signal: &Signal,
+    ) -> Result<signal::SignalFileState, CliError> {
+        signal::ensure_signal_file(&self.signal_dir(project_dir, session_id), signal)
+    }
+
     /// Check for and consume pending acknowledgment files.
     ///
     /// # Errors
@@ -334,6 +347,21 @@ mod tests {
         let json = serde_json::to_string(&claude_caps).expect("serialize");
         let deser: super::RuntimeCapabilities = serde_json::from_str(&json).expect("deserialize");
         assert!(deser.supports_readiness_signal);
+    }
+
+    #[test]
+    fn copilot_capabilities_expose_post_tool_context_injection() {
+        use super::runtime_for;
+
+        let capabilities = runtime_for(HookAgent::Copilot).capabilities();
+
+        assert!(capabilities.supports_context_injection);
+        assert!(
+            capabilities
+                .hook_points
+                .iter()
+                .any(|point| { point.name == "postToolUse" && point.supports_context_injection })
+        );
     }
 
     #[test]

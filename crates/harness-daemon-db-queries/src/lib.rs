@@ -11,6 +11,7 @@
 
 mod activity_fold;
 mod agent_working_copies;
+mod agent_workspace_activity;
 mod agent_workspace_teams;
 mod agent_workspaces;
 mod async_agents;
@@ -50,6 +51,10 @@ pub use activity_fold::DaemonDbActivityFold;
 pub use agent_working_copies::{
     AgentWorkingCopy, AsyncAgentWorkingCopyQueries, ProvisionedWorkspaceCheckout,
     WorkspaceCheckoutRequest, WorkspaceManagedAgentKind, WorkspaceMemberRegistration,
+};
+pub use agent_workspace_activity::{
+    AgentWorkspaceSignalAcknowledgment, AgentWorkspaceSignalRoute, AgentWorkspaceSignalTarget,
+    AsyncAgentWorkspaceActivityQueries,
 };
 pub use agent_workspace_teams::{
     AsyncAgentWorkspaceTeamOperationPreflightQueries, AsyncAgentWorkspaceTeamOperationQueries,

@@ -33,10 +33,18 @@ const DISPATCH_INTENT_WORKSPACE_SQL: &str = include_str!(
 pub fn run(conn: &Connection) -> Result<(), CliError> {
     apply(conn, "agent working copies", WORKING_COPIES_SQL)?;
     if table_exists(conn, "agent_tuis")? && !column_exists(conn, "agent_tuis", "workspace_id")? {
-        apply(conn, "terminal workspace ownership", AGENT_TUI_WORKSPACE_SQL)?;
+        apply(
+            conn,
+            "terminal workspace ownership",
+            AGENT_TUI_WORKSPACE_SQL,
+        )?;
     }
     if table_exists(conn, "codex_runs")? && !column_exists(conn, "codex_runs", "workspace_id")? {
-        apply(conn, "codex run workspace ownership", CODEX_RUN_WORKSPACE_SQL)?;
+        apply(
+            conn,
+            "codex run workspace ownership",
+            CODEX_RUN_WORKSPACE_SQL,
+        )?;
     }
     if table_exists(conn, "task_board_items")?
         && !column_exists(conn, "task_board_items", "workspace_id")?

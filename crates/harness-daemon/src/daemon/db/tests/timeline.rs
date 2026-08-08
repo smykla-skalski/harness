@@ -1,6 +1,34 @@
 use super::*;
 use crate::daemon::db::DaemonDbConversation;
 use crate::daemon::db::{DaemonDbTimeline, DaemonDbTimelineHandle};
+use harness_protocol::timeline::TimelineCursor;
+
+#[test]
+fn timeline_window_rejects_conflicting_cursors() {
+    let db = DaemonDb::open_in_memory().expect("open db");
+    let project = sample_project();
+    let state = sample_session_state();
+    db.sync_project(&project).expect("sync project");
+    db.create_session_record(&project.project_id, &state)
+        .expect("create session");
+    let cursor = TimelineCursor {
+        recorded_at: "2026-08-06T10:00:00Z".into(),
+        entry_id: "entry-conflicting-cursors".into(),
+    };
+
+    let error = db
+        .load_session_timeline_window(
+            &state.session_id,
+            &TimelineWindowRequest {
+                before: Some(cursor.clone()),
+                after: Some(cursor),
+                ..TimelineWindowRequest::default()
+            },
+        )
+        .expect_err("conflicting timeline cursors must fail");
+
+    assert!(error.to_string().contains("both before and after cursors"));
+}
 
 /// Regression coverage for the `TimelineDbSource` seam `harness_timeline`
 /// reads through instead of depending on `DaemonDb` directly: builds a

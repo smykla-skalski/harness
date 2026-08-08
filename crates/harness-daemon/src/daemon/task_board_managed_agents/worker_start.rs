@@ -1,9 +1,7 @@
 //! Launch one dispatched worker in whichever runtime and owner it has.
 
 use crate::daemon::agent_tui::WorkspaceTerminalOwner;
-use crate::daemon::http::{
-    DaemonHttpState, run_codex_agent_blocking, run_terminal_agent_blocking,
-};
+use crate::daemon::http::{DaemonHttpState, run_codex_agent_blocking, run_terminal_agent_blocking};
 use crate::daemon::protocol::ManagedAgentSnapshot;
 use crate::task_board::{DispatchAppliedTask, codex_worker_id, terminal_worker_id};
 use harness_kernel::errors::{CliError, CliErrorKind};
@@ -92,4 +90,3 @@ fn legacy_session_id(applied: &DispatchAppliedTask) -> Result<String, CliError> 
         .into()
     })
 }
-

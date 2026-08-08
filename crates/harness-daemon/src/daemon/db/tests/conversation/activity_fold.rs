@@ -204,7 +204,10 @@ fn deleting_a_session_evicts_its_activity_fold() {
     // so the agents go first, the way any real caller has to detach them. The
     // fold is keyed on the Session alone and must survive that.
     db.conn
-        .execute("DELETE FROM agents WHERE session_id = ?1", [FOLD_SESSION_ID])
+        .execute(
+            "DELETE FROM agents WHERE session_id = ?1",
+            [FOLD_SESSION_ID],
+        )
         .expect("detach the session agents");
     assert_eq!(
         db.activity_fold_entry_count(),

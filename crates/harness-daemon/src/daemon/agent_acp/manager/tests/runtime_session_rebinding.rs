@@ -139,7 +139,10 @@ async fn wake_prompt_rebinds_runtime_session_when_prompt_opens_new_protocol_sess
                 project_dir: temp.path().to_path_buf(),
                 prompt: "tell me how are you".into(),
                 signal_id: "sig-test-1".into(),
+                signal_expires_at: "2099-05-05T08:00:00Z".into(),
                 agent_id: snapshot.agent_id.clone(),
+                workspace_id: None,
+                member_id: None,
             },
         );
 
@@ -200,7 +203,10 @@ async fn wake_prompt_acknowledges_signal_in_original_signal_session_dir() {
                 project_dir: temp.path().to_path_buf(),
                 prompt: "please wake up".into(),
                 signal_id: signal.signal_id.clone(),
+                signal_expires_at: signal.expires_at.clone(),
                 agent_id: snapshot.agent_id.clone(),
+                workspace_id: None,
+                member_id: None,
             },
         );
 
@@ -222,6 +228,62 @@ async fn wake_prompt_acknowledges_signal_in_original_signal_session_dir() {
             pending.is_empty(),
             "pending signal should have been acknowledged"
         );
+        assert!(manager.stop(&snapshot.acp_id).is_ok());
+    });
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[cfg(unix)]
+async fn wake_prompt_normalizes_acceptance_after_signal_expiry() {
+    let temp = TempDir::new().expect("temp");
+    with_acp_test_env(&temp, || {
+        let script = temp.path().join("gemini-agent.sh");
+        write_sleeping_acp_agent(&script);
+        let request = AcpAgentStartRequest {
+            agent: "gemini".to_string(),
+            project_dir: Some(temp.path().display().to_string()),
+            ..AcpAgentStartRequest::default()
+        };
+        let manager = manager();
+        repoint_project_dir(&manager, temp.path());
+        let descriptor = descriptor_with_id(&script, "gemini");
+        let snapshot = manager
+            .start_descriptor(
+                "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+                &request,
+                &descriptor,
+            )
+            .expect("start ACP agent");
+        let runtime = runtime_for(HookAgent::Gemini);
+        let signal_session_id = wait_for_runtime_session_id(
+            &manager,
+            "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+            &snapshot.acp_id,
+        );
+        let mut signal = sample_signal("sig-expired-during-prompt");
+        signal.expires_at = "2000-01-01T00:00:00Z".into();
+        let signal_dir = temp.path().join("wake-signals").join(&signal_session_id);
+        write_signal_file(&signal_dir, &signal).expect("write expired signal");
+
+        assert!(manager.dispatch_wake_prompt(
+            runtime,
+            AcpWakePrompt {
+                acp_id: snapshot.acp_id.clone(),
+                orchestration_session_id: "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
+                signal_session_id: signal_session_id.clone(),
+                signal_dir: signal_dir.clone(),
+                project_dir: temp.path().to_path_buf(),
+                prompt: "please wake up".into(),
+                signal_id: signal.signal_id.clone(),
+                signal_expires_at: signal.expires_at.clone(),
+                agent_id: snapshot.agent_id.clone(),
+                workspace_id: None,
+                member_id: None,
+            },
+        ));
+
+        let acknowledgment = wait_for_signal_ack(&signal_dir, &signal.signal_id);
+        assert_eq!(acknowledgment.result, AckResult::Expired);
         assert!(manager.stop(&snapshot.acp_id).is_ok());
     });
 }
@@ -273,7 +335,10 @@ async fn wake_prompt_skips_ack_when_runtime_rebind_fails() {
                 project_dir: temp.path().to_path_buf(),
                 prompt: "please wake up".into(),
                 signal_id: signal.signal_id.clone(),
+                signal_expires_at: signal.expires_at.clone(),
                 agent_id: snapshot.agent_id.clone(),
+                workspace_id: None,
+                member_id: None,
             },
         );
 

@@ -20,8 +20,7 @@ impl CodexControllerHandle {
             ))
         })?;
         for recovery in db.task_board_admission_worker_recoveries().await? {
-            Box::pin(self.reconcile_one_admission_worker(db.as_ref(), &recovery))
-                .await?;
+            Box::pin(self.reconcile_one_admission_worker(db.as_ref(), &recovery)).await?;
         }
         Ok(())
     }
@@ -112,7 +111,10 @@ impl CodexControllerHandle {
         // `session_changed` can only be true for a legacy dispatch, since the
         // Session-task block is what sets it; a workspace recovery has no
         // Session mirror, change scope, or snapshot to publish.
-        let Some(session_id) = outcome.session_id.as_deref().filter(|_| outcome.session_changed)
+        let Some(session_id) = outcome
+            .session_id
+            .as_deref()
+            .filter(|_| outcome.session_changed)
         else {
             return Ok(());
         };

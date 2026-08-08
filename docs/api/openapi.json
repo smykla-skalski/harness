@@ -80,6 +80,195 @@
         "x-websocket-method": "agent_workspaces"
       }
     },
+    "/v1/agent-workspaces/{workspace_id}/activity": {
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "description": "Return the workspace-owned durable activity timeline",
+        "operationId": "get_workspace_activity",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "Durable workspace identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "known_revision",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "before_recorded_at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "before_entry_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "after_recorded_at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "after_entry_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable workspace activity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentWorkspaceActivityWindowResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "agent_workspace.activity"
+      }
+    },
+    "/v1/agent-workspaces/{workspace_id}/members/{member_id}/activity": {
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "description": "Return one durable member's activity, transcript, and signals",
+        "operationId": "get_member_activity",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "Durable workspace identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "member_id",
+            "in": "path",
+            "description": "Workspace-owned member identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable member activity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentWorkspaceMemberActivityResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "agent_workspace.member.activity"
+      }
+    },
     "/v1/agent-workspaces/{workspace_id}/members/{member_id}/remove": {
       "post": {
         "tags": [
@@ -161,6 +350,273 @@
           }
         },
         "x-websocket-method": "agent_workspace.member.remove"
+      }
+    },
+    "/v1/agent-workspaces/{workspace_id}/members/{member_id}/signals": {
+      "post": {
+        "tags": [
+          "agents"
+        ],
+        "description": "Persist and deliver a signal directly to a durable managed agent",
+        "operationId": "post_signal",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "Durable workspace identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "member_id",
+            "in": "path",
+            "description": "Workspace-owned member identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentWorkspaceSignalSendRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Durable signal record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentWorkspaceSignalRecord"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "agent_workspace.signal.send"
+      }
+    },
+    "/v1/agent-workspaces/{workspace_id}/members/{member_id}/signals/{signal_id}/ack": {
+      "post": {
+        "tags": [
+          "agents"
+        ],
+        "description": "Acknowledge a durable managed-agent signal",
+        "operationId": "post_signal_ack",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "Durable workspace identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "member_id",
+            "in": "path",
+            "description": "Workspace-owned member identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "signal_id",
+            "in": "path",
+            "description": "Signal identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentWorkspaceSignalAckRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Acknowledged durable signal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentWorkspaceSignalRecord"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "agent_workspace.signal.ack"
+      }
+    },
+    "/v1/agent-workspaces/{workspace_id}/members/{member_id}/signals/{signal_id}/cancel": {
+      "post": {
+        "tags": [
+          "agents"
+        ],
+        "description": "Cancel a pending durable managed-agent signal",
+        "operationId": "post_signal_cancel",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "Durable workspace identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "member_id",
+            "in": "path",
+            "description": "Workspace-owned member identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "signal_id",
+            "in": "path",
+            "description": "Signal identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentWorkspaceSignalCancelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Cancelled durable signal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentWorkspaceSignalRecord"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "agent_workspace.signal.cancel"
       }
     },
     "/v1/agent-workspaces/{workspace_id}/team": {
@@ -16065,6 +16521,156 @@
           "cancellation"
         ]
       },
+      "AgentWorkspaceActivityEntry": {
+        "type": "object",
+        "required": [
+          "entry_id",
+          "recorded_at",
+          "kind",
+          "owner",
+          "summary",
+          "payload"
+        ],
+        "properties": {
+          "entry_id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "legacy_agent_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "legacy_session_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "legacy_task_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "member_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "owner": {
+            "$ref": "#/components/schemas/AgentWorkspaceActivityOwner"
+          },
+          "payload": {},
+          "recorded_at": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          }
+        }
+      },
+      "AgentWorkspaceActivityOwner": {
+        "type": "object",
+        "required": [
+          "kind",
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/AgentWorkspaceActivityOwnerKind"
+          }
+        }
+      },
+      "AgentWorkspaceActivityOwnerKind": {
+        "type": "string",
+        "enum": [
+          "workspace",
+          "managed_agent",
+          "work_item",
+          "review",
+          "execution"
+        ]
+      },
+      "AgentWorkspaceActivityWindowResponse": {
+        "type": "object",
+        "required": [
+          "workspace_id",
+          "revision",
+          "total_count",
+          "window_start",
+          "window_end",
+          "has_older",
+          "has_newer",
+          "unchanged"
+        ],
+        "properties": {
+          "entries": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/AgentWorkspaceActivityEntry"
+            }
+          },
+          "has_newer": {
+            "type": "boolean"
+          },
+          "has_older": {
+            "type": "boolean"
+          },
+          "newest_cursor": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TimelineCursor"
+              }
+            ]
+          },
+          "oldest_cursor": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TimelineCursor"
+              }
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "total_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "unchanged": {
+            "type": "boolean"
+          },
+          "window_end": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "window_start": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "workspace_id": {
+            "type": "string"
+          }
+        }
+      },
       "AgentWorkspaceAvailability": {
         "type": "string",
         "enum": [
@@ -16115,6 +16721,49 @@
           "source_disagreement"
         ]
       },
+      "AgentWorkspaceConversationRecord": {
+        "type": "object",
+        "required": [
+          "workspace_id",
+          "member_id",
+          "owner",
+          "runtime",
+          "recorded_at",
+          "event"
+        ],
+        "properties": {
+          "event": {
+            "type": "object"
+          },
+          "legacy_agent_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "legacy_session_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "member_id": {
+            "type": "string"
+          },
+          "owner": {
+            "$ref": "#/components/schemas/AgentWorkspaceActivityOwner"
+          },
+          "recorded_at": {
+            "type": "string"
+          },
+          "runtime": {
+            "type": "string"
+          },
+          "workspace_id": {
+            "type": "string"
+          }
+        }
+      },
       "AgentWorkspaceListResponse": {
         "type": "object",
         "required": [
@@ -16158,6 +16807,38 @@
             "$ref": "#/components/schemas/ManagedAgentKind"
           },
           "managed_agent_id": {
+            "type": "string"
+          }
+        }
+      },
+      "AgentWorkspaceMemberActivityResponse": {
+        "type": "object",
+        "required": [
+          "workspace_id",
+          "member_id",
+          "owner"
+        ],
+        "properties": {
+          "activity": {},
+          "conversation": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentWorkspaceConversationRecord"
+            }
+          },
+          "member_id": {
+            "type": "string"
+          },
+          "owner": {
+            "$ref": "#/components/schemas/AgentWorkspaceActivityOwner"
+          },
+          "signals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentWorkspaceSignalRecord"
+            }
+          },
+          "workspace_id": {
             "type": "string"
           }
         }
@@ -16392,6 +17073,116 @@
           "failed",
           "unavailable"
         ]
+      },
+      "AgentWorkspaceSignalAckRequest": {
+        "type": "object",
+        "required": [
+          "result"
+        ],
+        "properties": {
+          "details": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "result": {
+            "$ref": "#/components/schemas/AckResult"
+          }
+        }
+      },
+      "AgentWorkspaceSignalCancelRequest": {
+        "type": "object",
+        "required": [
+          "actor"
+        ],
+        "properties": {
+          "actor": {
+            "type": "string"
+          }
+        }
+      },
+      "AgentWorkspaceSignalRecord": {
+        "type": "object",
+        "required": [
+          "workspace_id",
+          "member_id",
+          "owner",
+          "runtime",
+          "status",
+          "signal"
+        ],
+        "properties": {
+          "acknowledgment": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SignalAck"
+              }
+            ]
+          },
+          "legacy_agent_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "legacy_session_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "member_id": {
+            "type": "string"
+          },
+          "owner": {
+            "$ref": "#/components/schemas/AgentWorkspaceActivityOwner"
+          },
+          "runtime": {
+            "type": "string"
+          },
+          "signal": {
+            "$ref": "#/components/schemas/Signal"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SessionSignalStatus"
+          },
+          "workspace_id": {
+            "type": "string"
+          }
+        }
+      },
+      "AgentWorkspaceSignalSendRequest": {
+        "type": "object",
+        "required": [
+          "actor",
+          "idempotency_key",
+          "command",
+          "message"
+        ],
+        "properties": {
+          "action_hint": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "actor": {
+            "type": "string"
+          },
+          "command": {
+            "type": "string"
+          },
+          "idempotency_key": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
       },
       "AgentWorkspaceSummary": {
         "type": "object",

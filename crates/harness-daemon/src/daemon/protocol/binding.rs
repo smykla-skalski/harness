@@ -18,6 +18,9 @@ use super::{
     TaskRespondReviewRequest, TaskSubmitForReviewRequest, TaskSubmitReviewRequest,
     TaskUpdateRequest,
 };
+use harness_protocol::daemon::activity::{
+    AgentWorkspaceSignalCancelRequest, AgentWorkspaceSignalSendRequest,
+};
 use harness_protocol::daemon::voice::{
     VoiceAudioChunkRequest, VoiceSessionFinishRequest, VoiceSessionStartRequest,
     VoiceTranscriptUpdateRequest,
@@ -87,6 +90,18 @@ impl ControlPlaneActorRequest for RoleChangeRequest {
 }
 
 impl ControlPlaneActorRequest for AgentRemoveRequest {
+    fn bind_control_plane_actor(&mut self) {
+        bind_required_control_plane_actor(&mut self.actor);
+    }
+}
+
+impl ControlPlaneActorRequest for AgentWorkspaceSignalSendRequest {
+    fn bind_control_plane_actor(&mut self) {
+        bind_required_control_plane_actor(&mut self.actor);
+    }
+}
+
+impl ControlPlaneActorRequest for AgentWorkspaceSignalCancelRequest {
     fn bind_control_plane_actor(&mut self) {
         bind_required_control_plane_actor(&mut self.actor);
     }

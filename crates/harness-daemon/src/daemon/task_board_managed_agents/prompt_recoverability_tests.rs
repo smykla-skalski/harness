@@ -12,7 +12,9 @@ use crate::daemon::protocol::CodexRunStatus;
 use crate::task_board::AgentMode;
 use crate::task_board::render_triage_escalation_prompt;
 
-use super::super::test_support::{applied_task, codex_snapshot, seed_owner_session, test_http_state};
+use super::super::test_support::{
+    applied_task, codex_snapshot, seed_owner_session, test_http_state,
+};
 use super::super::{codex_worker_request, managed_worker_id};
 use super::{review_launch, write_launch};
 use crate::daemon::db::prelude::*;
@@ -53,7 +55,15 @@ async fn a_worker_run_keeps_the_prompt_it_started_with() {
     let run_id = managed_worker_id(&applied, "dispatch-intent-1");
     let request = codex_worker_request(&applied, &run_id).expect("render worker request");
 
-    let recovered = round_trip(&db, &run_id, applied.launch_owner_id().expect("a dispatched task has an owner"), &request.prompt).await;
+    let recovered = round_trip(
+        &db,
+        &run_id,
+        applied
+            .launch_owner_id()
+            .expect("a dispatched task has an owner"),
+        &request.prompt,
+    )
+    .await;
 
     assert_eq!(recovered, request.prompt);
 }
@@ -68,7 +78,15 @@ async fn an_implementation_run_keeps_the_prompt_it_started_with() {
     let run_id = "codex-implementation-attempt";
     let request = codex_worker_request(&applied, run_id).expect("render write request");
 
-    let recovered = round_trip(&db, run_id, applied.launch_owner_id().expect("a dispatched task has an owner"), &request.prompt).await;
+    let recovered = round_trip(
+        &db,
+        run_id,
+        applied
+            .launch_owner_id()
+            .expect("a dispatched task has an owner"),
+        &request.prompt,
+    )
+    .await;
 
     assert_eq!(recovered, request.prompt);
 }
@@ -83,7 +101,15 @@ async fn a_review_run_keeps_the_prompt_it_started_with() {
     let run_id = "codex-review-attempt";
     let request = codex_worker_request(&applied, run_id).expect("render review request");
 
-    let recovered = round_trip(&db, run_id, applied.launch_owner_id().expect("a dispatched task has an owner"), &request.prompt).await;
+    let recovered = round_trip(
+        &db,
+        run_id,
+        applied
+            .launch_owner_id()
+            .expect("a dispatched task has an owner"),
+        &request.prompt,
+    )
+    .await;
 
     assert_eq!(recovered, request.prompt);
 }
@@ -102,7 +128,15 @@ async fn an_escalation_run_keeps_the_prompt_it_started_with() {
     )
     .expect("render escalation prompt");
 
-    let recovered = round_trip(&db, "codex-escalation-1", applied.launch_owner_id().expect("a dispatched task has an owner"), &prompt).await;
+    let recovered = round_trip(
+        &db,
+        "codex-escalation-1",
+        applied
+            .launch_owner_id()
+            .expect("a dispatched task has an owner"),
+        &prompt,
+    )
+    .await;
 
     assert_eq!(recovered, prompt);
 }

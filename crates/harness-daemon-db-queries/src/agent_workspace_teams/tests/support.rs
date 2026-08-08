@@ -3,11 +3,12 @@ use std::path::{Path, PathBuf};
 use harness_daemon_db_core::{AsyncDaemonDb, DaemonDb, SchemaRepairHooks};
 use harness_kernel::errors::CliError;
 use harness_protocol::session::{CURRENT_VERSION, SessionState};
+use harness_protocol::timeline::TimelineWindowRequest;
 use serde_json::json;
 use sqlx::query;
 use tempfile::TempDir;
 
-use crate::AsyncAgentWorkspaceQueries;
+use crate::{AsyncAgentWorkspaceActivityQueries, AsyncAgentWorkspaceQueries};
 
 pub(super) const DAEMON_ID: &str = "daemon-team-test";
 pub(super) const NOW: &str = "2026-08-06T10:00:00Z";
@@ -50,6 +51,17 @@ impl Fixture {
             .await
             .expect("seed durable workspace");
         response.workspaces[0].workspace_id.clone()
+    }
+
+    pub(super) async fn reconcile_activity(&self, workspace_id: &str) {
+        self.db
+            .load_agent_workspace_activity(
+                DAEMON_ID,
+                workspace_id,
+                &TimelineWindowRequest::default(),
+            )
+            .await
+            .expect("reconcile durable agent activity");
     }
 
     pub(super) async fn seed_project(&self, project: &ProjectFixture) {

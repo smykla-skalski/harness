@@ -1,0 +1,1 @@
+ALTER TABLE agent_workspace_signals ADD COLUMN delivery_runtime_session_id TEXT;

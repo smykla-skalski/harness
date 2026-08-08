@@ -97,6 +97,9 @@ async fn migration_effect_observed(
     if migration_version == 70 {
         return column_exists(pool, "task_board_dispatch_intents", "workspace_id").await;
     }
+    if migration_version == 71 {
+        return table_exists(pool, "agent_workspace_activity_state").await;
+    }
     let Some((table, column)) = migration_effect_column(migration_version) else {
         return Ok(false);
     };
@@ -136,6 +139,10 @@ const fn migration_effect_column(migration_version: i64) -> Option<(&'static str
         67 => Some(("agent_tuis", "workspace_id")),
         68 => Some(("codex_runs", "workspace_id")),
         69 => Some(("task_board_items", "workspace_id")),
+        72 => Some(("agent_workspace_signals", "idempotency_key")),
+        74 => Some(("agent_workspace_signals", "wake_claimed_at")),
+        76 => Some(("agent_workspace_signals", "delivery_runtime_session_id")),
+        77 => Some(("agent_workspace_signals", "delivery_project_dir")),
         _ => None,
     }
 }
@@ -227,6 +234,12 @@ const fn migration_floor_version(migration_version: i64) -> u64 {
         // column per table it reaches, so the repair chain can skip whichever
         // parts a database already has.
         66..=70 => 65,
+        // v66 adds workspace-owned signals, transcripts, activity, and timeline history.
+        71 => 66,
+        // v67 adds signal idempotency and a managed-agent wake claim, then stamps the schema.
+        72..=75 => 67,
+        // v68 snapshots the exact runtime route used for each native signal.
+        76..=79 => 68,
         _ => u64::MAX,
     }
 }
@@ -452,62 +465,5 @@ async fn restore_migration_pragmas(conn: &mut sqlx::SqliteConnection) -> Result<
 }
 
 #[cfg(test)]
-mod pragma_tests {
-    use super::{SchemaRepairHooks, query, restore_migration_pragmas};
-    use crate::AsyncDaemonDb;
-
-    /// The hooks are unreachable here: `connect_with_hooks` only threads them
-    /// through `prepare_legacy_schema`, which is a no-op for a path that does
-    /// not exist yet (see its own early return), and this test always opens a
-    /// fresh `tempdir` path.
-    fn unreachable_repair_hooks() -> SchemaRepairHooks {
-        SchemaRepairHooks {
-            sync_session: |_, _, _| unreachable!("fresh db never re-runs legacy repairs"),
-            backfill_legacy_timelines: |_| unreachable!("fresh db never re-runs legacy repairs"),
-        }
-    }
-
-    /// Reading the pragma back through the pool proves nothing: the pool opens
-    /// connections with `foreign_keys(true)`, so it can answer from a connection
-    /// that was never suspended. This asserts on the same connection the restore
-    /// ran against, which is the one handed back to the pool.
-    #[tokio::test]
-    async fn restoring_pragmas_applies_every_statement_on_that_connection() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        let db = AsyncDaemonDb::connect_with_hooks(
-            &dir.path().join("harness.db"),
-            &unreachable_repair_hooks(),
-        )
-        .await
-        .expect("open async db");
-        let mut conn = db.pool().acquire().await.expect("acquire connection");
-        for pragma in [
-            "PRAGMA foreign_keys = OFF",
-            "PRAGMA legacy_alter_table = ON",
-        ] {
-            query(pragma)
-                .execute(&mut *conn)
-                .await
-                .expect("suspend pragma");
-        }
-
-        restore_migration_pragmas(&mut conn)
-            .await
-            .expect("restore pragmas");
-
-        let foreign_keys: i64 = sqlx::query_scalar("PRAGMA foreign_keys")
-            .fetch_one(&mut *conn)
-            .await
-            .expect("foreign_keys pragma");
-        let legacy_alter_table: i64 = sqlx::query_scalar("PRAGMA legacy_alter_table")
-            .fetch_one(&mut *conn)
-            .await
-            .expect("legacy_alter_table pragma");
-
-        assert_eq!(
-            (foreign_keys, legacy_alter_table),
-            (1, 0),
-            "a statement in the restore never reached the migrator's connection"
-        );
-    }
-}
+#[path = "async_bootstrap/pragma_tests.rs"]
+mod pragma_tests;

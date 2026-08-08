@@ -10,11 +10,18 @@ use super::{AgentRuntime, HookIntegrationPoint};
 
 pub struct CopilotRuntime;
 
-const HOOK_POINTS: &[HookIntegrationPoint] = &[HookIntegrationPoint {
-    name: "preToolUse",
-    typical_latency_seconds: 5,
-    supports_context_injection: false,
-}];
+const HOOK_POINTS: &[HookIntegrationPoint] = &[
+    HookIntegrationPoint {
+        name: "preToolUse",
+        typical_latency_seconds: 5,
+        supports_context_injection: false,
+    },
+    HookIntegrationPoint {
+        name: "postToolUse",
+        typical_latency_seconds: 5,
+        supports_context_injection: true,
+    },
+];
 
 impl AgentRuntime for CopilotRuntime {
     fn name(&self) -> &'static str {

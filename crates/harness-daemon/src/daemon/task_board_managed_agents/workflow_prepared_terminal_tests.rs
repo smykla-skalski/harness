@@ -43,7 +43,13 @@ async fn confirmed_local_start_atomically_completes_prepared_admission() {
     .await
     .expect("claim local target")
     .expect("new local target claim");
-    let mut run = codex_snapshot(CodexRunStatus::Running, claim.applied.launch_owner_id().expect("a dispatched task has an owner"));
+    let mut run = codex_snapshot(
+        CodexRunStatus::Running,
+        claim
+            .applied
+            .launch_owner_id()
+            .expect("a dispatched task has an owner"),
+    );
     run.run_id = claimed_attempt.idempotency_key.clone();
     run.board_item_id = Some(claim.applied.board_item_id.clone());
     run.workflow_execution_id = Some(execution_id.into());
@@ -417,7 +423,13 @@ pub(super) async fn claim_local_target_and_start(
     .await
     .expect("claim local target")
     .expect("new local target claim");
-    let mut run = codex_snapshot(CodexRunStatus::Running, claim.applied.launch_owner_id().expect("a dispatched task has an owner"));
+    let mut run = codex_snapshot(
+        CodexRunStatus::Running,
+        claim
+            .applied
+            .launch_owner_id()
+            .expect("a dispatched task has an owner"),
+    );
     run.run_id = claimed_attempt.idempotency_key;
     run.board_item_id = Some(claim.applied.board_item_id.clone());
     run.workflow_execution_id = Some(execution_id.into());

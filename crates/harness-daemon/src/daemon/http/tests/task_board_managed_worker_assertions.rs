@@ -27,7 +27,8 @@ pub(super) async fn assert_codex_worker_started(
         "the worker prompt names its board item"
     );
     assert!(
-        run.prompt.contains(&format!("Session task: {work_item_id}")),
+        run.prompt
+            .contains(&format!("Session task: {work_item_id}")),
         "the worker prompt names its work item"
     );
     assert!(

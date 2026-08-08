@@ -12,6 +12,11 @@ pub const PROJECTS: &str = "projects";
 pub const AGENT_WORKSPACES: &str = "agent_workspaces";
 pub const AGENT_WORKSPACE_TEAM: &str = "agent_workspace.team";
 pub const AGENT_WORKSPACE_MEMBER_REMOVE: &str = "agent_workspace.member.remove";
+pub const AGENT_WORKSPACE_ACTIVITY: &str = "agent_workspace.activity";
+pub const AGENT_WORKSPACE_MEMBER_ACTIVITY: &str = "agent_workspace.member.activity";
+pub const AGENT_WORKSPACE_SIGNAL_SEND: &str = "agent_workspace.signal.send";
+pub const AGENT_WORKSPACE_SIGNAL_ACK: &str = "agent_workspace.signal.ack";
+pub const AGENT_WORKSPACE_SIGNAL_CANCEL: &str = "agent_workspace.signal.cancel";
 pub const SESSIONS: &str = "sessions";
 pub const RUNTIME_SESSION_RESOLVE: &str = "runtime_session.resolve";
 pub const RUNTIMES_PROBE: &str = "runtimes.probe";
@@ -220,6 +225,11 @@ pub const ALL: &[&str] = &[
     AGENT_WORKSPACES,
     AGENT_WORKSPACE_TEAM,
     AGENT_WORKSPACE_MEMBER_REMOVE,
+    AGENT_WORKSPACE_ACTIVITY,
+    AGENT_WORKSPACE_MEMBER_ACTIVITY,
+    AGENT_WORKSPACE_SIGNAL_SEND,
+    AGENT_WORKSPACE_SIGNAL_ACK,
+    AGENT_WORKSPACE_SIGNAL_CANCEL,
     SESSIONS,
     RUNTIME_SESSION_RESOLVE,
     RUNTIMES_PROBE,

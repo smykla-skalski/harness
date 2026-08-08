@@ -61,7 +61,7 @@ impl AgentAdapter for VibeAdapter {
     fn render_output(
         &self,
         result: &NormalizedHookResult,
-        _event: &NormalizedEvent,
+        event: &NormalizedEvent,
     ) -> RenderedHookResponse {
         RenderedHookResponse {
             stdout: render_json(&VibeOutput {
@@ -79,7 +79,13 @@ impl AgentAdapter for VibeAdapter {
                 halt_agent: result.halt_agent,
             }),
             exit_code: 0,
+            additional_context_rendered: result.additional_context.is_some()
+                && self.supports_additional_context(event),
         }
+    }
+
+    fn supports_additional_context(&self, event: &NormalizedEvent) -> bool {
+        matches!(event, NormalizedEvent::BeforeToolUse)
     }
 
     fn normalize_tool(&self, tool_name: &str) -> ToolCategory {

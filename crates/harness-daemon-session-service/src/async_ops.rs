@@ -173,16 +173,16 @@ fn write_signal_ack_artifact(
 struct SignalAckOutcome {
     result: AckResult,
     started_task: Option<String>,
-    indexed_signal: Option<SessionSignalRecord>,
+    signal: SessionSignalRecord,
 }
 
-async fn persist_signal_ack_state(
+async fn load_signal_ack_target(
     storage: &impl AsyncSignalStorage,
     resolved: &ResolvedSession,
     request: &SignalAckRequest,
     project_dir: &Path,
-) -> Result<SignalAckOutcome, CliError> {
-    let signal = if let Some(signal) = indexed_signal_record(
+) -> Result<Option<SessionSignalRecord>, CliError> {
+    if let Some(signal) = indexed_signal_record(
         storage,
         &resolved.state.session_id,
         &request.agent_id,
@@ -190,42 +190,44 @@ async fn persist_signal_ack_state(
     )
     .await?
     {
-        Some(signal)
+        Ok(Some(signal))
     } else {
         session_service::load_signal_record_for_agent_from_state(
             &resolved.state,
             &request.agent_id,
             &request.signal_id,
             project_dir,
-        )?
-    };
-    let result = signal.as_ref().map_or(request.result, |record| {
-        session_service::normalize_signal_ack_result(&record.signal, request.result)
-    });
-    let mut started_task = None;
-
-    if let Some(signal) = signal.as_ref() {
-        let now = utc_now();
-        started_task = storage
-            .update_session_state_immediate(&resolved.state.session_id, |state| {
-                let started_task = session_service::apply_signal_ack_result(
-                    state,
-                    &request.agent_id,
-                    &signal.signal,
-                    result,
-                    &now,
-                );
-                session_service::refresh_session(state, &now);
-                Ok(started_task)
-            })
-            .await?;
-        storage.sync_file_state(&resolved.state.session_id).await?;
+        )
     }
+}
+
+async fn persist_signal_ack_state(
+    storage: &impl AsyncSignalStorage,
+    resolved: &ResolvedSession,
+    request: &SignalAckRequest,
+    signal: SessionSignalRecord,
+) -> Result<SignalAckOutcome, CliError> {
+    let result = session_service::normalize_signal_ack_result(&signal.signal, request.result);
+    let now = utc_now();
+    let started_task = storage
+        .update_session_state_immediate(&resolved.state.session_id, |state| {
+            let started_task = session_service::apply_signal_ack_result(
+                state,
+                &request.agent_id,
+                &signal.signal,
+                result,
+                &now,
+            );
+            session_service::refresh_session(state, &now);
+            Ok(started_task)
+        })
+        .await?;
+    storage.sync_file_state(&resolved.state.session_id).await?;
 
     Ok(SignalAckOutcome {
         result,
         started_task,
-        indexed_signal: signal,
+        signal,
     })
 }
 
@@ -305,9 +307,7 @@ async fn persist_acknowledged_signal_index(
     request: &SignalAckRequest,
     outcome: &SignalAckOutcome,
 ) -> Result<(), CliError> {
-    let Some(signal) = outcome.indexed_signal.as_ref() else {
-        return refresh_signal_index_for_resolved(storage, resolved).await;
-    };
+    let signal = &outcome.signal;
     let ack_agent = resolved
         .state
         .agents
@@ -394,8 +394,19 @@ async fn record_signal_ack_direct_async_inner(
 ) -> Result<(), CliError> {
     let resolved = resolved_session_for_signal_mutation(storage, session_id).await?;
     let project_dir = Path::new(&request.project_dir);
+    let Some(signal) = load_signal_ack_target(storage, &resolved, request, project_dir).await?
+    else {
+        return Ok(());
+    };
+    if !session_service::signal_belongs_to_session_route(
+        &signal.signal,
+        session_id,
+        &request.agent_id,
+    ) {
+        return Ok(());
+    }
     write_signal_ack_artifact(&resolved, session_id, request, project_dir)?;
-    let outcome = persist_signal_ack_state(storage, &resolved, request, project_dir).await?;
+    let outcome = persist_signal_ack_state(storage, &resolved, request, signal).await?;
     append_signal_ack_log_entries(storage, session_id, request, &outcome).await?;
     let resolved = resolved_session_for_signal_mutation(storage, session_id).await?;
     persist_acknowledged_signal_index(storage, &resolved, session_id, request, &outcome).await?;

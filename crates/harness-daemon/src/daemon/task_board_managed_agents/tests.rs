@@ -309,8 +309,9 @@ fn terminal_and_failed_same_session_workers_are_recovered() {
     for snapshot in snapshots {
         let expected_id = snapshot.agent_id().to_string();
         let applied = applied_task(AgentMode::Headless);
-        let recovered = resolve_start_failure(start_failure(), Ok(Some(snapshot)), &applied, WORKER_ID)
-            .expect("same-session durable worker evidence");
+        let recovered =
+            resolve_start_failure(start_failure(), Ok(Some(snapshot)), &applied, WORKER_ID)
+                .expect("same-session durable worker evidence");
         assert_eq!(recovered.agent_id(), expected_id);
     }
 }
@@ -334,7 +335,12 @@ fn read_only_recovery_rejects_a_conflicting_durable_run() {
     applied.read_only_workflow = Some(review_launch());
     let run_id = "codex-review-attempt";
     let request = codex_worker_request(&applied, run_id).expect("render review request");
-    let mut run = codex_snapshot(CodexRunStatus::Running, applied.launch_owner_id().expect("a dispatched task has an owner"));
+    let mut run = codex_snapshot(
+        CodexRunStatus::Running,
+        applied
+            .launch_owner_id()
+            .expect("a dispatched task has an owner"),
+    );
     run.run_id = run_id.into();
     run.board_item_id = request.board_item_id;
     run.workflow_execution_id = request.workflow_execution_id;
@@ -356,8 +362,12 @@ fn read_only_recovery_rejects_a_conflicting_durable_run() {
 
     let mut wrong_worktree = run.clone();
     wrong_worktree.project_dir = "/tmp/other-worktree".into();
-    let error = recover_same_applied_worker(ManagedAgentSnapshot::Codex(wrong_worktree), &applied, WORKER_ID)
-        .expect_err("conflicting worktree must fail");
+    let error = recover_same_applied_worker(
+        ManagedAgentSnapshot::Codex(wrong_worktree),
+        &applied,
+        WORKER_ID,
+    )
+    .expect_err("conflicting worktree must fail");
     assert_eq!(error.code(), "KSRCLI092");
 
     run.workflow_execution_id = Some("workflow-other".into());

@@ -59,6 +59,13 @@ const CURRENT_SCHEMA_TABLES: &[&str] = &[
     "agent_workspace_member_provenance",
     "agent_workspace_member_operations",
     "agent_working_copies",
+    "agent_workspace_activity_state",
+    "agent_workspace_activity_sources",
+    "agent_workspace_signals",
+    "agent_workspace_conversation_events",
+    "agent_workspace_activity_summaries",
+    "agent_workspace_timeline_entries",
+    "agent_workspace_timeline_state",
 ];
 
 const CURRENT_SCHEMA_POLICY_COLUMNS: &[(&str, &str)] = &[
@@ -112,6 +119,10 @@ const CURRENT_SCHEMA_RUN_COLUMNS: &[(&str, &str)] = &[
     ("agent_turn_runs", "runtime_turn_id"),
     ("task_board_ai_review_reports", "requested_runtime"),
     ("task_board_ai_review_reports", "actual_runtime"),
+    ("agent_workspace_signals", "idempotency_key"),
+    ("agent_workspace_signals", "wake_claimed_at"),
+    ("agent_workspace_signals", "delivery_runtime_session_id"),
+    ("agent_workspace_signals", "delivery_project_dir"),
 ];
 
 const DEPRECATED_SCHEMA_POLICY_COLUMNS: &[(&str, &str)] =
@@ -137,6 +148,26 @@ const CURRENT_SCHEMA_TRIGGERS: &[&str] = &[
     "agent_workspace_team_source_provenance_update",
     "agent_workspace_team_source_provenance_delete",
     "agent_workspace_team_detach_session",
+    "agent_workspace_activity_team_insert",
+    "agent_workspace_activity_source_link_insert",
+    "agent_workspace_activity_source_link_delete",
+    "agent_workspace_activity_member_provenance_insert",
+    "agent_workspace_activity_member_provenance_update",
+    "agent_workspace_activity_member_provenance_delete",
+    "agent_workspace_activity_signal_insert",
+    "agent_workspace_activity_signal_update",
+    "agent_workspace_activity_signal_delete",
+    "agent_workspace_activity_conversation_insert",
+    "agent_workspace_activity_conversation_update",
+    "agent_workspace_activity_conversation_delete",
+    "agent_workspace_activity_summary_insert",
+    "agent_workspace_activity_summary_update",
+    "agent_workspace_activity_summary_delete",
+    "agent_workspace_activity_timeline_insert",
+    "agent_workspace_activity_timeline_update",
+    "agent_workspace_activity_timeline_delete",
+    "agent_workspace_activity_detach_session_guard",
+    "agent_workspace_activity_detach_session",
 ];
 
 const CURRENT_SCHEMA_INDEXES: &[&str] = &[
@@ -158,6 +189,16 @@ const CURRENT_SCHEMA_INDEXES: &[&str] = &[
     "idx_codex_runs_workspace_updated",
     "idx_task_board_items_workspace",
     "idx_task_board_dispatch_workspace_work_item",
+    "idx_agent_workspace_activity_sources_session",
+    "idx_agent_workspace_signals_member",
+    "idx_agent_workspace_signals_source",
+    "idx_agent_workspace_signals_native_idempotency",
+    "idx_agent_workspace_conversation_member_time",
+    "idx_agent_workspace_conversation_source",
+    "idx_agent_workspace_timeline_entry_id",
+    "idx_agent_workspace_timeline_sort",
+    "idx_agent_workspace_timeline_owner",
+    "idx_agent_workspace_timeline_source",
 ];
 
 const CURRENT_SCHEMA_REMOTE_ACME_COLUMNS: &[(&str, &str)] = &[

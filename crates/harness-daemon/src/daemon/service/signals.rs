@@ -352,7 +352,10 @@ pub(crate) fn try_wake_started_workers(
                         project_dir: project_dir.to_path_buf(),
                         prompt: build_active_signal_prompt(&record.signal),
                         signal_id: record.signal.signal_id.clone(),
+                        signal_expires_at: record.signal.expires_at.clone(),
                         agent_id: record.agent_id.clone(),
+                        workspace_id: None,
+                        member_id: None,
                     },
                 );
             }

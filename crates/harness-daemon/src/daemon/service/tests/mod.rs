@@ -24,6 +24,7 @@ mod support;
 use support::*;
 
 mod adopted_external;
+mod agent_workspace_activity;
 mod async_signals;
 mod async_stream;
 mod background_import;

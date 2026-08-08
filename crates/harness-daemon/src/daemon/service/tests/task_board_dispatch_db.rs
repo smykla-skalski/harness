@@ -287,7 +287,10 @@ fn a_legacy_session_linked_item_still_dispatches_through_its_session() {
             .await
             .expect("prepare the legacy dispatch");
 
-            assert_eq!(applied.session_id.as_deref(), Some(session.session_id.as_str()));
+            assert_eq!(
+                applied.session_id.as_deref(),
+                Some(session.session_id.as_str())
+            );
             assert_eq!(applied.workspace_id, None);
             assert_eq!(applied.working_copy_id, None);
             let copies = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM agent_working_copies")

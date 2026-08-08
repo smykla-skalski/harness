@@ -20,6 +20,18 @@ use crate::stored_timeline_entry::StoredTimelineEntry;
 use crate::summaries::SessionSummaryQueries;
 use crate::timeline_store::replace_all_session_timeline_entries;
 
+pub(crate) fn validate_timeline_window_request(
+    request: &TimelineWindowRequest,
+) -> Result<(), CliError> {
+    if request.before.is_some() && request.after.is_some() {
+        Err(db_error(
+            "timeline window cannot include both before and after cursors",
+        ))
+    } else {
+        Ok(())
+    }
+}
+
 /// Row shape of a session's cached timeline-summary state
 /// (`session_timeline_state`). Used only by `harness-daemon`'s own
 /// `#[cfg(test)]` `DaemonDbTimeline` callers - not `#[cfg(test)]` here, since
@@ -205,6 +217,7 @@ impl DaemonDbTimeline for DaemonDb {
         session_id: &str,
         request: &TimelineWindowRequest,
     ) -> Result<Option<TimelineWindowResponse>, CliError> {
+        validate_timeline_window_request(request)?;
         let Some(state) = self.load_session_timeline_state(session_id)? else {
             return Ok(None);
         };

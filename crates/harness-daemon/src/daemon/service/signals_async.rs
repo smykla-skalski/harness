@@ -184,5 +184,15 @@ pub(crate) async fn record_signal_ack_direct_async(
     request: &SignalAckRequest,
     db: &AsyncDaemonDbHandle,
 ) -> Result<(), CliError> {
+    if super::agent_workspace_activity::record_native_runtime_acknowledgment_from_session_route(
+        db,
+        session_id,
+        &request.agent_id,
+        &request.signal_id,
+    )
+    .await?
+    {
+        return Ok(());
+    }
     harness_daemon_session_service::record_signal_ack_direct_async(session_id, request, db).await
 }

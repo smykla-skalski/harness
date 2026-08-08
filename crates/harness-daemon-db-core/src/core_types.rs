@@ -47,7 +47,7 @@ impl fmt::Debug for DaemonDb {
 // assert a freshly migrated database's stamped version against this
 // constant, the same reason `AsyncDaemonDb` is `pub` rather than
 // `pub(crate)`.
-pub const SCHEMA_VERSION: &str = "65";
+pub const SCHEMA_VERSION: &str = "68";
 
 #[must_use]
 pub fn db_error(detail: impl Into<Cow<'static, str>>) -> CliError {

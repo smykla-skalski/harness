@@ -28,8 +28,9 @@ use super::super::reviews::dispatch_reviews_method;
 use super::super::task_board::dispatch_task_board_method;
 use super::mutation_handlers::{
     dispatch_agent_change_role, dispatch_agent_remove, dispatch_agent_workspace_member_remove,
-    dispatch_improver_apply, dispatch_leader_transfer, dispatch_session_end,
-    dispatch_session_observe, dispatch_signal_cancel, dispatch_signal_send,
+    dispatch_agent_workspace_signal_ack, dispatch_agent_workspace_signal_cancel,
+    dispatch_agent_workspace_signal_send, dispatch_improver_apply, dispatch_leader_transfer,
+    dispatch_session_end, dispatch_session_observe, dispatch_signal_cancel, dispatch_signal_send,
     dispatch_task_arbitrate, dispatch_task_assign, dispatch_task_checkpoint,
     dispatch_task_claim_review, dispatch_task_create, dispatch_task_delete, dispatch_task_drop,
     dispatch_task_queue_policy, dispatch_task_respond_review, dispatch_task_submit_for_review,
@@ -135,6 +136,8 @@ async fn dispatch_read_method(
             | ws_methods::PROJECTS
             | ws_methods::AGENT_WORKSPACES
             | ws_methods::AGENT_WORKSPACE_TEAM
+            | ws_methods::AGENT_WORKSPACE_ACTIVITY
+            | ws_methods::AGENT_WORKSPACE_MEMBER_ACTIVITY
             | ws_methods::SESSIONS
             | ws_methods::RUNTIME_SESSION_RESOLVE
             | ws_methods::RUNTIMES_PROBE
@@ -245,6 +248,15 @@ async fn dispatch_agent_mutation(
         ws_methods::AGENT_REMOVE => Some(dispatch_agent_remove(request, state).await),
         ws_methods::AGENT_WORKSPACE_MEMBER_REMOVE => {
             Some(dispatch_agent_workspace_member_remove(request, state).await)
+        }
+        ws_methods::AGENT_WORKSPACE_SIGNAL_SEND => {
+            Some(dispatch_agent_workspace_signal_send(request, state).await)
+        }
+        ws_methods::AGENT_WORKSPACE_SIGNAL_ACK => {
+            Some(dispatch_agent_workspace_signal_ack(request, state).await)
+        }
+        ws_methods::AGENT_WORKSPACE_SIGNAL_CANCEL => {
+            Some(dispatch_agent_workspace_signal_cancel(request, state).await)
         }
         _ => None,
     }

@@ -25,6 +25,7 @@ use super::params::{
     extract_string_param, extract_u64_param,
 };
 
+mod agent_workspace_activity;
 mod subscriptions;
 
 pub(crate) use subscriptions::{
@@ -98,6 +99,15 @@ async fn dispatch_daemon_inventory_query(
         ws_methods::AGENT_WORKSPACE_TEAM => {
             Some(dispatch_agent_workspace_team_query(request, state).await)
         }
+        ws_methods::AGENT_WORKSPACE_ACTIVITY => Some(
+            agent_workspace_activity::dispatch_agent_workspace_activity_query(request, state).await,
+        ),
+        ws_methods::AGENT_WORKSPACE_MEMBER_ACTIVITY => Some(
+            agent_workspace_activity::dispatch_agent_workspace_member_activity_query(
+                request, state,
+            )
+            .await,
+        ),
         ws_methods::SESSIONS => Some(dispatch_sessions_query(&request.id, state).await),
         ws_methods::RUNTIME_SESSION_RESOLVE => {
             Some(dispatch_runtime_session_resolve_query(request, state).await)

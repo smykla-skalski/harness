@@ -8,9 +8,19 @@ use serde::de::DeserializeOwned;
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_kernel::io::{validate_safe_segment, write_text};
 
+mod acknowledgment;
+mod delivery;
+
 #[cfg(test)]
 mod tests;
 
+pub use acknowledgment::{
+    PendingSignalDelivery, SignalAckClaim, acknowledge_signal, acknowledge_signal_once,
+    acknowledgments_match, claim_signal_acknowledgment,
+};
+pub use delivery::{
+    SignalFileState, SignalSettlement, ensure_signal_file, settle_signal_if_present,
+};
 pub use harness_protocol::agent::{
     AckResult, DeliveryConfig, Signal, SignalAck, SignalPayload, SignalPriority,
     signal_matches_session,
@@ -154,107 +164,24 @@ fn parse_json_file_contents<T: DeserializeOwned>(path: &Path, content: &str) -> 
     }
 }
 
-struct AckPaths {
-    acknowledged_dir: PathBuf,
-    signal_file: PathBuf,
-    ack_file: PathBuf,
-    acknowledged_signal_file: PathBuf,
-}
-
-impl AckPaths {
-    fn new(signal_dir: &Path, signal_id: &str) -> Result<Self, CliError> {
-        let acknowledged_dir = acknowledged_dir(signal_dir);
-        Ok(Self {
-            acknowledged_dir: acknowledged_dir.clone(),
-            signal_file: pending_dir(signal_dir).join(signal_json_name(signal_id)?),
-            ack_file: acknowledged_dir.join(signal_ack_name(signal_id)?),
-            acknowledged_signal_file: acknowledged_dir.join(signal_json_name(signal_id)?),
-        })
-    }
-}
-
-/// Acknowledge a signal: write ack file and move signal from pending to acknowledged.
-///
-/// # Errors
-/// Returns `CliError` on filesystem failures.
-pub fn acknowledge_signal(signal_dir: &Path, ack: &SignalAck) -> Result<(), CliError> {
-    let paths = AckPaths::new(signal_dir, &ack.signal_id)?;
-    fs::create_dir_all(&paths.acknowledged_dir)
-        .map_err(|error| CliErrorKind::workflow_io(format!("create ack dir: {error}")))?;
-
-    let ack_json = serde_json::to_string_pretty(ack)
-        .map_err(|error| CliErrorKind::workflow_serialize(format!("ack: {error}")))?;
-    write_text(&paths.ack_file, &ack_json)?;
-    move_acknowledged_signal(&paths.signal_file, &paths.acknowledged_signal_file)
-}
-
-fn move_acknowledged_signal(
-    signal_file: &Path,
-    acknowledged_signal_file: &Path,
-) -> Result<(), CliError> {
-    match fs::rename(signal_file, acknowledged_signal_file) {
-        Ok(()) => Ok(()),
-        Err(error) => {
-            handle_acknowledge_rename_error(signal_file, acknowledged_signal_file, &error)
-        }
-    }
-}
-
-fn handle_acknowledge_rename_error(
-    signal_file: &Path,
-    acknowledged_signal_file: &Path,
-    error: &io::Error,
-) -> Result<(), CliError> {
-    if acknowledge_rename_raced_with_prior_move(error, acknowledged_signal_file) {
-        warn_acknowledge_rename_race(signal_file, acknowledged_signal_file);
-        return Ok(());
-    }
-
-    Err(acknowledge_rename_failure(
-        signal_file,
-        acknowledged_signal_file,
-        error,
-    ))
-}
-
-fn acknowledge_rename_raced_with_prior_move(
-    error: &io::Error,
-    acknowledged_signal_file: &Path,
-) -> bool {
-    error.kind() == io::ErrorKind::NotFound && acknowledged_signal_file.is_file()
-}
-
-#[allow(
-    clippy::cognitive_complexity,
-    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
-)]
-fn warn_acknowledge_rename_race(signal_file: &Path, acknowledged_signal_file: &Path) {
-    tracing::warn!(
-        pending = %signal_file.display(),
-        acknowledged = %acknowledged_signal_file.display(),
-        "signal file was already moved before acknowledge completed"
-    );
-}
-
-fn acknowledge_rename_failure(
-    signal_file: &Path,
-    acknowledged_signal_file: &Path,
-    error: &io::Error,
-) -> CliError {
-    CliErrorKind::workflow_io(format!(
-        "move acknowledged signal {} -> {}: {error}",
-        signal_file.display(),
-        acknowledged_signal_file.display()
-    ))
-    .into()
-}
-
 /// Read all acknowledgment files from the directory.
 ///
 /// # Errors
 /// Returns `CliError` on filesystem failures.
 pub fn read_acknowledgments(signal_dir: &Path) -> Result<Vec<SignalAck>, CliError> {
-    read_filtered_json_files(&acknowledged_dir(signal_dir), is_signal_ack_file)
+    let mut acknowledgments = Vec::new();
+    for path in read_json_entry_paths(&acknowledged_dir(signal_dir))? {
+        if !is_signal_ack_file(&path) {
+            continue;
+        }
+        let Some(acknowledgment) = try_parse_json_file::<SignalAck>(&path) else {
+            continue;
+        };
+        if acknowledgment::acknowledgment_is_terminal(signal_dir, &acknowledgment.signal_id)? {
+            acknowledgments.push(acknowledgment);
+        }
+    }
+    Ok(acknowledgments)
 }
 
 /// Return pending signals whose `created_at` is older than `threshold_seconds`.

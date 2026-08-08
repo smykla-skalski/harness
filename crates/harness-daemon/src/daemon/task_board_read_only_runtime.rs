@@ -388,7 +388,6 @@ impl TaskBoardReadOnlyRuntime for ProductionTaskBoardReadOnlyRuntime<'_> {
     }
 }
 
-
 #[cfg(test)]
 #[path = "task_board_read_only_runtime/detached_turn_tests.rs"]
 mod detached_turn_tests;

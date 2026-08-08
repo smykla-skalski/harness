@@ -70,6 +70,7 @@ fn discovery_routes() -> OpenApiRouter<DaemonHttpState> {
         .routes(routes!(get_agent_workspaces))
         .routes(routes!(get_agent_workspace_team))
         .routes(routes!(post_agent_workspace_member_remove))
+        .merge(super::agent_workspace_activity::routes())
         .routes(routes!(get_runtime_session_resolution))
         .routes(routes!(control::get_runtimes_probe))
         .route(http_paths::WS, get(ws_upgrade_handler))

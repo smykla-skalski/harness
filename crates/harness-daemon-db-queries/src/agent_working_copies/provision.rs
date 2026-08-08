@@ -4,8 +4,8 @@ use harness_workspace::workspace::utc_now;
 use sqlx::{Sqlite, Transaction, query};
 
 use crate::agent_workspaces::availability::{RecordedCheckout, recorded_checkout_availability};
-use crate::agent_workspaces::identity::digest_fields;
 use crate::agent_workspaces::availability_label;
+use crate::agent_workspaces::identity::digest_fields;
 use crate::agent_workspaces::shadow::{ShadowWorkspace, shadow_digest};
 
 use super::model::{ProvisionedWorkspaceCheckout, WorkspaceCheckoutRequest};
@@ -207,10 +207,12 @@ async fn existing_workspace_created_at(
     transaction: &mut Transaction<'_, Sqlite>,
     workspace_id: &str,
 ) -> Result<Option<String>, CliError> {
-    sqlx::query_as::<_, (String,)>("SELECT created_at FROM agent_workspaces WHERE workspace_id = ?1")
-        .bind(workspace_id)
-        .fetch_optional(transaction.as_mut())
-        .await
-        .map(|row| row.map(|row| row.0))
-        .map_err(|error| db_error(format!("load provisioned workspace timestamp: {error}")))
+    sqlx::query_as::<_, (String,)>(
+        "SELECT created_at FROM agent_workspaces WHERE workspace_id = ?1",
+    )
+    .bind(workspace_id)
+    .fetch_optional(transaction.as_mut())
+    .await
+    .map(|row| row.map(|row| row.0))
+    .map_err(|error| db_error(format!("load provisioned workspace timestamp: {error}")))
 }

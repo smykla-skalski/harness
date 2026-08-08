@@ -59,6 +59,7 @@ async fn session_deletion_preserves_removal_after_source_progress() {
         progressed.members[0].membership_status,
         AgentWorkspaceMembershipStatus::Removed
     );
+    fixture.reconcile_activity(&workspace_id).await;
 
     query("DELETE FROM sessions WHERE session_id = ?1")
         .bind(session_id)

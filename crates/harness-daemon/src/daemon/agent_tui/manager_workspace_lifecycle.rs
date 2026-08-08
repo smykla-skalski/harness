@@ -131,9 +131,11 @@ fn ensure_terminal_workspace(
     if snapshot.workspace_id.as_deref() == Some(workspace_id) {
         return Ok(snapshot);
     }
-    Err(harness_kernel::errors::CliErrorKind::session_agent_conflict(format!(
-        "terminal agent '{}' belongs to '{}', not workspace '{workspace_id}'",
-        snapshot.tui_id, snapshot.session_id
-    ))
-    .into())
+    Err(
+        harness_kernel::errors::CliErrorKind::session_agent_conflict(format!(
+            "terminal agent '{}' belongs to '{}', not workspace '{workspace_id}'",
+            snapshot.tui_id, snapshot.session_id
+        ))
+        .into(),
+    )
 }

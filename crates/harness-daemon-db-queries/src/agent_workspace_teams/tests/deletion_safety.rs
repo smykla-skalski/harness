@@ -76,6 +76,7 @@ async fn selected_session_deletion_preserves_durable_leadership() {
         .team
         .expect("durable team before deletion");
     let leader_member_id = before.leader_member_id.expect("durable leader");
+    fixture.reconcile_activity(&workspace_id).await;
 
     query("DELETE FROM sessions WHERE session_id = ?1")
         .bind(session_id)
@@ -130,6 +131,7 @@ async fn dirty_leadership_blocks_raw_session_deletion() {
         .reconcile_agent_workspace_team(DAEMON_ID, &workspace_id)
         .await
         .expect("reconcile first source leader");
+    fixture.reconcile_activity(&workspace_id).await;
     query("UPDATE sessions SET leader_id = 'agent-second-leader' WHERE session_id = ?1")
         .bind(session_id)
         .execute(fixture.db.pool())
@@ -152,7 +154,7 @@ async fn dirty_leadership_blocks_raw_session_deletion() {
 async fn codex_binding_disagreement_blocks_session_detachment() {
     let fixture = Fixture::new().await;
     let session_id = "session-codex-detach-conflict";
-    fixture
+    let workspace_id = fixture
         .seed_workspace("project-codex-detach-conflict", session_id)
         .await;
     fixture
@@ -164,6 +166,12 @@ async fn codex_binding_disagreement_blocks_session_detachment() {
             "thread-registration",
         )
         .await;
+    fixture
+        .db
+        .reconcile_agent_workspace_team(DAEMON_ID, &workspace_id)
+        .await
+        .expect("reconcile agent registration");
+    fixture.reconcile_activity(&workspace_id).await;
     fixture
         .seed_codex(
             session_id,
@@ -223,6 +231,7 @@ async fn empty_managed_identifier_detaches_as_readable_legacy_member() {
         "unexpected malformed registration conflict: {:?}",
         reconciled.conflicts
     );
+    fixture.reconcile_activity(&workspace_id).await;
 
     query("DELETE FROM sessions WHERE session_id = ?1")
         .bind(session_id)
@@ -290,6 +299,7 @@ async fn persisted_acp_disconnect_remains_recoverable_after_session_deletion() {
         before.members[0].runtime_lifecycle,
         AgentWorkspaceRuntimeLifecycle::Recoverable
     );
+    fixture.reconcile_activity(&workspace_id).await;
 
     query("DELETE FROM sessions WHERE session_id = ?1")
         .bind(session_id)
@@ -343,6 +353,7 @@ async fn detached_member_can_be_removed_without_its_session() {
     let member_id = member.member_id.clone();
     assert_eq!(before.leader_member_id.as_deref(), Some(member_id.as_str()));
     let runtime_lifecycle = member.runtime_lifecycle;
+    fixture.reconcile_activity(&workspace_id).await;
     query("DELETE FROM sessions WHERE session_id = ?1")
         .bind(session_id)
         .execute(fixture.db.pool())

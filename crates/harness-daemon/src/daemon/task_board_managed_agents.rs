@@ -11,11 +11,11 @@ use crate::daemon::http::{
 };
 use crate::daemon::protocol::ManagedAgentSnapshot;
 use crate::daemon::reviews_store::PolicyGraphQueries;
-#[cfg(test)]
-use crate::task_board::{codex_worker_id, terminal_worker_id};
 use crate::task_board::{
     AgentMode, DispatchAppliedTask, TaskBoardLaunchCapability, managed_worker_id,
 };
+#[cfg(test)]
+use crate::task_board::{codex_worker_id, terminal_worker_id};
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 const DISPATCH_CLAIM_HEARTBEAT_INTERVAL: Duration = Duration::from_secs(10);
@@ -32,9 +32,9 @@ mod claim_settlement;
 pub(crate) use claim_settlement::settle_claimed_task_board_worker;
 
 mod workspace_ownership;
-use workspace_ownership::{applied_worker_owner, join_worker_to_workspace};
-pub(crate) use workspace_ownership::worker_lock_owner;
 pub(crate) use workspace_ownership::settle_compensated_workspace_worker;
+pub(crate) use workspace_ownership::worker_lock_owner;
+use workspace_ownership::{applied_worker_owner, join_worker_to_workspace};
 
 mod worker_start;
 use worker_start::{start_codex_worker, start_interactive_worker};

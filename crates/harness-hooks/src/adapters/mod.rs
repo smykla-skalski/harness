@@ -30,6 +30,7 @@ pub use vibe::VibeAdapter;
 pub struct RenderedHookResponse {
     pub stdout: String,
     pub exit_code: i32,
+    pub additional_context_rendered: bool,
 }
 
 /// One hook registration entry for agent-specific config generation.
@@ -54,6 +55,9 @@ pub trait AgentAdapter: Send + Sync {
         result: &NormalizedHookResult,
         event: &NormalizedEvent,
     ) -> RenderedHookResponse;
+    fn supports_additional_context(&self, _event: &NormalizedEvent) -> bool {
+        false
+    }
     fn normalize_tool(&self, tool_name: &str) -> ToolCategory;
     fn event_name(&self, event: &NormalizedEvent) -> Option<&str>;
     fn generate_config(&self, hooks: &[HookRegistration]) -> String;

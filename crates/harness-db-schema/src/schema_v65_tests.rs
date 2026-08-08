@@ -302,9 +302,15 @@ fn one_live_working_copy_owns_a_path() {
          ) VALUES (?1, 'workspace-1', '/origin', 'project', '/copies/one',
                    'harness/copy', ?2, ?3, 'created', 'updated')";
 
-    conn.execute(insert, rusqlite::params!["copy-1", "active", None::<String>])
-        .expect("record the first working copy");
-    let duplicate = conn.execute(insert, rusqlite::params!["copy-2", "active", None::<String>]);
+    conn.execute(
+        insert,
+        rusqlite::params!["copy-1", "active", None::<String>],
+    )
+    .expect("record the first working copy");
+    let duplicate = conn.execute(
+        insert,
+        rusqlite::params!["copy-2", "active", None::<String>],
+    );
     assert!(
         duplicate.is_err(),
         "two live working copies on one path is the duplicate checkout to refuse"
@@ -316,6 +322,9 @@ fn one_live_working_copy_owns_a_path() {
         [],
     )
     .expect("release the first working copy");
-    conn.execute(insert, rusqlite::params!["copy-2", "active", None::<String>])
-        .expect("reuse the path once the prior copy is released");
+    conn.execute(
+        insert,
+        rusqlite::params!["copy-2", "active", None::<String>],
+    )
+    .expect("reuse the path once the prior copy is released");
 }

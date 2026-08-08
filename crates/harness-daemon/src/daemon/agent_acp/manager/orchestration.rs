@@ -9,7 +9,7 @@ use crate::agents::kind::DisconnectReason;
 use crate::agents::runtime::event::ConversationEvent;
 use crate::daemon::db::ensure_shared_db;
 use crate::daemon::db::prelude::*;
-use crate::daemon::protocol::StreamEvent;
+use crate::daemon::protocol::{SignalAckRequest, StreamEvent};
 use crate::daemon::service;
 use crate::session::service as orchestration_service;
 use crate::session::types::{AgentStatus, ManagedAgentRef, SessionState};
@@ -342,12 +342,50 @@ impl AcpManagerPort for DaemonAcpManagerPort {
         service::record_signal_ack_and_broadcast(
             request.session_id,
             request.agent_id,
-            request.signal_id,
-            request.result,
+            &request.acknowledgment.signal_id,
+            request.acknowledgment.result,
             request.project_dir,
             Some(&db),
             Some(&self.sender),
         )
+    }
+
+    async fn sync_wake_accept_async(
+        &self,
+        request: AcpWakeAcceptRequest<'_>,
+    ) -> Result<(), CliError> {
+        let Some(db) = self.async_db.get().cloned() else {
+            return self.sync_wake_accept(request);
+        };
+        match (request.workspace_id, request.member_id) {
+            (Some(workspace_id), Some(member_id)) => {
+                return service::record_native_runtime_acknowledgment_from_workspace_route(
+                    &db,
+                    workspace_id,
+                    member_id,
+                    request.acknowledgment,
+                )
+                .await;
+            }
+            (None, None) => {}
+            _ => {
+                return Err(CliErrorKind::workflow_io(
+                    "ACP wake acknowledgment has an incomplete workspace address",
+                )
+                .into());
+            }
+        }
+        service::record_signal_ack_direct_async(
+            request.session_id,
+            &SignalAckRequest {
+                agent_id: request.agent_id.to_string(),
+                signal_id: request.acknowledgment.signal_id.clone(),
+                result: request.acknowledgment.result,
+                project_dir: request.project_dir.to_string_lossy().into_owned(),
+            },
+            &db,
+        )
+        .await
     }
 
     #[cfg(test)]

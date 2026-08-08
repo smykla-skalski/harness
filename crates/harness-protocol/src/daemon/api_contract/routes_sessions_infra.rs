@@ -139,6 +139,46 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Get,
+        path: http_paths::AGENT_WORKSPACE_ACTIVITY,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::AGENT_WORKSPACE_ACTIVITY,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Get,
+        path: http_paths::AGENT_WORKSPACE_MEMBER_ACTIVITY,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::AGENT_WORKSPACE_MEMBER_ACTIVITY,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
+        path: http_paths::AGENT_WORKSPACE_SIGNAL_SEND,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::AGENT_WORKSPACE_SIGNAL_SEND,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
+        path: http_paths::AGENT_WORKSPACE_SIGNAL_ACK,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::AGENT_WORKSPACE_SIGNAL_ACK,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
+        path: http_paths::AGENT_WORKSPACE_SIGNAL_CANCEL,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::AGENT_WORKSPACE_SIGNAL_CANCEL,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Get,
         path: http_paths::RUNTIME_SESSION_RESOLVE,
         parity: HttpRouteParity::Rpc {
             ws_method: ws_methods::RUNTIME_SESSION_RESOLVE,
