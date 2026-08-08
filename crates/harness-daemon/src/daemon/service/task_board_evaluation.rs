@@ -189,11 +189,14 @@ async fn translate_session_task(
             sequence: None,
         })
         .await?;
+    // `updated` counts board items this evaluation moved, not records it wrote:
+    // the first report for an item creates its record without necessarily
+    // changing the lane the item already shows.
     Ok(translated_record(
         item,
         task,
         &result.progress,
-        result.applied,
+        result.item_changed,
     ))
 }
 
@@ -221,11 +224,11 @@ fn translated_record(
     item: &TaskBoardItem,
     task: &WorkItem,
     progress: &TaskBoardWorkItemProgress,
-    applied: bool,
+    item_changed: bool,
 ) -> TaskBoardEvaluationRecord {
     let mut record = record_from_work_item_progress(item, progress);
     record.task_status = Some(task.status);
-    record.updated = applied;
+    record.updated = item_changed;
     record
 }
 

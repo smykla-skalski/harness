@@ -42,6 +42,10 @@ pub(crate) struct TaskBoardWorkItemReportResult {
     pub(crate) progress: TaskBoardWorkItemProgress,
     pub(crate) item: TaskBoardItem,
     pub(crate) applied: bool,
+    /// Whether the projection actually moved the board item. A report can
+    /// advance the record without changing the lane the item already shows, and
+    /// callers that count what they changed must not count that as a change.
+    pub(crate) item_changed: bool,
     pub(crate) rejection: Option<TaskBoardWorkItemReportRejection>,
     /// The managed worker still owed a stop. Present only while the work item
     /// is settled and its worker has not been marked settled yet, so the stop
@@ -112,13 +116,17 @@ pub(crate) async fn report_task_board_work_item_progress(
     let attempt_id = resolve_attempt_id_in_tx(&mut transaction, &item, &work_item_id).await?;
     let report = stamped_report(request, attempt_id, item_revision, &now);
     let outcome = apply_work_item_report(&current, &report);
-    let result =
+    let projection =
         persist_outcome_in_tx(&mut transaction, item, item_revision, &outcome, &report).await?;
     transaction
         .commit()
         .await
         .map_err(|error| db_error(format!("commit task board work item report: {error}")))?;
-    Ok(finish_result(result, outcome, worker_settled_at.as_deref()))
+    Ok(finish_result(
+        projection,
+        outcome,
+        worker_settled_at.as_deref(),
+    ))
 }
 
 /// Marks a settled work item's worker as stopped so no later report tries to
@@ -221,15 +229,24 @@ async fn insert_initial_progress_in_tx(
     Ok(progress)
 }
 
+/// The board item after a report, and whether the report moved it.
+struct ProjectedItem {
+    item: TaskBoardItem,
+    changed: bool,
+}
+
 async fn persist_outcome_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     item: TaskBoardItem,
     item_revision: i64,
     outcome: &TaskBoardWorkItemReportOutcome,
     report: &TaskBoardWorkItemReport,
-) -> Result<TaskBoardItem, CliError> {
+) -> Result<ProjectedItem, CliError> {
     let TaskBoardWorkItemReportOutcome::Applied(progress) = outcome else {
-        return Ok(item);
+        return Ok(ProjectedItem {
+            item,
+            changed: false,
+        });
     };
     write_progress_in_tx(transaction, progress).await?;
     if let Some(checkpoint) = progress.latest_checkpoint()
@@ -311,18 +328,24 @@ async fn project_item_in_tx(
     item: TaskBoardItem,
     item_revision: i64,
     progress: &TaskBoardWorkItemProgress,
-) -> Result<TaskBoardItem, CliError> {
+) -> Result<ProjectedItem, CliError> {
     if transaction
         .has_active_dispatch_reservation_in_tx(&item.id)
         .await?
     {
-        return Ok(item);
+        return Ok(ProjectedItem {
+            item,
+            changed: false,
+        });
     }
     let mut projected = item.clone();
     projected.status = progress.state.board_status();
     projected.workflow = progress.project_workflow(&item.workflow);
     if projected.status == item.status && projected.workflow == item.workflow {
-        return Ok(item);
+        return Ok(ProjectedItem {
+            item,
+            changed: false,
+        });
     }
     projected.updated_at = progress.updated_at.clone();
     transaction
@@ -340,11 +363,14 @@ async fn project_item_in_tx(
         replace_with_lane_transition_in_tx(transaction, item, item_revision, projected, transition)
             .await?;
     bump_change_in_tx(transaction, ITEMS_CHANGE_SCOPE).await?;
-    Ok(write.item)
+    Ok(ProjectedItem {
+        item: write.item,
+        changed: true,
+    })
 }
 
 fn finish_result(
-    item: TaskBoardItem,
+    projection: ProjectedItem,
     outcome: TaskBoardWorkItemReportOutcome,
     worker_settled_at: Option<&str>,
 ) -> TaskBoardWorkItemReportResult {
@@ -361,8 +387,9 @@ fn finish_result(
         .flatten();
     TaskBoardWorkItemReportResult {
         progress,
-        item,
+        item: projection.item,
         applied,
+        item_changed: projection.changed,
         rejection,
         pending_worker_settlement,
     }
