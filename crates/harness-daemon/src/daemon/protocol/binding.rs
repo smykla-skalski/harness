@@ -13,7 +13,8 @@ use super::{
     TaskBoardOrchestratorRunOnceRequest, TaskBoardPlanApproveRequest, TaskBoardPlanRevokeRequest,
     TaskBoardProjectUpdateRequest, TaskBoardResetItemPositionRequest,
     TaskBoardSaveTriageRulesDraftRequest, TaskBoardSetItemPositionRequest,
-    TaskBoardSetTriageOverrideRequest, TaskCheckpointRequest, TaskClaimReviewRequest,
+    TaskBoardSetTriageOverrideRequest, TaskBoardWorkItemReportCommand,
+    TaskBoardWorkItemReportRequest, TaskCheckpointRequest, TaskClaimReviewRequest,
     TaskCreateRequest, TaskDeleteRequest, TaskDropRequest, TaskQueuePolicyRequest,
     TaskRespondReviewRequest, TaskSubmitForReviewRequest, TaskSubmitReviewRequest,
     TaskUpdateRequest,
@@ -308,6 +309,18 @@ impl ControlPlaneActorRequest for TaskBoardActivateTriageRulesRequest {
 impl ControlPlaneActorRequest for TaskBoardEvaluateRequest {
     fn bind_control_plane_actor(&mut self) {
         // Evaluate carries no actor; authorize via the trait for parity.
+    }
+}
+
+impl ControlPlaneActorRequest for TaskBoardWorkItemReportRequest {
+    fn bind_control_plane_actor(&mut self) {
+        bind_optional_control_plane_actor(&mut self.actor);
+    }
+}
+
+impl ControlPlaneActorRequest for TaskBoardWorkItemReportCommand {
+    fn bind_control_plane_actor(&mut self) {
+        self.report.bind_control_plane_actor();
     }
 }
 

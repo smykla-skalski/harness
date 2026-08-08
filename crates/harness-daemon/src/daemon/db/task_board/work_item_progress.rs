@@ -56,11 +56,14 @@ pub(crate) async fn task_board_work_item_progress(
         .begin()
         .await
         .map_err(|error| db_error(format!("begin work item progress read: {error}")))?;
-    let item = transaction
+    // An unknown item is an error rather than an empty record: reading back
+    // "not dispatched" for a mistyped id would hide the mistake, and the
+    // sibling workflow-progress read already refuses the same way.
+    let (item, _) = transaction
         .load_item_in_tx(board_item_id)
         .await?
-        .map(|(item, _)| item);
-    let progress = match item.as_ref().and_then(|item| item.work_item_id.as_deref()) {
+        .ok_or_else(|| db_error(format!("task-board item '{board_item_id}' not found")))?;
+    let progress = match item.work_item_id.as_deref() {
         Some(work_item_id) => load_progress_in_tx(&mut transaction, work_item_id)
             .await?
             .map(|(progress, _)| progress),
@@ -113,7 +116,7 @@ pub(crate) async fn report_task_board_work_item_progress(
         .commit()
         .await
         .map_err(|error| db_error(format!("commit task board work item report: {error}")))?;
-    Ok(finish_result(result, outcome, worker_settled_at))
+    Ok(finish_result(result, outcome, worker_settled_at.as_deref()))
 }
 
 /// Marks a settled work item's worker as stopped so no later report tries to
@@ -317,7 +320,7 @@ async fn project_item_in_tx(
 fn finish_result(
     item: TaskBoardItem,
     outcome: TaskBoardWorkItemReportOutcome,
-    worker_settled_at: Option<String>,
+    worker_settled_at: Option<&str>,
 ) -> TaskBoardWorkItemReportResult {
     let applied = outcome.applied();
     let rejection = outcome.rejection();

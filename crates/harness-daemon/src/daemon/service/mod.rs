@@ -227,6 +227,7 @@ mod task_board_repository_scope;
 mod task_board_runtime;
 #[cfg(test)]
 mod task_board_sync_tests;
+mod task_board_work_item_progress;
 #[path = "task_board_workflow_execution_adapter.rs"]
 pub(crate) mod task_board_workflow_execution;
 #[cfg(test)]
@@ -394,6 +395,9 @@ pub use task_board_runtime::{
 pub use task_board_runtime::{
     task_board_git_runtime_config, update_task_board_git_runtime_config,
     verify_task_board_git_signing,
+};
+pub(crate) use task_board_work_item_progress::{
+    get_task_board_work_item_progress_db, report_task_board_work_item_progress_db,
 };
 pub use task_board_working_copies::{
     WorkingCopyGcReport, delete_task_board_working_copy, list_task_board_working_copies,

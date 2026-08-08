@@ -18,6 +18,7 @@ use super::task_board_review_report_support::{
 use crate::daemon::db::task_board::prelude::*;
 
 mod review_freshness;
+mod work_item_progress;
 mod workflow_progress;
 
 #[test]
@@ -117,6 +118,10 @@ async fn run_task_board_transport_parity() {
     assert_eq!(http_review, json!({ "status": "not_started" }));
     assert_eq!(http_review, ws_review);
     workflow_progress::assert_not_started(&client, &base_url).await;
+    work_item_progress::assert_not_dispatched(&client, &base_url).await;
+    work_item_progress::link_work_items(&db).await;
+    work_item_progress::assert_report_and_read_agree(&client, &base_url).await;
+    work_item_progress::assert_missing_error(&client, &base_url).await;
 
     let http_execution = seed_running_execution(&db, "parity-http").await;
     let ws_execution = seed_running_execution(&db, "parity-ws").await;
@@ -514,6 +519,10 @@ fn normalized_item(item: &Value) -> Value {
     }
     if item.get("deleted_at").is_some() {
         item["deleted_at"] = json!("<deleted_at>");
+    }
+    // Each item owns its own work item, so the two differ by construction.
+    if item.get("work_item_id").is_some() {
+        item["work_item_id"] = json!("<work_item_id>");
     }
     item
 }

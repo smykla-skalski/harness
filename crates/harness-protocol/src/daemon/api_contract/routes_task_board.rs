@@ -1,6 +1,7 @@
 use super::routes_task_board_sync::{SYNC, SYNC_CANCEL, SYNC_STATUS};
 use super::{HttpApiRouteContract, HttpRouteMethod, HttpRouteParity, http_paths, ws_methods};
 
+mod work_item_progress;
 mod workflow_progress;
 
 pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
@@ -45,6 +46,8 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
         swift_client_exposed: true,
     },
     workflow_progress::ROUTE,
+    work_item_progress::READ_ROUTE,
+    work_item_progress::REPORT_ROUTE,
     HttpApiRouteContract {
         method: HttpRouteMethod::Put,
         path: http_paths::TASK_BOARD_ITEM,
