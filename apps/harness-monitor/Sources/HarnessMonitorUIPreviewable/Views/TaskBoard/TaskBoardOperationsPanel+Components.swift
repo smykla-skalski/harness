@@ -205,7 +205,7 @@ extension TaskBoardOperationsHost {
   func appliedSummaryRow(_ applied: TaskBoardDispatchAppliedTask) -> some View {
     keyedSummaryRow(
       title: applied.item.title,
-      subtitle: "\(applied.sessionId) · \(applied.workItemId)"
+      subtitle: "\(applied.ownerId ?? "Unassigned") · \(applied.workItemId)"
     )
   }
 

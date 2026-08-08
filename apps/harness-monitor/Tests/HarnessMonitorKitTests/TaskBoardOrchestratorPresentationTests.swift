@@ -14,6 +14,8 @@ struct TaskBoardOrchestratorPresentationTests {
         TaskBoardOrchestratorAppliedTask(
           boardItemId: item.id,
           sessionId: "sess-1",
+          workspaceId: nil,
+          workingCopyId: nil,
           workItemId: "task-1",
           itemTitle: item.title
         )

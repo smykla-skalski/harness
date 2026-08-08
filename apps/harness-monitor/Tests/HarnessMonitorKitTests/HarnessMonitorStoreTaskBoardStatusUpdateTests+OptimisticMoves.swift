@@ -13,7 +13,9 @@ extension HarnessMonitorStoreTaskBoardStatusUpdateTests {
         id: "board-1",
         status: .todo,
         sourceProjectId: "project-source",
-        executionRepository: "acme/widget"
+        executionRepository: "acme/widget",
+        workspaceId: "workspace-1",
+        workingCopyId: "working-copy-1"
       )
     ])
     client.configureMutationDelay(.milliseconds(200))
@@ -40,6 +42,8 @@ extension HarnessMonitorStoreTaskBoardStatusUpdateTests {
     #expect(observedOptimisticItem?.status == .inProgress)
     #expect(observedOptimisticItem?.sourceProjectId == "project-source")
     #expect(observedOptimisticItem?.executionRepository == "acme/widget")
+    #expect(observedOptimisticItem?.workspaceId == "workspace-1")
+    #expect(observedOptimisticItem?.workingCopyId == "working-copy-1")
     #expect(store.globalTaskBoardItems.first(where: { $0.id == "board-1" })?.status == .inProgress)
   }
 

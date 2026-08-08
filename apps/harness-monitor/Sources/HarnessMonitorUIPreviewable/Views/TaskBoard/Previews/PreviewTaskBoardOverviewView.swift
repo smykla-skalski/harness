@@ -225,6 +225,7 @@ public enum TaskBoardOrchestratorControlsPreviewRenderer {
         textSizeIndex: HarnessMonitorTextSize.scales.count - 1,
         directory: directory
       )
+      && TaskBoardDispatchAppliedRowsPreviewRenderer.dump(toDirectory: directory)
   }
 
   private static func renderItemControls(

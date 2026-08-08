@@ -27,6 +27,8 @@ struct TaskBoardItemWireDecodingTests {
     #expect(item.executionRepository == "acme/widget")
     #expect(item.tags == ["urgent"])
     #expect(item.importedFromProvider == .gitHub)
+    #expect(item.workspaceId == "workspace-1")
+    #expect(item.workingCopyId == "working-copy-1")
 
     let ref = try #require(item.externalRefs.first)
     #expect(ref.provider == .gitHub)
@@ -105,6 +107,8 @@ struct TaskBoardItemWireDecodingTests {
     #expect(item.externalRefs.first?.url == "https://example.com/123")
     #expect(item.externalRefs.first?.syncState?.status == .todo)
     #expect(item.importedFromProvider == .gitHub)
+    #expect(item.workspaceId == "workspace-1")
+    #expect(item.workingCopyId == "working-copy-1")
     #expect(item.planning.approvedBy == "lead")
     let workflow = try #require(item.workflow)
     #expect(workflow.status == .running)
@@ -216,6 +220,8 @@ struct TaskBoardItemWireDecodingTests {
     let item = try serverDecoder.decode(TaskBoardItem.self, from: Data(fullItemPayloadFixture.utf8))
     #expect(item.lanePosition == 2)
     #expect(item.laneOrigin == .manual(actor: "daemon-control"))
+    #expect(item.workspaceId == "workspace-1")
+    #expect(item.workingCopyId == "working-copy-1")
 
     let cacheEncoder = JSONEncoder()
     cacheEncoder.keyEncodingStrategy = .convertToSnakeCase
@@ -291,6 +297,8 @@ private let fullItemPayloadFixture = """
     },
     "session_id": "sig-1",
     "work_item_id": "wi-1",
+    "workspace_id": "workspace-1",
+    "working_copy_id": "working-copy-1",
     "usage": { "input_tokens": 100, "output_tokens": 50, "cost_usd": 0.25 },
     "lane_position": 2,
     "lane_origin": { "kind": "manual", "actor": "daemon-control" },

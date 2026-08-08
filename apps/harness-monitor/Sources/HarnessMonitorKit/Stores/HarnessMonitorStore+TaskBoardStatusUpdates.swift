@@ -170,6 +170,8 @@ extension TaskBoardItem {
       workflow: workflow,
       sessionId: sessionId,
       workItemId: workItemId,
+      workspaceId: workspaceId,
+      workingCopyId: workingCopyId,
       usage: usage,
       parentItemId: parentItemId,
       childOrder: childOrder,

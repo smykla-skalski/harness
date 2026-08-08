@@ -237,6 +237,8 @@ extension RecordingHarnessClient {
           TaskBoardDispatchAppliedTask(
             boardItemId: updated.id,
             sessionId: updated.sessionId ?? "sess-\(updated.id)",
+            workspaceId: updated.workspaceId,
+            workingCopyId: updated.workingCopyId,
             workItemId: updated.workItemId ?? "task-\(updated.id)",
             item: updated
           )
@@ -274,6 +276,8 @@ extension RecordingHarnessClient {
         applied: TaskBoardDispatchAppliedTask(
           boardItemId: item.id,
           sessionId: item.sessionId ?? "sess-\(item.id)",
+          workspaceId: item.workspaceId,
+          workingCopyId: item.workingCopyId,
           workItemId: item.workItemId ?? "task-\(item.id)",
           item: item
         ),
