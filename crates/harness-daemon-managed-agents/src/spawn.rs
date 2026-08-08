@@ -53,6 +53,14 @@ impl<'a> ManagedTerminalOwner<'a> {
     }
 }
 
+/// Start a terminal agent under `owner` and return the running process.
+///
+/// The owner decides which identity the child sees: a Session-owned terminal
+/// exports the Session, a workspace-owned one exports its workspace.
+///
+/// # Errors
+/// Returns [`CliError`] when the runtime bootstrap fails or the terminal
+/// process cannot be started.
 pub fn spawn_agent_tui_process(
     owner: ManagedTerminalOwner<'_>,
     tui_id: &str,

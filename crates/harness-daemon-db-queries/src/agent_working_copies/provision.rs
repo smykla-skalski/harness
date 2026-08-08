@@ -76,8 +76,28 @@ pub(super) async fn provision_in_tx(
         created_at: created_at.clone(),
         candidates: Vec::new(),
     };
-    let shadow = shadow_digest(&shadow);
+    let shadow_digest_value = shadow_digest(&shadow);
 
+    upsert_workspace_in_tx(transaction, &shadow, &shadow_digest_value, &now).await?;
+    upsert_team_in_tx(transaction, &workspace_id, &created_at, &now).await?;
+    upsert_working_copy_in_tx(transaction, request, &workspace_id, &now).await?;
+
+    Ok(ProvisionedWorkspaceCheckout {
+        workspace_id,
+        working_copy_id: request.working_copy_id.clone(),
+        worktree_path: request.worktree_path.clone(),
+        branch_ref: request.branch_ref.clone(),
+    })
+}
+
+/// Keeps `created_at` stable across a re-provision so the shadow digest this
+/// writes matches the one reconciliation recomputes from the stored row.
+async fn upsert_workspace_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    shadow: &ShadowWorkspace,
+    shadow_digest_value: &str,
+    updated_at: &str,
+) -> Result<(), CliError> {
     query(
         "INSERT INTO agent_workspaces (
             workspace_id, daemon_id, project_scope_id, checkout_id, source_project_id,
@@ -103,27 +123,35 @@ pub(super) async fn provision_in_tx(
             orchestration_authority = 'workspace',
             updated_at = excluded.updated_at",
     )
-    .bind(&workspace_id)
-    .bind(&request.daemon_id)
-    .bind(&project_scope_id)
-    .bind(&checkout_id)
-    .bind(&project.project_id)
-    .bind(project.summary_project_name())
-    .bind(&project.checkout_name)
-    .bind(&project_dir)
-    .bind(&repository_root)
-    .bind(&context_root)
-    .bind(i64::from(project.is_worktree))
-    .bind(&project.worktree_name)
-    .bind(availability_label(availability))
-    .bind(&manifest_digest)
-    .bind(&shadow)
-    .bind(&created_at)
-    .bind(&now)
+    .bind(&shadow.workspace_id)
+    .bind(&shadow.daemon_id)
+    .bind(&shadow.project_scope_id)
+    .bind(&shadow.checkout_id)
+    .bind(&shadow.source_project_id)
+    .bind(&shadow.project_name)
+    .bind(&shadow.checkout_name)
+    .bind(&shadow.project_dir)
+    .bind(&shadow.repository_root)
+    .bind(&shadow.context_root)
+    .bind(shadow.is_worktree)
+    .bind(&shadow.worktree_name)
+    .bind(&shadow.availability)
+    .bind(&shadow.manifest_digest)
+    .bind(shadow_digest_value)
+    .bind(&shadow.created_at)
+    .bind(updated_at)
     .execute(transaction.as_mut())
     .await
     .map_err(|error| db_error(format!("provision durable agent workspace: {error}")))?;
+    Ok(())
+}
 
+async fn upsert_team_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    workspace_id: &str,
+    created_at: &str,
+    updated_at: &str,
+) -> Result<(), CliError> {
     query(
         "INSERT INTO agent_workspace_teams (
             workspace_id, authority, selected_legacy_session_id, selected_lifecycle,
@@ -132,16 +160,21 @@ pub(super) async fn provision_in_tx(
          ) VALUES (?1, 'workspace', NULL, NULL, NULL, 1, 1, '', ?2, ?3)
          ON CONFLICT(workspace_id) DO NOTHING",
     )
-    .bind(&workspace_id)
-    .bind(&created_at)
-    .bind(&now)
+    .bind(workspace_id)
+    .bind(created_at)
+    .bind(updated_at)
     .execute(transaction.as_mut())
     .await
     .map_err(|error| db_error(format!("provision durable agent team: {error}")))?;
+    Ok(())
+}
 
-    // Idempotent on the reserved id: a preparation that crashed between the
-    // checkout and its commit retries with the same working-copy id, and must
-    // find one row rather than trip the live-path index with a second.
+async fn upsert_working_copy_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    request: &WorkspaceCheckoutRequest,
+    workspace_id: &str,
+    now: &str,
+) -> Result<(), CliError> {
     query(
         "INSERT INTO agent_working_copies (
             working_copy_id, workspace_id, origin_path, project_name, worktree_path,
@@ -158,26 +191,18 @@ pub(super) async fn provision_in_tx(
             updated_at = excluded.updated_at",
     )
     .bind(&request.working_copy_id)
-    .bind(&workspace_id)
+    .bind(workspace_id)
     .bind(&request.origin_path)
     .bind(&request.project_name)
     .bind(&request.worktree_path)
     .bind(&request.branch_ref)
-    .bind(&now)
+    .bind(now)
     .execute(transaction.as_mut())
     .await
     .map_err(|error| db_error(format!("record durable agent working copy: {error}")))?;
-
-    Ok(ProvisionedWorkspaceCheckout {
-        workspace_id,
-        working_copy_id: request.working_copy_id.clone(),
-        worktree_path: request.worktree_path.clone(),
-        branch_ref: request.branch_ref.clone(),
-    })
+    Ok(())
 }
 
-/// Keeps `created_at` stable across a re-provision so the shadow digest this
-/// writes matches the one reconciliation recomputes from the stored row.
 async fn existing_workspace_created_at(
     transaction: &mut Transaction<'_, Sqlite>,
     workspace_id: &str,

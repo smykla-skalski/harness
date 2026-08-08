@@ -305,6 +305,9 @@ mod completion;
 /// Both halves travel together on purpose: a workspace item must not pass this
 /// check on a Session match it never had, and comparing one field at a time is
 /// how that slips through.
+// Every field names an id because that is what the check compares; dropping the
+// suffix would only make them read as the objects they point at.
+#[expect(clippy::struct_field_names, reason = "each field really is an id")]
 #[derive(Clone, Copy)]
 pub(in crate::daemon::db::task_board) struct DispatchItemOwners<'a> {
     pub(in crate::daemon::db::task_board) session_id: Option<&'a str>,

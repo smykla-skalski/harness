@@ -72,10 +72,14 @@ impl Fixture {
     }
 }
 
+// Both stand in for a `SchemaRepairHooks` field, so the fallible signature is
+// fixed by the hook type even though neither can fail.
+#[expect(clippy::unnecessary_wraps, reason = "signature is fixed by SchemaRepairHooks")]
 fn noop_sync_session(_: &DaemonDb, _: &str, _: &SessionState) -> Result<(), CliError> {
     Ok(())
 }
 
+#[expect(clippy::unnecessary_wraps, reason = "signature is fixed by SchemaRepairHooks")]
 fn noop_backfill(_: &DaemonDb) -> Result<(), CliError> {
     Ok(())
 }

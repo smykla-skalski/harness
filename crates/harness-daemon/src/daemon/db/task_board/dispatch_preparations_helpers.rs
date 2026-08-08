@@ -129,9 +129,9 @@ pub(super) fn apply_preparation_to_item(
             .unwrap_or_else(|| format!("policy-trace-{}", Uuid::new_v4().simple())),
     );
     item.status = TaskBoardStatus::InProgress;
-    item.session_id = preparation.session_id.clone();
-    item.workspace_id = preparation.workspace_id.clone();
-    item.working_copy_id = preparation.working_copy_id.clone();
+    item.session_id.clone_from(&preparation.session_id);
+    item.workspace_id.clone_from(&preparation.workspace_id);
+    item.working_copy_id.clone_from(&preparation.working_copy_id);
     item.work_item_id = Some(preparation.work_item_id.clone());
     item.updated_at = utc_now();
 }

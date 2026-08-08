@@ -344,12 +344,15 @@ fn incompatible_schema() -> CliError {
     db_error("incompatible remote execution ledger schema; refusing destructive repair")
 }
 
+/// Answers whether one ledger table still carries the shape this repair expects.
+type TableShapeCheck = fn(&Connection) -> Result<bool, CliError>;
+
 /// Name the table whose stored shape stopped the classification.
 ///
 /// Without this the refusal says only that *something* is unrecognized, which
 /// is nearly useless when a migration changes one of a dozen ledger tables.
 fn incompatible_schema_detail(conn: &Connection) -> String {
-    let checks: [(&str, fn(&Connection) -> Result<bool, CliError>); 3] = [
+    let checks: [(&str, TableShapeCheck); 3] = [
         (HOST_TABLE, |conn| {
             table_sql(conn, HOST_TABLE)?
                 .map_or(Ok(false), |sql| is_expected_table(&sql, HOST_TABLE))
