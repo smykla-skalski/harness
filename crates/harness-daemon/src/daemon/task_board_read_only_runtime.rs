@@ -2,7 +2,6 @@ use async_trait::async_trait;
 
 use crate::daemon::db::AgentTurnRunSnapshot;
 use crate::daemon::db::prelude::*;
-use crate::daemon::db::task_board::prelude::AutomationKillSwitchQueries;
 use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::http::{DaemonHttpState, run_codex_agent_blocking};
 use crate::daemon::protocol::{CodexRunMode, CodexRunRequest, CodexRunSnapshot};
@@ -11,10 +10,10 @@ use crate::reviews::{
     ReviewsActionResponse, ReviewsApproveRequest, ReviewsApproveRequestSource,
 };
 use crate::task_board::{
-    TaskBoardImplementationResult, TaskBoardLifecycleOutcome, TaskBoardPullRequestIdentity,
-    TaskBoardWorkflowExecutionRecord, TaskBoardWorkflowKind,
+    TaskBoardImplementationResult, TaskBoardLifecycleOutcome, TaskBoardWorkflowExecutionRecord,
+    TaskBoardWorkflowKind,
 };
-use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::CliError;
 
 #[path = "task_board_read_only_runtime/agent_turn_report.rs"]
 pub(crate) mod agent_turn_report;
@@ -27,7 +26,7 @@ pub(crate) use agent_turn_report::AgentTurnReportStart;
 // `git_evidence` reaches `invalid_transition` through `super::`, so the binding
 // has to stay in this module rather than being called through `support::`.
 use support::{
-    ensure_automation_kill_switch_clear, invalid_transition, lifecycle_outcome, pr_review_identity,
+    ensure_automation_kill_switch_clear, invalid_transition, lifecycle_outcome,
     require_applied_approval, required_head, resolve_pr_review, stop_codex_run_if_killed,
 };
 

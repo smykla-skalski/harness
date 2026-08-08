@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db_handle::AsyncDaemonDbHandle;
+use crate::daemon::reviews_store::PolicyGraphQueries;
 use crate::task_board::policy_graph::PolicyGraph;
 use crate::task_board::{Machine, PolicyAction, PolicyApprovalGrant, TaskBoardItem};
 use harness_kernel::errors::CliError;

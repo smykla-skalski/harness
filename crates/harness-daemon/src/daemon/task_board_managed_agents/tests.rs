@@ -1,10 +1,5 @@
-use std::time::Duration;
-
-use tokio::time::timeout;
-
 use crate::daemon::agent_tui::AgentTuiStatus;
 use crate::daemon::protocol::{CodexRunStatus, ManagedAgentSnapshot};
-use crate::daemon::test_liveness::LIVENESS;
 use crate::session::types::SessionRole;
 use crate::task_board::{
     AgentMode, TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION, TaskBoardAttemptResultArtifact,
@@ -15,16 +10,12 @@ use crate::task_board::{
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
 
-use super::test_support::{
-    applied_task, codex_snapshot, seed_owner_session, terminal_snapshot, test_http_state,
-};
+use super::test_support::{applied_task, codex_snapshot, terminal_snapshot};
 use super::{
-    begin_worker_compensation, codex_worker_id, codex_worker_request, exact_worker_not_found,
-    managed_admission_owner_id, managed_worker_id, recover_same_applied_worker,
-    resolve_start_failure, start_worker_for_applied_task, stop_worker_in_lane, terminal_worker_id,
-    terminal_worker_request, worker_lock_owner,
+    codex_worker_id, codex_worker_request, exact_worker_not_found, managed_admission_owner_id,
+    managed_worker_id, recover_same_applied_worker, resolve_start_failure, terminal_worker_id,
+    terminal_worker_request,
 };
-use crate::daemon::db::prelude::*;
 
 /// Identity the fixtures reclaim under. Only the workspace path accepts a
 /// worker naming itself, so a Session fixture is unaffected by the value.
@@ -415,4 +406,8 @@ fn exact_post_start_miss_is_rollback_safe() {
 
     assert!(error.may_rollback());
     assert_eq!(error.into_cli_error().code(), "WORKFLOW_IO");
+}
+
+pub(super) fn start_failure() -> CliError {
+    CliErrorKind::workflow_io("managed worker start failed before persistence").into()
 }

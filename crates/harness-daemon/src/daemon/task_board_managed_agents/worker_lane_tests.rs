@@ -2,37 +2,16 @@ use std::time::Duration;
 
 use tokio::time::timeout;
 
-use crate::daemon::agent_tui::AgentTuiStatus;
-use crate::daemon::protocol::{CodexRunStatus, ManagedAgentSnapshot};
+use crate::daemon::protocol::CodexRunStatus;
 use crate::daemon::test_liveness::LIVENESS;
-use crate::session::types::SessionRole;
-use crate::task_board::{
-    AgentMode, TASK_BOARD_READ_ONLY_RUN_CONTEXT_VERSION, TaskBoardAttemptResultArtifact,
-    TaskBoardLocalAttemptResult, TaskBoardReadOnlyRunContext, TaskBoardReadOnlyWorkflowLaunch,
-    TaskBoardResolvedReviewer, TaskBoardReviewerProfile, TaskBoardWorkflowKind,
-    TaskBoardWorkflowSnapshot, TaskBoardWriteWorkflowLaunch, bind_plan_approval,
-    build_planning_result,
-};
-use harness_kernel::errors::{CliError, CliErrorKind};
+use crate::task_board::AgentMode;
 
-use super::test_support::{
-    applied_task, codex_snapshot, seed_owner_session, terminal_snapshot, test_http_state,
-};
+use super::test_support::{applied_task, codex_snapshot, seed_owner_session, test_http_state};
 use super::{
-    begin_worker_compensation, codex_worker_id, codex_worker_request, exact_worker_not_found,
-    managed_admission_owner_id, managed_worker_id, recover_same_applied_worker,
-    resolve_start_failure, start_worker_for_applied_task, stop_worker_in_lane, terminal_worker_id,
-    terminal_worker_request, worker_lock_owner,
+    begin_worker_compensation, managed_worker_id, start_worker_for_applied_task,
+    stop_worker_in_lane, worker_lock_owner,
 };
 use crate::daemon::db::prelude::*;
-
-/// Identity the fixtures reclaim under. Only the workspace path accepts a
-/// worker naming itself, so a Session fixture is unaffected by the value.
-const WORKER_ID: &str = "codex-dispatch-intent-existing";
-
-fn start_failure() -> CliError {
-    CliErrorKind::workflow_io("managed worker start failed before persistence").into()
-}
 
 #[tokio::test]
 async fn worker_start_waits_for_lane_before_preflight() {

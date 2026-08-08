@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 #[cfg(test)]
 use crate::daemon::protocol::{SessionDetail, SessionStartRequest, TaskCreateRequest};
 use crate::daemon::protocol::{
@@ -8,13 +6,12 @@ use crate::daemon::protocol::{
 };
 #[cfg(test)]
 use crate::session::types::CONTROL_PLANE_ACTOR_ID;
-use crate::task_board::policy_graph::PolicyGraph;
 #[cfg(test)]
 use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
 use crate::task_board::{
     DispatchAppliedTask, DispatchBlockReason, DispatchExecutionSummary, DispatchFailure,
-    DispatchFailureKind, DispatchPlan, DispatchReadiness, Machine, PolicyAction,
-    PolicyApprovalGrant, SpawnGateSwitches, TaskBoardItem, TaskBoardStatus,
+    DispatchFailureKind, DispatchPlan, DispatchReadiness, SpawnGateSwitches, TaskBoardItem,
+    TaskBoardStatus,
     build_dispatch_plans_with_policy, machine_mismatch_plan_with_policy,
 };
 #[cfg(test)]

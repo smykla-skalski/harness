@@ -2,9 +2,9 @@ use super::*;
 
 mod extended_fixtures;
 pub(super) use extended_fixtures::{
-    agent_columns, min_runtime_budget_ms, performance_session_id, sample_conversation_event,
-    sample_resolved_session, seeded_performance_db, session_agent_identity_rows,
-    simulate_pre_v11_agents_table,
+    agent_columns, codex_run_columns, min_runtime_budget_ms, performance_session_id,
+    sample_conversation_event, sample_resolved_session, seeded_performance_db,
+    session_agent_identity_rows, simulate_pre_v11_agents_table, simulate_pre_v13_codex_runs_table,
 };
 
 pub(super) fn sample_signal_record(expires_at: &str) -> SessionSignalRecord {
