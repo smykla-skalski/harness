@@ -48,8 +48,26 @@ pub(super) async fn record_native_runtime_acknowledgment_from_session_route(
     else {
         return Ok(false);
     };
+    import_native_runtime_acknowledgment(
+        db,
+        &daemon_id,
+        &route.workspace_id,
+        &route.member_id,
+        signal_id,
+    )
+    .await?;
+    Ok(true)
+}
+
+async fn import_native_runtime_acknowledgment(
+    db: &AsyncDaemonDbHandle,
+    daemon_id: &str,
+    workspace_id: &str,
+    member_id: &str,
+    signal_id: &str,
+) -> Result<(), CliError> {
     let activity = db
-        .load_agent_workspace_member_activity(&daemon_id, &route.workspace_id, &route.member_id)
+        .load_agent_workspace_member_activity(daemon_id, workspace_id, member_id)
         .await?;
     let signal = activity
         .signals
@@ -57,19 +75,19 @@ pub(super) async fn record_native_runtime_acknowledgment_from_session_route(
         .find(|record| record.signal.signal_id == signal_id)
         .ok_or_else(|| {
             CliErrorKind::workflow_io(format!(
-                "native signal '{signal_id}' disappeared from its compatibility route"
+                "native signal '{signal_id}' disappeared from its durable route"
             ))
         })?;
     if signal.acknowledgment.is_some() {
-        return Ok(true);
+        return Ok(());
     }
-    if !reconcile_runtime_acknowledgments(db, &daemon_id, &activity, Some(signal_id)).await? {
+    if !reconcile_runtime_acknowledgments(db, daemon_id, &activity, Some(signal_id)).await? {
         return Err(CliErrorKind::workflow_io(format!(
             "native signal '{signal_id}' has no runtime acknowledgment to import"
         ))
         .into());
     }
-    Ok(true)
+    Ok(())
 }
 
 async fn reconcile_runtime_acknowledgments(

@@ -248,7 +248,7 @@ pub(crate) use adopt::adopt_session_record_async;
 pub(crate) use agent_workspace_activity::{
     acknowledge_agent_workspace_signal_async, cancel_agent_workspace_signal_async,
     get_agent_workspace_activity_async, get_agent_workspace_member_activity_async,
-    send_agent_workspace_signal_async,
+    record_native_runtime_acknowledgment_from_workspace_route, send_agent_workspace_signal_async,
 };
 pub(crate) use agent_workspaces::{
     delete_session_with_artifact_cleanup_async, get_agent_workspace_team_async,

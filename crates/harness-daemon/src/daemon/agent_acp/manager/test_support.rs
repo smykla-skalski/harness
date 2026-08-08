@@ -117,6 +117,19 @@ pub(super) fn seed_daemon_db_at(path: &Path) {
     populate_daemon_db(&db);
 }
 
+pub(super) fn seed_daemon_db_for_session_at(path: &Path, project_dir: &Path, session_id: &str) {
+    let db = DaemonDbOwnedHandle(assert_ok(DaemonDb::open(path), "open db"));
+    let mut project = sample_project();
+    project.project_dir = Some(project_dir.to_path_buf());
+    project.repository_root = Some(project_dir.to_path_buf());
+    project.context_root = crate::workspace::project_context_dir(project_dir);
+    assert_ok(db.sync_project(&project), "sync project");
+    assert_ok(
+        db.sync_session(&project.project_id, &sample_session_state(session_id)),
+        "sync session",
+    );
+}
+
 fn populate_daemon_db(db: &DaemonDbOwnedHandle) {
     let project = sample_project();
     assert_ok(db.sync_project(&project), "sync project");

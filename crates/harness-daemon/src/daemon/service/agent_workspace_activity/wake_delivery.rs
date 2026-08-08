@@ -103,6 +103,8 @@ fn wake_acp(
             prompt: prompt.to_string(),
             signal_id: signal.signal_id.clone(),
             agent_id: target.member_id.clone(),
+            workspace_id: Some(target.workspace_id.clone()),
+            member_id: Some(target.member_id.clone()),
         },
     )
 }

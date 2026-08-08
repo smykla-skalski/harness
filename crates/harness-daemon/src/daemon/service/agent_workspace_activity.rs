@@ -1,4 +1,4 @@
-use harness_agents::runtime::signal::{AckResult, SignalFileState};
+use harness_agents::runtime::signal::{AckResult, SignalAck, SignalFileState};
 use harness_daemon_db_queries::AgentWorkspaceSignalAcknowledgment;
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_protocol::daemon::activity::{
@@ -38,6 +38,18 @@ pub(super) async fn record_native_runtime_acknowledgment_from_session_route(
         signal_id,
     )
     .await
+}
+
+pub(crate) async fn record_native_runtime_acknowledgment_from_workspace_route(
+    db: &AsyncDaemonDbHandle,
+    workspace_id: &str,
+    member_id: &str,
+    acknowledgment: &SignalAck,
+) -> Result<(), CliError> {
+    let daemon_id = prepare_activity_scope(db).await?;
+    persist_runtime_acknowledgment(db, &daemon_id, workspace_id, member_id, acknowledgment)
+        .await
+        .map(|_| ())
 }
 
 /// Return a workspace-owned activity window after reconciling legacy sources.
@@ -174,21 +186,15 @@ pub(crate) async fn acknowledge_agent_workspace_signal_async(
     signal_id: &str,
     request: &AgentWorkspaceSignalAckRequest,
 ) -> Result<AgentWorkspaceSignalRecord, CliError> {
-    let daemon_id = prepare_activity_scope(db).await?;
-    let activity = db
-        .load_agent_workspace_member_activity(&daemon_id, workspace_id, member_id)
-        .await?;
-    let durable_request = AgentWorkspaceSignalAcknowledgment {
-        signal_id: signal_id.to_string(),
-        result: request.result,
-        details: request.details.clone(),
-        acknowledged_at: None,
-    };
-    let Some(current) = activity
-        .signals
-        .into_iter()
-        .find(|record| record.signal.signal_id == signal_id)
-    else {
+    let (daemon_id, current) =
+        load_current_workspace_signal(db, workspace_id, member_id, signal_id).await?;
+    let Some(current) = current else {
+        let durable_request = AgentWorkspaceSignalAcknowledgment {
+            signal_id: signal_id.to_string(),
+            result: request.result,
+            details: request.details.clone(),
+            acknowledged_at: None,
+        };
         return persist_durable_acknowledgment(
             db,
             &daemon_id,
@@ -198,11 +204,18 @@ pub(crate) async fn acknowledge_agent_workspace_signal_async(
         )
         .await;
     };
+    let result =
+        harness_session::service::normalize_signal_ack_result(&current.signal, request.result);
+    let durable_request = AgentWorkspaceSignalAcknowledgment {
+        signal_id: signal_id.to_string(),
+        result,
+        details: request.details.clone(),
+        acknowledged_at: None,
+    };
     let acknowledged_at = match current.acknowledgment.as_ref() {
         None => harness_workspace::workspace::utc_now(),
         Some(acknowledgment)
-            if acknowledgment.result == request.result
-                && acknowledgment.details == request.details =>
+            if acknowledgment.result == result && acknowledgment.details == request.details =>
         {
             acknowledgment.acknowledged_at.clone()
         }
@@ -241,7 +254,7 @@ pub(crate) async fn acknowledge_agent_workspace_signal_async(
             &target,
             signal_id,
             acknowledged_at,
-            request.result,
+            result,
             request.details.clone(),
         ),
     )
@@ -254,6 +267,23 @@ pub(crate) async fn acknowledge_agent_workspace_signal_async(
         &runtime_acknowledgment,
     )
     .await
+}
+
+async fn load_current_workspace_signal(
+    db: &AsyncDaemonDbHandle,
+    workspace_id: &str,
+    member_id: &str,
+    signal_id: &str,
+) -> Result<(String, Option<AgentWorkspaceSignalRecord>), CliError> {
+    let daemon_id = prepare_activity_scope(db).await?;
+    let activity = db
+        .load_agent_workspace_member_activity(&daemon_id, workspace_id, member_id)
+        .await?;
+    let current = activity
+        .signals
+        .into_iter()
+        .find(|record| record.signal.signal_id == signal_id);
+    Ok((daemon_id, current))
 }
 
 /// Cancel a pending workspace signal in both the runtime file queue and durable ledger.

@@ -140,6 +140,8 @@ async fn wake_prompt_rebinds_runtime_session_when_prompt_opens_new_protocol_sess
                 prompt: "tell me how are you".into(),
                 signal_id: "sig-test-1".into(),
                 agent_id: snapshot.agent_id.clone(),
+                workspace_id: None,
+                member_id: None,
             },
         );
 
@@ -201,6 +203,8 @@ async fn wake_prompt_acknowledges_signal_in_original_signal_session_dir() {
                 prompt: "please wake up".into(),
                 signal_id: signal.signal_id.clone(),
                 agent_id: snapshot.agent_id.clone(),
+                workspace_id: None,
+                member_id: None,
             },
         );
 
@@ -274,6 +278,8 @@ async fn wake_prompt_skips_ack_when_runtime_rebind_fails() {
                 prompt: "please wake up".into(),
                 signal_id: signal.signal_id.clone(),
                 agent_id: snapshot.agent_id.clone(),
+                workspace_id: None,
+                member_id: None,
             },
         );
 

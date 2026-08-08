@@ -10,7 +10,7 @@ use crate::agents::acp::catalog::AcpAgentDescriptor;
 use crate::agents::kind::DisconnectReason;
 use crate::agents::runtime::event::ConversationEvent;
 #[cfg(feature = "daemon-runtime")]
-use crate::agents::runtime::signal::AckResult;
+use crate::agents::runtime::signal::SignalAck;
 use crate::daemon::protocol::StreamEvent;
 use crate::session::types::AgentStatus;
 use crate::workspace::utc_now;
@@ -40,13 +40,15 @@ pub(in crate::daemon::agent_acp) struct AcpRuntimeBinding<'a> {
     pub(super) agent_session_id: &'a str,
 }
 
+#[derive(Clone, Copy)]
 #[cfg(feature = "daemon-runtime")]
 pub(in crate::daemon::agent_acp) struct AcpWakeAcceptRequest<'a> {
     pub(super) session_id: &'a str,
     pub(super) agent_id: &'a str,
-    pub(super) signal_id: &'a str,
-    pub(super) result: AckResult,
+    pub(super) acknowledgment: &'a SignalAck,
     pub(super) project_dir: &'a Path,
+    pub(super) workspace_id: Option<&'a str>,
+    pub(super) member_id: Option<&'a str>,
 }
 
 #[async_trait]
@@ -129,6 +131,14 @@ pub(in crate::daemon::agent_acp) trait AcpManagerPort:
 
     #[cfg(feature = "daemon-runtime")]
     fn sync_wake_accept(&self, request: AcpWakeAcceptRequest<'_>) -> Result<(), CliError>;
+
+    #[cfg(feature = "daemon-runtime")]
+    async fn sync_wake_accept_async(
+        &self,
+        request: AcpWakeAcceptRequest<'_>,
+    ) -> Result<(), CliError> {
+        self.sync_wake_accept(request)
+    }
 
     #[cfg(all(test, feature = "daemon-runtime"))]
     fn daemon_db_slot(
@@ -279,9 +289,10 @@ impl AcpManagerPort for BridgeAcpManagerPort {
         let _ = (
             request.session_id,
             request.agent_id,
-            request.signal_id,
-            request.result,
+            request.acknowledgment,
             request.project_dir,
+            request.workspace_id,
+            request.member_id,
         );
         Ok(())
     }

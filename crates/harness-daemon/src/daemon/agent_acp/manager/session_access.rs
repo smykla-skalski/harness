@@ -34,6 +34,8 @@ pub struct AcpWakePrompt {
     pub prompt: String,
     pub signal_id: String,
     pub agent_id: String,
+    pub workspace_id: Option<String>,
+    pub member_id: Option<String>,
 }
 
 impl AcpAgentManagerHandle {
@@ -111,11 +113,11 @@ impl AcpAgentManagerHandle {
         let manager = self.clone();
         let acp_id_for_diag = prompt.acp_id.clone();
         let signal_id_for_diag = prompt.signal_id.clone();
+        let runtime_handle = tokio::runtime::Handle::try_current().ok();
         let thread_name = format!("acp-wake-{}", prompt.acp_id);
-        match thread::Builder::new()
-            .name(thread_name)
-            .spawn(move || run_wake_prompt(&manager, runtime, &session, prompt))
-        {
+        match thread::Builder::new().name(thread_name).spawn(move || {
+            run_wake_prompt(&manager, runtime, &session, prompt, runtime_handle.as_ref());
+        }) {
             Ok(_) => true,
             Err(error) => {
                 self.release_wake(&acp_id_for_diag, &signal_id_for_diag);
@@ -224,6 +226,7 @@ fn run_wake_prompt(
     runtime: &'static dyn AgentRuntime,
     session: &Arc<ActiveAcpSession>,
     prompt: AcpWakePrompt,
+    runtime_handle: Option<&tokio::runtime::Handle>,
 ) {
     let AcpWakePrompt {
         acp_id,
@@ -234,6 +237,8 @@ fn run_wake_prompt(
         prompt: prompt_text,
         signal_id,
         agent_id,
+        workspace_id,
+        member_id,
     } = prompt;
     let result = session.prompt_protocol_session(
         &acp_id,
@@ -266,7 +271,7 @@ fn run_wake_prompt(
                 manager.release_wake(&acp_id, &signal_id);
                 return;
             }
-            if record_wake_accept(
+            if let Some(acknowledgment) = record_wake_accept(
                 &orchestration_session_id,
                 &signal_session_id,
                 &signal_dir,
@@ -280,14 +285,15 @@ fn run_wake_prompt(
                         Some(format!("wake prompt accepted (signal {signal_id})")),
                     );
                 }
-                sync_wake_accept_to_daemon(
-                    manager,
-                    &orchestration_session_id,
-                    &agent_id,
-                    &signal_id,
-                    &project_dir,
-                    &acp_id,
-                );
+                let request = AcpWakeAcceptRequest {
+                    session_id: &orchestration_session_id,
+                    agent_id: &agent_id,
+                    acknowledgment: &acknowledgment,
+                    project_dir: &project_dir,
+                    workspace_id: workspace_id.as_deref(),
+                    member_id: member_id.as_deref(),
+                };
+                sync_wake_accept_to_daemon(manager, request, &acp_id, runtime_handle);
             }
         }
         Err(error) => {
@@ -367,7 +373,7 @@ fn record_wake_accept(
     signal_id: &str,
     agent_id: &str,
     acp_id: &str,
-) -> bool {
+) -> Option<SignalAck> {
     let ack = SignalAck {
         signal_id: signal_id.to_string(),
         acknowledged_at: utc_now(),
@@ -389,7 +395,7 @@ fn record_wake_accept(
                     ("session_agent_id", &agent_id),
                 ],
             );
-            true
+            Some(ack)
         }
         Err(error) => {
             record_wake_event(
@@ -403,7 +409,7 @@ fn record_wake_accept(
                     ("error", &error),
                 ],
             );
-            false
+            None
         }
     }
 }
@@ -411,25 +417,22 @@ fn record_wake_accept(
 #[cfg(feature = "daemon-runtime")]
 fn sync_wake_accept_to_daemon(
     manager: &AcpAgentManagerHandle,
-    orchestration_session_id: &str,
-    agent_id: &str,
-    signal_id: &str,
-    project_dir: &Path,
+    request: AcpWakeAcceptRequest<'_>,
     acp_id: &str,
+    runtime_handle: Option<&tokio::runtime::Handle>,
 ) {
-    if let Err(error) = manager.state.port.sync_wake_accept(AcpWakeAcceptRequest {
-        session_id: orchestration_session_id,
-        agent_id,
-        signal_id,
-        result: AckResult::Accepted,
-        project_dir,
-    }) {
+    let result = if let Some(runtime_handle) = runtime_handle {
+        runtime_handle.block_on(manager.state.port.sync_wake_accept_async(request))
+    } else {
+        manager.state.port.sync_wake_accept(request)
+    };
+    if let Err(error) = result {
         record_wake_event(
             WakeEventLevel::Warn,
             "ack_sync_failed",
             &[
                 ("managed_agent_id", &acp_id),
-                ("signal_id", &signal_id),
+                ("signal_id", &request.acknowledgment.signal_id),
                 ("error", &error),
             ],
         );

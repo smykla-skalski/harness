@@ -508,6 +508,7 @@ async fn stop_session_acp_agents_disconnects_archived_session_agents() {
 
 mod fault_policy;
 mod lazy_db;
+mod native_workspace_wake;
 mod process_keys;
 mod runtime_session_rebinding;
 mod startup_policy;

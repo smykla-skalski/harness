@@ -1,4 +1,5 @@
 use harness_kernel::errors::CliError;
+use harness_protocol::daemon::activity::AgentWorkspaceSignalAckRequest;
 
 use super::*;
 use crate::daemon::protocol::{CodexRunSnapshot, CodexSteerRequest};
@@ -59,6 +60,82 @@ fn prepared_terminal_acknowledgments_survive_expired_retry() {
             },
         );
     });
+}
+
+#[test]
+fn public_accepted_acknowledgment_normalizes_after_expiry() {
+    with_temp_project(|project| {
+        temp_env::with_var(
+            "CODEX_SESSION_ID",
+            Some("workspace-activity-worker"),
+            || {
+                let runtime = tokio::runtime::Runtime::new().expect("runtime");
+                runtime.block_on(assert_public_accepted_acknowledgment_expires(project));
+            },
+        );
+    });
+}
+
+async fn assert_public_accepted_acknowledgment_expires(project: &std::path::Path) {
+    let fixture = seed_workspace_activity_member(project).await;
+    let sent = send_agent_workspace_signal_async(
+        &fixture.db,
+        &fixture.workspace_id,
+        &fixture.member_id,
+        &AgentWorkspaceSignalSendRequest {
+            actor: "expired-public-ack-client".into(),
+            idempotency_key: "expired-public-ack-1".into(),
+            command: "expired-public-ack".into(),
+            message: "Normalize a late accepted acknowledgment".into(),
+            action_hint: None,
+        },
+        WakeDispatch::none(),
+    )
+    .await
+    .expect("send signal before late public acknowledgment");
+    expire_durable_signal(
+        &fixture.db,
+        &fixture.workspace_id,
+        &fixture.member_id,
+        &sent.signal.signal_id,
+    )
+    .await;
+
+    let acknowledged = acknowledge_agent_workspace_signal_async(
+        &fixture.db,
+        &fixture.workspace_id,
+        &fixture.member_id,
+        &sent.signal.signal_id,
+        &AgentWorkspaceSignalAckRequest {
+            result: AckResult::Accepted,
+            details: Some("accepted after expiry".into()),
+        },
+    )
+    .await
+    .expect("acknowledge expired signal through public mutation");
+    assert_eq!(acknowledged.status, SessionSignalStatus::Expired);
+    assert_eq!(
+        acknowledged
+            .acknowledgment
+            .expect("durable expired acknowledgment")
+            .result,
+        AckResult::Expired
+    );
+
+    let agent_runtime = runtime::runtime_for_name("codex").expect("Codex runtime");
+    let signal_dir = agent_runtime.signal_dir(project, "workspace-activity-worker");
+    let runtime_ack = runtime::signal::read_acknowledgments(&signal_dir)
+        .expect("read normalized runtime acknowledgment")
+        .into_iter()
+        .find(|acknowledgment| acknowledgment.signal_id == sent.signal.signal_id)
+        .expect("normalized runtime acknowledgment");
+    assert_eq!(runtime_ack.result, AckResult::Expired);
+    assert!(
+        runtime::signal::read_pending_signals(&signal_dir)
+            .expect("read runtime queue after normalized acknowledgment")
+            .iter()
+            .all(|signal| signal.signal_id != sent.signal.signal_id)
+    );
 }
 
 async fn route_through_forbidden_wake(fixture: &WorkspaceActivityFixture) {
