@@ -104,6 +104,7 @@ pub(crate) async fn report_task_board_work_item_progress(
             request.board_item_id
         )))
     })?;
+    let requested_sequence = validated_sequence(request.sequence)?;
     let now = utc_now();
     let current = match load_progress_in_tx(&mut transaction, &work_item_id).await? {
         Some((progress, settled)) => (progress, settled),
@@ -114,7 +115,7 @@ pub(crate) async fn report_task_board_work_item_progress(
     };
     let (current, worker_settled_at) = current;
     let attempt_id = resolve_attempt_id_in_tx(&mut transaction, &item, &work_item_id).await?;
-    let report = stamped_report(request, attempt_id, item_revision, &now);
+    let report = stamped_report(request, requested_sequence, attempt_id, item_revision, &now);
     let outcome = apply_work_item_report(&current, &report);
     let projection =
         persist_outcome_in_tx(&mut transaction, item, item_revision, &outcome, &report).await?;
@@ -177,8 +178,25 @@ fn worker_id_for(agent_mode: AgentMode, intent_id: &str) -> String {
     }
 }
 
+/// The ordering fence has to survive a round trip through the row's signed
+/// integer column, so a value that cannot is refused here rather than silently
+/// clamped into one the caller never sent.
+fn validated_sequence(sequence: Option<u64>) -> Result<Option<u64>, CliError> {
+    let Some(sequence) = sequence else {
+        return Ok(None);
+    };
+    if i64::try_from(sequence).is_err() {
+        return Err(CliErrorKind::invalid_transition(format!(
+            "task-board work item report sequence {sequence} is out of range"
+        ))
+        .into());
+    }
+    Ok(Some(sequence))
+}
+
 fn stamped_report(
     request: &TaskBoardWorkItemReportRequest,
+    sequence: Option<u64>,
     attempt_id: Option<String>,
     item_revision: i64,
     now: &str,
@@ -191,7 +209,7 @@ fn stamped_report(
         blocked_reason: request.blocked_reason.clone(),
         attempt_id,
         item_revision: item_revision.try_into().ok(),
-        sequence: request.sequence,
+        sequence,
         checkpoint_id: format!("work-item-checkpoint-{}", Uuid::new_v4().simple()),
         recorded_at: now.to_string(),
     }
@@ -300,7 +318,7 @@ async fn write_progress_in_tx(
             .item_revision
             .and_then(|value| i64::try_from(value).ok()),
     )
-    .bind(i64::try_from(progress.report_sequence).unwrap_or(i64::MAX))
+    .bind(sequence_column(progress.report_sequence)?)
     .bind(&progress.updated_at)
     .bind(progress.completed_at.as_deref())
     .execute(transaction.as_mut())
@@ -312,6 +330,17 @@ async fn write_progress_in_tx(
         ))
     })?;
     Ok(())
+}
+
+/// Every accepted fence is validated on the way in, so a value that does not
+/// fit here means the record itself is corrupt rather than the caller being
+/// wrong; surface that instead of writing a different number.
+fn sequence_column(sequence: u64) -> Result<i64, CliError> {
+    i64::try_from(sequence).map_err(|_| {
+        db_error(format!(
+            "work item report sequence {sequence} does not fit its column"
+        ))
+    })
 }
 
 /// Writes the lane the record now implies onto the board item, in the same

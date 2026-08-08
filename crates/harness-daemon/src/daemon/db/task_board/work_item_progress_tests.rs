@@ -343,6 +343,53 @@ async fn a_settled_item_never_leaves_its_terminal_lane() {
 }
 
 #[tokio::test]
+async fn an_unrepresentable_report_fence_is_refused() {
+    let fixture = fixture().await;
+    let mut request = request(&fixture, None);
+    request.summary = Some("still working".to_string());
+    request.sequence = Some(u64::MAX);
+
+    let error = fixture
+        .db
+        .report_task_board_work_item_progress(&request)
+        .await
+        .expect_err("an out-of-range fence must be refused");
+
+    assert!(
+        error.to_string().contains("out of range"),
+        "unexpected error: {error}"
+    );
+    assert!(
+        fixture
+            .db
+            .task_board_work_item_progress(&fixture.item_id)
+            .await
+            .expect("read progress")
+            .is_none(),
+        "a refused report must not create a record"
+    );
+}
+
+#[tokio::test]
+async fn a_bare_checkpoint_marks_the_item_running() {
+    let fixture = fixture().await;
+    let mut request = request(&fixture, None);
+    request.summary = Some("started".to_string());
+
+    let result = fixture
+        .db
+        .report_task_board_work_item_progress(&request)
+        .await
+        .expect("record a checkpoint");
+
+    assert_eq!(result.progress.state, TaskBoardWorkItemState::Running);
+    assert_eq!(
+        result.item.workflow.current_step_id.as_deref(),
+        Some("worker")
+    );
+}
+
+#[tokio::test]
 async fn an_out_of_order_report_leaves_the_record_untouched() {
     let fixture = fixture().await;
     let mut first = request(&fixture, Some(TaskBoardWorkItemState::Running));
