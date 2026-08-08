@@ -172,6 +172,7 @@ fn complete_run_records_evaluation_and_trace_ids() {
             task_status: None,
             board_status: Some(TaskBoardStatus::Done),
             workflow_status: Some(TaskBoardWorkflowStatus::Completed),
+            work_item_state: None,
             updated: true,
             reason: None,
             item: Some(evaluated_item),

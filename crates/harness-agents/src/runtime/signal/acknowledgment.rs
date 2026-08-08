@@ -97,13 +97,40 @@ fn claim_ack_locked(
     guard: FlockGuard,
 ) -> Result<SignalAckClaim, CliError> {
     if let Some(existing) = read_existing_ack(&paths, &acknowledgment.signal_id)? {
-        move_pending_if_present(&paths)?;
-        return Ok(SignalAckClaim::Existing(existing));
+        return claim_prepared_ack(paths, existing, guard);
     }
     require_pending_signal(&paths)?;
     Ok(SignalAckClaim::Created(PendingSignalDelivery {
         paths,
         acknowledgment: acknowledgment.clone(),
+        acknowledgment_json,
+        _guard: guard,
+    }))
+}
+
+/// Decides what an already-written acknowledgment means for a fresh claim.
+///
+/// A settlement is terminal only once the payload has left `pending`
+/// (`acknowledgment_is_terminal`). An acknowledgment whose payload is still
+/// pending was prepared by an attempt that died between writing it and getting
+/// its output to the agent, so retiring the payload here would settle the
+/// signal without anyone ever receiving it - the delivery is lost silently.
+/// Recovery re-claims that delivery instead, and commits the decision the first
+/// attempt recorded rather than this caller's, because the stored
+/// acknowledgment is the one every later reader has already agreed on.
+fn claim_prepared_ack(
+    paths: AckPaths,
+    existing: SignalAck,
+    guard: FlockGuard,
+) -> Result<SignalAckClaim, CliError> {
+    if !pending_signal_exists(&paths)? {
+        return Ok(SignalAckClaim::Existing(existing));
+    }
+    let acknowledgment_json = serde_json::to_string_pretty(&existing)
+        .map_err(|error| CliErrorKind::workflow_serialize(format!("ack: {error}")))?;
+    Ok(SignalAckClaim::Created(PendingSignalDelivery {
+        paths,
+        acknowledgment: existing,
         acknowledgment_json,
         _guard: guard,
     }))

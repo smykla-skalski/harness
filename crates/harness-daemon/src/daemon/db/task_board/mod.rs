@@ -163,6 +163,11 @@ mod remote_start_receipt_hardening_tests;
 mod remote_start_receipts;
 mod rows;
 mod scheduler;
+pub(crate) mod work_item_progress;
+mod work_item_progress_queries;
+mod work_item_progress_rows;
+#[cfg(test)]
+mod work_item_progress_tests;
 mod workflow_dispatch;
 mod workflow_dispatch_settlement;
 mod workflow_execution_attempts;

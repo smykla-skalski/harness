@@ -283,15 +283,34 @@ async fn stop_worker_in_lane(
     applied: &DispatchAppliedTask,
     managed_worker_id: String,
 ) -> Result<(), CliError> {
+    stop_managed_worker(
+        state,
+        applied.item.agent_mode,
+        managed_worker_id,
+        "task-board worker compensation",
+    )
+    .await
+}
+
+/// Stops one managed worker by its runtime identity alone.
+///
+/// A worker that is already gone is success, not an error: settling a work
+/// item has to stay idempotent across a daemon restart that outlived the run.
+pub(crate) async fn stop_managed_worker(
+    state: &DaemonHttpState,
+    agent_mode: AgentMode,
+    managed_worker_id: String,
+    purpose: &'static str,
+) -> Result<(), CliError> {
     let worker_id = managed_worker_id.clone();
-    let result = if applied.item.agent_mode == AgentMode::Interactive {
-        run_terminal_agent_blocking(state, "task-board worker compensation", move |manager| {
+    let result = if agent_mode == AgentMode::Interactive {
+        run_terminal_agent_blocking(state, purpose, move |manager| {
             manager.stop(&managed_worker_id)
         })
         .await
         .map(|_| ())
     } else {
-        run_codex_agent_blocking(state, "task-board worker compensation", move |controller| {
+        run_codex_agent_blocking(state, purpose, move |controller| {
             controller.stop(&managed_worker_id)
         })
         .await
@@ -299,7 +318,7 @@ async fn stop_worker_in_lane(
     };
     match result {
         Ok(()) => Ok(()),
-        Err(error) if exact_worker_not_found(&error, applied.item.agent_mode, &worker_id) => Ok(()),
+        Err(error) if exact_worker_not_found(&error, agent_mode, &worker_id) => Ok(()),
         Err(error) => Err(error),
     }
 }

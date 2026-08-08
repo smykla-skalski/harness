@@ -5,7 +5,7 @@ use crate::types::{TaskBoardItem, TaskBoardPriority, TaskBoardStatus};
 
 /// Byte-for-byte what `render_worker_prompt` produced for an item with none of
 /// the optional sections and no session to report into.
-const BARE_GOLDEN: &str = "Work on task-board item 'Bare item'.\n\nBoard item: board-2\nSession task: task-2\nPriority: Low\nStatus: Todo\n\nLifecycle:\nImplement the requested work, keep changes scoped, and run the smallest relevant validation. Submit the task for review when ready.";
+const BARE_GOLDEN: &str = "Work on task-board item 'Bare item'.\n\nBoard item: board-2\nSession task: task-2\nPriority: Low\nStatus: Todo\n\nLifecycle:\nImplement the requested work, keep changes scoped, and run the smallest relevant validation.\n1. Report progress with `harness task-board progress checkpoint --item-id board-2 --summary \"<summary>\" --progress <0-100>`.\n2. Submit with `harness task-board progress submit-for-review --item-id board-2 --summary \"<summary>\"`.\n3. If the work cannot continue, run `harness task-board progress block --item-id board-2 --reason \"<reason>\"` instead of stopping silently.\nRead the record back at any time with `harness task-board progress show --item-id board-2`. The controller also settles this item when the managed run completes and is the authoritative safety net.";
 
 fn bare_item() -> TaskBoardItem {
     let mut item = TaskBoardItem::new(

@@ -16,6 +16,7 @@ pub(super) mod review_report;
 pub(super) mod triage;
 pub(super) mod triage_escalation;
 pub(super) mod triage_rules;
+pub(super) mod work_item_progress;
 pub(super) mod workflow_progress;
 pub(super) mod working_copies;
 
@@ -63,6 +64,10 @@ fn task_board_item_routes() -> OpenApiRouter<DaemonHttpState> {
         .routes(routes!(review_report::get_task_board_item_review_report))
         .routes(routes!(
             workflow_progress::get_task_board_item_workflow_progress
+        ))
+        .routes(routes!(work_item_progress::get_task_board_item_progress))
+        .routes(routes!(
+            work_item_progress::post_task_board_item_progress_report
         ))
 }
 

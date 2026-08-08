@@ -216,6 +216,21 @@ public func formatTimestamp(
   return formatter.string(from: date)
 }
 
+/// Overload for a precomputed date, so a caller that already parsed its
+/// timestamp once (see `TaskBoardCardDateParsing`) never re-parses the string on
+/// every render. `nil` means the source string did not parse under any accepted
+/// format.
+@MainActor
+public func formatTimestamp(
+  _ date: Date?,
+  configuration: HarnessMonitorDateTimeConfiguration
+) -> String {
+  guard let date else {
+    return "n/a"
+  }
+  return formatTimestamp(date, configuration: configuration)
+}
+
 @MainActor
 public func formatTimelineTimestamp(
   _ date: Date,

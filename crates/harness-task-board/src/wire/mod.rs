@@ -20,6 +20,7 @@ mod task_board_steps;
 mod task_board_triage;
 mod task_board_triage_escalation;
 mod task_board_triage_rules;
+mod task_board_work_item_progress;
 
 pub use policy_transfer::*;
 pub use task_board::*;
@@ -31,3 +32,4 @@ pub use task_board_steps::*;
 pub use task_board_triage::*;
 pub use task_board_triage_escalation::*;
 pub use task_board_triage_rules::*;
+pub use task_board_work_item_progress::*;

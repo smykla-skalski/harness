@@ -59,6 +59,21 @@ fn prepared_acceptance_survives_cancellation_settlement() {
     assert_settled_acceptance(&signal_dir);
 }
 
+#[test]
+fn prepared_acceptance_stays_pending_for_recovery() {
+    let (_tmp, signal_dir, _prepared) = prepared_acceptance();
+    let signal = sample_signal();
+
+    let state = ensure_signal_file(&signal_dir, &signal).unwrap();
+
+    assert!(
+        matches!(state, SignalFileState::Pending),
+        "an accepted signal that was never delivered must stay recoverable, got {state:?}"
+    );
+    assert_eq!(read_pending_signals(&signal_dir).unwrap().len(), 1);
+    assert!(read_acknowledgments(&signal_dir).unwrap().is_empty());
+}
+
 fn prepared_acceptance() -> (tempfile::TempDir, PathBuf, SignalAck) {
     let tmp = tempfile::tempdir().unwrap();
     let signal_dir = tmp.path().join("signals");

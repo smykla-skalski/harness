@@ -3,19 +3,20 @@ use std::sync::{Arc, Mutex};
 use crate::daemon::http::{DaemonHttpState, task_board_route_executor};
 use crate::daemon::protocol::{
     TASK_BOARD_TRIAGE_HISTORY_INVALID_PARAMS, TaskBoardGetItemRequest, TaskBoardListItemsRequest,
-    TaskBoardTriageHistoryRequest, WsRequest, WsResponse,
+    TaskBoardTriageHistoryRequest, TaskBoardWorkItemReportCommand, WsRequest, WsResponse,
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
 use harness_task_board_remote_viewer::{
     project_task_board_ai_review_report, project_task_board_item,
     project_task_board_position_snapshot, project_task_board_triage_current,
-    project_task_board_triage_history, project_task_board_workflow_progress,
+    project_task_board_triage_history, project_task_board_work_item_progress,
+    project_task_board_workflow_progress,
 };
 
 use super::super::connection::ConnectionState;
 use super::super::dispatch::remote_viewer_projection_required;
 use super::super::mutations::{cli_error_response, dispatch_query_result};
-use super::{invalid_params, parse_params, parse_params_or_default};
+use super::{invalid_params, parse_control_plane_params, parse_params, parse_params_or_default};
 
 pub(super) async fn dispatch_task_board_capabilities(
     request: &WsRequest,
@@ -85,6 +86,35 @@ pub(super) async fn dispatch_task_board_workflow_progress_get(
         .await
         .map(|progress| project_task_board_workflow_progress(progress, viewer));
     dispatch_query_result(&request.id, result)
+}
+
+pub(super) async fn dispatch_task_board_progress_get(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+    connection: &Arc<Mutex<ConnectionState>>,
+) -> WsResponse {
+    let Ok(body) = parse_params::<TaskBoardGetItemRequest>(request) else {
+        return invalid_params(request);
+    };
+    let viewer = remote_viewer_projection_required(connection);
+    let result = task_board_route_executor::get_item_work_item_progress(state, &body.id)
+        .await
+        .map(|response| project_task_board_work_item_progress(response, viewer));
+    dispatch_query_result(&request.id, result)
+}
+
+pub(super) async fn dispatch_task_board_progress_report(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> WsResponse {
+    let Ok(body) = parse_control_plane_params::<TaskBoardWorkItemReportCommand>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(
+        &request.id,
+        task_board_route_executor::report_item_work_item_progress(state, &body.id, &body.report)
+            .await,
+    )
 }
 
 pub(super) async fn dispatch_task_board_position_get(
