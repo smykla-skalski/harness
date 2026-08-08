@@ -9,6 +9,11 @@ enum DashboardAgentsContentState: Equatable {
   case content
 }
 
+enum DashboardAgentsLoadPresentation: Equatable {
+  case foreground
+  case background
+}
+
 struct DashboardAgentBrowserViewState: Equatable, Sendable {
   var agents: [DashboardAgentSummary] = []
   var isLoading = false
@@ -52,17 +57,25 @@ struct DashboardAgentBrowserViewState: Equatable, Sendable {
 final class DashboardAgentsRouteState {
   private(set) var viewState: DashboardAgentBrowserViewState
   private var generation: UInt64 = 0
+  private var isLoadInFlight: Bool
 
   init(viewState: DashboardAgentBrowserViewState = DashboardAgentBrowserViewState()) {
     self.viewState = viewState
+    isLoadInFlight = viewState.isLoading
   }
 
-  func beginLoad(force: Bool) -> UInt64? {
-    guard force || !viewState.isLoading else { return nil }
+  func beginLoad(
+    force: Bool,
+    presentation: DashboardAgentsLoadPresentation = .foreground
+  ) -> UInt64? {
+    guard force || !isLoadInFlight else { return nil }
     generation &+= 1
-    viewState.isLoading = true
-    viewState.hasAttemptedLoad = true
-    viewState.issue = nil
+    isLoadInFlight = true
+    if presentation == .foreground {
+      viewState.isLoading = true
+      viewState.hasAttemptedLoad = true
+      viewState.issue = nil
+    }
     return generation
   }
 
@@ -84,6 +97,7 @@ final class DashboardAgentsRouteState {
     generation expectedGeneration: UInt64
   ) {
     guard generation == expectedGeneration else { return }
+    isLoadInFlight = false
     viewState.agents = result.agents
     viewState.source = result.source
     viewState.issue = result.issue

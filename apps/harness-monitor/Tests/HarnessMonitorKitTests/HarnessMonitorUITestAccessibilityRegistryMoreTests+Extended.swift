@@ -57,7 +57,7 @@ extension HarnessMonitorUITestAccessibilityRegistryMoreTests {
     let sessionUnavailable = try sourceFile(named: "SessionWindowView+Unavailable.swift")
     let settingsView = try sourceFile(named: "SettingsView.swift")
 
-    #expect(dashboardWindow.contains(".geometryGroup()\n        .toolbar {"))
+    try expectDashboardGeometryIsolationPrecedesToolbar(dashboardWindow)
     #expect(
       !dashboardWindow.contains(
         "accessibilityIdentifier(HarnessMonitorAccessibility.dashboardWindowRoot)\n      .toolbar {"
@@ -135,6 +135,19 @@ extension HarnessMonitorUITestAccessibilityRegistryMoreTests {
       )
     )
     #expect(dashboardToolbar.contains(".harnessMCPButton("))
+  }
+
+  private func expectDashboardGeometryIsolationPrecedesToolbar(_ source: String) throws {
+    let geometryIsolation = try #require(
+      source.range(of: "DashboardWholeDetailGeometryIsolation(")
+    )
+    let toolbar = try #require(
+      source.range(
+        of: ".toolbar {",
+        range: geometryIsolation.upperBound..<source.endIndex
+      )
+    )
+    #expect(geometryIsolation.lowerBound < toolbar.lowerBound)
   }
 
   @Test("Automation kill switch stays out of auxiliary windows")

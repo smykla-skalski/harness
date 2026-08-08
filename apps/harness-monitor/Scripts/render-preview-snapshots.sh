@@ -98,8 +98,77 @@ cleanup() {
 }
 trap cleanup EXIT
 
+render_focused_dashboard_agents_window() {
+  local preview_environment="$1"
+  local focused_name="$2"
+  local focused_stdout="$staging_directory/.focused-preview-$focused_name.stdout"
+  local focused_stderr="$staging_directory/.focused-preview-$focused_name.stderr"
+  local focused_request="$staging_directory/.capture-request-$focused_name"
+  local focused_complete="$staging_directory/.capture-complete-$focused_name"
+  local focused_capture="$staging_directory/$focused_name.png"
+  local render_complete="$staging_directory/.focused-preview-render-complete"
+
+  rm -f -- "$render_complete"
+  open -n -W "$derived_data/Build/Products/Preview/HarnessMonitorPreviewHost.app" \
+    --stdout "$focused_stdout" \
+    --stderr "$focused_stderr" \
+    --env "$preview_environment=$staging_directory" \
+    --env "HARNESS_MONITOR_FOCUSED_PREVIEW_CAPTURE=1" &
+  local focused_launcher_pid=$!
+  for _ in $(seq 1 600); do
+    [[ -s "$focused_request" ]] && break
+    kill -0 "$focused_launcher_pid" 2>/dev/null || break
+    sleep 0.05
+  done
+  if [[ ! -s "$focused_request" ]]; then
+    local launcher_status=0
+    wait "$focused_launcher_pid" || launcher_status=$?
+    printf 'error: focused preview did not publish a window for %s\n' "$focused_name" >&2
+    printf 'focused preview launcher exit: %s\n' "$launcher_status" >&2
+    [[ ! -s "$focused_stdout" ]] || cat "$focused_stdout" >&2
+    [[ ! -s "$focused_stderr" ]] || cat "$focused_stderr" >&2
+    return 1
+  fi
+
+  local focused_window_id
+  IFS= read -r focused_window_id < "$focused_request"
+  if [[ ! "$focused_window_id" =~ ^[1-9][0-9]*$ ]]; then
+    printf 'error: invalid focused preview window id for %s: %s\n' \
+      "$focused_name" "$focused_window_id" >&2
+    touch "$focused_complete"
+    wait "$focused_launcher_pid" || true
+    return 1
+  fi
+  for _ in $(seq 1 20); do
+    if screencapture -l "$focused_window_id" -o "$focused_capture" \
+      && [[ -s "$focused_capture" ]]; then
+      break
+    fi
+    sleep 0.05
+  done
+  if [[ ! -s "$focused_capture" ]]; then
+    printf 'error: focused preview capture failed for %s\n' "$focused_name" >&2
+    touch "$focused_complete"
+    wait "$focused_launcher_pid" || true
+    return 1
+  fi
+  touch "$focused_complete"
+  wait "$focused_launcher_pid" || true
+  [[ ! -s "$focused_stderr" ]] || cat "$focused_stderr" >&2
+  if [[ ! -s "$render_complete" ]]; then
+    printf 'error: focused dashboard agents preview did not complete\n' >&2
+    return 1
+  fi
+}
+
 case "$suite" in
   dashboard-agents)
+    render_focused_dashboard_agents_window \
+      HARNESS_DASHBOARD_AGENTS_LEGACY_WINDOW_PREVIEW_DUMP \
+      agents-window-before-whole-detail-geometry
+    render_focused_dashboard_agents_window \
+      HARNESS_DASHBOARD_AGENTS_NATIVE_WINDOW_PREVIEW_DUMP \
+      agents-window-after-native-split-geometry
     HARNESS_DASHBOARD_AGENTS_PREVIEW_DUMP="$staging_directory" "$host"
     ;;
   dashboard-audit-navigation)

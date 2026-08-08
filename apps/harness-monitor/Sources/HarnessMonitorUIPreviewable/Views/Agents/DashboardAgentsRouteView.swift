@@ -181,6 +181,7 @@ struct DashboardAgentsRouteView: View {
         }
       }
     }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .scaledFont(.body)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardAgentsRoot)
@@ -211,7 +212,7 @@ struct DashboardAgentsRouteView: View {
         } catch {
           return
         }
-        requestRefresh(force: false)
+        requestRefresh(force: false, presentation: .background)
       }
     }
     .task(id: history.pendingDashboardAgentsRestoreRequest?.requestID) {
@@ -319,8 +320,14 @@ struct DashboardAgentsRouteView: View {
     requestRefresh(force: true)
   }
 
-  func requestRefresh(force: Bool) {
-    guard isRouteVisible, let generation = state.beginLoad(force: force) else { return }
+  func requestRefresh(
+    force: Bool,
+    presentation: DashboardAgentsLoadPresentation = .foreground
+  ) {
+    guard
+      isRouteVisible,
+      let generation = state.beginLoad(force: force, presentation: presentation)
+    else { return }
     let sessionsSnapshot = sessions
     HarnessMonitorAsyncWorkQueue.shared.submit(
       .init(title: "Loading Dashboard agents") {
