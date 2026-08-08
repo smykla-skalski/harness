@@ -147,6 +147,7 @@ pub mod triage_override;
 pub mod triage_rules;
 pub mod types;
 pub mod wire;
+pub mod work_item_progress;
 mod worker_prompt;
 pub mod working_copy;
 
@@ -309,6 +310,11 @@ pub use types::{
     AgentMode, PrIntentSet, TaskBoardItem, TaskBoardPriority, TaskBoardStatus,
     TaskBoardTombstoneCause, TaskBoardWorkflowKind, TaskBoardWorkflowState,
     TaskBoardWorkflowStatus,
+};
+pub use work_item_progress::{
+    TASK_BOARD_WORK_ITEM_SUMMARY_LIMIT, TaskBoardWorkItemCheckpoint, TaskBoardWorkItemProgress,
+    TaskBoardWorkItemReport, TaskBoardWorkItemReportOutcome, TaskBoardWorkItemReportRejection,
+    TaskBoardWorkItemState, apply_work_item_report,
 };
 pub use worker_prompt::{
     WorkerPromptContext, codex_worker_id, managed_worker_id, plan_worker_prompt,
