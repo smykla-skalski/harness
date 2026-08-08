@@ -26,7 +26,7 @@ def load_script() -> ModuleType:
 
 
 seed = load_script()
-LANE_FORMAT_VERSION = 2
+LANE_FORMAT_VERSION = 3
 
 
 class SeedRustBuildLaneTests(unittest.TestCase):
@@ -90,6 +90,23 @@ class SeedRustBuildLaneTests(unittest.TestCase):
         self.assertTrue(
             any("4 cached artifacts" in message for message in self.messages)
         )
+
+    def test_seeded_dependency_metadata_points_at_destination_lane(self) -> None:
+        donor = self.create_donor(self.segment("donor"), artifacts=1)
+        dep_info = donor / "debug" / "deps" / "artifact.d"
+        dep_info.write_bytes(
+            b"artifact: "
+            + os.fsencode(donor / "debug" / "build" / "fixture" / "out" / "generated.rs")
+            + b"\n"
+        )
+        destination = self.target_base / self.segment("destination")
+
+        result = self.run_seed(destination.name)
+
+        seeded = (destination / "debug" / "deps" / "artifact.d").read_bytes()
+        self.assertEqual(result, seed.RESULT_SEEDED)
+        self.assertIn(os.fsencode(destination), seeded)
+        self.assertNotIn(os.fsencode(donor), seeded)
 
     def test_most_recent_lane_wins_over_larger_stale_lane(self) -> None:
         stale = self.create_donor(self.segment("stale"), artifacts=5)
@@ -222,7 +239,7 @@ class SeedRustBuildLaneTests(unittest.TestCase):
     def test_destination_must_match_the_lane_format(self) -> None:
         destination = self.segment("destination", version=1)
 
-        with self.assertRaisesRegex(ValueError, "lane format version 2"):
+        with self.assertRaisesRegex(ValueError, "lane format version 3"):
             seed.seed_lane(
                 self.repo_root,
                 self.target_base / destination,

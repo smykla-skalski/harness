@@ -207,7 +207,7 @@ configure_sccache_socket() {
 }
 
 default_sccache_basedirs() {
-  local checkout inventory segment worktrees
+  local checkout inventory worktrees
 
   worktrees="$(
     git -C "$ROOT" worktree list --porcelain 2>/dev/null \
@@ -215,11 +215,7 @@ default_sccache_basedirs() {
       || true
   )"
   if [[ -z "$worktrees" ]]; then
-    printf '%s' "$ROOT"
-    if (( target_dir_is_default )); then
-      printf ':%s' "$target_dir"
-    fi
-    printf '\n'
+    printf '%s\n' "$ROOT"
     return 0
   fi
 
@@ -227,12 +223,6 @@ default_sccache_basedirs() {
     while IFS= read -r checkout; do
       [[ -n "$checkout" ]] || continue
       printf '%s\n' "$checkout"
-      if [[ "$checkout" == "$COMMON_REPO_ROOT" ]]; then
-        segment="$(cargo_lane_main_segment)"
-      else
-        segment="$(cargo_lane_segment_for_path "$checkout")"
-      fi
-      printf '%s/target/dev/%s\n' "$COMMON_REPO_ROOT" "$segment"
     done <<<"$worktrees" \
       | awk 'substr($0, 1, 1) == "/"' \
       | LC_ALL=C sort -u
@@ -799,8 +789,9 @@ configure_tmpdir
 resolve_sccache_bin || true
 if [[ -n "${SCCACHE_BIN:-}" ]]; then
   # The server fixes this list at startup. Include every registered checkout
-  # and its isolated target lane so identical source, --out-dir, and --extern
-  # paths normalize to the same cache key across worktrees.
+  # so equivalent source paths normalize across worktrees. Target lanes stay
+  # distinct: Rust dep-info embeds their absolute paths and cannot be safely
+  # restored into another lane by a compiler-cache hit.
   export SCCACHE_BASEDIRS="${SCCACHE_BASEDIRS:-$(default_sccache_basedirs)}"
   # Swallowing a socket failure would leave sccache enabled on whatever default
   # endpoint it picks, which can be a localhost TCP port any local user can
@@ -964,40 +955,20 @@ already_no_run() {
   return 1
 }
 
-# Place --no-run ahead of any separator. Appended at the end it would land past
-# a caller's `--` and reach the test binary as one of its arguments, leaving the
-# build phase to run the whole suite instead of only compiling it.
-build_only_args() {
-  local arg inserted=0
-  build_only_argv=()
-  for arg in "$@"; do
-    if (( ! inserted )) && [[ "$arg" == "--" ]]; then
-      build_only_argv+=(--no-run)
-      inserted=1
-    fi
-    build_only_argv+=("$arg")
-  done
-  if (( ! inserted )); then
-    build_only_argv+=(--no-run)
-  fi
-}
-
 # nextest does not speak the jobserver protocol and has said it will not, so its
-# test width cannot renegotiate mid-run and has to be fixed up front. Its two
-# halves want opposite things, though: the build wants the pool, and holding a
-# block across it would starve the compile that produces the very binaries the
-# block is for. So build first against the full pool, then take the block and
-# run - by then cargo has nothing left to compile.
+# test width cannot renegotiate mid-run and has to be fixed up front. Reserve
+# only that fair share around one nextest invocation. Cargo can still draw the
+# rest of the pool while building, and the run reuses the exact same process and
+# environment instead of invalidating the graph with a second Cargo command.
 if [[ "$jobserver_mode" == "pool" ]] \
   && (( nextest_threads_explicit == 0 )) \
   && command_is_nextest_run "$@" \
   && ! already_no_run "$@"; then
-  build_only_args "$@"
-  harness_run_step "cargo-local test build" "$cargo_bin" "${build_only_argv[@]}" || exit $?
+  test_token_request=$((NEXTEST_TEST_THREADS - 1))
   harness_run_step "cargo-local command" \
     python3 "$(jobserver_script)" run \
     --repo-root "$(jobserver_pool_key)" \
-    --max "$(jobserver_budget)" \
+    --max "$test_token_request" \
     --env NEXTEST_TEST_THREADS \
     --floor 2 \
     -- "$cargo_bin" "$@"
