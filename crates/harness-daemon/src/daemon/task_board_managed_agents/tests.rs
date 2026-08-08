@@ -63,12 +63,12 @@ fn codex_worker_request_carries_task_board_identity() {
     assert!(
         request
             .prompt
-            .contains("harness session task list session-1 --json")
+            .contains("harness task-board progress checkpoint --item-id board-1")
     );
     assert!(
         request
             .prompt
-            .contains("harness session task submit-for-review session-1 task-1")
+            .contains("harness task-board progress submit-for-review --item-id board-1")
     );
     assert!(request.prompt.contains("authoritative safety net"));
 }

@@ -85,6 +85,12 @@ This document contains the help content for the `harness` command-line program.
 * [`harness task-board dispatch-pick`↴](#harness-task-board-dispatch-pick)
 * [`harness task-board dispatch-deliver`↴](#harness-task-board-dispatch-deliver)
 * [`harness task-board evaluate`↴](#harness-task-board-evaluate)
+* [`harness task-board progress`↴](#harness-task-board-progress)
+* [`harness task-board progress checkpoint`↴](#harness-task-board-progress-checkpoint)
+* [`harness task-board progress submit-for-review`↴](#harness-task-board-progress-submit-for-review)
+* [`harness task-board progress complete`↴](#harness-task-board-progress-complete)
+* [`harness task-board progress block`↴](#harness-task-board-progress-block)
+* [`harness task-board progress show`↴](#harness-task-board-progress-show)
 * [`harness task-board audit`↴](#harness-task-board-audit)
 * [`harness task-board project`↴](#harness-task-board-project)
 * [`harness task-board machine`↴](#harness-task-board-machine)
@@ -1487,6 +1493,7 @@ Cross-project task board
 * `dispatch-pick` — Preview the highest-priority ready task-board dispatch
 * `dispatch-deliver` — Deliver one held task-board dispatch
 * `evaluate` — Evaluate linked session work and update board workflow state
+* `progress` — Report and read worker progress on a dispatched item
 * `audit` — Print task-board audit data
 * `project` — Manage known projects
 * `machine` — Manage known worker machines
@@ -1858,6 +1865,101 @@ Evaluate linked session work and update board workflow state
 
 
 
+## `harness task-board progress`
+
+Report and read worker progress on a dispatched item
+
+**Usage:** `harness task-board progress <COMMAND>`
+
+###### **Subcommands:**
+
+* `checkpoint` — Record a checkpoint against the dispatched work item
+* `submit-for-review` — Hand the work item to review, keeping the attempt that produced it
+* `complete` — Report the work item as finished
+* `block` — Report the work item as stalled and needing a human
+* `show` — Show the current progress and checkpoint log
+
+
+
+## `harness task-board progress checkpoint`
+
+Record a checkpoint against the dispatched work item
+
+**Usage:** `harness task-board progress checkpoint [OPTIONS] --item-id <ITEM_ID> --summary <SUMMARY>`
+
+###### **Options:**
+
+* `--item-id <ITEM_ID>` [alias: `id`] — Task-board item identifier
+* `--actor <ACTOR>` — The agent reporting. Defaults to the calling principal
+* `--sequence <SEQUENCE>` — Ordering fence; must be greater than the last accepted report
+* `--json`
+* `--summary <SUMMARY>` — What the worker has done since the last checkpoint
+* `--progress <PROGRESS>`
+* `--running` — Report the worker as running rather than leaving the state alone
+
+
+
+## `harness task-board progress submit-for-review`
+
+Hand the work item to review, keeping the attempt that produced it
+
+**Usage:** `harness task-board progress submit-for-review [OPTIONS] --item-id <ITEM_ID>`
+
+###### **Options:**
+
+* `--item-id <ITEM_ID>` [alias: `id`] — Task-board item identifier
+* `--actor <ACTOR>` — The agent reporting. Defaults to the calling principal
+* `--sequence <SEQUENCE>` — Ordering fence; must be greater than the last accepted report
+* `--json`
+* `--summary <SUMMARY>` — What the reviewer should look at
+
+
+
+## `harness task-board progress complete`
+
+Report the work item as finished
+
+**Usage:** `harness task-board progress complete [OPTIONS] --item-id <ITEM_ID>`
+
+###### **Options:**
+
+* `--item-id <ITEM_ID>` [alias: `id`] — Task-board item identifier
+* `--actor <ACTOR>` — The agent reporting. Defaults to the calling principal
+* `--sequence <SEQUENCE>` — Ordering fence; must be greater than the last accepted report
+* `--json`
+* `--summary <SUMMARY>`
+
+
+
+## `harness task-board progress block`
+
+Report the work item as stalled and needing a human
+
+**Usage:** `harness task-board progress block [OPTIONS] --item-id <ITEM_ID> --reason <REASON>`
+
+###### **Options:**
+
+* `--item-id <ITEM_ID>` [alias: `id`] — Task-board item identifier
+* `--actor <ACTOR>` — The agent reporting. Defaults to the calling principal
+* `--sequence <SEQUENCE>` — Ordering fence; must be greater than the last accepted report
+* `--json`
+* `--reason <REASON>` — Why the work cannot continue
+
+
+
+## `harness task-board progress show`
+
+Show the current progress and checkpoint log
+
+**Usage:** `harness task-board progress show [OPTIONS] --item-id <ITEM_ID>`
+
+###### **Options:**
+
+* `--item-id <ITEM_ID>` [alias: `id`]
+* `--json`
+
+
+
 ## `harness task-board audit`
 
 Print task-board audit data
@@ -2131,7 +2233,7 @@ Manage task-board spawn policy and approval grants
 * `grant-resolve` — Approve or deny one pending approval grant
 * `grant-revoke` — Revoke one approval grant
 * `spawn-requires-live-policy` — Toggle the fail-closed live-policy requirement for worker spawning
-* `spawn-kill-switch` — Toggle the emergency worker-spawn kill switch
+* `spawn-kill-switch` — Toggle the emergency app-wide automation kill switch
 
 
 
@@ -2242,7 +2344,7 @@ Toggle the fail-closed live-policy requirement for worker spawning
 
 ## `harness task-board policy spawn-kill-switch`
 
-Toggle the emergency worker-spawn kill switch
+Toggle the emergency app-wide automation kill switch
 
 **Usage:** `harness task-board policy spawn-kill-switch [OPTIONS] --enabled <ENABLED>`
 
