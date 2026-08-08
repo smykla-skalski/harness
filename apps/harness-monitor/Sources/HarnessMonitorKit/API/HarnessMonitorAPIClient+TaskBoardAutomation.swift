@@ -21,7 +21,7 @@ extension HarnessMonitorAPIClient {
   public func taskBoardAutomationRunDetail(
     runID: String
   ) async throws -> TaskBoardAutomationRunDetail {
-    let encodedRunID = try taskBoardAutomationPathSegment(runID)
+    let encodedRunID = try taskBoardPathSegment(runID)
     return try await get(
       "/v1/task-board/orchestrator/runs/\(encodedRunID)",
       decoder: PolicyWireCoding.decoder
@@ -45,11 +45,4 @@ extension HarnessMonitorAPIClient {
     )
   }
 
-  private func taskBoardAutomationPathSegment(_ value: String) throws -> String {
-    let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-._~"))
-    guard let encoded = value.addingPercentEncoding(withAllowedCharacters: allowed) else {
-      throw HarnessMonitorAPIError.invalidEndpoint(value)
-    }
-    return encoded
-  }
 }

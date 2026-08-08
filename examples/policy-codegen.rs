@@ -2956,6 +2956,23 @@ const TASK_BOARD_EVALUATION_EMIT_ONLY: &[&str] = &[
     "TaskBoardEvaluationOutcome",
     "EvaluationSignalFailure",
 ];
+const TASK_BOARD_WORK_ITEM_PROGRESS_SOURCE: &str =
+    include_str!("../crates/harness-task-board/src/work_item_progress.rs");
+const TASK_BOARD_WORK_ITEM_PROGRESS_WIRE_SOURCE: &str =
+    include_str!("../crates/harness-task-board/src/wire/task_board_work_item_progress.rs");
+const TASK_BOARD_WORK_ITEM_PROGRESS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardWorkItemProgressWireTypes.generated.swift";
+// The durable worker-progress record, its checkpoint log, and the read/report
+// endpoint envelopes. `TaskBoardWorkItemState` is emitted here and resolves
+// across modules for the evaluation record that references it.
+const TASK_BOARD_WORK_ITEM_PROGRESS_EMIT_ONLY: &[&str] = &[
+    "TaskBoardWorkItemState",
+    "TaskBoardWorkItemCheckpoint",
+    "TaskBoardWorkItemProgress",
+    "TaskBoardWorkItemReportRejection",
+    "TaskBoardWorkItemReportRequest",
+    "TaskBoardWorkItemReportResponse",
+    "TaskBoardWorkItemProgressResponse",
+];
 const TASK_BOARD_DISPATCH_SOURCE: &str =
     include_str!("../crates/harness-task-board/src/dispatch.rs");
 // DispatchPlan and its pure-data closure (DispatchReadiness/DispatchBlockReason/
@@ -3682,6 +3699,15 @@ fn modules() -> Vec<GeneratedModule> {
             ],
         },
         GeneratedModule {
+            output: TASK_BOARD_WORK_ITEM_PROGRESS_OUTPUT,
+            description: "the Rust task-board worker progress record and its report envelopes",
+            defaults: &[],
+            sources: &[
+                TASK_BOARD_WORK_ITEM_PROGRESS_SOURCE,
+                TASK_BOARD_WORK_ITEM_PROGRESS_WIRE_SOURCE,
+            ],
+        },
+        GeneratedModule {
             output: TASK_BOARD_DISPATCH_OUTPUT,
             description: "the Rust task-board dispatch execution summary, step routes and plan graph",
             defaults: &[],
@@ -3922,6 +3948,7 @@ fn generate_module(module: &GeneratedModule) -> String {
         TASK_BOARD_MACHINES_OUTPUT => TASK_BOARD_MACHINES_EMIT_ONLY,
         TASK_BOARD_PLANNING_OUTPUT => TASK_BOARD_PLANNING_EMIT_ONLY,
         TASK_BOARD_EVALUATION_OUTPUT => TASK_BOARD_EVALUATION_EMIT_ONLY,
+        TASK_BOARD_WORK_ITEM_PROGRESS_OUTPUT => TASK_BOARD_WORK_ITEM_PROGRESS_EMIT_ONLY,
         TASK_BOARD_DISPATCH_OUTPUT => TASK_BOARD_DISPATCH_EMIT_ONLY,
         TASK_BOARD_WORKING_COPY_OUTPUT => TASK_BOARD_WORKING_COPY_EMIT_ONLY,
         ACP_PROBE_OUTPUT => ACP_PROBE_EMIT_ONLY,
