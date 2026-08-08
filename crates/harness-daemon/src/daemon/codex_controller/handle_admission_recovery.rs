@@ -20,7 +20,7 @@ impl CodexControllerHandle {
             ))
         })?;
         for recovery in db.task_board_admission_worker_recoveries().await? {
-            self.reconcile_one_admission_worker(db.as_ref(), &recovery)
+            Box::pin(self.reconcile_one_admission_worker(db.as_ref(), &recovery))
                 .await?;
         }
         Ok(())
@@ -48,7 +48,7 @@ impl CodexControllerHandle {
         if let Some(run) = db.codex_run(&recovery.managed_worker_id).await? {
             return self.reconcile_existing_admission_run(db, run).await;
         }
-        self.reconcile_missing_admission_run(db, recovery).await
+        Box::pin(self.reconcile_missing_admission_run(db, recovery)).await
     }
 
     async fn reconcile_existing_admission_run(
@@ -82,14 +82,14 @@ impl CodexControllerHandle {
             return Ok(());
         };
         let publish_result = self.publish_missing_admission_recovery(db, &outcome).await;
-        let evaluation_result = daemon_service::evaluate_task_board_async(
+        let evaluation_result = Box::pin(daemon_service::evaluate_task_board_async(
             &TaskBoardEvaluateRequest {
                 item_id: Some(outcome.item_id.clone()),
                 status: None,
                 dry_run: false,
             },
             db,
-        )
+        ))
         .await;
         publish_result?;
         evaluation_result?;

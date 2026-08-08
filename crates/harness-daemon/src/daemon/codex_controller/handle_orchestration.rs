@@ -120,14 +120,14 @@ impl CodexControllerHandle {
                 async_db.bump_change("global").await?;
             }
             if reconcile_board_item && let Some(board_item_id) = run_async.board_item_id.clone() {
-                daemon_service::evaluate_task_board_async(
+                Box::pin(daemon_service::evaluate_task_board_async(
                     &TaskBoardEvaluateRequest {
                         item_id: Some(board_item_id),
                         status: None,
                         dry_run: false,
                     },
                     &async_db,
-                )
+                ))
                 .await?;
             }
             Ok(changed)

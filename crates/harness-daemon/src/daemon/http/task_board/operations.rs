@@ -213,7 +213,7 @@ pub(super) async fn post_task_board_evaluate(
         Ok(parts) => parts,
         Err(response) => return *response,
     };
-    let result = task_board_route_executor::evaluate(&state, request).await;
+    let result = Box::pin(task_board_route_executor::evaluate(&state, request)).await;
     timed_json(
         "POST",
         http_paths::TASK_BOARD_EVALUATE,

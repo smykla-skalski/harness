@@ -110,7 +110,7 @@ pub(crate) async fn evaluate(
     request: TaskBoardEvaluateRequest,
 ) -> Result<TaskBoardEvaluationResponse, CliError> {
     let async_db = require_async_db(state, "task board evaluate")?;
-    let result = service::evaluate_task_board_async(&request, async_db).await;
+    let result = Box::pin(service::evaluate_task_board_async(&request, async_db)).await;
     if result.as_ref().is_ok_and(|response| response.updated > 0) {
         service::broadcast_sessions_updated_async(&state.sender, Some(async_db)).await;
     }

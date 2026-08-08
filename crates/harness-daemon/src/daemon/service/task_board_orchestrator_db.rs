@@ -141,7 +141,7 @@ async fn execute_run(
     progress.0 = Some(dispatch.clone());
 
     begin_stage(session, 4, "evaluation").await?;
-    let evaluation = run_evaluation_phase(db, prepared, session).await;
+    let evaluation = Box::pin(run_evaluation_phase(db, prepared, session)).await;
     let evaluation = finish_stage(session, 4, "evaluation", evaluation).await?;
     progress.1 = Some(evaluation.clone());
 
