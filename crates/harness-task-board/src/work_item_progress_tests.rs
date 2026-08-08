@@ -37,14 +37,14 @@ fn applied(
 }
 
 #[test]
-fn checkpoint_records_summary_and_progress_without_moving_state() {
+fn checkpoint_records_its_summary_and_progress() {
     let mut report = report(None);
     report.summary = Some("wrote the failing test".to_string());
     report.progress_percent = Some(40);
 
     let updated = applied(&progress(), &report);
 
-    assert_eq!(updated.state, TaskBoardWorkItemState::Pending);
+    assert_eq!(updated.summary.as_deref(), Some("wrote the failing test"));
     assert_eq!(updated.progress_percent, Some(40));
     assert_eq!(updated.report_sequence, 1);
     let checkpoint = updated.latest_checkpoint().expect("checkpoint recorded");
@@ -171,6 +171,90 @@ fn unblocking_reopens_the_record_and_drops_its_settlement_stamp() {
     assert_eq!(resumed.state, TaskBoardWorkItemState::Running);
     assert!(resumed.completed_at.is_none());
     assert!(resumed.blocked_reason.is_none());
+}
+
+#[test]
+fn a_bare_checkpoint_marks_a_pending_worker_running() {
+    let mut report = report(None);
+    report.summary = Some("started on the failing test".to_string());
+
+    let updated = applied(&progress(), &report);
+
+    assert_eq!(updated.state, TaskBoardWorkItemState::Running);
+}
+
+#[test]
+fn a_bare_checkpoint_resumes_work_a_review_sent_back() {
+    let sent_back = applied(
+        &progress(),
+        &report(Some(TaskBoardWorkItemState::ChangesRequested)),
+    );
+
+    let updated = applied(&sent_back, &report(None));
+
+    assert_eq!(updated.state, TaskBoardWorkItemState::Running);
+}
+
+#[test]
+fn a_bare_checkpoint_never_pulls_work_back_out_of_review() {
+    for state in [
+        TaskBoardWorkItemState::AwaitingReview,
+        TaskBoardWorkItemState::InReview,
+    ] {
+        let handed_off = applied(&progress(), &report(Some(state)));
+
+        let updated = applied(&handed_off, &report(None));
+
+        assert_eq!(updated.state, state, "{state:?}");
+    }
+}
+
+#[test]
+fn changes_requested_keeps_the_reason_the_review_sent_back() {
+    let mut sent_back = report(Some(TaskBoardWorkItemState::ChangesRequested));
+    sent_back.blocked_reason = Some("Needs one fix".to_string());
+
+    let updated = applied(&progress(), &sent_back);
+
+    assert_eq!(updated.blocked_reason.as_deref(), Some("Needs one fix"));
+    assert_eq!(
+        updated
+            .project_workflow(&TaskBoardWorkflowState::default())
+            .last_error
+            .as_deref(),
+        Some("Needs one fix")
+    );
+}
+
+#[test]
+fn resuming_after_a_review_drops_the_reason_it_sent_back() {
+    let mut sent_back = report(Some(TaskBoardWorkItemState::ChangesRequested));
+    sent_back.blocked_reason = Some("Needs one fix".to_string());
+    let sent_back = applied(&progress(), &sent_back);
+
+    let resumed = applied(&sent_back, &report(Some(TaskBoardWorkItemState::Running)));
+
+    assert!(resumed.blocked_reason.is_none());
+}
+
+#[test]
+fn only_stalled_states_carry_a_reason() {
+    let carrying = [
+        TaskBoardWorkItemState::Blocked,
+        TaskBoardWorkItemState::ChangesRequested,
+    ];
+    for state in carrying {
+        assert!(state.carries_reason(), "{state:?}");
+    }
+    for state in [
+        TaskBoardWorkItemState::Pending,
+        TaskBoardWorkItemState::Running,
+        TaskBoardWorkItemState::AwaitingReview,
+        TaskBoardWorkItemState::InReview,
+        TaskBoardWorkItemState::Done,
+    ] {
+        assert!(!state.carries_reason(), "{state:?}");
+    }
 }
 
 #[test]

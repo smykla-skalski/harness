@@ -1,7 +1,9 @@
 use tempfile::{TempDir, tempdir};
 
 use crate::daemon::db::AsyncDaemonDb;
-use crate::session::types::{TaskQueuePolicy, TaskSeverity, TaskSource, TaskStatus};
+use crate::session::types::{
+    ReviewConsensus, ReviewVerdict, TaskQueuePolicy, TaskSeverity, TaskSource, TaskStatus,
+};
 use crate::task_board::{
     TaskBoardEvaluationOutcome, TaskBoardWorkItemState, TaskBoardWorkflowStatus,
 };
@@ -307,6 +309,65 @@ async fn evaluation_defers_its_item_write_until_the_dispatch_claims() {
         evaluated.item.workflow.current_step_id.as_deref(),
         Some("worker_pending")
     );
+}
+
+#[tokio::test]
+async fn a_review_asking_for_changes_reports_the_reason_it_sent_back() {
+    let fixture = fixture().await;
+    let item = create_item(&fixture, "board-1", Some("session-1")).await;
+    let mut task = work_item(TaskStatus::InReview);
+    task.consensus = Some(ReviewConsensus {
+        verdict: ReviewVerdict::RequestChanges,
+        summary: "Needs one fix".to_string(),
+        points: Vec::new(),
+        closed_at: NOW.to_string(),
+        reviewer_agent_ids: vec!["reviewer-1".to_string()],
+    });
+
+    let record = translate_session_task(&fixture.db, &item, &task, false)
+        .await
+        .expect("translate the session task");
+
+    assert_eq!(
+        record.outcome,
+        TaskBoardEvaluationOutcome::ReviewChangesRequested
+    );
+    assert_eq!(record.reason.as_deref(), Some("Needs one fix"));
+    let stored = fixture
+        .db
+        .task_board_item(&item.id)
+        .await
+        .expect("reload item");
+    assert_eq!(
+        stored.workflow.last_error.as_deref(),
+        Some("Needs one fix"),
+        "the board item must carry what the reviewer sent it back for"
+    );
+}
+
+#[tokio::test]
+async fn a_dry_run_reports_the_same_reason_as_a_real_run() {
+    let fixture = fixture().await;
+    let item = create_item(&fixture, "board-1", Some("session-1")).await;
+    let mut task = work_item(TaskStatus::InReview);
+    task.consensus = Some(ReviewConsensus {
+        verdict: ReviewVerdict::RequestChanges,
+        summary: "Needs one fix".to_string(),
+        points: Vec::new(),
+        closed_at: NOW.to_string(),
+        reviewer_agent_ids: vec!["reviewer-1".to_string()],
+    });
+
+    let dry_run = translate_session_task(&fixture.db, &item, &task, true)
+        .await
+        .expect("dry run");
+    let real = translate_session_task(&fixture.db, &item, &task, false)
+        .await
+        .expect("real run");
+
+    assert_eq!(dry_run.reason, real.reason);
+    assert_eq!(dry_run.outcome, real.outcome);
+    assert_eq!(dry_run.board_status, real.board_status);
 }
 
 #[tokio::test]

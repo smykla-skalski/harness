@@ -40,6 +40,16 @@ impl TaskBoardWorkItemState {
         matches!(self, Self::Blocked | Self::Done)
     }
 
+    /// Whether this state carries an explanation of why the work is not
+    /// progressing. Blocked carries what stopped it; changes-requested carries
+    /// what the reviewer sent it back for. Every other state has nothing to
+    /// explain, so it drops any reason a previous one recorded rather than
+    /// leaving a stale one on the board.
+    #[must_use]
+    pub const fn carries_reason(self) -> bool {
+        matches!(self, Self::Blocked | Self::ChangesRequested)
+    }
+
     /// Whether the work item is frozen against further reports.
     ///
     /// Only completion freezes. Blocked work has stalled rather than finished:
@@ -345,8 +355,18 @@ fn overwrite_reported_fields(
     updated: &mut TaskBoardWorkItemProgress,
     report: &TaskBoardWorkItemReport,
 ) {
-    if let Some(state) = report.state {
-        updated.state = state;
+    match report.state {
+        Some(state) => updated.state = state,
+        // A report that names no state is a worker saying "still going". That
+        // is the shape every checkpoint takes, so without this a worker that
+        // reported ten checkpoints would still read as Pending and `Running`
+        // would be unreachable through the documented flow. Only the two states
+        // that mean "the worker owns this" promote; a checkpoint must never
+        // pull work back out of review.
+        None if promotes_to_running(updated.state) => {
+            updated.state = TaskBoardWorkItemState::Running;
+        }
+        None => {}
     }
     if let Some(percent) = report.progress_percent {
         updated.progress_percent = Some(percent.min(100));
@@ -362,13 +382,20 @@ fn overwrite_reported_fields(
     }
 }
 
-/// A blocked work item keeps a reason; leaving the blocked state drops the one
-/// that no longer applies rather than leaving a stale error on the board.
+const fn promotes_to_running(state: TaskBoardWorkItemState) -> bool {
+    matches!(
+        state,
+        TaskBoardWorkItemState::Pending | TaskBoardWorkItemState::ChangesRequested
+    )
+}
+
+/// The reason a stalled work item keeps, dropped as soon as it moves to a state
+/// with nothing to explain.
 fn blocked_reason_for(
     updated: &TaskBoardWorkItemProgress,
     report: &TaskBoardWorkItemReport,
 ) -> Option<String> {
-    if updated.state != TaskBoardWorkItemState::Blocked {
+    if !updated.state.carries_reason() {
         return None;
     }
     report
