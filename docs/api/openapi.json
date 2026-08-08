@@ -12073,6 +12073,141 @@
         "x-websocket-method": "task_board.position_reset"
       }
     },
+    "/v1/task-board/items/{item_id}/progress": {
+      "get": {
+        "tags": [
+          "task-board"
+        ],
+        "description": "Return the durable worker progress and checkpoint log for one dispatched task-board item, or an empty response when the item has never been dispatched",
+        "operationId": "get_task_board_item_progress",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "description": "Task-board item identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current worker progress, or an empty response before dispatch",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskBoardWorkItemProgressResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid task-board request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "task_board.progress_get"
+      }
+    },
+    "/v1/task-board/items/{item_id}/progress/report": {
+      "post": {
+        "tags": [
+          "task-board"
+        ],
+        "description": "Record one worker report against a dispatched task-board item. A report that arrives after the work settled, or out of order, is returned as an unapplied no-op with the current record rather than an error",
+        "operationId": "post_task_board_item_progress_report",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "description": "Task-board item identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskBoardWorkItemReportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The record after the report, and whether the report moved it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskBoardWorkItemReportResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unknown item, an item that was never dispatched, or an invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/RemoteAuthRequired"
+          },
+          "414": {
+            "$ref": "#/components/responses/RemoteRequestUriTooLong"
+          },
+          "413": {
+            "$ref": "#/components/responses/RemoteRequestBodyTooLarge"
+          },
+          "431": {
+            "$ref": "#/components/responses/RemoteRequestHeadersTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/RemoteRequestThrottled"
+          },
+          "503": {
+            "$ref": "#/components/responses/RemoteServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/RemoteRequestTimedOut"
+          }
+        },
+        "x-websocket-method": "task_board.progress_report"
+      }
+    },
     "/v1/task-board/items/{item_id}/review-report": {
       "get": {
         "tags": [
@@ -35697,6 +35832,267 @@
             "type": "boolean"
           }
         }
+      },
+      "TaskBoardWorkItemCheckpoint": {
+        "type": "object",
+        "description": "One append-only checkpoint a worker recorded against its work item.",
+        "required": [
+          "checkpoint_id",
+          "sequence",
+          "actor",
+          "summary",
+          "recorded_at"
+        ],
+        "properties": {
+          "actor": {
+            "type": "string"
+          },
+          "attempt_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The worker run that produced this checkpoint."
+          },
+          "checkpoint_id": {
+            "type": "string"
+          },
+          "progress_percent": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "maximum": 100,
+            "minimum": 0
+          },
+          "recorded_at": {
+            "type": "string"
+          },
+          "sequence": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Position in this work item's checkpoint log, starting at 1.",
+            "minimum": 0
+          },
+          "summary": {
+            "type": "string"
+          }
+        }
+      },
+      "TaskBoardWorkItemProgress": {
+        "type": "object",
+        "description": "The durable progress record for one dispatched work item.",
+        "required": [
+          "board_item_id",
+          "work_item_id",
+          "state",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "attempt_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The worker run that last moved this work item. Preserved across a review\nhandoff so a reviewer can tell which attempt produced the work."
+          },
+          "blocked_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "board_item_id": {
+            "type": "string"
+          },
+          "checkpoints": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskBoardWorkItemCheckpoint"
+            }
+          },
+          "completed_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "execution_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The execution that owns this work item, when the item carries one."
+          },
+          "item_revision": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "The board item revision the last accepted report was stamped at.",
+            "minimum": 0
+          },
+          "progress_percent": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "maximum": 100,
+            "minimum": 0
+          },
+          "report_sequence": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Monotonic report counter. A report that does not advance it is refused.",
+            "minimum": 0
+          },
+          "state": {
+            "$ref": "#/components/schemas/TaskBoardWorkItemState"
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "work_item_id": {
+            "type": "string"
+          }
+        }
+      },
+      "TaskBoardWorkItemProgressResponse": {
+        "type": "object",
+        "description": "The durable worker progress for one board item, absent until dispatch.",
+        "properties": {
+          "progress": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TaskBoardWorkItemProgress"
+              }
+            ]
+          }
+        }
+      },
+      "TaskBoardWorkItemReportRejection": {
+        "type": "string",
+        "description": "Why a report left the record untouched.",
+        "enum": [
+          "terminal",
+          "stale_sequence"
+        ]
+      },
+      "TaskBoardWorkItemReportRequest": {
+        "type": "object",
+        "description": "What a worker reports against its dispatched work item.\n\nThe attempt identity and the work-item revision are deliberately absent: the\ndaemon stamps both from the item's own dispatch, so a review handoff carries\nthe attempt the board really started rather than one the worker named.",
+        "properties": {
+          "actor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Who is reporting. Defaults to the control plane when omitted."
+          },
+          "blocked_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "progress_percent": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "maximum": 100,
+            "minimum": 0
+          },
+          "sequence": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Ordering fence. Supply it to make a retried delivery detectable; omit it\nto take the next sequence.",
+            "minimum": 0
+          },
+          "state": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TaskBoardWorkItemState",
+                "description": "The state to move to. Omit to record a checkpoint without moving."
+              }
+            ]
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "TaskBoardWorkItemReportResponse": {
+        "type": "object",
+        "description": "The record after one report, and whether the report moved it.",
+        "required": [
+          "applied",
+          "progress"
+        ],
+        "properties": {
+          "applied": {
+            "type": "boolean"
+          },
+          "progress": {
+            "$ref": "#/components/schemas/TaskBoardWorkItemProgress"
+          },
+          "rejection": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TaskBoardWorkItemReportRejection",
+                "description": "Why an unapplied report was ignored. A rejection is a visible no-op\nrather than an error: a worker retrying a delivery has done nothing\nwrong, and the record it reads back is the authority either way."
+              }
+            ]
+          },
+          "rejection_message": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "TaskBoardWorkItemState": {
+        "type": "string",
+        "description": "Where a dispatched work item stands, owned by the board rather than by a\nSession task.",
+        "enum": [
+          "pending",
+          "running",
+          "awaiting_review",
+          "in_review",
+          "changes_requested",
+          "blocked",
+          "done"
+        ]
       },
       "TaskBoardWorkflowAttemptProgress": {
         "type": "object",

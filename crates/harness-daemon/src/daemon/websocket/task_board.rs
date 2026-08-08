@@ -144,6 +144,12 @@ async fn dispatch_read_method(
         ws_methods::TASK_BOARD_WORKFLOW_PROGRESS_GET => {
             Some(read::dispatch_task_board_workflow_progress_get(request, state, connection).await)
         }
+        ws_methods::TASK_BOARD_PROGRESS_GET => {
+            Some(read::dispatch_task_board_progress_get(request, state).await)
+        }
+        ws_methods::TASK_BOARD_PROGRESS_REPORT => {
+            Some(read::dispatch_task_board_progress_report(request, state).await)
+        }
         ws_methods::TASK_BOARD_POSITION_GET => {
             Some(read::dispatch_task_board_position_get(request, state, connection).await)
         }

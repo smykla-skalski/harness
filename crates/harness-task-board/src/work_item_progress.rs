@@ -313,6 +313,22 @@ pub fn apply_work_item_report(
     let mut updated = current.clone();
     updated.report_sequence = sequence;
     updated.updated_at.clone_from(&report.recorded_at);
+    overwrite_reported_fields(&mut updated, report);
+    updated.blocked_reason = blocked_reason_for(&updated, report);
+    push_checkpoint(&mut updated, report);
+    if updated.state.is_terminal() {
+        updated.completed_at = Some(report.recorded_at.clone());
+    }
+    TaskBoardWorkItemReportOutcome::Applied(updated)
+}
+
+/// Copies across only what the report actually names. A field the report omits
+/// keeps its recorded value, so a plain checkpoint cannot erase the attempt
+/// identity or revision an earlier review handoff established.
+fn overwrite_reported_fields(
+    updated: &mut TaskBoardWorkItemProgress,
+    report: &TaskBoardWorkItemReport,
+) {
     if let Some(state) = report.state {
         updated.state = state;
     }
@@ -328,12 +344,6 @@ pub fn apply_work_item_report(
     if report.item_revision.is_some() {
         updated.item_revision = report.item_revision;
     }
-    updated.blocked_reason = blocked_reason_for(&updated, report);
-    push_checkpoint(&mut updated, report);
-    if updated.state.is_terminal() {
-        updated.completed_at = Some(report.recorded_at.clone());
-    }
-    TaskBoardWorkItemReportOutcome::Applied(updated)
 }
 
 /// A blocked work item keeps a reason; leaving the blocked state drops the one

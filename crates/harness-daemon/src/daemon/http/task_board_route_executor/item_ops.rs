@@ -12,7 +12,8 @@ use crate::daemon::protocol::{
     TaskBoardSetTriageOverrideRequest, TaskBoardSyncCancelResponse, TaskBoardSyncRequest,
     TaskBoardSyncResponse, TaskBoardSyncStatusResponse, TaskBoardTriageCurrentResponse,
     TaskBoardTriageHistoryResponse, TaskBoardTriageOverrideMutationResponse,
-    TaskBoardUpdateItemRequest,
+    TaskBoardUpdateItemRequest, TaskBoardWorkItemProgressResponse, TaskBoardWorkItemReportRequest,
+    TaskBoardWorkItemReportResponse,
 };
 use crate::daemon::service;
 use crate::task_board::{
@@ -91,6 +92,31 @@ pub(crate) async fn get_item_workflow_progress(
 ) -> Result<TaskBoardWorkflowProgressResponse, CliError> {
     service::get_task_board_workflow_progress_db(
         require_async_db(state, "task board workflow progress get")?,
+        request,
+    )
+    .await
+}
+
+pub(crate) async fn get_item_work_item_progress(
+    state: &DaemonHttpState,
+    item_id: &str,
+) -> Result<TaskBoardWorkItemProgressResponse, CliError> {
+    service::get_task_board_work_item_progress_db(
+        require_async_db(state, "task board work item progress get")?,
+        item_id,
+    )
+    .await
+}
+
+pub(crate) async fn report_item_work_item_progress(
+    state: &DaemonHttpState,
+    item_id: &str,
+    request: &TaskBoardWorkItemReportRequest,
+) -> Result<TaskBoardWorkItemReportResponse, CliError> {
+    service::report_task_board_work_item_progress_db(
+        state,
+        require_async_db(state, "task board work item progress report")?,
+        item_id,
         request,
     )
     .await

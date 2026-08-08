@@ -42,6 +42,18 @@ fn task_board_ws_parity_part_1() -> Vec<(HttpRouteMethod, &'static str, &'static
             true,
         ),
         (
+            HttpRouteMethod::Get,
+            http_paths::TASK_BOARD_ITEM_PROGRESS,
+            ws_methods::TASK_BOARD_PROGRESS_GET,
+            true,
+        ),
+        (
+            HttpRouteMethod::Post,
+            http_paths::TASK_BOARD_ITEM_PROGRESS_REPORT,
+            ws_methods::TASK_BOARD_PROGRESS_REPORT,
+            true,
+        ),
+        (
             HttpRouteMethod::Put,
             http_paths::TASK_BOARD_ITEM,
             ws_methods::TASK_BOARD_UPDATE,

@@ -353,6 +353,22 @@ async fn checkpoints_persist_in_order_across_reports() {
 }
 
 #[tokio::test]
+async fn reading_an_unknown_item_is_refused() {
+    let fixture = fixture().await;
+
+    let error = fixture
+        .db
+        .task_board_work_item_progress("board-missing")
+        .await
+        .expect_err("unknown item must be refused");
+
+    assert!(
+        error.to_string().contains("not found"),
+        "unexpected error: {error}"
+    );
+}
+
+#[tokio::test]
 async fn reading_an_undispatched_item_returns_no_record() {
     let fixture = fixture().await;
     fixture
