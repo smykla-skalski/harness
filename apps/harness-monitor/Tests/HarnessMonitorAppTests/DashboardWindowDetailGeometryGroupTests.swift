@@ -5,47 +5,70 @@ import XCTest
 /// + propagate_dirty). NavigationSplitView's column animation drives 4 body
 /// evals per toggle (intrinsic, route-independent — proven in round 3i), each
 /// of which propagates the animating column width through the detail subtree.
-/// `geometryGroup()` (macOS 14.1+) snapshots the detail's geometry so
+/// `geometryGroup()` (macOS 14.1+) snapshots ordinary detail geometry so
 /// descendants see a stable post-animation size during the column-width
-/// transition, dropping per-frame layout cost for content that does not need
-/// to interpolate. The column animation visual itself runs at the
-/// NavigationSplitView level — geometryGroup on the detail subtree does not
-/// change the column-reveal visual.
+/// transition. Agents is excluded because its nested split must receive the
+/// parent geometry to honor its pane widths.
 @MainActor
 final class DashboardWindowDetailGeometryGroupTests: XCTestCase {
-  func testDetailSubtreeIsolatesGeometryFromColumnAnimation() throws {
-    let source = try dashboardWindowSource()
+  func testOrdinaryDetailSubtreesIsolateGeometryFromColumnAnimation() throws {
+    let source = try dashboardRouteContentSource()
 
     XCTAssertTrue(
-      source.contains(".geometryGroup()"),
-      "DashboardWindowView must wrap its detail subtree in geometryGroup() to "
-        + "isolate descendant layout from the column-width animation"
+      source.contains("DashboardRetainedRouteGeometryIsolation"),
+      "ordinary Dashboard routes must isolate descendant layout from column animation"
     )
   }
 
-  func testGeometryGroupSitsInsideDetailNotOnTheLayout() throws {
+  func testWholeDetailGeometryIsolationIsPreviewOnlyAndStable() throws {
     let source = try dashboardWindowSource()
 
-    // Round 3g proved geometryGroup on the custom Layout (DashboardRetainedRouteLayout)
-    // regresses. Anchor the modifier to the detail-closure scope by requiring it
-    // to follow .navigationSubtitle which only appears in the detail closure body.
-    let detailScope = source.range(of: ".navigationSubtitle(route.navigationSubtitle)")
-    XCTAssertNotNil(detailScope, "Detail-closure anchor missing — test setup drifted")
-    if let detailScope {
-      let tail = String(source[detailScope.upperBound...])
-      let geoIndex = tail.range(of: ".geometryGroup()")
-      let closingBraceIndex = tail.range(of: "}")
-      XCTAssertNotNil(geoIndex, "geometryGroup() must appear after navigationSubtitle")
-      if let geoIndex, let closingBraceIndex {
-        XCTAssertLessThan(
-          geoIndex.lowerBound, closingBraceIndex.lowerBound,
-          "geometryGroup() must sit inside the detail closure, before the closing brace"
-        )
-      }
-    }
+    XCTAssertTrue(source.contains("isolatesWholeDetailGeometry: false"))
+    XCTAssertTrue(
+      source.contains(
+        "DashboardWholeDetailGeometryIsolation(isEnabled: isolatesWholeDetailGeometry)"
+      )
+    )
+  }
+
+  func testAgentsNestedSplitReceivesParentGeometry() throws {
+    let source = try dashboardRouteContentSource()
+    let agentsStart = try XCTUnwrap(
+      source.range(of: "DashboardRetainedAuxiliaryRoute(isVisible: isAgentsVisible)")
+    )
+    let auditStart = try XCTUnwrap(
+      source.range(of: "DashboardRetainedAuxiliaryRoute(isVisible: isAuditVisible)")
+    )
+    let agentsSection = source[agentsStart.lowerBound..<auditStart.lowerBound]
+
+    XCTAssertFalse(
+      agentsSection.contains("DashboardRetainedRouteGeometryIsolation"),
+      "Agents must receive parent geometry so its nested split stays visible"
+    )
+  }
+
+  func testAgentsRouteAcceptsTheFullDashboardDetailProposal() throws {
+    let source = try sourceFile(
+      at: "Views/Agents/DashboardAgentsRouteView.swift"
+    )
+
+    XCTAssertTrue(
+      source.contains(
+        ".frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)"
+      ),
+      "Agents must accept the retained layout's full detail proposal"
+    )
+  }
+
+  private func dashboardRouteContentSource() throws -> String {
+    try sourceFile(at: "Views/Dashboard/DashboardRouteContent.swift")
   }
 
   private func dashboardWindowSource() throws -> String {
+    try sourceFile(at: "Views/Dashboard/DashboardWindowView.swift")
+  }
+
+  private func sourceFile(at path: String) throws -> String {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let repoRoot =
       testsDirectory
@@ -55,8 +78,8 @@ final class DashboardWindowDetailGeometryGroupTests: XCTestCase {
       .deletingLastPathComponent()
     let fileURL =
       repoRoot
-      .appendingPathComponent("apps/harness-monitor/Sources/HarnessMonitorUIPreviewable")
-      .appendingPathComponent("Views/Dashboard/DashboardWindowView.swift")
+        .appendingPathComponent("apps/harness-monitor/Sources/HarnessMonitorUIPreviewable")
+        .appendingPathComponent(path)
     return try String(contentsOf: fileURL, encoding: .utf8)
   }
 }

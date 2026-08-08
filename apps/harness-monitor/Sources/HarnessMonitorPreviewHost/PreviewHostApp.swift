@@ -5,14 +5,25 @@ import SwiftUI
 
 @main
 struct PreviewHostApp: App {
-  private let focusedTaskBoardInspectorDirectory: String?
+  private let focusedPreview: FocusedPreview?
 
   // Render modes stay headless unless a fixture must prove focused system chrome.
   init() {
     let environment = ProcessInfo.processInfo.environment
-    focusedTaskBoardInspectorDirectory =
-      environment["HARNESS_TASK_BOARD_INSPECTOR_PREVIEW_DUMP"]
-    if focusedTaskBoardInspectorDirectory != nil {
+    if let directory = environment["HARNESS_TASK_BOARD_INSPECTOR_PREVIEW_DUMP"] {
+      focusedPreview = .taskBoardInspector(directory)
+    } else if let directory =
+      environment["HARNESS_DASHBOARD_AGENTS_LEGACY_WINDOW_PREVIEW_DUMP"]
+    {
+      focusedPreview = .dashboardAgents(directory, isolatesWholeDetailGeometry: true)
+    } else if let directory =
+      environment["HARNESS_DASHBOARD_AGENTS_NATIVE_WINDOW_PREVIEW_DUMP"]
+    {
+      focusedPreview = .dashboardAgents(directory, isolatesWholeDetailGeometry: false)
+    } else {
+      focusedPreview = nil
+    }
+    if focusedPreview != nil {
       NSApplication.shared.setActivationPolicy(.regular)
       return
     }
@@ -91,13 +102,17 @@ struct PreviewHostApp: App {
 
   var body: some Scene {
     WindowGroup("Harness Monitor Previews") {
-      if let focusedTaskBoardInspectorDirectory {
-        FocusedTaskBoardInspectorPreviewHost(
-          outputDirectory: focusedTaskBoardInspectorDirectory
-        )
-      } else {
+      switch focusedPreview {
+      case nil:
         PreviewHostContentView()
           .frame(minWidth: 900, minHeight: 600)
+      case .dashboardAgents(let directory, let isolatesWholeDetailGeometry):
+        FocusedDashboardAgentsPreviewHost(
+          outputDirectory: directory,
+          isolatesWholeDetailGeometry: isolatesWholeDetailGeometry
+        )
+      case .taskBoardInspector(let directory):
+        FocusedTaskBoardInspectorPreviewHost(outputDirectory: directory)
       }
     }
   }
@@ -108,6 +123,24 @@ struct PreviewHostApp: App {
   ]
 }
 
+private struct FocusedDashboardAgentsPreviewHost: View {
+  let outputDirectory: String
+  let isolatesWholeDetailGeometry: Bool
+
+  var body: some View {
+    Color.clear
+      .frame(width: 1, height: 1)
+      .task {
+        await Task.yield()
+        FocusedPreview.dashboardAgents(
+          outputDirectory,
+          isolatesWholeDetailGeometry: isolatesWholeDetailGeometry
+        )
+        .renderAndExit()
+      }
+  }
+}
+
 private struct FocusedTaskBoardInspectorPreviewHost: View {
   let outputDirectory: String
 
@@ -116,16 +149,44 @@ private struct FocusedTaskBoardInspectorPreviewHost: View {
       .frame(width: 1, height: 1)
       .task {
         await Task.yield()
-        let succeeded = await MainActor.run {
-          TaskBoardInspectorPreviewRenderer.dump(toDirectory: outputDirectory)
-        }
-        let completionURL = URL(fileURLWithPath: outputDirectory)
-          .appendingPathComponent(".focused-preview-render-complete")
-        let recordedCompletion =
-          succeeded
-          && (try? Data("complete\n".utf8).write(to: completionURL, options: .atomic)) != nil
-        exit(recordedCompletion ? 0 : 1)
+        FocusedPreview.taskBoardInspector(outputDirectory).renderAndExit()
       }
+  }
+}
+
+private enum FocusedPreview {
+  case dashboardAgents(String, isolatesWholeDetailGeometry: Bool)
+  case taskBoardInspector(String)
+
+  var outputDirectory: String {
+    switch self {
+    case .dashboardAgents(let directory, _), .taskBoardInspector(let directory):
+      directory
+    }
+  }
+
+  @MainActor
+  func dump() -> Bool {
+    switch self {
+    case .dashboardAgents(let directory, let isolatesWholeDetailGeometry):
+      DashboardAgentsWindowLayoutPreviewRenderer.dump(
+        toDirectory: directory,
+        isolatesWholeDetailGeometry: isolatesWholeDetailGeometry
+      )
+    case .taskBoardInspector(let directory):
+      TaskBoardInspectorPreviewRenderer.dump(toDirectory: directory)
+    }
+  }
+
+  @MainActor
+  func renderAndExit() {
+    let succeeded = dump()
+    let completionURL = URL(fileURLWithPath: outputDirectory)
+      .appendingPathComponent(".focused-preview-render-complete")
+    let recordedCompletion =
+      succeeded
+      && (try? Data("complete\n".utf8).write(to: completionURL, options: .atomic)) != nil
+    exit(recordedCompletion ? 0 : 1)
   }
 }
 

@@ -89,6 +89,82 @@ struct DashboardAgentsRouteStateTests {
     #expect(!cachedState.viewState.presentsAsFullWidthState)
   }
 
+  @Test("Background refresh preserves the presented state until completion")
+  func backgroundRefreshPreservesPresentedState() throws {
+    let presented = DashboardAgentBrowserViewState(
+      hasAttemptedLoad: true,
+      source: .cache,
+      issue: .offline("No connection"),
+      cachedAt: .now,
+      refreshedAt: .now
+    )
+    let state = DashboardAgentsRouteState(viewState: presented)
+
+    let generation = try #require(
+      state.beginLoad(force: false, presentation: .background)
+    )
+
+    #expect(state.viewState == presented)
+    #expect(state.beginLoad(force: false, presentation: .background) == nil)
+
+    state.finishLoad(
+      DashboardAgentRefreshResult(
+        agents: [],
+        source: .live,
+        issue: nil,
+        refreshedAt: .now
+      ),
+      generation: generation
+    )
+    #expect(state.viewState.issue == nil)
+    #expect(state.viewState.source == .live)
+    #expect(!state.viewState.isLoading)
+  }
+
+  @Test("Agents nested split receives parent geometry without measured widths")
+  func agentsNestedSplitUsesNativeGeometry() throws {
+    let dashboardSource = try previewableSourceFile(
+      domain: "Dashboard",
+      named: "DashboardWindowView.swift"
+    )
+    let layoutSource = try previewableSourceFile(
+      domain: "Sessions",
+      named: "SessionWindowStandardLayout.swift"
+    )
+    let routeContentSource = try previewableSourceFile(
+      domain: "Dashboard",
+      named: "DashboardRouteContent.swift"
+    )
+    let headerSource = try previewableSourceFile(
+      domain: "Agents",
+      named: "DashboardAgentsRouteHeader.swift"
+    )
+
+    #expect(
+      dashboardSource.contains(
+        "DashboardWholeDetailGeometryIsolation(isEnabled: isolatesWholeDetailGeometry)"
+      )
+    )
+    let agentsStart = try #require(
+      routeContentSource.range(of: "DashboardRetainedAuxiliaryRoute(isVisible: isAgentsVisible)")
+    )
+    let auditStart = try #require(
+      routeContentSource.range(of: "DashboardRetainedAuxiliaryRoute(isVisible: isAuditVisible)")
+    )
+    let agentsSection = routeContentSource[agentsStart.lowerBound..<auditStart.lowerBound]
+    #expect(!agentsSection.contains("DashboardRetainedRouteGeometryIsolation"))
+    #expect(routeContentSource.contains("DashboardRetainedRouteGeometryIsolation"))
+    #expect(
+      layoutSource.contains(
+        ".navigationSplitViewColumnWidth(min: 190, ideal: sidebarWidth, max: 360)"
+      )
+    )
+    #expect(layoutSource.contains(".navigationSplitViewStyle(.prominentDetail)"))
+    #expect(headerSource.contains("ViewThatFits(in: .horizontal)"))
+    #expect(!headerSource.contains("onGeometryChange"))
+    #expect(!headerSource.contains("availableControlsWidth"))
+  }
+
   @Test("Late refresh cannot replace a newer workspace snapshot")
   func lateRefreshCannotReplaceNewerSnapshot() throws {
     let state = DashboardAgentsRouteState()

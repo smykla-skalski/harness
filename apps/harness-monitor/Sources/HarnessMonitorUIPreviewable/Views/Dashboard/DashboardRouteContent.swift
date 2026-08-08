@@ -56,6 +56,7 @@ struct DashboardRouteContent: View, Equatable {
       .opacity(isTaskBoardVisible ? 1 : 0)
       .allowsHitTesting(isTaskBoardVisible)
       .accessibilityHidden(!isTaskBoardVisible)
+      .modifier(DashboardRetainedRouteGeometryIsolation())
 
       DashboardRetainedAuxiliaryRoute(isVisible: isAgentsVisible) {
         DashboardAgentsRouteView(
@@ -74,6 +75,7 @@ struct DashboardRouteContent: View, Equatable {
           history: history
         )
       }
+      .modifier(DashboardRetainedRouteGeometryIsolation())
       .layoutValue(key: DashboardRetainedRouteKey.self, value: .audit)
 
       DashboardRetainedAuxiliaryRoute(isVisible: isPolicyCanvasVisible) {
@@ -85,6 +87,7 @@ struct DashboardRouteContent: View, Equatable {
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
       }
+      .modifier(DashboardRetainedRouteGeometryIsolation())
       .layoutValue(key: DashboardRetainedRouteKey.self, value: .policyCanvas)
 
       DashboardRetainedAuxiliaryRoute(isVisible: isDiagnosticsVisible) {
@@ -93,11 +96,13 @@ struct DashboardRouteContent: View, Equatable {
           selectedRoute: route
         )
       }
+      .modifier(DashboardRetainedRouteGeometryIsolation())
       .layoutValue(key: DashboardRetainedRouteKey.self, value: .diagnostics)
 
       DashboardRetainedAuxiliaryRoute(isVisible: isDebuggingVisible) {
         DashboardDebuggingRouteView()
       }
+      .modifier(DashboardRetainedRouteGeometryIsolation())
       .layoutValue(key: DashboardRetainedRouteKey.self, value: .debugging)
 
       // Reviews intentionally leaves the tree when its route closes so its
@@ -108,6 +113,7 @@ struct DashboardRouteContent: View, Equatable {
           selectedRoute: $selectedRoute,
           searchAutomationCommand: reviewsSearchAutomation
         )
+        .modifier(DashboardRetainedRouteGeometryIsolation())
         .layoutValue(key: DashboardRetainedRouteKey.self, value: .reviews)
       }
     }
@@ -117,6 +123,12 @@ struct DashboardRouteContent: View, Equatable {
         searchAutomationCommand: $reviewsSearchAutomationCommand
       )
     )
+  }
+}
+
+private struct DashboardRetainedRouteGeometryIsolation: ViewModifier {
+  func body(content: Content) -> some View {
+    content.geometryGroup()
   }
 }
 

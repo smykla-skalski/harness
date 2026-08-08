@@ -6,6 +6,7 @@ public struct DashboardWindowView: View {
   public let dashboardUI: HarnessMonitorStore.ContentDashboardSlice
   public let sessionCatalog: HarnessMonitorStore.SessionCatalogSlice
   public let history: GlobalWindowNavigationHistory
+  let isolatesWholeDetailGeometry: Bool
   @AppStorage(HarnessMonitorMCPSettingsDefaults.registryHostEnabledKey)
   var mcpRegistryHostEnabled = HarnessMonitorMCPSettingsDefaults.registryHostEnabledDefault
   @AppStorage(DashboardRouteRestorationDefaults.storageKey)
@@ -42,9 +43,26 @@ public struct DashboardWindowView: View {
     sessionCatalog: HarnessMonitorStore.SessionCatalogSlice,
     history: GlobalWindowNavigationHistory? = nil
   ) {
+    self.init(
+      store: store,
+      dashboardUI: dashboardUI,
+      sessionCatalog: sessionCatalog,
+      history: history,
+      isolatesWholeDetailGeometry: false
+    )
+  }
+
+  init(
+    store: HarnessMonitorStore,
+    dashboardUI: HarnessMonitorStore.ContentDashboardSlice,
+    sessionCatalog: HarnessMonitorStore.SessionCatalogSlice,
+    history: GlobalWindowNavigationHistory? = nil,
+    isolatesWholeDetailGeometry: Bool
+  ) {
     self.store = store
     self.dashboardUI = dashboardUI
     self.sessionCatalog = sessionCatalog
+    self.isolatesWholeDetailGeometry = isolatesWholeDetailGeometry
     self.history =
       history
       ?? GlobalWindowNavigationHistory(
@@ -207,15 +225,7 @@ public struct DashboardWindowView: View {
         }
         .navigationTitle(route.navigationTitle)
         .navigationSubtitle(route.navigationSubtitle)
-        // Isolate the detail subtree's geometry from the parent column-width
-        // animation: NavigationSplitView drives 4 body evals per toggle and
-        // propagates intermediate column widths through descendant layout each
-        // frame, dominating the trace's AttributeGraph hot symbols (find1<A>,
-        // propagate_dirty, UpdateStack.update). geometryGroup snapshots the
-        // detail's geometry so descendants see a stable size during the
-        // transition; the column-reveal visual itself runs at the
-        // NavigationSplitView level and is unchanged.
-        .geometryGroup()
+        .modifier(DashboardWholeDetailGeometryIsolation(isEnabled: isolatesWholeDetailGeometry))
         .toolbar {
           DashboardWindowToolbar(
             store: store,
@@ -283,5 +293,18 @@ public struct DashboardWindowView: View {
     }
     await Task.yield()
     history.finishDashboardRestoreRequest(request.requestID)
+  }
+}
+
+private struct DashboardWholeDetailGeometryIsolation: ViewModifier {
+  let isEnabled: Bool
+
+  @ViewBuilder
+  func body(content: Content) -> some View {
+    if isEnabled {
+      content.geometryGroup()
+    } else {
+      content
+    }
   }
 }

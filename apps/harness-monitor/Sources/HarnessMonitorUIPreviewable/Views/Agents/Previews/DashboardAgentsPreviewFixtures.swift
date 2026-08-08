@@ -73,6 +73,11 @@ enum DashboardAgentsPreviewFixtures {
     issue: .offline("Daemon is offline"),
     cachedAt: Date(timeIntervalSince1970: 1_785_663_600)
   )
+  @MainActor static var offlineBackgroundRefreshState: DashboardAgentBrowserViewState {
+    let routeState = DashboardAgentsRouteState(viewState: offlineState)
+    _ = routeState.beginLoad(force: false, presentation: .background)
+    return routeState.viewState
+  }
   static let failureState = DashboardAgentBrowserViewState(
     hasAttemptedLoad: true,
     source: .live,
