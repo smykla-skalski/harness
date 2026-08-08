@@ -47,8 +47,8 @@ pub(crate) struct TaskBoardDispatchPreparation {
     /// preparation retries onto the same directory rather than a second one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) working_copy_id: Option<String>,
-    /// Workspace that checkout turned out to belong to. Unknown at reservation
-    /// - the id is derived from the checkout's own git identity - so
+    /// Workspace that checkout turned out to belong to. The id derives from the
+    /// checkout's own git identity, so it is unknown at reservation and
     /// preparation fills it in before publishing the intent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) workspace_id: Option<String>,

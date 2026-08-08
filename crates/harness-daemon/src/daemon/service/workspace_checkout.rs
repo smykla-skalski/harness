@@ -3,10 +3,9 @@
 //! This is the Session-free half of what `session_setup::prepare_session` does:
 //! resolve the origin, make a linked worktree, and discover the project the
 //! worker will actually run in. What it deliberately does *not* do is write
-//! `state.json`, register an active Session, or touch the sessions tree at all
-//! - the checkout lives under `<data-root>/working-copies/`, because the
-//! startup orphan sweep deletes anything under `sessions/` that has no
-//! `state.json`.
+//! `state.json`, register an active Session, or touch the sessions tree at all.
+//! The checkout lives under `<data-root>/working-copies/`, because the startup
+//! orphan sweep deletes anything under `sessions/` that has no `state.json`.
 
 use std::fs;
 use std::path::{Path, PathBuf};
