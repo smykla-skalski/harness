@@ -121,8 +121,8 @@ struct LegacyManagedLaunchAgentCleanupTests {
     #expect(stored.sorted() == legacy.sorted())
   }
 
-  @Test("Failed unregister disables the current service and retries next launch")
-  func failedUnregisterDisablesCurrentServiceAndRetries() throws {
+  @Test("Failed unregister disables the current service and remains retryable")
+  func failedUnregisterDisablesCurrentServiceAndRemainsRetryable() throws {
     let suiteName =
       "io.harnessmonitor.kit-tests.legacy-cleanup.\(UUID().uuidString)"
     let defaults = try #require(UserDefaults(suiteName: suiteName))
@@ -132,7 +132,10 @@ struct LegacyManagedLaunchAgentCleanupTests {
     var currentServiceUnregisterCount = 0
     let firstResult = LegacyManagedLaunchAgentCleanup.runOnce(defaults: defaults) { name in
       if name == HarnessMonitorPaths.launchAgentPlistName {
-        return LegacyLaunchAgentManagerStub(state: .enabled) {
+        return LegacyLaunchAgentManagerStub(
+          state: .enabled,
+          unregisterFails: true
+        ) {
           currentServiceUnregisterCount += 1
         }
       }
@@ -147,20 +150,21 @@ struct LegacyManagedLaunchAgentCleanupTests {
       ) ?? []
     #expect(completedAfterFailure.isEmpty)
 
-    var retriedInSameProcess = false
-    let cachedResult = LegacyManagedLaunchAgentCleanup.runOnce(defaults: defaults) { _ in
-      retriedInSameProcess = true
+    var sameProcessRetryCount = 0
+    let retryResult = LegacyManagedLaunchAgentCleanup.runOnce(defaults: defaults) { _ in
+      sameProcessRetryCount += 1
       return LegacyLaunchAgentManagerStub(state: .notRegistered)
     }
-    #expect(cachedResult == false)
-    #expect(retriedInSameProcess == false)
-
-    LegacyManagedLaunchAgentCleanup.resetForTests()
-    let retryResult = LegacyManagedLaunchAgentCleanup.runOnce(defaults: defaults) { _ in
-      LegacyLaunchAgentManagerStub(state: .notRegistered)
-    }
-
     #expect(retryResult)
+    #expect(sameProcessRetryCount > 0)
+
+    var calledAfterSuccess = false
+    let cachedSuccess = LegacyManagedLaunchAgentCleanup.runOnce(defaults: defaults) { _ in
+      calledAfterSuccess = true
+      return LegacyLaunchAgentManagerStub(state: .enabled)
+    }
+    #expect(cachedSuccess)
+    #expect(calledAfterSuccess == false)
     let completedAfterRetry =
       defaults.stringArray(
         forKey: LegacyManagedLaunchAgentCleanup.completedNamesDefaultsKey

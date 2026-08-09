@@ -61,11 +61,12 @@ public enum LegacyManagedLaunchAgentCleanup {
   static let strategyVersionDefaultsKey =
     "HarnessMonitor.LegacyLaunchAgentCleanup.StrategyVersion"
   static let strategyVersion = 2
+  static let failureMessage =
+    "Legacy daemon cleanup failed; daemon startup remains disabled to prevent duplicate automation"
   private static let lock = NSLock()
-  nonisolated(unsafe) private static var cachedResult: Bool?
+  nonisolated(unsafe) private static var didComplete = false
 
-  /// Runs once per process and returns whether every legacy registration was
-  /// removed. A failed result remains retryable on the next app launch.
+  /// Retries failed cleanup calls and caches success for the process lifetime.
   @discardableResult
   public static func runOnce(
     defaults: UserDefaults = .standard,
@@ -75,12 +76,18 @@ public enum LegacyManagedLaunchAgentCleanup {
   ) -> Bool {
     lock.lock()
     defer { lock.unlock() }
-    if let cachedResult {
-      return cachedResult
+    if didComplete {
+      return true
     }
     let result = performCleanup(defaults: defaults, managerFactory: managerFactory)
-    cachedResult = result
+    didComplete = result
     return result
+  }
+
+  public static func requireComplete() throws {
+    guard runOnce() else {
+      throw DaemonControlError.commandFailed(failureMessage)
+    }
   }
 
   private static func performCleanup(
@@ -136,9 +143,9 @@ public enum LegacyManagedLaunchAgentCleanup {
 
   /// Test-only escape hatch: clears the once-guard so a unit test can verify
   /// the runOnce path more than once in the same process.
-  public static func resetForTests() {
+  static func resetForTests() {
     lock.lock()
-    cachedResult = nil
+    didComplete = false
     lock.unlock()
   }
 
@@ -159,7 +166,10 @@ public enum LegacyManagedLaunchAgentCleanup {
       )
     } catch {
       HarnessMonitorLogger.lifecycle.fault(
-        "Could not disable current SMAppService \(name, privacy: .public): \(error.localizedDescription, privacy: .public)"
+        """
+        Could not disable current SMAppService \(name, privacy: .public): \
+        \(error.localizedDescription, privacy: .public)
+        """
       )
     }
   }

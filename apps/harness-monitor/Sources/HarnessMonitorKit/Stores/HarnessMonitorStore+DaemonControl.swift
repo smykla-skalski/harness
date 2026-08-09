@@ -39,25 +39,12 @@ extension HarnessMonitorStore {
   }
 
   func ensureManagedLaunchAgentReady() async throws -> DaemonLaunchAgentRegistrationState {
-    guard LegacyManagedLaunchAgentCleanup.runOnce() else {
-      throw DaemonControlError.commandFailed(Self.legacyDaemonCleanupFailureMessage)
-    }
+    try LegacyManagedLaunchAgentCleanup.requireComplete()
     var registrationState = await daemonController.launchAgentRegistrationState()
     if registrationState == .notRegistered || registrationState == .notFound {
       registrationState = try await daemonController.registerLaunchAgent()
     }
     return registrationState
-  }
-
-  private static let legacyDaemonCleanupFailureMessage =
-    "Legacy daemon cleanup failed; the current daemon remains disabled to prevent duplicate automation"
-
-  func requireLegacyManagedLaunchAgentCleanup() async -> Bool {
-    guard LegacyManagedLaunchAgentCleanup.runOnce() else {
-      await applyLaunchAgentOfflineState(reason: Self.legacyDaemonCleanupFailureMessage)
-      return false
-    }
-    return true
   }
 
   /// Once per app launch, tear down and re-register the bundled SMAppService
