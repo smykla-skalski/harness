@@ -343,9 +343,7 @@ impl AgentTuiManagerHandle {
         !stop_flag.load(Ordering::Relaxed)
     }
 
-    pub(super) fn live_refresh_retry_delay(
-        current: std::time::Duration,
-    ) -> std::time::Duration {
+    pub(super) fn live_refresh_retry_delay(current: std::time::Duration) -> std::time::Duration {
         (current * 2).min(LIVE_REFRESH_RETRY_LIMIT)
     }
 
@@ -391,11 +389,7 @@ impl AgentTuiManagerHandle {
         clippy::cognitive_complexity,
         reason = "tracing macro expansion in a leaf logging helper"
     )]
-    pub(super) fn log_live_refresh_failure(
-        tui_id: &str,
-        error: &CliError,
-        failure_count: u32,
-    ) {
+    pub(super) fn log_live_refresh_failure(tui_id: &str, error: &CliError, failure_count: u32) {
         if failure_count == 1 {
             tracing::warn!(tui_id = %tui_id, %error, "terminal agent live refresh failed");
         } else {

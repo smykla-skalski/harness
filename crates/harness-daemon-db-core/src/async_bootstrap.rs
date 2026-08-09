@@ -106,11 +106,7 @@ async fn migration_effect_observed(
         return table_exists(pool, "task_board_work_item_progress").await;
     }
     if migration_version == 82 {
-        return index_exists(
-            pool,
-            "idx_task_board_dispatch_intents_recovery",
-        )
-        .await;
+        return index_exists(pool, "idx_task_board_dispatch_intents_recovery").await;
     }
     let Some((table, column)) = migration_effect_column(migration_version) else {
         return Ok(false);
