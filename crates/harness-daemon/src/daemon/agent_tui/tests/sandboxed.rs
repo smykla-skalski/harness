@@ -1,4 +1,11 @@
+use std::collections::BTreeMap;
+use std::io::ErrorKind;
+use std::os::unix::net::UnixListener;
+use std::panic::{AssertUnwindSafe, catch_unwind, resume_unwind};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
+use std::thread;
+use std::time::Duration;
 
 use tokio::sync::broadcast;
 
@@ -6,9 +13,13 @@ use crate::daemon::agent_tui::{
     ActiveAgentTui, AgentTuiManagerHandle, AgentTuiSize, AgentTuiSnapshot, AgentTuiStartRequest,
     AgentTuiStatus, TerminalScreenSnapshot,
 };
+use crate::daemon::bridge::{
+    BRIDGE_CAPABILITY_AGENT_TUI, BridgeState, acquire_bridge_lock_exclusive, bridge_state_path,
+};
 use crate::daemon::db::DaemonDb;
 use crate::daemon::db::prelude::*;
 use crate::daemon::db_handle::DaemonDbOwnedHandle;
+use crate::daemon::state::HostBridgeCapabilityManifest;
 use crate::session::service as session_service;
 use crate::session::types::SessionRole;
 use crate::workspace::utc_now;
@@ -48,6 +59,135 @@ fn sandboxed_bridge_snapshot_preserves_durable_workspace_owner() {
     assert_eq!(normalized.workspace_id.as_deref(), Some("workspace-owner"));
     assert_eq!(normalized.session_id, "workspace-owner");
     assert!(normalized.agent_id.is_empty());
+}
+
+#[test]
+fn sandboxed_list_returns_an_active_cached_snapshot_without_bridge_rpc() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let daemon_home = tmp.path().join("daemon-home");
+    let host_home = tmp.path().join("host-home");
+    fs_err::create_dir_all(&host_home).expect("host home");
+    temp_env::with_vars(
+        [
+            ("HARNESS_DAEMON_DATA_HOME", daemon_home.to_str()),
+            ("HARNESS_APP_GROUP_ID", None),
+            ("XDG_DATA_HOME", None),
+            ("HARNESS_HOST_HOME", host_home.to_str()),
+            ("HOME", host_home.to_str()),
+        ],
+        || {
+            with_counting_fake_bridge(&tmp, |rpc_count| {
+                assert_sandboxed_list_uses_cached_snapshot(&tmp, &rpc_count);
+            });
+        },
+    );
+}
+
+fn assert_sandboxed_list_uses_cached_snapshot(tmp: &tempfile::TempDir, rpc_count: &AtomicUsize) {
+    let db = DaemonDbOwnedHandle(DaemonDb::open_in_memory().expect("open db"));
+    let project = crate::daemon::index::DiscoveredProject {
+        project_id: "project-list-test".into(),
+        name: "project".into(),
+        project_dir: Some(tmp.path().join("project")),
+        repository_root: Some(tmp.path().join("project")),
+        checkout_id: "checkout-list-test".into(),
+        checkout_name: "Directory".into(),
+        context_root: tmp.path().join("context-root"),
+        is_worktree: false,
+        worktree_name: None,
+    };
+    db.sync_project(&project).expect("sync project");
+    let session = session_service::build_new_session(
+        "list test",
+        "list test",
+        "6bb2d489-b2ac-5b23-a08c-f9cb6d3d1aaf",
+        "claude",
+        None,
+        &utc_now(),
+    );
+    db.sync_session(&project.project_id, &session)
+        .expect("sync session");
+    let snapshot = sample_snapshot(
+        "agent-tui-list-test",
+        &session.session_id,
+        "agent-list-test",
+        "codex",
+        "2026-08-09T10:00:00Z",
+        "2026-08-09T10:00:01Z",
+    );
+    db.save_agent_tui(&snapshot).expect("save cached snapshot");
+    let db_slot = Arc::new(OnceLock::new());
+    db_slot
+        .set(Arc::new(Mutex::new(db)))
+        .expect("install test db");
+    let (sender, _) = broadcast::channel(8);
+    let manager = AgentTuiManagerHandle::new(sender, db_slot, true);
+    manager
+        .active()
+        .expect("active map")
+        .insert(snapshot.tui_id.clone(), ActiveAgentTui::new(None));
+
+    let listed = manager.list(&session.session_id).expect("list cached TUI");
+
+    assert_eq!(listed.tuis, vec![snapshot]);
+    assert_eq!(rpc_count.load(Ordering::Relaxed), 0);
+}
+
+fn with_counting_fake_bridge(tmp: &tempfile::TempDir, operation: impl FnOnce(Arc<AtomicUsize>)) {
+    let socket_path = tmp.path().join("bridge.sock");
+    let listener = UnixListener::bind(&socket_path).expect("bind fake bridge");
+    listener
+        .set_nonblocking(true)
+        .expect("make fake bridge nonblocking");
+    let token_path = tmp.path().join("bridge.token");
+    fs_err::write(&token_path, "test-token\n").expect("write bridge token");
+    let _bridge_lock = acquire_bridge_lock_exclusive().expect("hold bridge lock");
+    let bridge_state = BridgeState {
+        socket_path: socket_path.display().to_string(),
+        pid: std::process::id(),
+        started_at: "2026-08-09T10:00:00Z".into(),
+        token_path: token_path.display().to_string(),
+        capabilities: BTreeMap::from([(
+            BRIDGE_CAPABILITY_AGENT_TUI.into(),
+            HostBridgeCapabilityManifest {
+                enabled: true,
+                healthy: true,
+                transport: "unix".into(),
+                endpoint: Some(socket_path.display().to_string()),
+                metadata: BTreeMap::new(),
+            },
+        )]),
+    };
+    fs_err::write(
+        bridge_state_path(),
+        serde_json::to_vec(&bridge_state).expect("serialize bridge state"),
+    )
+    .expect("write bridge state");
+
+    let stop_server = Arc::new(AtomicBool::new(false));
+    let rpc_count = Arc::new(AtomicUsize::new(0));
+    let server_stop = Arc::clone(&stop_server);
+    let server_count = Arc::clone(&rpc_count);
+    let server = thread::spawn(move || {
+        while !server_stop.load(Ordering::Relaxed) {
+            match listener.accept() {
+                Ok((stream, _)) => {
+                    server_count.fetch_add(1, Ordering::Relaxed);
+                    drop(stream);
+                }
+                Err(error) if error.kind() == ErrorKind::WouldBlock => {
+                    thread::sleep(Duration::from_millis(2));
+                }
+                Err(error) => panic!("accept fake bridge request: {error}"),
+            }
+        }
+    });
+    let operation_result = catch_unwind(AssertUnwindSafe(|| operation(Arc::clone(&rpc_count))));
+    stop_server.store(true, Ordering::Relaxed);
+    server.join().expect("join fake bridge");
+    if let Err(payload) = operation_result {
+        resume_unwind(payload);
+    }
 }
 
 #[test]

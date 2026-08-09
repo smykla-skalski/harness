@@ -46,17 +46,26 @@ async fn reconcile_interactive_worker(
     db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
     recovery: &TaskBoardAdmissionWorkerRecovery,
 ) -> Result<(), CliError> {
-    if db.agent_tui(&recovery.managed_worker_id).await?.is_none()
-        && db
+    let snapshot = if let Some(snapshot) = db.agent_tui(&recovery.managed_worker_id).await? {
+        Some(snapshot)
+    } else {
+        if db
             .reconcile_missing_task_board_admission_worker(recovery, MISSING_WORKER_RECOVERY_REASON)
             .await?
             .is_some()
-    {
+        {
+            return Ok(());
+        }
+        db.agent_tui(&recovery.managed_worker_id).await?
+    };
+    let Some(snapshot) = snapshot else {
         return Ok(());
-    }
-    if db.agent_tui(&recovery.managed_worker_id).await?.is_none() {
-        return Ok(());
-    }
+    };
+    recover_same_applied_worker(
+        ManagedAgentSnapshot::Terminal(snapshot),
+        &recovery.dispatch,
+        &recovery.managed_worker_id,
+    )?;
     join_worker_to_workspace(db, &recovery.dispatch, &recovery.managed_worker_id).await?;
     let worker_id = recovery.managed_worker_id.clone();
     let workspace_id = recovery.dispatch.workspace_id.clone();

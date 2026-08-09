@@ -79,15 +79,14 @@ impl AgentTuiManagerHandle {
         }
 
         let previous = snapshot.clone();
-        let refreshed = if self.is_tui_active(&snapshot.tui_id)? {
-            match self.refresh_live_snapshot(snapshot) {
-                Ok(refreshed) => refreshed,
-                Err(error) if self.state.sandboxed => {
-                    Self::warn_live_refresh_failure(&previous.tui_id, &error);
-                    previous.clone()
-                }
-                Err(error) => return Err(error),
-            }
+        let is_active = self.is_tui_active(&snapshot.tui_id)?;
+        let refreshed = if self.state.sandboxed && is_active {
+            // The background refresh owns bridge liveness. A request-coupled
+            // list must stay a local read: one unavailable bridge otherwise
+            // costs the caller five seconds for every cached terminal.
+            snapshot
+        } else if is_active {
+            self.refresh_live_snapshot(snapshot)?
         } else {
             Self::orphaned_inactive_snapshot(snapshot)
         };

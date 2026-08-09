@@ -1,12 +1,14 @@
-use crate::daemon::db::task_board::prelude::*;
+use crate::daemon::db::{TaskBoardAdmissionWorkerRecovery, task_board::prelude::*};
 use crate::task_board::{AgentMode, TaskBoardWorkItemState};
 use harness_daemon_managed_agents::{AgentTuiStatus, AsyncAgentTuiStorage};
 
 use super::managed_worker_id;
-use super::restart_recovery::reconcile_interactive_workers_after_restart;
+use super::restart_recovery::{
+    reconcile_interactive_workers, reconcile_interactive_workers_after_restart,
+};
 use super::test_support::{
-    applied_task, seed_owner_session, seed_workspace_owner, terminal_snapshot, test_http_state,
-    test_http_state_with_sandboxed,
+    applied_task, seed_owner_session, seed_session, seed_workspace_owner, terminal_snapshot,
+    test_http_state, test_http_state_with_sandboxed,
 };
 
 const INTENT_ID: &str = "dispatch-interactive-restart";
@@ -207,6 +209,66 @@ async fn restart_defers_a_session_owned_worker_until_the_bridge_returns() {
         },
     ))
     .await;
+}
+
+#[tokio::test]
+async fn restart_rejects_a_legacy_terminal_owned_by_another_session_before_joining_it() {
+    let state = test_http_state_with_sandboxed(true);
+    let db = state.async_db.get().cloned().expect("test async db");
+    let mut applied = applied_task(AgentMode::Interactive);
+    applied.workspace_id = Some(WORKSPACE_ID.into());
+    applied.working_copy_id = Some(WORKING_COPY_ID.into());
+    applied.item.session_id.clone_from(&applied.session_id);
+    applied.item.workspace_id = applied.workspace_id.clone();
+    applied.item.working_copy_id = applied.working_copy_id.clone();
+    applied.item.work_item_id = Some(applied.work_item_id.clone());
+    let worker_id = managed_worker_id(&applied, INTENT_ID);
+    seed_owner_session(&db, &applied).await;
+    seed_session(&db, "different-session").await;
+    seed_workspace(&db).await;
+    seed_dispatch(&db, &applied, &worker_id).await;
+    let mut snapshot = terminal_snapshot(AgentTuiStatus::Running, "different-session");
+    snapshot.tui_id.clone_from(&worker_id);
+    db.save_agent_tui(&snapshot)
+        .await
+        .expect("persist conflicting legacy runtime");
+    let recovery = TaskBoardAdmissionWorkerRecovery {
+        managed_worker_id: worker_id.clone(),
+        intent_id: INTENT_ID.into(),
+        item_id: applied.board_item_id.clone(),
+        session_id: applied.session_id.clone(),
+        task_id: applied.work_item_id.clone(),
+        workflow_execution_id: applied
+            .item
+            .workflow
+            .execution_id
+            .clone()
+            .expect("execution"),
+        dispatch: applied,
+    };
+
+    let error = reconcile_interactive_workers(&state, &db, &[recovery])
+        .await
+        .expect_err("cross-Session recovery must fail before workspace adoption");
+
+    assert_eq!(error.code(), "KSRCLI092");
+    let preserved = db
+        .agent_tui(&worker_id)
+        .await
+        .expect("load conflicting runtime")
+        .expect("runtime remains durable");
+    assert_eq!(preserved.session_id, "different-session");
+    assert!(preserved.workspace_id.is_none());
+    let members: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM agent_workspace_members
+         WHERE workspace_id = ?1 AND managed_agent_id = ?2",
+    )
+    .bind(WORKSPACE_ID)
+    .bind(&worker_id)
+    .fetch_one(db.pool())
+    .await
+    .expect("count workspace members");
+    assert_eq!(members, 0);
 }
 
 async fn seed_workspace(db: &crate::daemon::db_handle::AsyncDaemonDbHandle) {

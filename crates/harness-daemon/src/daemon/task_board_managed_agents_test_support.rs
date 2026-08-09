@@ -168,7 +168,7 @@ pub(super) async fn seed_session(
     })
     .to_string();
     sqlx::query(
-        "INSERT INTO projects (
+        "INSERT OR IGNORE INTO projects (
              project_id, name, checkout_id, checkout_name, context_root,
              is_worktree, discovered_at, updated_at
          ) VALUES ('project-1', 'harness', 'checkout-1', 'main',
