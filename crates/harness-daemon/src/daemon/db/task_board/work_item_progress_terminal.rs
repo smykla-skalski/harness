@@ -88,7 +88,7 @@ pub(super) async fn project_task_board_runtime_terminal_for_attempt(
     Ok(changed)
 }
 
-async fn project_exact_runtime_terminal_in_tx(
+pub(in crate::daemon::db::task_board) async fn project_exact_runtime_terminal_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     board_item_id: &str,
     work_item_id: &str,

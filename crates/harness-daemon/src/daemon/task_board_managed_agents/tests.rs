@@ -297,16 +297,22 @@ fn worker_identity_is_stable_for_reclaimed_dispatch_claims() {
 
 #[test]
 fn terminal_and_failed_same_session_workers_are_recovered() {
-    let snapshots = [
-        ManagedAgentSnapshot::Terminal(terminal_snapshot(AgentTuiStatus::Stopped, "session-1")),
-        ManagedAgentSnapshot::Codex(codex_snapshot(CodexRunStatus::Failed, "session-1")),
+    let recoveries = [
+        (
+            AgentMode::Interactive,
+            ManagedAgentSnapshot::Terminal(terminal_snapshot(AgentTuiStatus::Stopped, "session-1")),
+        ),
+        (
+            AgentMode::Headless,
+            ManagedAgentSnapshot::Codex(codex_snapshot(CodexRunStatus::Failed, "session-1")),
+        ),
     ];
 
-    for snapshot in snapshots {
+    for (mode, snapshot) in recoveries {
         let expected_id = snapshot.agent_id().to_string();
-        let applied = applied_task(AgentMode::Headless);
+        let applied = applied_task(mode);
         let recovered =
-            resolve_start_failure(start_failure(), Ok(Some(snapshot)), &applied, WORKER_ID)
+            resolve_start_failure(start_failure(), Ok(Some(snapshot)), &applied, &expected_id)
                 .expect("same-session durable worker evidence");
         assert_eq!(recovered.agent_id(), expected_id);
     }

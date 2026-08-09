@@ -128,12 +128,7 @@ pub async fn serve_remote_https(
         // restart never leaves an agent turn run or its admission stuck active.
         async_db.reconcile_interrupted_agent_turn_runs().await?;
     }
-    Box::pin(
-        app_state
-            .codex_controller
-            .reconcile_task_board_admission_workers_after_restart(),
-    )
-    .await?;
+    super::recover_task_board_workers_after_restart(&app_state).await?;
     let _background = spawn_background_tasks(&app_state, config.poll_interval, &shutdown_rx);
 
     let serve_result = http::serve(listener, app_state, shutdown_rx).await;

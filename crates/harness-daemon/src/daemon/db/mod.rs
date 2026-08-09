@@ -23,6 +23,7 @@ pub(crate) use crate::daemon::protocol::CodexRunSnapshot;
 pub(crate) use crate::daemon::protocol::{CodexRunMode, CodexRunStatus};
 #[cfg(test)]
 pub(crate) use crate::session::types::AgentRegistration;
+#[cfg(test)]
 pub(crate) use crate::session::types::SessionState;
 #[cfg(test)]
 pub(crate) use crate::session::types::SessionStatus;
@@ -72,7 +73,6 @@ pub(crate) use async_runtime::AsyncRuntimeSnapshotQueries;
 pub(crate) use harness_daemon_db_queries::AsyncSessionStateQueries;
 pub(crate) use harness_daemon_db_queries::AsyncSessionSummaryQueries;
 pub(crate) use harness_daemon_db_queries::AsyncSignalIndexQueries;
-pub(crate) use harness_daemon_db_queries::sync_session_in_transaction;
 pub(crate) use harness_daemon_db_queries::{AsyncDaemonTransactions, AsyncSessionWriteQueries};
 mod audit;
 pub(crate) use harness_daemon_db_queries::AsyncAuditQueries;

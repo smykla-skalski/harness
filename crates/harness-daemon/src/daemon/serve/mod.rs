@@ -195,13 +195,25 @@ async fn run_startup_recovery(app_state: &DaemonHttpState) -> Result<(), CliErro
         // released rather than surfacing as unsupported entries for one pass.
         async_db.reconcile_interrupted_agent_turn_runs().await?;
     }
+    recover_task_board_workers_after_restart(app_state).await?;
+    Ok(())
+}
+
+async fn recover_task_board_workers_after_restart(
+    app_state: &DaemonHttpState,
+) -> Result<(), CliError> {
     Box::pin(
         app_state
             .codex_controller
             .reconcile_task_board_admission_workers_after_restart(),
     )
     .await?;
-    Ok(())
+    Box::pin(
+        crate::daemon::task_board_managed_agents::reconcile_interactive_workers_after_restart(
+            app_state,
+        ),
+    )
+    .await
 }
 
 #[expect(

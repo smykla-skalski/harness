@@ -1,8 +1,6 @@
 use tokio::sync::mpsc;
 
 use crate::daemon::protocol::CodexRunStatus;
-use crate::daemon::test_liveness::LIVENESS;
-use crate::session::storage as session_storage;
 use crate::session::types::{SessionMetrics, SessionState, TaskStatus};
 use crate::task_board::dispatch::{
     DispatchLifecycle, DispatchLifecyclePhase, DispatchLifecycleStatus, DispatchLifecycleStep,
@@ -20,10 +18,10 @@ use crate::daemon::db::AsyncSessionSummaryQueries;
 use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
-const SESSION_ID: &str = "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc";
-const TASK_ID: &str = "task-1";
-const ITEM_ID: &str = "board-admission-recovery";
-const WORKER_ID: &str = "codex-run-1";
+pub(super) const SESSION_ID: &str = "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc";
+pub(super) const TASK_ID: &str = "task-1";
+pub(super) const ITEM_ID: &str = "board-admission-recovery";
+pub(super) const WORKER_ID: &str = "codex-run-1";
 
 #[tokio::test(flavor = "multi_thread")]
 async fn rate_only_committed_usage_is_excluded_from_worker_recovery() {
@@ -120,13 +118,12 @@ async fn non_completed_intent_with_active_concurrency_fails_recovery_closed() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn missing_run_blocks_linked_task_and_board_without_refunding_rate_usage() {
+async fn missing_run_blocks_durable_work_item_without_mutating_session_history() {
     Box::pin(with_isolated_async_harness_env(|_| async move {
-        let (controller, db, tempdir) =
+        let (controller, db, _tempdir) =
             controller_with_async_session_state(bound_in_progress_state()).await;
         let (intent_id, _) =
             Box::pin(seed_committed_admission(&db, &["concurrency", "rate"])).await;
-        let mut events = controller.state.sender.subscribe();
 
         Box::pin(controller.reconcile_task_board_admission_workers_after_restart())
             .await
@@ -137,14 +134,20 @@ async fn missing_run_blocks_linked_task_and_board_without_refunding_rate_usage()
             .await
             .expect("load recovered session")
             .expect("recovered session");
-        assert_blocked_task(&resolved.state);
-        let layout =
-            session_storage::layout_from_project_dir(&tempdir.path().join("project"), SESSION_ID)
-                .expect("session layout");
-        let mirrored = session_storage::load_state(&layout)
-            .expect("load session mirror")
-            .expect("mirrored session");
-        assert_blocked_task(&mirrored);
+        assert_eq!(resolved.state.tasks[TASK_ID].status, TaskStatus::InProgress);
+        let progress = db
+            .task_board_work_item_progress(ITEM_ID)
+            .await
+            .expect("load recovered work-item progress")
+            .expect("recovered work-item progress");
+        assert_eq!(
+            progress.state,
+            crate::task_board::TaskBoardWorkItemState::Blocked
+        );
+        assert_eq!(
+            progress.blocked_reason.as_deref(),
+            Some("Managed worker was missing after daemon restart")
+        );
         let board_item = db.task_board_item(ITEM_ID).await.expect("load board item");
         assert_eq!(board_item.status, TaskBoardStatus::Failed);
         assert_eq!(board_item.workflow.status, TaskBoardWorkflowStatus::Failed);
@@ -159,24 +162,6 @@ async fn missing_run_blocks_linked_task_and_board_without_refunding_rate_usage()
         assert_eq!(
             ledger_state(&db, &intent_id, "rate").await,
             ("committed".into(), None)
-        );
-        let published = tokio::time::timeout(LIVENESS, async {
-            loop {
-                let event = events.recv().await.expect("receive session recovery event");
-                if event.session_id.as_deref() == Some(SESSION_ID) {
-                    return event;
-                }
-            }
-        })
-        .await
-        .expect("session recovery broadcast");
-        assert!(
-            matches!(
-                published.event.as_str(),
-                "session_updated" | "sessions_updated_delta" | "session_extensions"
-            ),
-            "unexpected recovery event: {}",
-            published.event
         );
     }))
     .await;
@@ -221,7 +206,7 @@ async fn terminal_save_releases_concurrency_before_board_reconciliation() {
     .await;
 }
 
-fn bound_in_progress_state() -> SessionState {
+pub(super) fn bound_in_progress_state() -> SessionState {
     let mut state = sample_session_state_with_open_task_and_codex_agent();
     let task = state.tasks.get_mut(TASK_ID).expect("open task");
     task.status = TaskStatus::InProgress;
@@ -236,17 +221,7 @@ fn bound_in_progress_state() -> SessionState {
     state
 }
 
-fn assert_blocked_task(state: &SessionState) {
-    let task = &state.tasks[TASK_ID];
-    assert_eq!(task.status, TaskStatus::Blocked);
-    assert_eq!(
-        task.blocked_reason.as_deref(),
-        Some("Codex worker was missing after daemon restart")
-    );
-    assert!(state.agents["agent-1"].current_task_id.is_none());
-}
-
-async fn seed_committed_admission(
+pub(super) async fn seed_committed_admission(
     db: &AsyncDaemonDbHandle,
     kinds: &[&str],
 ) -> (String, DispatchAppliedTask) {
@@ -365,7 +340,7 @@ async fn insert_committed_ledger(db: &AsyncDaemonDbHandle, intent_id: &str, kind
     .expect("insert committed recovery ledger");
 }
 
-async fn ledger_state(
+pub(super) async fn ledger_state(
     db: &AsyncDaemonDbHandle,
     intent_id: &str,
     kind: &str,

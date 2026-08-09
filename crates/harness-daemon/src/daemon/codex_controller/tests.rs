@@ -11,6 +11,7 @@ use crate::daemon::protocol::{CodexRunMode, CodexRunRequest, CodexRunStatus};
 use crate::session::types::{AgentStatus, SessionRole};
 
 mod admission_recovery;
+mod admission_recovery_workspace;
 mod completion_evidence;
 mod dependency_fixer;
 mod registration_recovery;

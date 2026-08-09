@@ -99,6 +99,22 @@ impl AgentTuiManagerHandle {
         Ok(refreshed)
     }
 
+    /// Refresh a recovered Task Board TUI while preserving its durable
+    /// workspace owner even when an older bridge still reports a Session.
+    pub(crate) fn recover_for_workspace(
+        &self,
+        tui_id: &str,
+        workspace_id: &str,
+    ) -> Result<AgentTuiSnapshot, CliError> {
+        let previous = self.load_snapshot(tui_id)?;
+        let mut refreshed = self.refresh_live_snapshot(previous.clone())?;
+        refreshed.session_id = workspace_id.to_string();
+        refreshed.workspace_id = Some(workspace_id.to_string());
+        refreshed.agent_id.clear();
+        self.persist_refreshed_snapshot(&previous, &refreshed)?;
+        Ok(refreshed)
+    }
+
     /// Send keyboard-like input into an active TUI.
     ///
     /// # Errors

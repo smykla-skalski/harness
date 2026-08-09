@@ -250,7 +250,9 @@ impl AgentTuiManagerHandle {
     }
 
     fn snapshot_changed(previous: &AgentTuiSnapshot, refreshed: &AgentTuiSnapshot) -> bool {
-        previous.status != refreshed.status
+        previous.session_id != refreshed.session_id
+            || previous.workspace_id != refreshed.workspace_id
+            || previous.status != refreshed.status
             || previous.size != refreshed.size
             || previous.screen != refreshed.screen
             || previous.exit_code != refreshed.exit_code

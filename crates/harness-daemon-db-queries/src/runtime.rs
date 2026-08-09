@@ -169,7 +169,7 @@ impl RuntimeSnapshotQueries for DaemonDb {
                 project_dir, thread_id, turn_id, mode,
                 status, prompt, latest_summary, final_message, error,
                 pending_approvals_json, resolved_approvals_json, events_json,
-                created_at, updated_at, model, effort
+                created_at, updated_at, model, effort, workspace_id
              FROM codex_runs
              WHERE run_id = ?1",
             [run_id],
@@ -191,9 +191,9 @@ impl RuntimeSnapshotQueries for DaemonDb {
                     project_dir, thread_id, turn_id, mode,
                     status, prompt, latest_summary, final_message, error,
                     pending_approvals_json, resolved_approvals_json, events_json,
-                    created_at, updated_at, model, effort
+                    created_at, updated_at, model, effort, workspace_id
                  FROM codex_runs
-                 WHERE session_id = ?1
+                 WHERE session_id = ?1 OR workspace_id = ?1
                  ORDER BY updated_at DESC",
             )
             .map_err(|error| db_error(format!("prepare codex run list: {error}")))?;
@@ -334,11 +334,14 @@ impl RuntimeSnapshotQueries for DaemonDb {
 
 fn codex_run_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<CodexRunSnapshot> {
     let run_id: String = row.get(0)?;
-    // A session-less standalone run persists NULL for `session_id` (see
-    // `save_codex_run`); the wire type stays non-optional, so a NULL falls
-    // back to the run's own id rather than surfacing here.
+    // A workspace-owned or standalone run persists NULL for `session_id` (see
+    // `save_codex_run`); the wire type stays non-optional, so use its durable
+    // workspace owner before falling back to the run id.
     let session_id: Option<String> = row.get(1)?;
-    let session_id = session_id.unwrap_or_else(|| run_id.clone());
+    let workspace_id: Option<String> = row.get(23)?;
+    let session_id = session_id
+        .or(workspace_id)
+        .unwrap_or_else(|| run_id.clone());
     let mode_raw: String = row.get(10)?;
     let status_raw: String = row.get(11)?;
     let pending_approvals_json: String = row.get(16)?;

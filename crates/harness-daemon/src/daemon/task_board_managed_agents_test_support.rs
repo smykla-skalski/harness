@@ -189,6 +189,38 @@ pub(super) async fn seed_session(
     .expect("seed managed-agent session");
 }
 
+pub(super) async fn seed_workspace_owner(
+    db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
+    workspace_id: &str,
+) {
+    sqlx::query(
+        "INSERT INTO agent_workspaces (
+             workspace_id, daemon_id, project_scope_id, checkout_id, source_project_id,
+             project_name, checkout_name, project_dir, repository_root, context_root,
+             is_worktree, availability, manifest_digest, shadow_digest,
+             orchestration_authority, created_at, updated_at
+         ) VALUES (?1, 'daemon-test', ?1, ?1, ?1, 'Project', 'Checkout',
+                   '/tmp/project', '/tmp/project', '/tmp/project', 0, 'available',
+                   'manifest', 'shadow', 'workspace', '2026-01-01T10:00:00Z',
+                   '2026-01-01T10:00:00Z')",
+    )
+    .bind(workspace_id)
+    .execute(db.pool())
+    .await
+    .expect("seed workspace owner");
+    sqlx::query(
+        "INSERT INTO agent_workspace_teams (
+             workspace_id, authority, source_revision, reconciled_revision,
+             shadow_digest, created_at, updated_at
+         ) VALUES (?1, 'workspace', 1, 1, 'shadow',
+                   '2026-01-01T10:00:00Z', '2026-01-01T10:00:00Z')",
+    )
+    .bind(workspace_id)
+    .execute(db.pool())
+    .await
+    .expect("seed workspace team");
+}
+
 pub(super) fn terminal_snapshot(status: AgentTuiStatus, session_id: &str) -> AgentTuiSnapshot {
     AgentTuiSnapshot {
         tui_id: "agent-tui-dispatch-intent-existing".into(),
