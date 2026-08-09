@@ -15,6 +15,7 @@ pub(crate) struct ActiveAgentTui {
     pub(crate) process: Option<Arc<AgentTuiProcess>>,
     pub(crate) stop_flag: Arc<AtomicBool>,
     pub(crate) input_worker: Option<AgentTuiInputWorker>,
+    pub(crate) workspace_id: Option<String>,
 }
 
 impl ActiveAgentTui {
@@ -26,6 +27,7 @@ impl ActiveAgentTui {
             }),
             process,
             stop_flag,
+            workspace_id: None,
         }
     }
 

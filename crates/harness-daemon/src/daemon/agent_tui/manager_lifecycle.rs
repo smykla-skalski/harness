@@ -288,6 +288,9 @@ impl AgentTuiManagerHandle {
         snapshot: &AgentTuiSnapshot,
     ) -> Result<(), CliError> {
         if self.is_tui_active(&snapshot.tui_id)? {
+            if let Some(active) = self.active()?.get_mut(&snapshot.tui_id) {
+                active.workspace_id.clone_from(&snapshot.workspace_id);
+            }
             self.save_and_broadcast("agent_tui_updated", snapshot)?;
             return Ok(());
         }
@@ -298,8 +301,9 @@ impl AgentTuiManagerHandle {
         &self,
         event_name: &str,
         snapshot: &AgentTuiSnapshot,
-        active: ActiveAgentTui,
+        mut active: ActiveAgentTui,
     ) -> Result<(), CliError> {
+        active.workspace_id.clone_from(&snapshot.workspace_id);
         let stop_flag = Arc::clone(&active.stop_flag);
         let tui_id = snapshot.tui_id.clone();
         self.active()?.insert(tui_id.clone(), active);

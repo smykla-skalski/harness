@@ -62,6 +62,36 @@ fn sandboxed_bridge_snapshot_preserves_durable_workspace_owner() {
 }
 
 #[test]
+fn sandboxed_active_owner_normalization_needs_no_durable_snapshot() {
+    let db_slot = Arc::new(OnceLock::new());
+    let (sender, _) = broadcast::channel(8);
+    let manager = AgentTuiManagerHandle::new(sender, db_slot, true);
+    let tui_id = "agent-tui-active-owner";
+    let mut active = ActiveAgentTui::new(None);
+    active.workspace_id = Some("workspace-owner".into());
+    manager
+        .active()
+        .expect("active map")
+        .insert(tui_id.into(), active);
+    let bridge = sample_snapshot(
+        tui_id,
+        "legacy-session",
+        "legacy-agent",
+        "codex",
+        "2026-08-09T10:00:00Z",
+        "2026-08-09T10:00:02Z",
+    );
+
+    let normalized = manager
+        .normalize_active_bridge_snapshot(tui_id, bridge)
+        .expect("normalize active bridge snapshot");
+
+    assert_eq!(normalized.workspace_id.as_deref(), Some("workspace-owner"));
+    assert_eq!(normalized.session_id, "workspace-owner");
+    assert!(normalized.agent_id.is_empty());
+}
+
+#[test]
 fn sandboxed_list_returns_an_active_cached_snapshot_without_bridge_rpc() {
     let tmp = tempfile::tempdir().expect("tempdir");
     let daemon_home = tmp.path().join("daemon-home");

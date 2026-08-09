@@ -161,11 +161,29 @@ impl AgentTuiManagerHandle {
     pub(super) fn normalize_bridge_snapshot(
         &self,
         previous: &AgentTuiSnapshot,
+        refreshed: AgentTuiSnapshot,
+    ) -> AgentTuiSnapshot {
+        self.normalize_bridge_snapshot_owner(previous.workspace_id.as_deref(), refreshed)
+    }
+
+    pub(super) fn normalize_active_bridge_snapshot(
+        &self,
+        tui_id: &str,
+        refreshed: AgentTuiSnapshot,
+    ) -> Result<AgentTuiSnapshot, CliError> {
+        let workspace_id = self.active_tui(tui_id)?.workspace_id;
+        Ok(self.normalize_bridge_snapshot_owner(workspace_id.as_deref(), refreshed))
+    }
+
+    fn normalize_bridge_snapshot_owner(
+        &self,
+        workspace_id: Option<&str>,
         mut refreshed: AgentTuiSnapshot,
     ) -> AgentTuiSnapshot {
-        if let Some(workspace_id) = previous.workspace_id.as_ref() {
-            refreshed.session_id.clone_from(workspace_id);
-            refreshed.workspace_id = Some(workspace_id.clone());
+        if let Some(workspace_id) = workspace_id {
+            refreshed.session_id.clear();
+            refreshed.session_id.push_str(workspace_id);
+            refreshed.workspace_id = Some(workspace_id.to_string());
             refreshed.agent_id.clear();
         }
         self.normalize_snapshot(refreshed)
@@ -251,7 +269,7 @@ impl AgentTuiManagerHandle {
     }
 
     pub(crate) fn normalize_snapshot(&self, mut snapshot: AgentTuiSnapshot) -> AgentTuiSnapshot {
-        if snapshot.agent_id.is_empty() {
+        if snapshot.workspace_id.is_none() && snapshot.agent_id.is_empty() {
             self.try_resolve_agent_id(&mut snapshot);
         }
         snapshot
