@@ -5,6 +5,21 @@ import Testing
 @MainActor
 @Suite("Harness Monitor store")
 struct HarnessMonitorStoreTests {
+  @Test("Task Board clients remain fenced when legacy cleanup fails")
+  func taskBoardClientRespectsLegacyCleanupFailure() async {
+    let daemon = RecordingDaemonController(
+      legacyCleanupError: DaemonControlError.commandFailed("cleanup failed")
+    )
+    let store = HarnessMonitorStore(daemonController: daemon)
+
+    await #expect(throws: DaemonControlError.self) {
+      _ = try await store.taskBoardHostSnapshot()
+    }
+
+    #expect(await daemon.recordedLegacyCleanupCallCount() == 1)
+    #expect(await daemon.recordedBootstrapCallCount() == 0)
+  }
+
   @Test("Bootstrap loads the dashboard data")
   func bootstrapLoadsDashboardData() async {
     let store = await makeBootstrappedStore()

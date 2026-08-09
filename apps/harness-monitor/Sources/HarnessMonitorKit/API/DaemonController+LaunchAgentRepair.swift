@@ -79,30 +79,32 @@ extension DaemonController {
       break
     }
 
-    try launchAgentManager.unregister()
-    clearManagedLaunchAgentBundleStamp(at: stampURL)
-    clearManagedLaunchAgentOwner()
-    await awaitManagedLaunchAgentBTMSettleAfterUnregister()
+    return try await withRequiredManagedLaunchAgentLock {
+      try launchAgentManager.unregister()
+      clearManagedLaunchAgentBundleStamp(at: stampURL)
+      clearManagedLaunchAgentOwner()
+      await awaitManagedLaunchAgentBTMSettleAfterUnregister()
 
-    try launchAgentManager.register()
-    let postState = launchAgentManager.registrationState()
-    switch postState {
-    case .enabled:
-      try persistManagedLaunchAgentBundleStamp(currentStamp, to: stampURL)
-      try persistCurrentManagedLaunchAgentOwner()
-      HarnessMonitorLogger.lifecycle.notice(
-        "Refreshed managed launch agent on launch after helper bundle stamp change"
-      )
-      return true
-    case .requiresApproval:
-      HarnessMonitorLogger.lifecycle.notice(
-        "Managed launch agent refresh awaiting user approval in System Settings"
-      )
-      return true
-    case .notRegistered, .notFound:
-      throw DaemonControlError.commandFailed(
-        "launch agent refresh did not complete"
-      )
+      try launchAgentManager.register()
+      let postState = launchAgentManager.registrationState()
+      switch postState {
+      case .enabled:
+        try persistManagedLaunchAgentBundleStamp(currentStamp, to: stampURL)
+        try persistCurrentManagedLaunchAgentOwner()
+        HarnessMonitorLogger.lifecycle.notice(
+          "Refreshed managed launch agent on launch after helper bundle stamp change"
+        )
+        return true
+      case .requiresApproval:
+        HarnessMonitorLogger.lifecycle.notice(
+          "Managed launch agent refresh awaiting user approval in System Settings"
+        )
+        return true
+      case .notRegistered, .notFound:
+        throw DaemonControlError.commandFailed(
+          "launch agent refresh did not complete"
+        )
+      }
     }
   }
 
@@ -113,35 +115,37 @@ extension DaemonController {
   /// In `.managed` mode the unregister is followed by a fresh register so
   /// the helper is reachable again on the next launchd spawn cycle.
   public func repairLaunchAgentRegistration() async throws -> String {
-    let preState = launchAgentManager.registrationState()
-    switch preState {
-    case .enabled, .requiresApproval:
-      try launchAgentManager.unregister()
-      clearManagedLaunchAgentBundleStamp()
-      clearManagedLaunchAgentOwner()
-      await awaitManagedLaunchAgentBTMSettleAfterUnregister()
-    case .notRegistered, .notFound:
-      break
-    }
+    try await withRequiredManagedLaunchAgentLock {
+      let preState = launchAgentManager.registrationState()
+      switch preState {
+      case .enabled, .requiresApproval:
+        try launchAgentManager.unregister()
+        clearManagedLaunchAgentBundleStamp()
+        clearManagedLaunchAgentOwner()
+        await awaitManagedLaunchAgentBTMSettleAfterUnregister()
+      case .notRegistered, .notFound:
+        break
+      }
 
-    guard ownership == .managed else {
-      return preState == .notRegistered || preState == .notFound
-        ? "launch agent not registered"
-        : "launch agent unregistered"
-    }
+      guard ownership == .managed else {
+        return preState == .notRegistered || preState == .notFound
+          ? "launch agent not registered"
+          : "launch agent unregistered"
+      }
 
-    try launchAgentManager.register()
-    let postState = launchAgentManager.registrationState()
-    if postState == .enabled {
-      try persistCurrentManagedLaunchAgentBundleStamp()
-      try persistCurrentManagedLaunchAgentOwner()
-      return "launch agent re-registered"
+      try launchAgentManager.register()
+      let postState = launchAgentManager.registrationState()
+      if postState == .enabled {
+        try persistCurrentManagedLaunchAgentBundleStamp()
+        try persistCurrentManagedLaunchAgentOwner()
+        return "launch agent re-registered"
+      }
+      if postState == .requiresApproval {
+        return "launch agent re-registered; approval required in System Settings"
+      }
+      throw DaemonControlError.commandFailed(
+        "launch agent re-registration did not complete"
+      )
     }
-    if postState == .requiresApproval {
-      return "launch agent re-registered; approval required in System Settings"
-    }
-    throw DaemonControlError.commandFailed(
-      "launch agent re-registration did not complete"
-    )
   }
 }

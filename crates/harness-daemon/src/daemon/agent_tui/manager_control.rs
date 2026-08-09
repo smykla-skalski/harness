@@ -144,11 +144,12 @@ impl AgentTuiManagerHandle {
     ) -> Result<AgentTuiSnapshot, CliError> {
         request.validate().map_err(CliErrorKind::workflow_parse)?;
         if self.state.sandboxed {
-            let snapshot = self.normalize_active_bridge_snapshot(
-                tui_id,
+            let workspace_id = self.bridge_snapshot_workspace_id(tui_id)?;
+            let snapshot = self.normalize_bridge_snapshot_owner(
+                workspace_id.as_deref(),
                 BridgeClient::for_capability(BridgeCapability::AgentTui)?
                     .agent_tui_input(tui_id, request)?,
-            )?;
+            );
             self.save_and_broadcast("agent_tui_updated", &snapshot)?;
             return Ok(snapshot);
         }
@@ -222,11 +223,12 @@ impl AgentTuiManagerHandle {
         request: &AgentTuiResizeRequest,
     ) -> Result<AgentTuiSnapshot, CliError> {
         if self.state.sandboxed {
-            let snapshot = self.normalize_active_bridge_snapshot(
-                tui_id,
+            let workspace_id = self.bridge_snapshot_workspace_id(tui_id)?;
+            let snapshot = self.normalize_bridge_snapshot_owner(
+                workspace_id.as_deref(),
                 BridgeClient::for_capability(BridgeCapability::AgentTui)?
                     .agent_tui_resize(tui_id, request)?,
-            )?;
+            );
             self.save_and_broadcast("agent_tui_updated", &snapshot)?;
             return Ok(snapshot);
         }

@@ -217,13 +217,15 @@ public struct DaemonController: DaemonControlling {
 
   public func registerLaunchAgent() async throws -> DaemonLaunchAgentRegistrationState {
     try requireLocalDaemonControl("Register Launch Agent")
-    try launchAgentManager.register()
-    let state = launchAgentManager.registrationState()
-    if state == .enabled {
-      try persistCurrentManagedLaunchAgentBundleStamp()
-      try persistCurrentManagedLaunchAgentOwner()
+    return try await withRequiredManagedLaunchAgentLock {
+      try launchAgentManager.register()
+      let state = launchAgentManager.registrationState()
+      if state == .enabled {
+        try persistCurrentManagedLaunchAgentBundleStamp()
+        try persistCurrentManagedLaunchAgentOwner()
+      }
+      return state
     }
-    return state
   }
 
   public func launchAgentRegistrationState() async -> DaemonLaunchAgentRegistrationState {
@@ -260,9 +262,12 @@ public struct DaemonController: DaemonControlling {
       return try await requestDaemonStop(using: client)
     }
     if launchAgentManager.registrationState() == .enabled {
-      try launchAgentManager.unregister()
-      clearManagedLaunchAgentBundleStamp()
-      clearManagedLaunchAgentOwner()
+      try await withRequiredManagedLaunchAgentLock {
+        try launchAgentManager.unregister()
+        clearManagedLaunchAgentBundleStamp()
+        clearManagedLaunchAgentOwner()
+        await awaitManagedLaunchAgentBTMSettleAfterUnregister()
+      }
       return "stopped"
     }
 
@@ -319,10 +324,12 @@ public struct DaemonController: DaemonControlling {
     case .notRegistered, .notFound:
       return "launch agent not installed"
     case .enabled, .requiresApproval:
-      try launchAgentManager.unregister()
-      clearManagedLaunchAgentBundleStamp()
-      clearManagedLaunchAgentOwner()
-      await awaitManagedLaunchAgentBTMSettleAfterUnregister()
+      try await withRequiredManagedLaunchAgentLock {
+        try launchAgentManager.unregister()
+        clearManagedLaunchAgentBundleStamp()
+        clearManagedLaunchAgentOwner()
+        await awaitManagedLaunchAgentBTMSettleAfterUnregister()
+      }
       return "launch agent removed"
     }
   }

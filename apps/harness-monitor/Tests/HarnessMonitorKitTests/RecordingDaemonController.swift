@@ -17,6 +17,7 @@ actor RecordingDaemonController: DaemonControlling {
   private let bootstrapChecksCancellation: Bool
   private let warmUpError: (any Error)?
   private let deferredManagedLaunchAgentRefreshResult: Bool
+  private let legacyCleanupError: (any Error)?
   private var lastEventMessage = "daemon ready"
   private var registerLaunchAgentCallCount = 0
   private var warmUpCallCount = 0
@@ -24,6 +25,7 @@ actor RecordingDaemonController: DaemonControlling {
   private var deferredRefreshCallCount = 0
   private var bootstrapCallCount = 0
   private var launchAgentStateCallCount = 0
+  private var legacyCleanupCallCount = 0
 
   init(
     client: any HarnessMonitorClientProtocol = PreviewHarnessClient(),
@@ -35,7 +37,8 @@ actor RecordingDaemonController: DaemonControlling {
     bootstrapChecksCancellation: Bool = false,
     warmUpError: (any Error)? = nil,
     usesWarmUpErrorForBootstrap: Bool = true,
-    deferredManagedLaunchAgentRefreshResult: Bool = false
+    deferredManagedLaunchAgentRefreshResult: Bool = false,
+    legacyCleanupError: (any Error)? = nil
   ) {
     self.client = client
     self.bootstrapOutcomes = bootstrapOutcomes
@@ -46,6 +49,7 @@ actor RecordingDaemonController: DaemonControlling {
     self.bootstrapChecksCancellation = bootstrapChecksCancellation
     self.warmUpError = warmUpError
     self.deferredManagedLaunchAgentRefreshResult = deferredManagedLaunchAgentRefreshResult
+    self.legacyCleanupError = legacyCleanupError
   }
 
   func bootstrapClient() async throws -> any HarnessMonitorClientProtocol {
@@ -114,6 +118,13 @@ actor RecordingDaemonController: DaemonControlling {
   func performDeferredManagedLaunchAgentRefreshIfNeeded() async -> Bool {
     deferredRefreshCallCount += 1
     return deferredManagedLaunchAgentRefreshResult
+  }
+
+  func requireLegacyManagedLaunchAgentCleanup() async throws {
+    legacyCleanupCallCount += 1
+    if let legacyCleanupError {
+      throw legacyCleanupError
+    }
   }
 
   func stopDaemon() async throws -> String {
@@ -204,5 +215,9 @@ actor RecordingDaemonController: DaemonControlling {
 
   func recordedLaunchAgentStateCallCount() async -> Int {
     launchAgentStateCallCount
+  }
+
+  func recordedLegacyCleanupCallCount() async -> Int {
+    legacyCleanupCallCount
   }
 }

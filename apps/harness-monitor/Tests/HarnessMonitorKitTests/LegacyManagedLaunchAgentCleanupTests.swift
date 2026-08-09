@@ -230,10 +230,10 @@ struct LegacyManagedLaunchAgentCleanupTests {
     #expect(recorder.events().filter { $0 == "quiesced" }.count == 1)
   }
 
-  @Test("Controller engages the kill switch through the trusted local manifest")
-  func controllerEngagesKillSwitchThroughTrustedManifest() async throws {
+  @Test("Controller fences and stops every trusted live managed daemon")
+  func controllerFencesAndStopsTrustedManagedDaemon() async throws {
     let client = RecordingHarnessClient()
-    try await withTempDaemonFixture(pid: 1_234) { environment in
+    try await withTempDaemonFixture(pid: UInt32(getpid())) { environment in
       let controller = DaemonController(
         environment: environment,
         launchAgentManager: RecordingLaunchAgentManager(state: .enabled),
@@ -241,13 +241,14 @@ struct LegacyManagedLaunchAgentCleanupTests {
         sessionFactory: { _ in client }
       )
 
-      try await controller.engageAutomationKillSwitchAfterLegacyCleanupFailure()
+      try await controller.quiesceManagedDaemonsAfterLegacyCleanupFailure()
     }
 
     let requests = client.lock.withLock {
       client.policyCanvasSpawnKillSwitchRequests
     }
     #expect(requests == [true])
+    #expect(client.lock.withLock { client.stopDaemonRequestCount } == 1)
   }
 }
 

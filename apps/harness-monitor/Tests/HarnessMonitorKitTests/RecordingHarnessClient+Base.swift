@@ -80,7 +80,10 @@ extension RecordingHarnessClient {
   }
 
   func stopDaemon() async throws -> DaemonControlResponse {
-    DaemonControlResponse(status: "stopping")
+    lock.withLock {
+      stopDaemonRequestCount += 1
+    }
+    return DaemonControlResponse(status: "stopping")
   }
 
   func projects() async throws -> [ProjectSummary] {

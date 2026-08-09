@@ -7,6 +7,63 @@ import Foundation
 #endif
 
 extension HarnessMonitorPaths {
+  /// Enumerate every live managed daemon manifest in the app-group family.
+  /// A daemon's singleton lock prevents two processes from sharing one data
+  /// home, so scanning the base root and each runtime lane identifies every
+  /// process that a legacy launch-agent registration can still own.
+  static func liveManagedDaemonManifestURLs(
+    using environment: HarnessMonitorEnvironment,
+    fileManager: FileManager = .default,
+    pidIsLive: (Int32) -> Bool = HarnessMonitorPaths.defaultPidIsLive
+  ) -> [URL] {
+    var dataHomes: [URL] = []
+    if let configured = configuredDataHomeRoot(using: environment) {
+      appendUnique(configured, to: &dataHomes)
+    }
+    if let lane = runtimeLaneBaseRoot(using: environment) {
+      appendUnique(lane, to: &dataHomes)
+    }
+    if let container = appGroupContainerCandidate(
+      using: environment
+    ) {
+      appendUnique(container, to: &dataHomes)
+      let lanesRoot = container.appendingPathComponent(
+        HarnessMonitorRuntimeLane.dataHomeLanesDirectoryName,
+        isDirectory: true
+      )
+      let lanes =
+        (try? fileManager.contentsOfDirectory(
+          at: lanesRoot,
+          includingPropertiesForKeys: [.isDirectoryKey]
+        )) ?? []
+      for lane in lanes {
+        guard (try? lane.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true else {
+          continue
+        }
+        appendUnique(lane, to: &dataHomes)
+      }
+    }
+
+    return dataHomes.flatMap { dataHome in
+      let daemonBase =
+        dataHome
+        .appendingPathComponent("harness", isDirectory: true)
+        .appendingPathComponent("daemon", isDirectory: true)
+      return [
+        daemonBase
+          .appendingPathComponent(DaemonOwnership.managed.rawValue, isDirectory: true)
+          .appendingPathComponent("manifest.json"),
+        daemonBase.appendingPathComponent("manifest.json"),
+      ].filter {
+        isLiveManagedManifest(
+          at: $0,
+          fileManager: fileManager,
+          pidIsLive: pidIsLive
+        )
+      }
+    }
+  }
+
   /// Pick a data-home root by probing for a daemon whose ownership-scoped
   /// manifest pid is alive.
   ///
@@ -119,6 +176,30 @@ extension HarnessMonitorPaths {
     guard pid > 0 else { return false }
     if kill(pid, 0) == 0 { return true }
     return errno == EPERM
+  }
+
+  private static func appendUnique(_ url: URL, to urls: inout [URL]) {
+    let candidate = url.standardizedFileURL
+    guard urls.contains(candidate) == false else { return }
+    urls.append(candidate)
+  }
+
+  private static func isLiveManagedManifest(
+    at manifestURL: URL,
+    fileManager: FileManager,
+    pidIsLive: (Int32) -> Bool
+  ) -> Bool {
+    guard fileManager.fileExists(atPath: manifestURL.path),
+      let data = try? Data(contentsOf: manifestURL),
+      let manifest = try? JSONDecoder().decode(DaemonManifestProbe.self, from: data),
+      pidIsLive(manifest.pid)
+    else {
+      return false
+    }
+    guard let ownership = manifest.ownership else {
+      return true
+    }
+    return DaemonOwnership(rawValue: ownership) == .managed
   }
 
   private static func appGroupContainerCandidate(

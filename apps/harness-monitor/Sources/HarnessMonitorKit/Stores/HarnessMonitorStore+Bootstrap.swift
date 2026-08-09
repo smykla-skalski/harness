@@ -321,6 +321,7 @@ extension HarnessMonitorStore {
   func bootstrapRemoteDaemon() async {
     restorePersistedSessionStateWhileConnectingInBackground()
     do {
+      try await daemonController.requireLegacyManagedLaunchAgentCleanup()
       let client = try await withBootstrapTelemetryPhase(.remoteDaemonConnect) {
         try await daemonController.bootstrapClient()
       }

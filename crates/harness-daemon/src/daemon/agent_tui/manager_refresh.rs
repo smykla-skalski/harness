@@ -166,16 +166,17 @@ impl AgentTuiManagerHandle {
         self.normalize_bridge_snapshot_owner(previous.workspace_id.as_deref(), refreshed)
     }
 
-    pub(super) fn normalize_active_bridge_snapshot(
+    pub(super) fn bridge_snapshot_workspace_id(
         &self,
         tui_id: &str,
-        refreshed: AgentTuiSnapshot,
-    ) -> Result<AgentTuiSnapshot, CliError> {
-        let workspace_id = self.active_tui(tui_id)?.workspace_id;
-        Ok(self.normalize_bridge_snapshot_owner(workspace_id.as_deref(), refreshed))
+    ) -> Result<Option<String>, CliError> {
+        if let Some(active) = self.active()?.get(tui_id) {
+            return Ok(active.workspace_id.clone());
+        }
+        Ok(self.load_snapshot(tui_id)?.workspace_id)
     }
 
-    fn normalize_bridge_snapshot_owner(
+    pub(super) fn normalize_bridge_snapshot_owner(
         &self,
         workspace_id: Option<&str>,
         mut refreshed: AgentTuiSnapshot,

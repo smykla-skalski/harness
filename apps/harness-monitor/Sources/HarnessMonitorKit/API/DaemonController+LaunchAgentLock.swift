@@ -76,6 +76,21 @@ extension DaemonController {
       try? await Task.sleep(for: retryInterval)
     }
   }
+
+  func withRequiredManagedLaunchAgentLock<Value>(
+    perform: () async throws -> Value
+  ) async throws -> Value where Value: Sendable {
+    let outcome = try await withManagedLaunchAgentLock(
+      totalTimeout: .seconds(2),
+      perform: perform
+    )
+    guard case .acquired(let value) = outcome else {
+      throw DaemonControlError.commandFailed(
+        "Managed launch-agent lifecycle is busy in another Harness Monitor process"
+      )
+    }
+    return value
+  }
 }
 
 extension DaemonController {

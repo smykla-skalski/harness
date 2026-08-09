@@ -62,7 +62,7 @@ fn sandboxed_bridge_snapshot_preserves_durable_workspace_owner() {
 }
 
 #[test]
-fn sandboxed_active_owner_normalization_needs_no_durable_snapshot() {
+fn sandboxed_bridge_owner_prefers_active_state_without_durable_snapshot() {
     let db_slot = Arc::new(OnceLock::new());
     let (sender, _) = broadcast::channel(8);
     let manager = AgentTuiManagerHandle::new(sender, db_slot, true);
@@ -73,22 +73,64 @@ fn sandboxed_active_owner_normalization_needs_no_durable_snapshot() {
         .active()
         .expect("active map")
         .insert(tui_id.into(), active);
-    let bridge = sample_snapshot(
-        tui_id,
-        "legacy-session",
+    assert_eq!(
+        manager
+            .bridge_snapshot_workspace_id(tui_id)
+            .expect("load active bridge owner")
+            .as_deref(),
+        Some("workspace-owner")
+    );
+}
+
+#[test]
+fn sandboxed_bridge_owner_falls_back_to_durable_survivor() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let session_id = "c98dde51-44c4-5e13-a8c9-335f42e09035";
+    let db = DaemonDbOwnedHandle(DaemonDb::open_in_memory().expect("open db"));
+    let project = crate::daemon::index::DiscoveredProject {
+        project_id: "project-durable-owner".into(),
+        name: "durable owner".into(),
+        project_dir: Some(tmp.path().to_path_buf()),
+        repository_root: Some(tmp.path().to_path_buf()),
+        checkout_id: "checkout-durable-owner".into(),
+        checkout_name: "Directory".into(),
+        context_root: tmp.path().to_path_buf(),
+        is_worktree: false,
+        worktree_name: None,
+    };
+    db.sync_project(&project).expect("sync project");
+    let session = session_service::build_new_session(
+        "durable owner",
+        "durable owner",
+        session_id,
+        "claude",
+        None,
+        &utc_now(),
+    );
+    db.sync_session(&project.project_id, &session)
+        .expect("sync session");
+    let snapshot = sample_snapshot(
+        "agent-tui-durable-owner",
+        session_id,
         "legacy-agent",
         "codex",
         "2026-08-09T10:00:00Z",
         "2026-08-09T10:00:02Z",
     );
+    db.save_agent_tui(&snapshot).expect("save durable survivor");
+    let db_slot = Arc::new(OnceLock::new());
+    db_slot
+        .set(Arc::new(Mutex::new(db)))
+        .expect("install test db");
+    let (sender, _) = broadcast::channel(8);
+    let manager = AgentTuiManagerHandle::new(sender, db_slot, true);
 
-    let normalized = manager
-        .normalize_active_bridge_snapshot(tui_id, bridge)
-        .expect("normalize active bridge snapshot");
-
-    assert_eq!(normalized.workspace_id.as_deref(), Some("workspace-owner"));
-    assert_eq!(normalized.session_id, "workspace-owner");
-    assert!(normalized.agent_id.is_empty());
+    assert_eq!(
+        manager
+            .bridge_snapshot_workspace_id(&snapshot.tui_id)
+            .expect("load durable bridge owner"),
+        None
+    );
 }
 
 #[test]

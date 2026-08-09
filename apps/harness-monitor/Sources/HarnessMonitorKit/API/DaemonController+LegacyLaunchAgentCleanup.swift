@@ -41,6 +41,9 @@ public enum LegacyManagedLaunchAgentCleanup {
     afterCurrentServiceUnregister: @escaping @Sendable () async -> Void,
     quiesceOnFailure: @escaping @Sendable () async throws -> Void
   ) async throws {
+    guard completedInThisProcess() == false else {
+      return
+    }
     let sendableDefaults = SendableUserDefaults(defaults)
     try await coordinator.run {
       while true {
@@ -58,6 +61,12 @@ public enum LegacyManagedLaunchAgentCleanup {
         throw DaemonControlError.commandFailed(failureMessage)
       }
     }
+  }
+
+  static func completedInThisProcess() -> Bool {
+    lock.lock()
+    defer { lock.unlock() }
+    return didComplete
   }
 
   private static func serializedAttempt(
@@ -217,33 +226,57 @@ private actor LegacyManagedLaunchAgentCleanupCoordinator {
 
 extension DaemonController {
   public func requireLegacyManagedLaunchAgentCleanup() async throws {
-    try await LegacyManagedLaunchAgentCleanup.requireComplete(
-      afterCurrentServiceUnregister: {
-        clearManagedLaunchAgentBundleStamp()
-        clearManagedLaunchAgentOwner()
-        await awaitManagedLaunchAgentBTMSettleAfterUnregister()
-      },
-      quiesceOnFailure: {
-        try await engageAutomationKillSwitchAfterLegacyCleanupFailure()
-      }
-    )
+    guard LegacyManagedLaunchAgentCleanup.completedInThisProcess() == false else {
+      return
+    }
+    let outcome = try await withManagedLaunchAgentLock(totalTimeout: .seconds(2)) {
+      try await LegacyManagedLaunchAgentCleanup.requireComplete(
+        afterCurrentServiceUnregister: {
+          clearManagedLaunchAgentBundleStamp()
+          clearManagedLaunchAgentOwner()
+          if managedLaunchAgentBTMSettleDelay > .zero {
+            try? await managedLaunchAgentBTMSettleSleep(managedLaunchAgentBTMSettleDelay)
+          }
+        },
+        quiesceOnFailure: {
+          try await quiesceManagedDaemonsAfterLegacyCleanupFailure()
+        }
+      )
+    }
+    guard case .acquired = outcome else {
+      throw DaemonControlError.commandFailed(
+        "Legacy daemon cleanup is busy in another Harness Monitor process"
+      )
+    }
   }
 
-  func engageAutomationKillSwitchAfterLegacyCleanupFailure() async throws {
-    let manifest = try loadManifest(emitTrace: false)
-    let connection = try daemonConnection(from: manifest, emitTrace: false)
-    let client = sessionFactory(connection)
-    do {
-      _ = try await client.setPolicyCanvasSpawnKillSwitch(
-        request: PolicyCanvasSetSpawnKillSwitchRequest(enabled: true)
-      )
-      await client.shutdown()
+  func quiesceManagedDaemonsAfterLegacyCleanupFailure() async throws {
+    let manifestURLs = HarnessMonitorPaths.liveManagedDaemonManifestURLs(using: environment)
+    for manifestURL in manifestURLs {
+      let manifest = try loadManifest(at: manifestURL, emitTrace: false)
+      let endpoint = try endpointURL(from: manifest.endpoint)
+      guard Self.isTrustedManagedEndpoint(endpoint) else {
+        throw DaemonControlError.invalidManifest(
+          "managed daemon endpoints must use loopback http(s): \(manifest.endpoint)"
+        )
+      }
+      let connection = try daemonConnection(from: manifest, emitTrace: false)
+      let client = sessionFactory(connection)
+      do {
+        _ = try? await client.setPolicyCanvasSpawnKillSwitch(
+          request: PolicyCanvasSetSpawnKillSwitchRequest(enabled: true)
+        )
+        _ = try await client.stopDaemon()
+        await client.shutdown()
+      } catch {
+        await client.shutdown()
+        throw error
+      }
+    }
+    if manifestURLs.isEmpty == false {
       HarnessMonitorLogger.lifecycle.fault(
-        "Engaged the automation kill switch after legacy daemon cleanup failed"
+        "Stopped managed automation after legacy daemon cleanup failed"
       )
-    } catch {
-      await client.shutdown()
-      throw error
     }
   }
 }
