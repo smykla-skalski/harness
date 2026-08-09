@@ -401,20 +401,17 @@ impl AgentTuiManagerHandle {
         let agent_id = snapshot.agent_id.clone();
         let attempt_id = snapshot.tui_id.clone();
         let workspace_terminal = snapshot.workspace_id.is_some() && agent_id.is_empty();
-        let terminal_reason = workspace_terminal_reason(snapshot, reason);
+        let terminal_report = TaskBoardRuntimeTerminalReport::from_terminal_agent(
+            snapshot.status,
+            snapshot.error.as_deref(),
+            snapshot.signal.as_deref(),
+        );
         let sender = self.state.sender.clone();
         let reason_owned = reason.to_string();
         if let Some(result) = self.run_with_async_db(|async_db| async move {
-            if workspace_terminal {
+            if workspace_terminal && let Some(report) = terminal_report.as_ref() {
                 async_db
-                    .project_task_board_runtime_terminal_for_attempt(
-                        &attempt_id,
-                        &TaskBoardRuntimeTerminalReport {
-                            state: crate::task_board::TaskBoardWorkItemState::Blocked,
-                            summary: None,
-                            blocked_reason: Some(terminal_reason),
-                        },
-                    )
+                    .project_task_board_runtime_terminal_for_attempt(&attempt_id, report)
                     .await?;
             }
             if agent_id.is_empty() {
@@ -447,17 +444,4 @@ impl AgentTuiManagerHandle {
         }
         Ok(())
     }
-}
-
-fn workspace_terminal_reason(snapshot: &AgentTuiSnapshot, fallback: &str) -> String {
-    let detail = snapshot
-        .error
-        .as_deref()
-        .or(snapshot.signal.as_deref())
-        .map(str::trim)
-        .filter(|detail| !detail.is_empty());
-    detail.map_or_else(
-        || format!("{fallback} before reporting completion"),
-        |detail| format!("{fallback} before reporting completion: {detail}"),
-    )
 }

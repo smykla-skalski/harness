@@ -341,7 +341,19 @@ pub(super) async fn release_item_admission_in_tx(
         "UPDATE task_board_dispatch_admission_ledger
          SET state = 'released', expires_at = NULL, released_at = ?2
          WHERE item_id = ?1
-           AND (state = 'reserved' OR (kind = 'concurrency' AND state = 'committed'))",
+           AND (
+               state = 'reserved'
+               OR (
+                   kind = 'concurrency' AND state = 'committed'
+                   AND NOT EXISTS (
+                       SELECT 1 FROM task_board_work_item_progress AS progress
+                       WHERE progress.item_id = task_board_dispatch_admission_ledger.item_id
+                         AND progress.attempt_id = task_board_dispatch_admission_ledger.managed_worker_id
+                         AND progress.completed_at IS NOT NULL
+                         AND progress.worker_settled_at IS NULL
+                   )
+               )
+           )",
     )
     .bind(item_id)
     .bind(now)
@@ -357,8 +369,16 @@ pub(super) async fn ensure_item_admission_can_terminate_in_tx(
 ) -> Result<(), CliError> {
     let active = query_scalar::<_, bool>(
         "SELECT EXISTS(
-             SELECT 1 FROM task_board_dispatch_admission_ledger
-             WHERE item_id = ?1 AND kind = 'concurrency' AND state = 'committed'
+             SELECT 1 FROM task_board_dispatch_admission_ledger AS ledger
+             WHERE ledger.item_id = ?1 AND ledger.kind = 'concurrency'
+               AND ledger.state = 'committed'
+               AND NOT EXISTS (
+                   SELECT 1 FROM task_board_work_item_progress AS progress
+                   WHERE progress.item_id = ledger.item_id
+                     AND progress.attempt_id = ledger.managed_worker_id
+                     AND progress.completed_at IS NOT NULL
+                     AND progress.worker_settled_at IS NULL
+               )
          )",
     )
     .bind(item_id)

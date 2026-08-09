@@ -6,6 +6,7 @@ use super::work_item_progress::{TaskBoardWorkItemReportRequest, TaskBoardWorkIte
 use super::{work_item_progress, work_item_progress_settlement, work_item_progress_terminal};
 use crate::daemon::db::{AsyncDaemonDb, CliError};
 use crate::task_board::{AgentMode, TaskBoardWorkItemProgress, TaskBoardWorkItemState};
+use harness_daemon_managed_agents::AgentTuiStatus;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TaskBoardPendingWorkerSettlement {
@@ -20,6 +21,40 @@ pub(crate) struct TaskBoardRuntimeTerminalReport {
     pub(crate) state: TaskBoardWorkItemState,
     pub(crate) summary: Option<String>,
     pub(crate) blocked_reason: Option<String>,
+}
+
+impl TaskBoardRuntimeTerminalReport {
+    pub(crate) fn from_terminal_agent(
+        status: AgentTuiStatus,
+        error: Option<&str>,
+        signal: Option<&str>,
+    ) -> Option<Self> {
+        let reason = match status {
+            AgentTuiStatus::Exited => "managed terminal agent exited",
+            AgentTuiStatus::Failed => "managed terminal agent failed",
+            AgentTuiStatus::Stopped => "managed terminal agent stopped",
+            AgentTuiStatus::Starting | AgentTuiStatus::Running => return None,
+        };
+        let detail = error
+            .or(signal)
+            .map(str::trim)
+            .filter(|detail| !detail.is_empty());
+        let blocked_reason = detail.map_or_else(
+            || format!("{reason} before reporting completion"),
+            |detail| format!("{reason} before reporting completion: {detail}"),
+        );
+        Some(Self {
+            state: TaskBoardWorkItemState::Blocked,
+            summary: None,
+            blocked_reason: Some(blocked_reason),
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct TaskBoardTerminalWorkerAttempt {
+    pub(crate) attempt_id: String,
+    pub(crate) report: TaskBoardRuntimeTerminalReport,
 }
 
 pub(crate) trait WorkItemProgressQueries: Send + Sync {
@@ -61,6 +96,16 @@ pub(crate) trait WorkItemProgressQueries: Send + Sync {
         &self,
         limit: usize,
     ) -> Result<Vec<TaskBoardPendingWorkerSettlement>, CliError>;
+
+    /// Load sessionless interactive attempts whose durable runtime is terminal
+    /// but whose exact progress row still needs projection.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when the rows cannot be read or decoded.
+    async fn terminal_task_board_worker_attempts(
+        &self,
+        limit: usize,
+    ) -> Result<Vec<TaskBoardTerminalWorkerAttempt>, CliError>;
 
     /// Whether the exact work item is owned by the structured workflow engine.
     ///
@@ -129,6 +174,13 @@ impl WorkItemProgressQueries for AsyncDaemonDb {
     ) -> Result<Vec<TaskBoardPendingWorkerSettlement>, CliError> {
         work_item_progress_settlement::pending_task_board_work_item_worker_settlements(self, limit)
             .await
+    }
+
+    async fn terminal_task_board_worker_attempts(
+        &self,
+        limit: usize,
+    ) -> Result<Vec<TaskBoardTerminalWorkerAttempt>, CliError> {
+        work_item_progress_settlement::terminal_task_board_worker_attempts(self, limit).await
     }
 
     async fn task_board_work_item_is_workflow_owned(

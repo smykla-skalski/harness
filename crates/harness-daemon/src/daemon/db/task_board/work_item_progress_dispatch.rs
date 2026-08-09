@@ -2,7 +2,6 @@
 
 use sqlx::{Sqlite, Transaction};
 
-use super::dispatch_admission_tx_ext::TaskBoardDispatchAdmissionTxExt;
 use super::item_tx_ext::TaskBoardItemTxExt;
 use super::work_item_progress::project_item_in_tx;
 use super::work_item_progress_rows::load_progress_in_tx;
@@ -12,7 +11,6 @@ use crate::task_board::TaskBoardItem;
 pub(in crate::daemon::db::task_board) async fn reconcile_progress_after_dispatch_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     board_item_id: &str,
-    managed_worker_id: &str,
 ) -> Result<TaskBoardItem, CliError> {
     let (item, item_revision) = transaction
         .load_item_in_tx(board_item_id)
@@ -24,11 +22,6 @@ pub(in crate::daemon::db::task_board) async fn reconcile_progress_after_dispatch
     let Some(loaded) = load_progress_in_tx(transaction, board_item_id, work_item_id).await? else {
         return Ok(item);
     };
-    if loaded.progress.state.is_settled() {
-        transaction
-            .release_managed_worker_admission_in_tx(managed_worker_id)
-            .await?;
-    }
     Ok(
         project_item_in_tx(transaction, item, item_revision, &loaded.progress)
             .await?

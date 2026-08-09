@@ -180,7 +180,7 @@ fn only_the_first_hook_claim_emits_a_signal() {
 }
 
 #[test]
-fn concurrent_recovery_emits_a_prepared_signal_once() {
+fn concurrent_recovery_does_not_emit_an_acknowledged_signal() {
     with_temp_project(|project| {
         let signal_dir = project.join("signals");
         let signal = signal();
@@ -205,25 +205,7 @@ fn concurrent_recovery_emits_a_prepared_signal_once() {
         });
         let results = attempts.map(|attempt| attempt.join().unwrap());
 
-        assert_eq!(
-            results
-                .iter()
-                .filter(|injection| !injection.lines.is_empty())
-                .count(),
-            1
-        );
-        assert!(
-            results
-                .iter()
-                .any(|injection| injection.lines == ["[signal:inject_context] deliver once"])
-        );
-        let owner = results
-            .into_iter()
-            .find(|injection| !injection.lines.is_empty())
-            .expect("one recovery owner");
-        let mut output = Vec::new();
-        let rendered = rendered_signal_output(owner.lines.join("\n"));
-        signal_delivery::write_hook_output(&mut output, &rendered, owner.deliveries).unwrap();
+        assert!(results.iter().all(|injection| injection.lines.is_empty()));
         assert!(
             runtime::signal::read_pending_signals(&signal_dir)
                 .unwrap()
@@ -244,7 +226,7 @@ fn concurrent_recovery_emits_a_prepared_signal_once() {
 }
 
 #[test]
-fn failed_payload_settlement_is_recovered_without_losing_delivery() {
+fn failed_payload_move_after_stdout_flush_does_not_redeliver() {
     with_temp_project(|project| {
         let signal_dir = project.join("signals");
         let signal = signal();
@@ -259,10 +241,26 @@ fn failed_payload_settlement_is_recovered_without_losing_delivery() {
         let rendered = rendered_signal_output(failed.lines.join("\n"));
         signal_delivery::write_hook_output(&mut first_output, &rendered, failed.deliveries)
             .unwrap();
+        assert_eq!(
+            String::from_utf8(first_output).unwrap(),
+            "[signal:inject_context] deliver once"
+        );
         assert_settlement_is_prepared(&signal_dir, &signal, &acknowledged);
 
         fs::remove_dir(&obstructed_payload).unwrap();
-        assert_recovery_delivers_once(project, &signal_dir, &signal);
+        let retry = observe_signal(project, &signal_dir, &signal, "2026-08-06T10:00:02Z");
+        assert!(retry.lines.is_empty());
+        assert!(
+            runtime::signal::read_pending_signals(&signal_dir)
+                .unwrap()
+                .is_empty()
+        );
+        assert_eq!(
+            runtime::signal::read_acknowledgments(&signal_dir)
+                .unwrap()
+                .len(),
+            1
+        );
     });
 }
 

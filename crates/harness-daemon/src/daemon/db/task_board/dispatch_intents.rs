@@ -293,7 +293,6 @@ pub(super) async fn complete_task_board_dispatch(
     let item = super::work_item_progress_dispatch::reconcile_progress_after_dispatch_in_tx(
         &mut transaction,
         &item.id,
-        managed_worker_id,
     )
     .await?;
     transaction

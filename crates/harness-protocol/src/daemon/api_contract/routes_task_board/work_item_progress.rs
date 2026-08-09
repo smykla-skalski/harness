@@ -15,5 +15,5 @@ pub(super) const REPORT_ROUTE: HttpApiRouteContract = HttpApiRouteContract {
     parity: HttpRouteParity::Rpc {
         ws_method: ws_methods::TASK_BOARD_PROGRESS_REPORT,
     },
-    swift_client_exposed: true,
+    swift_client_exposed: false,
 };
