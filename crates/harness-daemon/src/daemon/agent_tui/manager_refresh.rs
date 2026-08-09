@@ -335,12 +335,21 @@ impl AgentTuiManagerHandle {
         let _ = self.remove_active(tui_id);
     }
 
-    fn wait_for_live_refresh_tick(stop_flag: &AtomicBool, delay: std::time::Duration) -> bool {
-        if stop_flag.load(Ordering::Relaxed) {
-            return false;
+    pub(super) fn wait_for_live_refresh_tick(
+        stop_flag: &AtomicBool,
+        delay: std::time::Duration,
+    ) -> bool {
+        let deadline = std::time::Instant::now() + delay;
+        loop {
+            if stop_flag.load(Ordering::Relaxed) {
+                return false;
+            }
+            let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+            if remaining.is_zero() {
+                return true;
+            }
+            thread::sleep(remaining.min(LIVE_REFRESH_INTERVAL));
         }
-        thread::sleep(delay);
-        !stop_flag.load(Ordering::Relaxed)
     }
 
     pub(super) fn live_refresh_retry_delay(current: std::time::Duration) -> std::time::Duration {

@@ -1,3 +1,4 @@
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 
 use tokio::sync::broadcast;
@@ -118,6 +119,26 @@ fn sandboxed_live_refresh_retry_backs_off_to_thirty_seconds() {
         AgentTuiManagerHandle::live_refresh_retry_delay(delay),
         std::time::Duration::from_secs(30)
     );
+}
+
+#[test]
+fn live_refresh_backoff_stops_without_waiting_for_the_full_delay() {
+    let stop_flag = Arc::new(AtomicBool::new(false));
+    let stop_flag_for_thread = Arc::clone(&stop_flag);
+    let stopper = std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        stop_flag_for_thread.store(true, Ordering::Relaxed);
+    });
+    let started = std::time::Instant::now();
+
+    let should_refresh = AgentTuiManagerHandle::wait_for_live_refresh_tick(
+        &stop_flag,
+        std::time::Duration::from_secs(30),
+    );
+
+    stopper.join().expect("stopper thread");
+    assert!(!should_refresh);
+    assert!(started.elapsed() < std::time::Duration::from_millis(250));
 }
 
 #[test]
