@@ -89,6 +89,12 @@ impl DispatchAdmissionQueries for AsyncDaemonDb {
         super::admission_recovery::task_board_admission_worker_recoveries(self).await
     }
 
+    async fn prepare_task_board_admission_worker_recoveries(
+        &self,
+    ) -> Result<Vec<TaskBoardAdmissionWorkerRecovery>, CliError> {
+        super::admission_recovery::prepare_task_board_admission_worker_recoveries(self).await
+    }
+
     async fn migrate_legacy_task_board_admission_worker_owners(&self) -> Result<usize, CliError> {
         super::admission_recovery::migrate_legacy_task_board_admission_worker_owners(self).await
     }

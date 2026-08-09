@@ -40,8 +40,7 @@ pub(crate) use workspace_ownership::worker_lock_owner;
 mod worker_start;
 use worker_start::{start_codex_worker, start_interactive_worker};
 
-mod restart_recovery;
-pub(crate) use restart_recovery::reconcile_interactive_workers_after_restart;
+pub(crate) mod restart_recovery;
 
 pub(crate) struct TaskBoardDispatchClaimHeartbeat {
     task: JoinHandle<()>,

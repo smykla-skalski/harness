@@ -2,7 +2,9 @@
 
 use crate::daemon::db::TaskBoardAdmissionWorkerRecovery;
 use crate::daemon::db::task_board::prelude::*;
-use crate::daemon::http::{DaemonHttpState, require_async_db, run_terminal_agent_blocking};
+#[cfg(test)]
+use crate::daemon::http::require_async_db;
+use crate::daemon::http::{DaemonHttpState, run_terminal_agent_blocking};
 use crate::daemon::protocol::ManagedAgentSnapshot;
 use harness_daemon_managed_agents::AsyncAgentTuiStorage;
 use harness_kernel::errors::CliError;
@@ -11,13 +13,21 @@ use super::{join_worker_to_workspace, recover_same_applied_worker, worker_lock_o
 
 const MISSING_WORKER_RECOVERY_REASON: &str = "Managed worker was missing after daemon restart";
 
+#[cfg(test)]
 pub(crate) async fn reconcile_interactive_workers_after_restart(
     state: &DaemonHttpState,
 ) -> Result<(), CliError> {
     let db = require_async_db(state, "interactive task-board admission recovery")?;
-    db.migrate_legacy_task_board_admission_worker_owners()
-        .await?;
-    for recovery in db.task_board_admission_worker_recoveries().await? {
+    let recoveries = db.prepare_task_board_admission_worker_recoveries().await?;
+    reconcile_interactive_workers(state, db, &recoveries).await
+}
+
+pub(crate) async fn reconcile_interactive_workers(
+    state: &DaemonHttpState,
+    db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
+    recoveries: &[TaskBoardAdmissionWorkerRecovery],
+) -> Result<(), CliError> {
+    for recovery in recoveries {
         if !recovery.managed_worker_id.starts_with("agent-tui-") {
             continue;
         }
@@ -26,7 +36,7 @@ pub(crate) async fn reconcile_interactive_workers_after_restart(
             .managed_agent_mutation_locks
             .lock(&owner, &recovery.managed_worker_id)
             .await;
-        reconcile_interactive_worker(state, db, &recovery).await?;
+        reconcile_interactive_worker(state, db, recovery).await?;
     }
     Ok(())
 }

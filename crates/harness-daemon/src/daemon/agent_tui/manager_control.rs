@@ -80,7 +80,14 @@ impl AgentTuiManagerHandle {
 
         let previous = snapshot.clone();
         let refreshed = if self.is_tui_active(&snapshot.tui_id)? {
-            self.refresh_live_snapshot(snapshot)?
+            match self.refresh_live_snapshot(snapshot) {
+                Ok(refreshed) => refreshed,
+                Err(error) if self.state.sandboxed => {
+                    Self::warn_live_refresh_failure(&previous.tui_id, &error);
+                    previous.clone()
+                }
+                Err(error) => return Err(error),
+            }
         } else {
             Self::orphaned_inactive_snapshot(snapshot)
         };
@@ -107,6 +114,14 @@ impl AgentTuiManagerHandle {
         workspace_id: &str,
     ) -> Result<AgentTuiSnapshot, CliError> {
         let previous = self.load_snapshot(tui_id)?;
+        if self.state.sandboxed && previous.status == AgentTuiStatus::Running {
+            let mut recovered = previous;
+            recovered.session_id = workspace_id.to_string();
+            recovered.workspace_id = Some(workspace_id.to_string());
+            recovered.agent_id.clear();
+            self.register_recovered_snapshot(&recovered)?;
+            return Ok(recovered);
+        }
         let mut refreshed = self.refresh_live_snapshot(previous.clone())?;
         refreshed.session_id = workspace_id.to_string();
         refreshed.workspace_id = Some(workspace_id.to_string());
@@ -126,7 +141,9 @@ impl AgentTuiManagerHandle {
     ) -> Result<AgentTuiSnapshot, CliError> {
         request.validate().map_err(CliErrorKind::workflow_parse)?;
         if self.state.sandboxed {
-            let snapshot = self.normalize_snapshot(
+            let previous = self.load_snapshot(tui_id)?;
+            let snapshot = self.normalize_bridge_snapshot(
+                &previous,
                 BridgeClient::for_capability(BridgeCapability::AgentTui)?
                     .agent_tui_input(tui_id, request)?,
             );
@@ -203,7 +220,9 @@ impl AgentTuiManagerHandle {
         request: &AgentTuiResizeRequest,
     ) -> Result<AgentTuiSnapshot, CliError> {
         if self.state.sandboxed {
-            let snapshot = self.normalize_snapshot(
+            let previous = self.load_snapshot(tui_id)?;
+            let snapshot = self.normalize_bridge_snapshot(
+                &previous,
                 BridgeClient::for_capability(BridgeCapability::AgentTui)?
                     .agent_tui_resize(tui_id, request)?,
             );
@@ -230,7 +249,7 @@ impl AgentTuiManagerHandle {
                 .and_then(|bridge| bridge.agent_tui_stop(tui_id))
             {
                 Ok(stopped) => {
-                    let stopped = self.normalize_snapshot(stopped);
+                    let stopped = self.normalize_bridge_snapshot(&snapshot, stopped);
                     let _ = self.remove_active(tui_id)?;
                     self.save_and_broadcast("agent_tui_stopped", &stopped)?;
                     return Ok(stopped);

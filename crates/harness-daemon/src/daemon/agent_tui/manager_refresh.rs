@@ -30,6 +30,8 @@ use crate::daemon::db::task_board::prelude::{
 use crate::daemon::db_handle::{AsyncDaemonDbHandle, DaemonDbOwnedHandle};
 use harness_daemon_managed_agents::{AgentTuiSnapshot, AgentTuiStatus, lock};
 
+const LIVE_REFRESH_RETRY_LIMIT: std::time::Duration = std::time::Duration::from_secs(2);
+
 impl AgentTuiManagerHandle {
     pub(super) fn db(&self) -> Result<Arc<Mutex<DaemonDbOwnedHandle>>, CliError> {
         ensure_shared_db(&self.state.db)
@@ -143,11 +145,30 @@ impl AgentTuiManagerHandle {
         snapshot: AgentTuiSnapshot,
     ) -> Result<AgentTuiSnapshot, CliError> {
         if self.state.sandboxed && snapshot.status == AgentTuiStatus::Running {
-            let snapshot = BridgeClient::for_capability(BridgeCapability::AgentTui)?
-                .agent_tui_get(&snapshot.tui_id)?;
-            return Ok(self.normalize_snapshot(snapshot));
+            let refreshed = BridgeClient::for_capability(BridgeCapability::AgentTui)?
+                .agent_tui_get(&snapshot.tui_id);
+            return match refreshed {
+                Ok(refreshed) => Ok(self.normalize_bridge_snapshot(&snapshot, refreshed)),
+                Err(error) if error.code() == "KSRCLI090" => {
+                    Ok(Self::orphaned_inactive_snapshot(snapshot))
+                }
+                Err(error) => Err(error),
+            };
         }
         self.refresh_local_snapshot(snapshot)
+    }
+
+    pub(super) fn normalize_bridge_snapshot(
+        &self,
+        previous: &AgentTuiSnapshot,
+        mut refreshed: AgentTuiSnapshot,
+    ) -> AgentTuiSnapshot {
+        if let Some(workspace_id) = previous.workspace_id.as_ref() {
+            refreshed.session_id.clone_from(workspace_id);
+            refreshed.workspace_id = Some(workspace_id.clone());
+            refreshed.agent_id.clear();
+        }
+        self.normalize_snapshot(refreshed)
     }
 
     pub(super) fn refresh_local_snapshot(
@@ -269,25 +290,33 @@ impl AgentTuiManagerHandle {
     }
 
     fn run_live_refresh_loop(&self, tui_id: &str, stop_flag: &AtomicBool) {
-        while Self::wait_for_live_refresh_tick(stop_flag) && self.handle_live_refresh_step(tui_id) {
+        let mut delay = LIVE_REFRESH_INTERVAL;
+        loop {
+            if !Self::wait_for_live_refresh_tick(stop_flag, delay) {
+                break;
+            }
+            match self.live_refresh_step(tui_id) {
+                Ok(true) => delay = LIVE_REFRESH_INTERVAL,
+                Ok(false) => break,
+                Err(error) => {
+                    Self::warn_live_refresh_failure(tui_id, &error);
+                    if !self.state.sandboxed {
+                        break;
+                    }
+                    delay = (delay * 2).min(LIVE_REFRESH_RETRY_LIMIT);
+                }
+            }
         }
 
         let _ = self.remove_active(tui_id);
     }
 
-    fn wait_for_live_refresh_tick(stop_flag: &AtomicBool) -> bool {
+    fn wait_for_live_refresh_tick(stop_flag: &AtomicBool, delay: std::time::Duration) -> bool {
         if stop_flag.load(Ordering::Relaxed) {
             return false;
         }
-        thread::sleep(LIVE_REFRESH_INTERVAL);
+        thread::sleep(delay);
         !stop_flag.load(Ordering::Relaxed)
-    }
-
-    fn handle_live_refresh_step(&self, tui_id: &str) -> bool {
-        self.live_refresh_step(tui_id).unwrap_or_else(|error| {
-            Self::warn_live_refresh_failure(tui_id, &error);
-            false
-        })
     }
 
     fn live_refresh_step(&self, tui_id: &str) -> Result<bool, CliError> {
@@ -332,7 +361,7 @@ impl AgentTuiManagerHandle {
         clippy::cognitive_complexity,
         reason = "tracing macro expansion in a leaf logging helper"
     )]
-    fn warn_live_refresh_failure(tui_id: &str, error: &CliError) {
+    pub(super) fn warn_live_refresh_failure(tui_id: &str, error: &CliError) {
         tracing::warn!(tui_id = %tui_id, %error, "terminal agent live refresh failed");
     }
 

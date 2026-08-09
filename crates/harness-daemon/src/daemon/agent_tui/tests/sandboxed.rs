@@ -13,6 +13,42 @@ use crate::session::service as session_service;
 use crate::session::types::SessionRole;
 use crate::workspace::utc_now;
 
+use super::support::sample_snapshot;
+
+#[test]
+fn sandboxed_bridge_snapshot_preserves_durable_workspace_owner() {
+    let db = DaemonDbOwnedHandle(DaemonDb::open_in_memory().expect("open db"));
+    let db_slot = Arc::new(OnceLock::new());
+    db_slot
+        .set(Arc::new(Mutex::new(db)))
+        .expect("install test db");
+    let (sender, _) = broadcast::channel(8);
+    let manager = AgentTuiManagerHandle::new(sender, db_slot, true);
+    let mut previous = sample_snapshot(
+        "agent-tui-adopted",
+        "workspace-owner",
+        "",
+        "codex",
+        "2026-08-09T10:00:00Z",
+        "2026-08-09T10:00:01Z",
+    );
+    previous.workspace_id = Some("workspace-owner".into());
+    let bridge = sample_snapshot(
+        "agent-tui-adopted",
+        "legacy-session",
+        "legacy-agent",
+        "codex",
+        "2026-08-09T10:00:00Z",
+        "2026-08-09T10:00:02Z",
+    );
+
+    let normalized = manager.normalize_bridge_snapshot(&previous, bridge);
+
+    assert_eq!(normalized.workspace_id.as_deref(), Some("workspace-owner"));
+    assert_eq!(normalized.session_id, "workspace-owner");
+    assert!(normalized.agent_id.is_empty());
+}
+
 #[test]
 fn sandboxed_stop_without_bridge_falls_back_to_local_cleanup() {
     let tmp = tempfile::tempdir().expect("tempdir");

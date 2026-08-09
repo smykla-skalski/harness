@@ -3,8 +3,11 @@ use crate::task_board::{AgentMode, TaskBoardWorkItemState};
 use harness_daemon_managed_agents::{AgentTuiStatus, AsyncAgentTuiStorage};
 
 use super::managed_worker_id;
-use super::reconcile_interactive_workers_after_restart;
-use super::test_support::{applied_task, seed_workspace_owner, terminal_snapshot, test_http_state};
+use super::restart_recovery::reconcile_interactive_workers_after_restart;
+use super::test_support::{
+    applied_task, seed_workspace_owner, terminal_snapshot, test_http_state,
+    test_http_state_with_sandboxed,
+};
 
 const INTENT_ID: &str = "dispatch-interactive-restart";
 const WORKSPACE_ID: &str = "workspace-interactive-restart";
@@ -71,6 +74,75 @@ async fn restart_recovers_interactive_worker_once_without_a_session() {
     .await
     .expect("count recovered members");
     assert_eq!(members, 1);
+}
+
+#[tokio::test]
+async fn restart_defers_a_live_interactive_worker_until_the_bridge_returns() {
+    let daemon_root = tempfile::tempdir().expect("daemon root");
+    let host_home = tempfile::tempdir().expect("host home");
+    Box::pin(temp_env::async_with_vars(
+        [
+            ("HARNESS_DAEMON_DATA_HOME", daemon_root.path().to_str()),
+            ("HARNESS_APP_GROUP_ID", None),
+            ("XDG_DATA_HOME", None),
+            ("HARNESS_HOST_HOME", host_home.path().to_str()),
+            ("HOME", host_home.path().to_str()),
+        ],
+        async {
+            let state = test_http_state_with_sandboxed(true);
+            let db = state.async_db.get().cloned().expect("test async db");
+            let mut applied = applied_task(AgentMode::Interactive);
+            applied.session_id = None;
+            applied.workspace_id = Some(WORKSPACE_ID.into());
+            applied.working_copy_id = Some(WORKING_COPY_ID.into());
+            applied.item.session_id = None;
+            applied.item.workspace_id = applied.workspace_id.clone();
+            applied.item.working_copy_id = applied.working_copy_id.clone();
+            applied.item.work_item_id = Some(applied.work_item_id.clone());
+            let worker_id = managed_worker_id(&applied, INTENT_ID);
+            seed_workspace(&db).await;
+            seed_dispatch(&db, &applied, &worker_id).await;
+            let mut snapshot = terminal_snapshot(AgentTuiStatus::Running, WORKSPACE_ID);
+            snapshot.tui_id.clone_from(&worker_id);
+            snapshot.workspace_id = Some(WORKSPACE_ID.into());
+            snapshot.agent_id.clear();
+            db.save_agent_tui(&snapshot)
+                .await
+                .expect("persist bridge-hosted runtime");
+
+            reconcile_interactive_workers_after_restart(&state)
+                .await
+                .expect("defer recovery until the bridge returns");
+
+            tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+
+            assert!(
+                state
+                    .agent_tui_manager
+                    .is_tui_active(&worker_id)
+                    .expect("load recovered active state")
+            );
+            let recovered = db
+                .agent_tui(&worker_id)
+                .await
+                .expect("load deferred runtime")
+                .expect("deferred runtime");
+            assert_eq!(recovered.status, AgentTuiStatus::Running);
+            let ledger: String = sqlx::query_scalar(
+                "SELECT state FROM task_board_dispatch_admission_ledger
+                 WHERE ledger_id = 'ledger-interactive-restart'",
+            )
+            .fetch_one(db.pool())
+            .await
+            .expect("load deferred admission");
+            assert_eq!(ledger, "committed");
+            let _ = state
+                .agent_tui_manager
+                .remove_active(&worker_id)
+                .expect("stop deferred refresh");
+        },
+    ))
+    .await;
 }
 
 async fn seed_workspace(db: &crate::daemon::db_handle::AsyncDaemonDbHandle) {

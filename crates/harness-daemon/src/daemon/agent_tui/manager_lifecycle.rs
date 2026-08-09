@@ -280,10 +280,30 @@ impl AgentTuiManagerHandle {
         snapshot: &AgentTuiSnapshot,
         active: ActiveAgentTui,
     ) -> Result<(), CliError> {
+        self.register_snapshot("agent_tui_started", snapshot, active)
+    }
+
+    pub(crate) fn register_recovered_snapshot(
+        &self,
+        snapshot: &AgentTuiSnapshot,
+    ) -> Result<(), CliError> {
+        if self.is_tui_active(&snapshot.tui_id)? {
+            self.save_and_broadcast("agent_tui_updated", snapshot)?;
+            return Ok(());
+        }
+        self.register_snapshot("agent_tui_updated", snapshot, ActiveAgentTui::new(None))
+    }
+
+    fn register_snapshot(
+        &self,
+        event_name: &str,
+        snapshot: &AgentTuiSnapshot,
+        active: ActiveAgentTui,
+    ) -> Result<(), CliError> {
         let stop_flag = Arc::clone(&active.stop_flag);
         let tui_id = snapshot.tui_id.clone();
         self.active()?.insert(tui_id.clone(), active);
-        if let Err(error) = self.save_and_broadcast("agent_tui_started", snapshot) {
+        if let Err(error) = self.save_and_broadcast(event_name, snapshot) {
             let _ = self.remove_active(&tui_id)?;
             return Err(error);
         }

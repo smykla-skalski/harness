@@ -95,10 +95,7 @@ impl AgentTuiManagerHandle {
         transcript_path: &Path,
     ) -> Result<AgentTuiSnapshot, CliError> {
         let bridge = BridgeClient::for_capability(BridgeCapability::AgentTui)?;
-        // The bridge only spawns the PTY and reports what it made; ownership is
-        // the daemon's to record, so the workspace is stamped on the way in to
-        // persistence rather than sent across the bridge protocol.
-        let mut snapshot = bridge.agent_tui_start(&AgentTuiStartSpec {
+        let snapshot = bridge.agent_tui_start(&AgentTuiStartSpec {
             session_id: owner.workspace_id.to_string(),
             workspace_id: Some(owner.workspace_id.to_string()),
             agent_id: String::new(),
@@ -115,7 +112,6 @@ impl AgentTuiManagerHandle {
                 .map(ToString::to_string),
             effort: request.effort.clone(),
         })?;
-        snapshot.workspace_id = Some(owner.workspace_id.to_string());
         self.register_started_snapshot(&snapshot, ActiveAgentTui::new(None))?;
         Ok(snapshot)
     }
