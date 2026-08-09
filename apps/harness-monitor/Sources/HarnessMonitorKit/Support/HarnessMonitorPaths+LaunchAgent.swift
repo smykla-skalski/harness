@@ -72,6 +72,14 @@ extension HarnessMonitorPaths {
       .appendingPathComponent("managed-launch-agent.lock")
   }
 
+  public static func legacyManagedLaunchAgentLockURL(
+    using environment: HarnessMonitorEnvironment = .current
+  ) -> URL {
+    appGroupHarnessRoot(using: environment)
+      .appendingPathComponent("managed-launch-agents", isDirectory: true)
+      .appendingPathComponent("legacy-cleanup.lock")
+  }
+
   static func managedLaunchAgentControlRoot(
     using environment: HarnessMonitorEnvironment = .current
   ) -> URL {

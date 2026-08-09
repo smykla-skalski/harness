@@ -162,12 +162,11 @@ legacy_agent_plist_target="$launch_agents_dir/$plist_template_name"
 # `error: 22 (EINVAL)` on macOS 26 and silently leaves
 # `Service status: 3 (.notFound)` — the daemon never registers and
 # `Bootstrapping daemon client for managed daemon mode` then stalls
-# forever. The lane name still flows into the daemon via the
-# `HARNESS_MONITOR_RUNTIME_LANE` env entry below; we do not need it on
-# the launchd label as well. The pre-coexistence label format
-# `<base>.<lane>` worked by accident because the legacy plist was
-# registered on a much earlier macOS where SMAppService did not yet
-# enforce this match.
+# forever. The hyphenated lane suffix keeps each managed runtime isolated
+# while remaining one immediate child of the app group. The older dotted
+# labels were registered from fixed legacy plist filenames on macOS versions
+# that did not enforce the filename match; those fixed plists remain bundled
+# solely so upgrades can unregister them.
 app_group_id="$(harness_monitor_runtime_app_group_id)"
 bundle_stamp_path="$(resolve_bundle_stamp_path)"
 

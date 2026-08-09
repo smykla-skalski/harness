@@ -13,6 +13,39 @@ private struct ManagedDaemonQuiescenceResult: Sendable {
   let failure: String?
 }
 
+private enum ManagedDaemonControlOutcome: Sendable {
+  case stopped
+  case failed(String)
+  case timedOut
+  case cancelled
+}
+
+private actor ManagedDaemonControlGate {
+  private var outcome: ManagedDaemonControlOutcome?
+  private var waiters: [CheckedContinuation<ManagedDaemonControlOutcome, Never>] = []
+
+  func wait() async -> ManagedDaemonControlOutcome {
+    if let outcome {
+      return outcome
+    }
+    return await withCheckedContinuation { continuation in
+      waiters.append(continuation)
+    }
+  }
+
+  func finish(_ outcome: ManagedDaemonControlOutcome) {
+    guard self.outcome == nil else {
+      return
+    }
+    self.outcome = outcome
+    let waiters = waiters
+    self.waiters.removeAll()
+    for waiter in waiters {
+      waiter.resume(returning: outcome)
+    }
+  }
+}
+
 extension DaemonController {
   func quiesceManagedDaemonsAfterLegacyCleanupFailure() async throws {
     let deadline = ContinuousClock.now + managedStaleManifestGracePeriod
@@ -144,7 +177,8 @@ extension DaemonController {
           }
           try await requestManagedDaemonQuiescence(
             manifest,
-            trustedDaemonRoot: candidate.rootURL
+            trustedDaemonRoot: candidate.rootURL,
+            deadline: deadline
           )
           stopRequestedPID = pid
           stoppedPID = pid
@@ -175,7 +209,8 @@ extension DaemonController {
 
   private func requestManagedDaemonQuiescence(
     _ manifest: DaemonManifest,
-    trustedDaemonRoot: URL
+    trustedDaemonRoot: URL,
+    deadline: ContinuousClock.Instant
   ) async throws {
     let endpoint = try endpointURL(from: manifest.endpoint)
     guard Self.isTrustedManagedEndpoint(endpoint) else {
@@ -189,32 +224,85 @@ extension DaemonController {
       emitTrace: false
     )
     let client = sessionFactory(connection)
-    do {
-      _ = try? await client.setPolicyCanvasSpawnKillSwitch(
-        request: PolicyCanvasSetSpawnKillSwitchRequest(enabled: true)
+    let remaining = ContinuousClock.now.duration(to: deadline)
+    guard remaining > .zero else {
+      try terminateManagedDaemonAfterControlFailure(
+        manifest,
+        reason: "managed daemon control deadline expired"
       )
-      _ = try await client.stopDaemon()
-      await client.shutdown()
-    } catch {
-      let controlError = error
-      await client.shutdown()
+      return
+    }
+
+    let gate = ManagedDaemonControlGate()
+    let request = Task {
       do {
-        let pid = try validatedManagedDaemonFallbackPID(manifest)
-        guard processSignal(pid, SIGTERM) == 0 else {
-          throw DaemonControlError.commandFailed(
-            "validated managed daemon process could not be terminated"
-          )
-        }
-        HarnessMonitorLogger.lifecycle.fault(
-          "Signaled validated managed daemon pid \(pid, privacy: .public) after control failure"
+        _ = try? await client.setPolicyCanvasSpawnKillSwitch(
+          request: PolicyCanvasSetSpawnKillSwitchRequest(enabled: true)
         )
+        _ = try await client.stopDaemon()
+        await client.shutdown()
+        await gate.finish(.stopped)
       } catch {
-        let fallbackError = error
+        await client.shutdown()
+        await gate.finish(.failed(error.localizedDescription))
+      }
+    }
+    let timeout = Task {
+      do {
+        try await Task.sleep(for: remaining)
+      } catch {
+        return
+      }
+      await gate.finish(.timedOut)
+    }
+    let outcome = await withTaskCancellationHandler {
+      await gate.wait()
+    } onCancel: {
+      Task { await gate.finish(.cancelled) }
+    }
+    timeout.cancel()
+
+    switch outcome {
+    case .stopped:
+      return
+    case .cancelled:
+      request.cancel()
+      Task { await client.shutdown() }
+      throw CancellationError()
+    case .failed(let reason):
+      try terminateManagedDaemonAfterControlFailure(manifest, reason: reason)
+    case .timedOut:
+      request.cancel()
+      Task {
+        await client.shutdown()
+        await request.value
+      }
+      try terminateManagedDaemonAfterControlFailure(
+        manifest,
+        reason: "managed daemon control deadline expired"
+      )
+    }
+  }
+
+  private func terminateManagedDaemonAfterControlFailure(
+    _ manifest: DaemonManifest,
+    reason: String
+  ) throws {
+    do {
+      let pid = try validatedManagedDaemonFallbackPID(manifest)
+      guard processSignal(pid, SIGTERM) == 0 else {
         throw DaemonControlError.commandFailed(
-          "Managed daemon control failed: \(controlError.localizedDescription); "
-            + "validated process fallback failed: \(fallbackError.localizedDescription)"
+          "validated managed daemon process could not be terminated"
         )
       }
+      HarnessMonitorLogger.lifecycle.fault(
+        "Signaled validated managed daemon pid \(pid, privacy: .public) after control failure"
+      )
+    } catch {
+      throw DaemonControlError.commandFailed(
+        "Managed daemon control failed: \(reason); "
+          + "validated process fallback failed: \(error.localizedDescription)"
+      )
     }
   }
 }

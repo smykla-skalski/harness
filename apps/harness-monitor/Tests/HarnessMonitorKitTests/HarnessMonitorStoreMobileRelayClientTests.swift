@@ -11,8 +11,21 @@ final class HarnessMonitorStoreMobileRelayClientTests: XCTestCase {
 
     _ = try await store.clientForMobileRelay()
     let warmUpCallCount = await daemon.recordedWarmUpCallCount()
+    let cleanupCallCount = await daemon.recordedLegacyCleanupCallCount()
 
     XCTAssertEqual(warmUpCallCount, 0)
+    XCTAssertEqual(cleanupCallCount, 0)
+  }
+
+  func testMobileRelayClientUsesBackgroundClientWithoutCleanup() async throws {
+    let daemon = RecordingDaemonController()
+    let store = HarnessMonitorStore(daemonController: daemon)
+    store.mobileRelayBackgroundClient = PreviewHarnessClient()
+
+    _ = try await store.clientForMobileRelay()
+    let cleanupCallCount = await daemon.recordedLegacyCleanupCallCount()
+
+    XCTAssertEqual(cleanupCallCount, 0)
   }
 
   func testMobileRelayClientBootstrapsStoreInsteadOfOpeningSecondConnection() async throws {

@@ -108,6 +108,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var policyCanvasWorkspaceStorage: PolicyCanvasWorkspace?
   var policyCanvasSpawnKillSwitchRequests: [Bool] = []
   var stopDaemonRequestCount = 0
+  var stopDaemonDelay: Duration?
   var stopDaemonError: (any Error)?
   var policyPipelinesByCanvasID: [String: PolicyPipelineDocument] = [:]
   var policyAuditByCanvasID: [String: PolicyPipelineAuditSummary] = [:]

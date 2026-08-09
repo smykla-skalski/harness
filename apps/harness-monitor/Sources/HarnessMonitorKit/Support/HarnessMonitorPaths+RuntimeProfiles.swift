@@ -86,6 +86,22 @@ extension HarnessMonitorPaths {
       return inferredFromDataHome
     }
 
+    if let embeddedLane = sanitizeRuntimeLane(
+      embeddedBundleValue(
+        for: "HarnessMonitorManagedDaemonRuntimeLane",
+        using: environment
+      )
+    ) {
+      return embeddedLane
+    }
+
+    if let embeddedDataHome = embeddedBundleValue(
+      for: "HarnessMonitorManagedDaemonDataHome",
+      using: environment
+    ) {
+      return inferRuntimeLane(fromPath: embeddedDataHome)
+    }
+
     return nil
   }
 
@@ -160,6 +176,13 @@ extension HarnessMonitorPaths {
       environment.values[HarnessMonitorRuntimeLane.codexWSPortEnvironmentKey]
     ) {
       return explicitPort
+    }
+
+    if let embeddedPort = embeddedBundleValue(
+      for: "HarnessMonitorManagedDaemonCodexWSPort",
+      using: environment
+    ) {
+      return embeddedPort
     }
 
     guard let lane = resolvedRuntimeLane(using: environment) else {

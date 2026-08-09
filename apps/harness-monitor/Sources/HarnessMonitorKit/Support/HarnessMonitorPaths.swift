@@ -138,10 +138,10 @@ public enum HarnessMonitorPaths {
   /// `error: 22 (EINVAL)` and `Service status: 3 (.notFound)` whenever the
   /// two diverge, which manifests as a managed-daemon bootstrap that loops
   /// on `Bootstrapping daemon client for managed daemon mode` without ever
-  /// spawning a daemon process. Lane identity therefore flows through the
-  /// For sandboxed SMAppService launch agents, the service name must be an
-  /// immediate child of the app group. A lane suffix is joined with `-`, not
-  /// another `.`, so the service remains `<app-group>.<single-component>`.
+  /// spawning a daemon process. Sandboxed SMAppService launch agents must
+  /// also be immediate children of the app group, so the lane suffix is
+  /// joined with `-`, not another `.`, and the result remains
+  /// `<app-group>.<single-component>`.
   public static func launchAgentLabel(
     using environment: HarnessMonitorEnvironment = .current
   ) -> String {

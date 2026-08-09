@@ -175,6 +175,10 @@ struct DaemonControllerLaunchAgentLockTests {
       HarnessMonitorPaths.managedLaunchAgentBundleStampURL(using: laneA)
         != HarnessMonitorPaths.managedLaunchAgentBundleStampURL(using: laneB)
     )
+    #expect(
+      HarnessMonitorPaths.legacyManagedLaunchAgentLockURL(using: laneA)
+        == HarnessMonitorPaths.legacyManagedLaunchAgentLockURL(using: laneB)
+    )
   }
 }
 

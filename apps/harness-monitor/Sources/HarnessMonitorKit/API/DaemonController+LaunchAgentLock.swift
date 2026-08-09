@@ -41,6 +41,34 @@ extension DaemonController {
     perform: () async throws -> Value
   ) async throws -> LaunchAgentLockOutcome<Value> where Value: Sendable {
     let url = HarnessMonitorPaths.managedLaunchAgentLockURL(using: environment)
+    return try await withLaunchAgentLock(
+      at: url,
+      totalTimeout: totalTimeout,
+      retryInterval: retryInterval,
+      perform: perform
+    )
+  }
+
+  func withLegacyManagedLaunchAgentLock<Value>(
+    totalTimeout: Duration = .milliseconds(250),
+    retryInterval: Duration = .milliseconds(25),
+    perform: () async throws -> Value
+  ) async throws -> LaunchAgentLockOutcome<Value> where Value: Sendable {
+    let url = HarnessMonitorPaths.legacyManagedLaunchAgentLockURL(using: environment)
+    return try await withLaunchAgentLock(
+      at: url,
+      totalTimeout: totalTimeout,
+      retryInterval: retryInterval,
+      perform: perform
+    )
+  }
+
+  private func withLaunchAgentLock<Value>(
+    at url: URL,
+    totalTimeout: Duration,
+    retryInterval: Duration,
+    perform: () async throws -> Value
+  ) async throws -> LaunchAgentLockOutcome<Value> where Value: Sendable {
     try FileManager.default.createDirectory(
       at: url.deletingLastPathComponent(),
       withIntermediateDirectories: true

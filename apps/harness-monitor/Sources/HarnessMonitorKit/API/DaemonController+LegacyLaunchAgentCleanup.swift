@@ -52,6 +52,7 @@ public enum LegacyManagedLaunchAgentCleanup {
   ) async throws {
     let sendableDefaults = SendableUserDefaults(defaults)
     try await coordinator.run {
+      var lastQuiescenceFailure: String?
       while true {
         let attempt = await Task.detached(priority: .userInitiated) {
           serializedAttempt(
@@ -68,8 +69,18 @@ public enum LegacyManagedLaunchAgentCleanup {
           await afterCurrentServiceUnregister()
           continue
         }
-        try await quiesceOnFailure()
-        throw DaemonControlError.commandFailed(failureMessage)
+        do {
+          try await quiesceOnFailure()
+        } catch {
+          let message = error.localizedDescription
+          if message != lastQuiescenceFailure {
+            HarnessMonitorLogger.lifecycle.fault(
+              "Legacy daemon quiescence failed: \(message, privacy: .public)"
+            )
+            lastQuiescenceFailure = message
+          }
+          try await Task.sleep(for: .seconds(1))
+        }
       }
     }
   }
@@ -221,7 +232,7 @@ private actor LegacyManagedLaunchAgentCleanupCoordinator {
 
 extension DaemonController {
   public func requireLegacyManagedLaunchAgentCleanup() async throws {
-    let outcome = try await withManagedLaunchAgentLock(totalTimeout: .seconds(2)) {
+    let outcome = try await withLegacyManagedLaunchAgentLock(totalTimeout: .seconds(2)) {
       try await LegacyManagedLaunchAgentCleanup.requireComplete(
         defaults: legacyLaunchAgentCleanupDefaults.value,
         currentName: HarnessMonitorPaths.launchAgentPlistName(using: environment),

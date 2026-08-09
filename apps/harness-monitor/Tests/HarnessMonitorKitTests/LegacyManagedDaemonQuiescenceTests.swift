@@ -6,25 +6,6 @@ import Testing
 
 @Suite("Legacy managed daemon quiescence", .serialized)
 struct LegacyManagedDaemonQuiescenceTests {
-  @Test("Managed helper identity accepts isolated lanes and known legacy helpers")
-  func managedHelperIdentityAcceptsIsolatedLanes() {
-    #expect(
-      DaemonController.isTrustedManagedHelperIdentifier(
-        "Q498EB36N4.io.harnessmonitor.agent-fix-automation-6245e82a"
-      )
-    )
-    #expect(
-      DaemonController.isTrustedManagedHelperIdentifier(
-        "Q498EB36N4.io.harnessmonitor.daemon"
-      )
-    )
-    #expect(
-      DaemonController.isTrustedManagedHelperIdentifier(
-        "Q498EB36N4.io.harnessmonitor.agentforeign"
-      ) == false
-    )
-  }
-
   @Test("Controller fences and stops every trusted live managed daemon")
   func controllerFencesAndStopsTrustedManagedDaemon() async throws {
     let client = RecordingHarnessClient()
@@ -201,47 +182,6 @@ struct LegacyManagedDaemonQuiescenceTests {
     #expect(ContinuousClock.now - startedAt < .milliseconds(300))
   }
 
-  @Test("Controller falls back to a validated process signal")
-  func controllerFallsBackToValidatedProcessSignal() async throws {
-    let fixture = try ManagedDaemonQuiescenceFixture(name: "signal-fallback")
-    defer { fixture.remove() }
-    let candidate = try #require(
-      HarnessMonitorPaths.managedDaemonRootCandidates(using: fixture.environment).first
-    )
-    let pid: Int32 = 45_612
-    try fixture.writeManifest(
-      at: candidate,
-      endpoint: "http://127.0.0.1:65106",
-      pid: pid
-    )
-    let client = RecordingHarnessClient()
-    client.stopDaemonError = ManagedDaemonQuiescenceTestError.stopFailed
-    let signalRecorder = ManagedDaemonSignalRecorder()
-    let controller = DaemonController(
-      environment: fixture.environment,
-      ownership: .managed,
-      sessionFactory: { _ in client },
-      processLiveness: { requestedPID in
-        #expect(requestedPID == pid)
-        return .alive(
-          executablePath: "/Applications/Harness Monitor.app/Contents/Resources/harness-daemon")
-      },
-      processSignal: { requestedPID, signal in
-        signalRecorder.record(pid: requestedPID, signal: signal)
-        return 0
-      },
-      managedDaemonProcessIdentityValidator: { requestedPID in
-        requestedPID == pid
-      }
-    )
-
-    try await controller.quiesceManagedDaemonsAfterLegacyCleanupFailure()
-
-    let recordedSignal = try #require(signalRecorder.value)
-    #expect(recordedSignal.0 == pid)
-    #expect(recordedSignal.1 == SIGTERM)
-  }
-
   @Test("Controller recovers the endpoint from the candidate root")
   func controllerRecoversEndpointFromCandidateRoot() async throws {
     let fixture = try ManagedDaemonQuiescenceFixture(name: "endpoint-recovery")
@@ -270,7 +210,7 @@ struct LegacyManagedDaemonQuiescenceTests {
   }
 }
 
-private struct ManagedDaemonQuiescenceFixture {
+struct ManagedDaemonQuiescenceFixture {
   let homeDirectory: URL
   let environment: HarnessMonitorEnvironment
 
@@ -365,7 +305,7 @@ private struct ManagedDaemonQuiescenceFixture {
   }
 }
 
-private final class ManagedDaemonSignalRecorder: @unchecked Sendable {
+final class ManagedDaemonSignalRecorder: @unchecked Sendable {
   private let lock = NSLock()
   private var recordedValue: (Int32, Int32)?
 
@@ -403,7 +343,7 @@ private actor ManagedDaemonQuiescenceCompletion {
   }
 }
 
-private enum ManagedDaemonQuiescenceTestError: Error {
+enum ManagedDaemonQuiescenceTestError: Error {
   case lockFailed
   case stopFailed
 }

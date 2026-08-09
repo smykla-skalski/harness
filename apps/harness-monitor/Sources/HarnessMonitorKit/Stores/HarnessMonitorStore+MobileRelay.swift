@@ -2,7 +2,6 @@ import Foundation
 
 extension HarnessMonitorStore {
   public func clientForMobileRelay() async throws -> any HarnessMonitorClientProtocol {
-    try await daemonController.requireLegacyManagedLaunchAgentCleanup()
     if let client {
       return client
     }
@@ -20,6 +19,7 @@ extension HarnessMonitorStore {
       }
     }
 
+    try await daemonController.requireLegacyManagedLaunchAgentCleanup()
     let client = try await makeMobileRelayBackgroundClient()
     mobileRelayBackgroundClient = client
     return client

@@ -173,7 +173,18 @@ extension HarnessMonitorStoreHostBridgeTests {
       recoveredClient.recordedCalls().last
         == .reconfigureHostBridge(enable: ["codex"], disable: [], force: false)
     )
-    #expect(await daemon.recordedOperations() == ["warm-up", "repair", "warm-up"])
+    let recordedOperations = await daemon.recordedOperations()
+    #expect(
+      recordedOperations
+        == [
+          "legacy-cleanup",
+          "legacy-cleanup",
+          "warm-up",
+          "legacy-cleanup",
+          "repair",
+          "warm-up",
+        ]
+    )
     #expect(store.hostBridgeCapabilityState(for: "codex") == .ready)
     #expect(store.currentSuccessFeedbackMessage == "Enabled Codex host bridge")
   }

@@ -7,6 +7,10 @@ private let managedDaemonLaunchAgentLabel =
   ?? "Q498EB36N4.io.harnessmonitor.agent"
 private let managedDaemonDataHome =
   ProcessInfo.processInfo.environment["TUIST_MANAGED_DAEMON_DATA_HOME"] ?? ""
+private let managedDaemonRuntimeLane =
+  ProcessInfo.processInfo.environment["TUIST_MANAGED_DAEMON_RUNTIME_LANE"] ?? ""
+private let managedDaemonCodexWSPort =
+  ProcessInfo.processInfo.environment["TUIST_MANAGED_DAEMON_CODEX_WS_PORT"] ?? ""
 
 private let macOSDestinations: Destinations = [.mac]
 private let macOSDeploymentTargets: DeploymentTargets = .macOS("26.0")
@@ -747,6 +751,9 @@ private let monitorAppSettings: Settings = .settings(
     "INFOPLIST_FILE": "Resources/HarnessMonitor-Info.plist",
     "HARNESS_MONITOR_DAEMON_LAUNCH_AGENT_LABEL": .string(managedDaemonLaunchAgentLabel),
     "HARNESS_MONITOR_BUNDLED_DAEMON_DATA_HOME": .string(managedDaemonDataHome),
+    "HARNESS_DAEMON_DATA_HOME": .string(managedDaemonDataHome),
+    "HARNESS_MONITOR_RUNTIME_LANE": .string(managedDaemonRuntimeLane),
+    "HARNESS_CODEX_WS_PORT": .string(managedDaemonCodexWSPort),
     "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.app",
     "PRODUCT_MODULE_NAME": "HarnessMonitor",
     "PRODUCT_NAME": "Harness Monitor",
@@ -804,6 +811,9 @@ private let externalDaemonAppSettings: Settings = .settings(
     "INFOPLIST_FILE": "Resources/HarnessMonitor-Info.plist",
     "HARNESS_MONITOR_DAEMON_LAUNCH_AGENT_LABEL": .string(managedDaemonLaunchAgentLabel),
     "HARNESS_MONITOR_BUNDLED_DAEMON_DATA_HOME": .string(managedDaemonDataHome),
+    "HARNESS_DAEMON_DATA_HOME": .string(managedDaemonDataHome),
+    "HARNESS_MONITOR_RUNTIME_LANE": .string(managedDaemonRuntimeLane),
+    "HARNESS_CODEX_WS_PORT": .string(managedDaemonCodexWSPort),
     "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.app",
     "PRODUCT_MODULE_NAME": "HarnessMonitor",
     "PRODUCT_NAME": "Harness Monitor (External Daemon)",
@@ -848,6 +858,9 @@ private let uiTestHostSettings: Settings = .settings(
     "INFOPLIST_FILE": "Resources/HarnessMonitor-Info.plist",
     "HARNESS_MONITOR_DAEMON_LAUNCH_AGENT_LABEL": .string(managedDaemonLaunchAgentLabel),
     "HARNESS_MONITOR_BUNDLED_DAEMON_DATA_HOME": .string(managedDaemonDataHome),
+    "HARNESS_DAEMON_DATA_HOME": .string(managedDaemonDataHome),
+    "HARNESS_MONITOR_RUNTIME_LANE": .string(managedDaemonRuntimeLane),
+    "HARNESS_CODEX_WS_PORT": .string(managedDaemonCodexWSPort),
     "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.app.ui-testing",
     "PRODUCT_NAME": "Harness Monitor UI Testing",
     "REGISTER_APP_GROUPS": "YES",
@@ -895,6 +908,9 @@ private let isolatedAppSettings: Settings = .settings(
     "INFOPLIST_FILE": "Resources/HarnessMonitor-Info.plist",
     "HARNESS_MONITOR_DAEMON_LAUNCH_AGENT_LABEL": .string(managedDaemonLaunchAgentLabel),
     "HARNESS_MONITOR_BUNDLED_DAEMON_DATA_HOME": .string(managedDaemonDataHome),
+    "HARNESS_DAEMON_DATA_HOME": .string(managedDaemonDataHome),
+    "HARNESS_MONITOR_RUNTIME_LANE": .string(managedDaemonRuntimeLane),
+    "HARNESS_CODEX_WS_PORT": .string(managedDaemonCodexWSPort),
     "PRODUCT_BUNDLE_IDENTIFIER": .string(isolatedAppBundleId),
     "PRODUCT_NAME": "Harness Monitor Isolated",
     "REGISTER_APP_GROUPS": "NO",
