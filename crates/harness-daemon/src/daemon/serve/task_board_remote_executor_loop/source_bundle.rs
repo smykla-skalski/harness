@@ -106,10 +106,13 @@ pub(super) async fn apply_prior_phase_bundle(
 }
 
 pub(super) async fn require_prior_phase_bundle_applied(
+    _record: &TaskBoardRemoteAssignmentRecord,
     offer: &RemoteOfferRequest,
     identity: &RemoteWorkerIdentity,
     workspace: &Path,
 ) -> Result<(), CliError> {
+    #[cfg(test)]
+    record_prior_phase_audit(_record);
     let import = prior_phase_import_plan(offer, identity, workspace).await?;
     spawn_blocking(move || {
         import
@@ -307,6 +310,16 @@ pub(super) fn prior_phase_application_count(record: &TaskBoardRemoteAssignmentRe
 }
 
 #[cfg(test)]
+pub(super) fn prior_phase_audit_count(record: &TaskBoardRemoteAssignmentRecord) -> usize {
+    prior_phase_audits()
+        .lock()
+        .expect("lock prior-phase audit counts")
+        .get(&materialized_request_key(record))
+        .copied()
+        .unwrap_or_default()
+}
+
+#[cfg(test)]
 fn record_materialized_request_read(record: &TaskBoardRemoteAssignmentRecord) {
     let mut reads = materialized_request_reads()
         .lock()
@@ -322,6 +335,14 @@ fn record_prior_phase_application(record: &TaskBoardRemoteAssignmentRecord) {
     *applications
         .entry(materialized_request_key(record))
         .or_default() += 1;
+}
+
+#[cfg(test)]
+fn record_prior_phase_audit(record: &TaskBoardRemoteAssignmentRecord) {
+    let mut audits = prior_phase_audits()
+        .lock()
+        .expect("lock prior-phase audit counts");
+    *audits.entry(materialized_request_key(record)).or_default() += 1;
 }
 
 #[cfg(test)]
@@ -343,6 +364,12 @@ fn materialized_request_reads() -> &'static Mutex<HashMap<String, usize>> {
 fn prior_phase_applications() -> &'static Mutex<HashMap<String, usize>> {
     static APPLICATIONS: OnceLock<Mutex<HashMap<String, usize>>> = OnceLock::new();
     APPLICATIONS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+#[cfg(test)]
+fn prior_phase_audits() -> &'static Mutex<HashMap<String, usize>> {
+    static AUDITS: OnceLock<Mutex<HashMap<String, usize>>> = OnceLock::new();
+    AUDITS.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
 fn git_error(error: &GitError) -> CliError {

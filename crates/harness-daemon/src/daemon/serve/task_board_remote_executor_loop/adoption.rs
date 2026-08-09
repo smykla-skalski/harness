@@ -22,7 +22,7 @@ use super::runtime::{
 };
 use super::stop::claim_and_settle_invalid_remote_run;
 use super::stop::settle_lifecycle_settings_drift;
-use super::terminal::persist_terminal_snapshot;
+use super::terminal::{persist_terminal_snapshot, persist_terminal_source_failure};
 use super::{
     PreparedRemoteWorkspace, RemoteWorkerIdentity, claim_active_lifecycle_owner, concurrent,
     validate_terminal_remote_source,
@@ -84,7 +84,21 @@ pub(super) async fn execute_and_reconcile_remote_worker(
         record = adopted;
     }
     if !snapshot.status.is_active() {
-        validate_terminal_remote_source(offer, identity, workspace).await?;
+        if let Err(error) =
+            validate_terminal_remote_source(&record, offer, identity, workspace).await
+        {
+            tracing::warn!(
+                %error,
+                assignment_id = %record.assignment_id,
+                "remote executor terminal source audit failed"
+            );
+            return Box::pin(persist_terminal_source_failure(
+                db,
+                &state.daemon_epoch,
+                &record,
+            ))
+            .await;
+        }
         return Box::pin(persist_terminal_snapshot(
             db,
             &state.daemon_epoch,

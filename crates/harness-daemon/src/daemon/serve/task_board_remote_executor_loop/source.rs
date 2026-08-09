@@ -85,6 +85,7 @@ pub(super) async fn prepare_remote_workspace(
 }
 
 pub(super) async fn validate_terminal_remote_source(
+    record: &TaskBoardRemoteAssignmentRecord,
     offer: &RemoteOfferRequest,
     identity: &RemoteWorkerIdentity,
     workspace: &PreparedRemoteWorkspace,
@@ -93,7 +94,7 @@ pub(super) async fn validate_terminal_remote_source(
         return Ok(());
     }
     if matches!(offer.source, RemoteSourceMaterial::PriorPhaseBundle { .. }) {
-        return require_prior_phase_bundle_applied(offer, identity, workspace.path()).await;
+        return require_prior_phase_bundle_applied(record, offer, identity, workspace.path()).await;
     }
     let worktree = workspace.path().to_path_buf();
     let revision = initial_source_revision(offer)?.to_string();
