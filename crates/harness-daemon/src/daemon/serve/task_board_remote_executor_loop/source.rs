@@ -49,7 +49,8 @@ pub(super) async fn prepare_remote_workspace(
     let require_source_head =
         starts_worker || offer.binding.phase != TaskBoardExecutionPhase::Implementation;
     let revision = initial_source_revision(offer)?;
-    let repository_source = matches!(offer.source, RemoteSourceMaterial::Repository { .. });
+    let prior_phase_source = matches!(offer.source, RemoteSourceMaterial::PriorPhaseBundle { .. });
+    let checkout_requires_source_head = require_source_head && !prior_phase_source;
     let workspace = if offer.work_owner.is_some() {
         ensure_remote_workspace(
             db,
@@ -57,7 +58,7 @@ pub(super) async fn prepare_remote_workspace(
             identity,
             revision,
             starts_worker,
-            require_source_head && repository_source,
+            checkout_requires_source_head,
         )
         .await?
     } else {
@@ -68,12 +69,12 @@ pub(super) async fn prepare_remote_workspace(
                 identity,
                 revision,
                 starts_worker,
-                require_source_head && repository_source,
+                checkout_requires_source_head,
             )
             .await?,
         )
     };
-    if require_source_head && !repository_source {
+    if require_source_head && prior_phase_source {
         apply_prior_phase_bundle(db, record, offer, identity, workspace.path()).await?;
     }
     if starts_worker && !executor_settings_match(db, record, offer).await? {
@@ -96,7 +97,7 @@ async fn ensure_remote_workspace(
         invalid_transition("remote executor assignment has no frozen checkout path")
     })?);
     let offer = record.require_offer()?;
-    let snapshot_import = if allow_create || require_source_head {
+    let snapshot_import = if allow_create {
         materialize_repository_snapshot(db, record, offer, &origin).await?
     } else {
         None
@@ -225,7 +226,7 @@ pub(super) async fn ensure_remote_session(
         invalid_transition("remote executor assignment has no frozen checkout path")
     })?);
     let offer = record.require_offer()?;
-    let snapshot_import = if allow_create || require_source_head {
+    let snapshot_import = if allow_create {
         materialize_repository_snapshot(db, record, offer, &origin).await?
     } else {
         None

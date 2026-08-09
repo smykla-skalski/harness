@@ -111,7 +111,7 @@ async fn snapshot_import_survives_restart_then_creates_exact_session_and_cleans_
 }
 
 #[tokio::test]
-async fn workspace_snapshot_probe_accepts_the_implementation_head_without_reimporting_source() {
+async fn workspace_snapshot_start_rejects_drift_while_implementation_probe_accepts_it() {
     let data = tempfile::tempdir().expect("create isolated data root");
     let data_path = data.path().to_string_lossy().into_owned();
     Box::pin(temp_env::async_with_vars(
@@ -148,6 +148,22 @@ async fn workspace_snapshot_probe_accepts_the_implementation_head_without_reimpo
             );
             let implementation_head = git(workspace.path(), &["rev-parse", "HEAD"]);
             assert_ne!(implementation_head, source.revision);
+
+            let error = super::super::source::prepare_remote_workspace(
+                &fixture.db,
+                &assignment,
+                &offer,
+                &identity,
+                true,
+            )
+            .await
+            .expect_err("fresh Start rejects a workspace that drifted from its sealed snapshot");
+            assert!(
+                error
+                    .to_string()
+                    .contains("worktree head drifted before start"),
+                "unexpected snapshot Start fence: {error}"
+            );
 
             let recovered = super::super::source::prepare_remote_workspace(
                 &fixture.db,
