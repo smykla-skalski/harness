@@ -30,14 +30,10 @@ use super::{
 use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "sequential start/validate/adopt/settle pipeline, each step already its own helper"
-)]
 pub(super) async fn execute_and_reconcile_remote_worker(
     state: &DaemonHttpState,
     db: &AsyncDaemonDbHandle,
-    mut record: TaskBoardRemoteAssignmentRecord,
+    record: TaskBoardRemoteAssignmentRecord,
     offer: &RemoteOfferRequest,
     identity: &RemoteWorkerIdentity,
     action: &PreparedRemoteWorkerAction,
@@ -57,7 +53,59 @@ pub(super) async fn execute_and_reconcile_remote_worker(
                 };
             }
         };
-    let permit = action.permit();
+    Box::pin(reconcile_remote_worker_snapshot(
+        state,
+        db,
+        record,
+        offer,
+        identity,
+        action.permit(),
+        snapshot,
+        workspace,
+    ))
+    .await
+}
+
+pub(super) async fn reconcile_persisted_terminal_remote_worker(
+    state: &DaemonHttpState,
+    db: &AsyncDaemonDbHandle,
+    record: TaskBoardRemoteAssignmentRecord,
+    offer: &RemoteOfferRequest,
+    identity: &RemoteWorkerIdentity,
+    snapshot: &TaskBoardRemoteExecutorRun,
+) -> Result<(), CliError> {
+    let receipt = record
+        .start_receipt
+        .as_ref()
+        .ok_or_else(|| concurrent("terminal remote worker has no durable start receipt"))?;
+    let workspace = PreparedRemoteWorkspace::from_start_receipt(receipt);
+    Box::pin(reconcile_remote_worker_snapshot(
+        state,
+        db,
+        record,
+        offer,
+        identity,
+        None,
+        snapshot.clone(),
+        &workspace,
+    ))
+    .await
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the exact record, offer, runtime, owner, and workspace evidence stay explicit"
+)]
+async fn reconcile_remote_worker_snapshot(
+    state: &DaemonHttpState,
+    db: &AsyncDaemonDbHandle,
+    mut record: TaskBoardRemoteAssignmentRecord,
+    offer: &RemoteOfferRequest,
+    identity: &RemoteWorkerIdentity,
+    permit: Option<&TaskBoardRemoteExecutorStartIoPermit>,
+    snapshot: TaskBoardRemoteExecutorRun,
+    workspace: &PreparedRemoteWorkspace,
+) -> Result<(), CliError> {
     if record.state == TaskBoardRemoteAssignmentState::Claimed && permit.is_none() {
         return stop_pre_permit_remote_run(state, db, &record, &snapshot).await;
     }
@@ -84,31 +132,48 @@ pub(super) async fn execute_and_reconcile_remote_worker(
         record = adopted;
     }
     if !snapshot.status.is_active() {
-        if let Err(error) =
-            validate_terminal_remote_source(&record, offer, identity, workspace).await
-        {
-            tracing::warn!(
-                %error,
-                assignment_id = %record.assignment_id,
-                "remote executor terminal source audit failed"
-            );
-            return Box::pin(persist_terminal_source_failure(
-                db,
-                &state.daemon_epoch,
-                &record,
-            ))
-            .await;
-        }
-        return Box::pin(persist_terminal_snapshot(
-            db,
-            &state.daemon_epoch,
-            &record,
-            &snapshot,
-            workspace.path(),
-        ))
+        return persist_valid_terminal_snapshot(
+            state, db, &record, offer, identity, &snapshot, workspace,
+        )
         .await;
     }
     mark_running_if_active(db, &record, &snapshot).await
+}
+
+async fn persist_valid_terminal_snapshot(
+    state: &DaemonHttpState,
+    db: &AsyncDaemonDbHandle,
+    record: &TaskBoardRemoteAssignmentRecord,
+    offer: &RemoteOfferRequest,
+    identity: &RemoteWorkerIdentity,
+    snapshot: &TaskBoardRemoteExecutorRun,
+    workspace: &PreparedRemoteWorkspace,
+) -> Result<(), CliError> {
+    let source_result = match workspace.require_repository().await {
+        Ok(()) => validate_terminal_remote_source(record, offer, identity, workspace).await,
+        Err(error) => Err(error),
+    };
+    if let Err(error) = source_result {
+        tracing::warn!(
+            %error,
+            assignment_id = %record.assignment_id,
+            "remote executor terminal source audit failed"
+        );
+        return Box::pin(persist_terminal_source_failure(
+            db,
+            &state.daemon_epoch,
+            record,
+        ))
+        .await;
+    }
+    Box::pin(persist_terminal_snapshot(
+        db,
+        &state.daemon_epoch,
+        record,
+        snapshot,
+        workspace.path(),
+    ))
+    .await
 }
 
 /// Adopts a claimed worker's start and takes its lifecycle ownership.

@@ -43,8 +43,10 @@ mod terminal;
 #[path = "task_board_remote_executor_loop/workspace.rs"]
 mod workspace;
 use crate::daemon::db_handle::AsyncDaemonDbHandle;
-use adoption::execute_and_reconcile_remote_worker;
-use adoption::reconcile_persisted_start_without_run;
+use adoption::{
+    execute_and_reconcile_remote_worker, reconcile_persisted_start_without_run,
+    reconcile_persisted_terminal_remote_worker,
+};
 use cleanup::{cleanup_unstarted_executor_provisioning, reconcile_settled_executor_cleanup};
 use fences::{concurrent, invalid_transition, require_executor_identity, shutdown_observed};
 use recovery::{abandon_predecessor_claim, prepare_recovery};
@@ -260,6 +262,18 @@ async fn reconcile_active_remote_worker(
             .as_ref()
             .ok_or_else(|| concurrent("launch-drifted remote executor has no durable run"))?;
         return settle_lifecycle_settings_drift(state, db, &record, snapshot).await;
+    }
+    if record.start_receipt.is_some()
+        && matches!(
+            record.state,
+            TaskBoardRemoteAssignmentState::Started | TaskBoardRemoteAssignmentState::Running
+        )
+        && let Some(snapshot) = existing.as_ref().filter(|run| !run.status.is_active())
+    {
+        return reconcile_persisted_terminal_remote_worker(
+            state, db, record, &offer, identity, snapshot,
+        )
+        .await;
     }
     let Some(prepared) = prepare_active_remote_worker(
         db,

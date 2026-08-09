@@ -20,6 +20,7 @@ use crate::task_board::{
 };
 use chrono::{Duration, SecondsFormat, Utc};
 use harness_daemon_db_queries::AsyncAgentWorkingCopyQueries;
+use sqlx::query;
 
 #[tokio::test]
 async fn workspace_prior_phase_probe_skips_source_audit_until_terminal_validation() {
@@ -183,6 +184,168 @@ async fn drifted_terminal_source_settles_once_and_leaves_the_active_scan() {
         },
     ))
     .await;
+}
+
+#[tokio::test]
+async fn terminal_run_with_deleted_workspace_settles_source_failure_once() {
+    let data = tempfile::tempdir().expect("create isolated data root");
+    let data_path = data.path().to_string_lossy().into_owned();
+    Box::pin(temp_env::async_with_vars(
+        [
+            ("XDG_DATA_HOME", Some(data_path.as_str())),
+            (
+                "CLAUDE_SESSION_ID",
+                Some("remote-bundle-missing-workspace-test"),
+            ),
+        ],
+        async {
+            let source = BundleSource::new();
+            let fixture = remote_executor_fixture(1).await;
+            configure_executor(&fixture, source.repository.path()).await;
+            let mut template = fixture.request.clone();
+            template.deadline_at =
+                (Utc::now() + Duration::minutes(10)).to_rfc3339_opts(SecondsFormat::AutoSi, true);
+            let (offer, _) = workspace_owned_bundle_offer(&template, &source);
+            upload_bundle(&fixture, &offer, &source.bytes).await;
+            let assignment = Box::pin(claim_live_with_start_authority(&fixture, &offer)).await;
+            let identity = remote_executor_identity(&assignment).expect("executor identity");
+            let state = executor_state(&fixture.db, "instance-a");
+            let seam = install_deterministic_runtime_seam().await;
+
+            reconcile_task_board_remote_executor_tick(&state)
+                .await
+                .expect("start source-backed runtime");
+            let running = fixture
+                .db
+                .task_board_remote_assignment(&assignment.assignment_id)
+                .await
+                .expect("load running source-backed assignment")
+                .expect("running source-backed assignment");
+            let working_copy = fixture
+                .db
+                .load_agent_working_copy(&identity.working_copy_id)
+                .await
+                .expect("load running executor working copy")
+                .expect("running executor working copy");
+            persist_completed_run(&fixture, &identity.run_id, &running).await;
+            let layout = crate::daemon::service::workspace_checkout::recorded_layout(
+                &working_copy.project_name,
+                &working_copy.working_copy_id,
+            );
+            crate::workspace::worktree::WorktreeController::destroy(
+                source.repository.path(),
+                &layout,
+            )
+            .expect("destroy terminal runtime workspace");
+            assert!(!std::path::Path::new(&working_copy.worktree_path).exists());
+
+            reconcile_task_board_remote_executor_tick(&state)
+                .await
+                .expect("settle terminal runtime whose workspace disappeared");
+            let failed = fixture
+                .db
+                .task_board_remote_assignment(&assignment.assignment_id)
+                .await
+                .expect("load missing-workspace assignment")
+                .expect("missing-workspace assignment");
+            assert_eq!(failed.state, TaskBoardRemoteAssignmentState::Failed);
+            assert_eq!(
+                failed
+                    .status_response
+                    .as_ref()
+                    .and_then(|response| response.error_code.as_deref()),
+                Some("executor_source_invalid")
+            );
+            assert_eq!(
+                source_bundle::prior_phase_audit_count(&assignment),
+                0,
+                "missing repositories must settle before the expensive Git audit"
+            );
+
+            reconcile_task_board_remote_executor_tick(&state)
+                .await
+                .expect("settled missing-workspace failure leaves active scan");
+            assert_eq!(source_bundle::prior_phase_audit_count(&assignment), 0);
+            assert_eq!(seam.calls().await.len(), 1);
+        },
+    ))
+    .await;
+}
+
+#[tokio::test]
+async fn persisted_terminal_run_settles_without_another_runtime_probe() {
+    let data = tempfile::tempdir().expect("create isolated data root");
+    let data_path = data.path().to_string_lossy().into_owned();
+    Box::pin(temp_env::async_with_vars(
+        [
+            ("XDG_DATA_HOME", Some(data_path.as_str())),
+            (
+                "CLAUDE_SESSION_ID",
+                Some("remote-bundle-persisted-terminal-test"),
+            ),
+        ],
+        async {
+            let source = BundleSource::new();
+            let fixture = remote_executor_fixture(1).await;
+            configure_executor(&fixture, source.repository.path()).await;
+            let mut template = fixture.request.clone();
+            template.deadline_at =
+                (Utc::now() + Duration::minutes(10)).to_rfc3339_opts(SecondsFormat::AutoSi, true);
+            let (offer, _) = workspace_owned_bundle_offer(&template, &source);
+            upload_bundle(&fixture, &offer, &source.bytes).await;
+            let assignment = Box::pin(claim_live_with_start_authority(&fixture, &offer)).await;
+            let identity = remote_executor_identity(&assignment).expect("executor identity");
+            let state = executor_state(&fixture.db, "instance-a");
+            let seam = install_deterministic_runtime_seam().await;
+
+            reconcile_task_board_remote_executor_tick(&state)
+                .await
+                .expect("start source-backed runtime");
+            let running = fixture
+                .db
+                .task_board_remote_assignment(&assignment.assignment_id)
+                .await
+                .expect("load running source-backed assignment")
+                .expect("running source-backed assignment");
+            persist_completed_run(&fixture, &identity.run_id, &running).await;
+
+            reconcile_task_board_remote_executor_tick(&state)
+                .await
+                .expect("persist the already-terminal runtime");
+            let completed = fixture
+                .db
+                .task_board_remote_assignment(&assignment.assignment_id)
+                .await
+                .expect("load completed assignment")
+                .expect("completed assignment");
+            assert_eq!(completed.state, TaskBoardRemoteAssignmentState::Completed);
+            assert_eq!(source_bundle::prior_phase_audit_count(&assignment), 1);
+            assert_eq!(
+                seam.calls().await.len(),
+                1,
+                "a durable terminal runtime must not be probed again"
+            );
+        },
+    ))
+    .await;
+}
+
+async fn persist_completed_run(
+    fixture: &RemoteExecutorFixture,
+    run_id: &str,
+    record: &TaskBoardRemoteAssignmentRecord,
+) {
+    query(
+        "UPDATE codex_runs
+         SET status = 'completed', final_message = ?2, updated_at = ?3
+         WHERE run_id = ?1",
+    )
+    .bind(run_id)
+    .bind(completed_message(record))
+    .bind(crate::workspace::utc_now())
+    .execute(fixture.db.pool())
+    .await
+    .expect("persist completed remote runtime");
 }
 
 fn completed_message(record: &crate::daemon::db::TaskBoardRemoteAssignmentRecord) -> String {
