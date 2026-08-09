@@ -53,23 +53,28 @@ public struct ServiceManagementDaemonLaunchAgentManager: DaemonLaunchAgentManagi
 /// One-shot cleanup of old SMAppService plists. The current sandbox-safe
 /// layout uses an app-group-child service name; earlier builds used
 /// `io.harnessmonitor.daemon.managed` and pre-coexistence builds used
-/// `io.harnessmonitor.daemon`. We try to unregister both silently on the first
-/// launch under the new layout and accept any failure.
+/// `io.harnessmonitor.daemon`. We unregister them before the current service
+/// is inspected so an upgrade cannot leave two automation daemons running.
 public enum LegacyManagedLaunchAgentCleanup {
-  /// UserDefaults key tracking which legacy plist names we have already
-  /// attempted to evict on this machine. Once a name is in here we skip the
-  /// per-launch attempt; SMAppService throws "Operation not permitted" when
-  /// the plist file is absent from the bundle whether or not BTM still holds
-  /// a record, so we cannot tell success from failure and one try is all the
-  /// framework gives us.
   public static let completedNamesDefaultsKey =
     "HarnessMonitor.LegacyLaunchAgentCleanup.CompletedNames"
+  static let attemptCountsDefaultsKey =
+    "HarnessMonitor.LegacyLaunchAgentCleanup.AttemptCounts"
+  static let strategyVersionDefaultsKey =
+    "HarnessMonitor.LegacyLaunchAgentCleanup.StrategyVersion"
+  static let strategyVersion = 2
+  static let maximumAttempts = 3
   private static let lock = NSLock()
   nonisolated(unsafe) private static var didAttempt = false
 
   /// Runs once per process. Subsequent calls are no-ops. Within the first
   /// call, also skips any legacy plist name already recorded in `defaults`.
-  public static func runOnce(defaults: UserDefaults = .standard) {
+  public static func runOnce(
+    defaults: UserDefaults = .standard,
+    managerFactory: (String) -> any DaemonLaunchAgentManaging = {
+      ServiceManagementDaemonLaunchAgentManager(plistName: $0)
+    }
+  ) {
     lock.lock()
     let alreadyAttempted = didAttempt
     didAttempt = true
@@ -77,31 +82,51 @@ public enum LegacyManagedLaunchAgentCleanup {
     guard !alreadyAttempted else { return }
 
     let currentName = HarnessMonitorPaths.launchAgentPlistName
-    let completedNames = Set(
-      defaults.stringArray(forKey: completedNamesDefaultsKey) ?? []
-    )
+    let usesCurrentStrategy =
+      defaults.integer(forKey: strategyVersionDefaultsKey) == strategyVersion
+    var completedNames =
+      usesCurrentStrategy
+      ? Set(defaults.stringArray(forKey: completedNamesDefaultsKey) ?? [])
+      : []
+    var attemptCounts =
+      usesCurrentStrategy
+      ? defaults.dictionary(forKey: attemptCountsDefaultsKey) as? [String: Int] ?? [:]
+      : [:]
     let pendingNames = HarnessMonitorPaths.legacyLaunchAgentPlistNames
-      .filter { $0 != currentName && !completedNames.contains($0) }
-    guard pendingNames.isEmpty == false else { return }
+      .filter {
+        $0 != currentName
+          && !completedNames.contains($0)
+          && attemptCounts[$0, default: 0] < maximumAttempts
+      }
+    guard pendingNames.isEmpty == false else {
+      defaults.set(strategyVersion, forKey: strategyVersionDefaultsKey)
+      return
+    }
 
     for legacyName in pendingNames {
-      // Attempt the unregister regardless of `SMAppService.status`. BTM may
-      // still hold a disposition record for an old label, and `unregister()`
-      // is the framework-owned eviction path. The marker below ensures we
-      // only burn the one attempt SMAppService allows per machine.
-      let legacyService = SMAppService.agent(plistName: legacyName)
+      let legacyService = managerFactory(legacyName)
+      let state = legacyService.registrationState()
       HarnessMonitorLogger.lifecycle.info(
         """
         Legacy SMAppService cleanup: legacy_plist=\(legacyName, privacy: .public) \
         current_plist=\(currentName, privacy: .public) \
-        status_raw=\(String(describing: legacyService.status), privacy: .public)
+        status=\(String(describing: state), privacy: .public)
         """
       )
-      attemptUnregister(legacyService, name: legacyName)
+      let completed =
+        state == .notRegistered
+        || attemptUnregister(legacyService, name: legacyName)
+      if completed {
+        completedNames.insert(legacyName)
+        attemptCounts.removeValue(forKey: legacyName)
+      } else {
+        attemptCounts[legacyName, default: 0] += 1
+      }
     }
 
-    let updated = completedNames.union(pendingNames)
-    defaults.set(updated.sorted(), forKey: completedNamesDefaultsKey)
+    defaults.set(completedNames.sorted(), forKey: completedNamesDefaultsKey)
+    defaults.set(attemptCounts, forKey: attemptCountsDefaultsKey)
+    defaults.set(strategyVersion, forKey: strategyVersionDefaultsKey)
   }
 
   /// Test-only escape hatch: clears the once-guard so a unit test can verify
@@ -112,12 +137,16 @@ public enum LegacyManagedLaunchAgentCleanup {
     lock.unlock()
   }
 
-  private static func attemptUnregister(_ service: SMAppService, name: String) {
+  private static func attemptUnregister(
+    _ service: any DaemonLaunchAgentManaging,
+    name: String
+  ) -> Bool {
     do {
       try service.unregister()
       HarnessMonitorLogger.lifecycle.info(
         "Auto-unregistered legacy SMAppService plist \(name, privacy: .public)"
       )
+      return true
     } catch {
       HarnessMonitorLogger.lifecycle.notice(
         """
@@ -125,6 +154,7 @@ public enum LegacyManagedLaunchAgentCleanup {
         \(error.localizedDescription, privacy: .public)
         """
       )
+      return false
     }
   }
 }

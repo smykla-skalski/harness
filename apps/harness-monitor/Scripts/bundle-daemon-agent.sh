@@ -122,6 +122,23 @@ file_stat_signature() {
   /usr/bin/stat -f '%m:%z' "$path"
 }
 
+resolve_bundle_stamp_path() {
+  local fallback="${DERIVED_FILE_DIR:-$TARGET_BUILD_DIR}/$TARGET_NAME-bundle-daemon-agent.stamp"
+  local output_count="${SCRIPT_OUTPUT_FILE_COUNT:-0}"
+  local index variable candidate
+  if [[ "$output_count" =~ ^[0-9]+$ ]]; then
+    for ((index = 0; index < output_count; index++)); do
+      variable="SCRIPT_OUTPUT_FILE_$index"
+      candidate="${!variable:-}"
+      if [[ "$candidate" == *-bundle-daemon-agent.stamp ]]; then
+        printf '%s\n' "$candidate"
+        return
+      fi
+    done
+  fi
+  printf '%s\n' "$fallback"
+}
+
 app_bundle="$TARGET_BUILD_DIR/$WRAPPER_NAME"
 # Resolved before the stamp so a build that had to defer the reseal cannot be
 # short-circuited by a later one that could have done it. Skipped under the
@@ -150,7 +167,7 @@ plist_target="$launch_agents_dir/$plist_name"
 # enforce this match.
 launch_agent_label="Q498EB36N4.io.harnessmonitor.agent"
 app_group_id="$(harness_monitor_runtime_app_group_id)"
-bundle_stamp_path="${SCRIPT_OUTPUT_FILE_8:-${DERIVED_FILE_DIR:-$TARGET_BUILD_DIR}/$TARGET_NAME-bundle-daemon-agent.stamp}"
+bundle_stamp_path="$(resolve_bundle_stamp_path)"
 
 # Resolve a codesign identity. Xcode populates EXPANDED_CODE_SIGN_IDENTITY
 # only when CODE_SIGNING_ALLOWED=YES; the `monitor:build` and named build

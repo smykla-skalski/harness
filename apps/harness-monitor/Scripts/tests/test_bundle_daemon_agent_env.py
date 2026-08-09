@@ -1054,6 +1054,13 @@ class BundleStampShortcutTests(unittest.TestCase):
             / "Q498EB36N4.io.harnessmonitor.agent.plist"
         )
         bundle_stamp_path = derived_dir / "HarnessMonitor-bundle-daemon-agent.stamp"
+        legacy_plist_path = (
+            target_build_dir
+            / "Contents"
+            / "Library"
+            / "LaunchAgents"
+            / "io.harnessmonitor.daemon.plist"
+        )
 
         (repo_root / ".git").mkdir(parents=True)
         project_dir.mkdir(parents=True, exist_ok=True)
@@ -1066,6 +1073,7 @@ class BundleStampShortcutTests(unittest.TestCase):
         daemon_target.write_text("bundled\n")
         daemon_target.chmod(0o755)
         plist_target.write_text("plist\n")
+        legacy_plist_path.write_text("legacy plist\n")
 
         bundle_stamp_path.write_text(
             "\n".join(_bundle_stamp_lines(daemon_source)) + "\n"
@@ -1088,6 +1096,9 @@ class BundleStampShortcutTests(unittest.TestCase):
             "EXPANDED_CODE_SIGN_IDENTITY": "fake-identity",
             "MARKETING_VERSION": "1.2.3",
             "WRAPPER_NAME": "Harness Monitor.app",
+            "SCRIPT_OUTPUT_FILE_COUNT": "10",
+            "SCRIPT_OUTPUT_FILE_8": str(legacy_plist_path),
+            "SCRIPT_OUTPUT_FILE_9": str(bundle_stamp_path),
         }
         return env, daemon_source
 
@@ -1104,6 +1115,8 @@ class BundleStampShortcutTests(unittest.TestCase):
             )
 
             self.assertEqual(completed.returncode, 0, msg=completed.stderr)
+            legacy_plist = Path(env["SCRIPT_OUTPUT_FILE_8"])
+            self.assertEqual(legacy_plist.read_text(), "legacy plist\n")
 
     def test_a_skeleton_plugin_invalidates_a_sealed_stamp(self) -> None:
         """A build that had to defer the reseal must not let the next one

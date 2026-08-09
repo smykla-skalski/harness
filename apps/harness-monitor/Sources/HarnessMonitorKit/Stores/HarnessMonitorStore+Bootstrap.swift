@@ -236,6 +236,7 @@ extension HarnessMonitorStore {
   }
 
   func bootstrapManagedDaemon() async {
+    LegacyManagedLaunchAgentCleanup.runOnce()
     await refreshManagedLaunchAgentOnFirstLaunchIfNeeded()
 
     let registrationState: DaemonLaunchAgentRegistrationState
