@@ -105,8 +105,11 @@ pub(super) async fn registration_is_current(
     .bind(&registration.assignment_id)
     .fetch_one(pool)
     .await
-    .map_err(|error| db_error(format!("load current workspace member registration: {error}")))?
-        != 0;
+    .map_err(|error| {
+        db_error(format!(
+            "load current workspace member registration: {error}"
+        ))
+    })? != 0;
     if !member_is_current {
         return Ok(false);
     }

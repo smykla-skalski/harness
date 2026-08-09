@@ -148,8 +148,8 @@ async fn bind_workspace_owned_run(
         return Ok(());
     }
     db.register_workspace_managed_member(&registration)
-    .await
-    .map(|_| ())
+        .await
+        .map(|_| ())
 }
 
 pub(super) fn remote_run_request(offer: &RemoteOfferRequest) -> CodexRunRequest {

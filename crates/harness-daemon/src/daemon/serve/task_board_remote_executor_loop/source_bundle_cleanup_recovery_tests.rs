@@ -18,7 +18,10 @@ async fn workspace_prior_phase_cleanup_recovers_after_files_were_removed_before_
     Box::pin(temp_env::async_with_vars(
         [
             ("XDG_DATA_HOME", Some(data_path.as_str())),
-            ("CLAUDE_SESSION_ID", Some("remote-workspace-cleanup-replay-test")),
+            (
+                "CLAUDE_SESSION_ID",
+                Some("remote-workspace-cleanup-replay-test"),
+            ),
         ],
         async {
             let source = BundleSource::new();
