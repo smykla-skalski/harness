@@ -19,10 +19,13 @@ public protocol DaemonControlling: Sendable {
     timeout: Duration
   ) async throws -> any HarnessMonitorClientProtocol
   func performDeferredManagedLaunchAgentRefreshIfNeeded() async -> Bool
+  func requireLegacyManagedLaunchAgentCleanup() async throws
 }
 
 extension DaemonControlling {
   public func refreshManagedLaunchAgentForLaunch() async throws -> Bool {
     false
   }
+
+  public func requireLegacyManagedLaunchAgentCleanup() async throws {}
 }

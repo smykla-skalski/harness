@@ -141,6 +141,18 @@ extension RecordingHarnessClient {
     }
   }
 
+  func setPolicyCanvasSpawnKillSwitch(
+    request: PolicyCanvasSetSpawnKillSwitchRequest
+  ) async throws -> PolicyCanvasWorkspace {
+    lock.withLock {
+      var workspace = ensurePolicyWorkspaceStateLocked()
+      policyCanvasSpawnKillSwitchRequests.append(request.enabled)
+      workspace.spawnKillSwitch = request.enabled
+      policyCanvasWorkspaceStorage = workspace
+      return workspace
+    }
+  }
+
   func policyPipeline(
     canvasId: String? = nil
   ) async throws -> PolicyPipelineDocument {

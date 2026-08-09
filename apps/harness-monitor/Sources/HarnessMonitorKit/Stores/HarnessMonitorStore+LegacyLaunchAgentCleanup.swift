@@ -1,9 +1,11 @@
 extension HarnessMonitorStore {
   func requireLegacyManagedLaunchAgentCleanup() async -> Bool {
-    guard LegacyManagedLaunchAgentCleanup.runOnce() else {
+    do {
+      try await daemonController.requireLegacyManagedLaunchAgentCleanup()
+      return true
+    } catch {
       await applyLaunchAgentOfflineState(reason: LegacyManagedLaunchAgentCleanup.failureMessage)
       return false
     }
-    return true
   }
 }

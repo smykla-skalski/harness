@@ -4,7 +4,7 @@ extension DaemonController {
   public func awaitManifestWarmUp(
     timeout: Duration
   ) async throws -> any HarnessMonitorClientProtocol {
-    try LegacyManagedLaunchAgentCleanup.requireComplete()
+    try await requireLegacyManagedLaunchAgentCleanup()
     var state = WarmUpLoopState(ownerSnapshot: currentOwnerSnapshot())
     state.pendingBundleStampRefresh =
       try managedLaunchAgentRefreshNeededForBundledHelperChange(state: &state)

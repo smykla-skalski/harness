@@ -39,7 +39,7 @@ extension HarnessMonitorStore {
   }
 
   func ensureManagedLaunchAgentReady() async throws -> DaemonLaunchAgentRegistrationState {
-    try LegacyManagedLaunchAgentCleanup.requireComplete()
+    try await daemonController.requireLegacyManagedLaunchAgentCleanup()
     var registrationState = await daemonController.launchAgentRegistrationState()
     if registrationState == .notRegistered || registrationState == .notFound {
       registrationState = try await daemonController.registerLaunchAgent()

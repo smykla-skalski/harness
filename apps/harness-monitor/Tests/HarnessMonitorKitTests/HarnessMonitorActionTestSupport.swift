@@ -106,6 +106,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var policySimulationOverride: Bool?
   var policyCanvasWorkspaceError: (any Error)?
   var policyCanvasWorkspaceStorage: PolicyCanvasWorkspace?
+  var policyCanvasSpawnKillSwitchRequests: [Bool] = []
   var policyPipelinesByCanvasID: [String: PolicyPipelineDocument] = [:]
   var policyAuditByCanvasID: [String: PolicyPipelineAuditSummary] = [:]
   var policyCanvasIDCounter = 1
