@@ -91,16 +91,16 @@ case "$mode" in
     exit 23
     ;;
   interrupt-cleans)
-    printf 'fake daemon started\\n'
-    printf '{"pid":999}\\n' >"$manifest"
     trap 'rm -f "$manifest"; printf "fake daemon cleaned manifest on interrupt\\n"; exit 130' INT TERM HUP
+    printf '{"pid":999}\\n' >"$manifest"
+    printf 'fake daemon started\\n'
     while :; do
       sleep 1
     done
     ;;
   interrupt-leaks)
-    printf '{"pid":999}\\n' >"$manifest"
     trap 'printf "fake daemon leaked manifest on interrupt\\n"; exit 130' INT TERM HUP
+    printf '{"pid":999}\\n' >"$manifest"
     while :; do
       sleep 1
     done
