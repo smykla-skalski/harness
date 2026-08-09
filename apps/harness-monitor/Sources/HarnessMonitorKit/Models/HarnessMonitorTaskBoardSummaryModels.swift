@@ -319,7 +319,7 @@ public struct TaskBoardDispatchAppliedTask: Codable, Equatable, Identifiable, Se
   public var id: String { boardItemId }
 
   /// Whichever owner this dispatch actually has.
-  public var ownerId: String? { workspaceId ?? sessionId }
+  public var ownerId: String? { workspaceId ?? sessionId ?? workingCopyId }
 }
 
 public struct TaskBoardDispatchReadiness: Codable, Equatable, Sendable {

@@ -97,14 +97,6 @@ async fn executor_offer_replay_and_digest_tamper_are_fail_closed() {
     let denied = authenticated_post(&client, &base_url, OFFER_PATH, OPERATOR, &offer).await;
     assert_eq!(denied.status(), StatusCode::FORBIDDEN);
 
-    let mut legacy = offer.clone();
-    legacy.work_owner = None;
-    legacy.request_sha256.clear();
-    let legacy = legacy.seal().expect("seal legacy Session-owned offer");
-    let rejected_legacy =
-        authenticated_post(&client, &base_url, OFFER_PATH, HOST_ID, &legacy).await;
-    assert_eq!(rejected_legacy.status(), StatusCode::BAD_REQUEST);
-
     let first = authenticated_post(&client, &base_url, OFFER_PATH, HOST_ID, &offer).await;
     assert_eq!(first.status(), StatusCode::OK);
     let first = first
@@ -133,6 +125,43 @@ async fn executor_offer_replay_and_digest_tamper_are_fail_closed() {
             .expect("load tampered assignment")
             .is_none()
     );
+
+    server.abort();
+    let _ = server.await;
+}
+
+#[tokio::test]
+async fn accepted_legacy_executor_offer_replays_after_owner_requirement() {
+    let state = remote_executor_state().await;
+    let async_db = state.async_db.get().expect("async db").clone();
+    let (base_url, server) = serve(state).await;
+    let client = Client::new();
+    let mut legacy = offer_request("assignment-route-legacy", "legacy-key");
+    legacy.work_owner = None;
+    legacy.request_sha256.clear();
+    let legacy = legacy.seal().expect("seal legacy Session-owned offer");
+
+    let rejected = authenticated_post(&client, &base_url, OFFER_PATH, HOST_ID, &legacy).await;
+    assert_eq!(rejected.status(), StatusCode::BAD_REQUEST);
+    async_db
+        .accept_task_board_remote_assignment_offer(
+            &legacy,
+            HOST_ID,
+            HOST_INSTANCE,
+            &Utc::now().to_rfc3339_opts(SecondsFormat::AutoSi, true),
+        )
+        .await
+        .expect("seed pre-upgrade accepted legacy offer");
+
+    let replay = authenticated_post(&client, &base_url, OFFER_PATH, HOST_ID, &legacy).await;
+    assert_eq!(replay.status(), StatusCode::OK);
+    let replay = replay
+        .json::<RemoteOfferResponse>()
+        .await
+        .expect("decode pre-upgrade accepted replay");
+    assert_eq!(replay.disposition, RemoteOfferDisposition::Accepted);
+    assert_eq!(replay.binding, legacy.binding);
+    assert_eq!(replay.offer_request_sha256, legacy.request_sha256);
 
     server.abort();
     let _ = server.await;

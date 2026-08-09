@@ -1,7 +1,7 @@
 use harness_daemon_db_core::db_error;
 use harness_kernel::errors::CliError;
 use harness_workspace::workspace::utc_now;
-use sqlx::{Sqlite, Transaction, query, query_as};
+use sqlx::{Sqlite, SqlitePool, Transaction, query, query_as, query_scalar};
 
 use crate::agent_workspaces::identity::digest_fields;
 
@@ -80,6 +80,70 @@ pub(super) async fn register_in_tx(
     .await
     .map_err(|error| db_error(format!("mark workspace team reconciled: {error}")))?;
     Ok(member_id)
+}
+
+pub(super) async fn registration_is_current(
+    pool: &SqlitePool,
+    registration: &WorkspaceMemberRegistration,
+) -> Result<bool, CliError> {
+    let member_is_current = query_scalar::<_, i64>(
+        "SELECT EXISTS (
+            SELECT 1 FROM agent_workspace_members
+            WHERE workspace_id = ?1 AND member_id = ?2 AND runtime_kind = ?3
+              AND managed_agent_kind = ?4 AND managed_agent_id = ?5
+              AND display_name = ?6 AND assignment_id IS ?7
+              AND membership_status = 'joined' AND liveness_status = 'active'
+              AND runtime_lifecycle = 'running'
+         )",
+    )
+    .bind(&registration.workspace_id)
+    .bind(registration.member_id())
+    .bind(&registration.runtime_kind)
+    .bind(registration.kind.as_str())
+    .bind(&registration.managed_agent_id)
+    .bind(&registration.display_name)
+    .bind(&registration.assignment_id)
+    .fetch_one(pool)
+    .await
+    .map_err(|error| db_error(format!("load current workspace member registration: {error}")))?
+        != 0;
+    if !member_is_current {
+        return Ok(false);
+    }
+    runtime_owner_is_current(pool, registration).await
+}
+
+async fn runtime_owner_is_current(
+    pool: &SqlitePool,
+    registration: &WorkspaceMemberRegistration,
+) -> Result<bool, CliError> {
+    let current = match registration.kind {
+        super::model::WorkspaceManagedAgentKind::Codex => query_scalar::<_, i64>(
+            "SELECT EXISTS (
+                SELECT 1 FROM codex_runs
+                WHERE run_id = ?1 AND workspace_id = ?2
+                  AND session_id IS NULL AND session_agent_id IS NULL
+             )",
+        ),
+        super::model::WorkspaceManagedAgentKind::Terminal => query_scalar::<_, i64>(
+            "SELECT EXISTS (
+                SELECT 1 FROM agent_tuis
+                WHERE tui_id = ?1 AND workspace_id = ?2
+                  AND session_id IS NULL AND agent_id = ''
+             )",
+        ),
+        super::model::WorkspaceManagedAgentKind::Acp => query_scalar::<_, i64>(
+            "SELECT EXISTS (
+                SELECT 1 FROM agent_turn_runs WHERE run_id = ?1 AND session_id = ?2
+             )",
+        ),
+    }
+    .bind(&registration.managed_agent_id)
+    .bind(&registration.workspace_id)
+    .fetch_one(pool)
+    .await
+    .map_err(|error| db_error(format!("load current managed runtime owner: {error}")))?;
+    Ok(current != 0)
 }
 
 async fn bind_runtime_owner_in_tx(

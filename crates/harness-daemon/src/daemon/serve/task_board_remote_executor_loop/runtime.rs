@@ -133,14 +133,21 @@ async fn bind_workspace_owned_run(
         "openrouter" => WorkspaceManagedAgentKind::Acp,
         _ => return Err(concurrent("remote workspace uses an unsupported runtime")),
     };
-    db.register_workspace_managed_member(&WorkspaceMemberRegistration {
+    let registration = WorkspaceMemberRegistration {
         workspace_id: workspace_id.to_string(),
         kind,
         managed_agent_id: identity.run_id.clone(),
         runtime_kind: offer.launch.runtime.clone(),
         display_name: offer.launch.display_name.clone(),
         assignment_id: Some(source_owner.work_item_id.clone()),
-    })
+    };
+    if db
+        .workspace_managed_member_is_current(&registration)
+        .await?
+    {
+        return Ok(());
+    }
+    db.register_workspace_managed_member(&registration)
     .await
     .map(|_| ())
 }

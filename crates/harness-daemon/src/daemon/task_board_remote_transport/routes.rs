@@ -262,12 +262,16 @@ async fn offer(
     map_route_result(
         async {
             request.validate().map_err(|error| wire_error(&error))?;
-            request
-                .work_owner
-                .as_ref()
-                .ok_or_else(|| wire_error(&RemoteWireError::MissingField("work_owner")))?;
             let (db, principal) =
                 assignment_route(&headers, &state, "offer", &request.binding).await?;
+            if request.work_owner.is_none()
+                && db
+                    .exact_task_board_remote_offer_receipt(&request, &principal)
+                    .await?
+                    .is_none()
+            {
+                return Err(wire_error(&RemoteWireError::MissingField("work_owner")));
+            }
             let outcome = db
                 .accept_task_board_remote_assignment_offer(
                     &request,

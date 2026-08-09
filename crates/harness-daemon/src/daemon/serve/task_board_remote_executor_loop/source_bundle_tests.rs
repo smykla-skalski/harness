@@ -26,6 +26,9 @@ const STARTED_AT: &str = "2026-07-19T10:00:30Z";
 const UNKNOWN_AT: &str = "2026-07-19T10:00:40Z";
 const EXPIRED_AT: &str = "2026-07-19T10:11:00Z";
 
+#[path = "source_bundle_cleanup_recovery_tests.rs"]
+mod cleanup_recovery_tests;
+
 #[tokio::test]
 async fn prior_phase_import_ref_is_cleaned_before_durable_cleanup_marker() {
     let data = tempfile::tempdir().expect("create isolated data root");

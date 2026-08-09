@@ -217,48 +217,6 @@ struct TaskBoardStepPromptPreview: View {
   }
 }
 
-struct TaskBoardHeldDispatchesView: View {
-  let summary: TaskBoardHeldDispatchSummary
-
-  @Environment(\.fontScale)
-  private var fontScale
-
-  private var groupFont: Font {
-    HarnessMonitorTextSize.scaledFont(.callout, by: fontScale)
-  }
-  private var itemTitleFont: Font {
-    HarnessMonitorTextSize.scaledFont(.callout.weight(.semibold), by: fontScale)
-  }
-  private var itemDetailFont: Font {
-    HarnessMonitorTextSize.scaledFont(.callout.monospaced(), by: fontScale)
-  }
-
-  var body: some View {
-    DisclosureGroup("Held for delivery (\(summary.count))") {
-      if summary.items.isEmpty {
-        Text("No held dispatches")
-          .foregroundStyle(.secondary)
-      } else {
-        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-          ForEach(summary.items, id: \.intentId) { item in
-            VStack(alignment: .leading, spacing: 2) {
-              Text(item.boardItemId)
-                .font(itemTitleFont)
-              Text("\(item.sessionId) · \(item.workItemId)")
-                .font(itemDetailFont)
-                .foregroundStyle(.secondary)
-                .textSelection(.enabled)
-            }
-          }
-        }
-        .padding(.top, HarnessMonitorTheme.spacingXS)
-      }
-    }
-    .font(groupFont)
-    .accessibilityIdentifier("harness.task-board.step.held-dispatches")
-  }
-}
-
 struct TaskBoardPolicyGuardsView: View {
   let workspace: PolicyCanvasWorkspace?
 

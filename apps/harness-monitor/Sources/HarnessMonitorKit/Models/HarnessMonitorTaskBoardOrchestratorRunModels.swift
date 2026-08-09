@@ -75,7 +75,7 @@ public struct TaskBoardOrchestratorAppliedTask: Codable, Equatable, Identifiable
   public var id: String { boardItemId }
 
   /// Whichever owner this dispatch actually has.
-  public var ownerId: String? { workspaceId ?? sessionId }
+  public var ownerId: String? { workspaceId ?? sessionId ?? workingCopyId }
 
   public init(
     boardItemId: String,
@@ -92,6 +92,11 @@ public struct TaskBoardOrchestratorAppliedTask: Codable, Equatable, Identifiable
     self.workItemId = workItemId
     self.itemTitle = itemTitle
   }
+}
+
+extension TaskBoardHeldDispatchItem {
+  /// Whichever owner this held dispatch actually has.
+  public var ownerId: String? { workspaceId ?? sessionId ?? workingCopyId }
 }
 
 public struct TaskBoardOrchestratorDispatchOutcome: Codable, Equatable, Sendable {

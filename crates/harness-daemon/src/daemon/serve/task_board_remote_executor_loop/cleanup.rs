@@ -105,7 +105,10 @@ async fn release_executor_local_state(
     let workspace = if offer.work_owner.is_some() {
         db.load_agent_working_copy(&identity.working_copy_id)
             .await?
-            .map(|copy| PathBuf::from(copy.worktree_path))
+            .and_then(|copy| {
+                let worktree = PathBuf::from(copy.worktree_path);
+                (!copy.released && worktree.is_dir()).then_some(worktree)
+            })
     } else {
         db.resolve_session(&identity.session_id)
             .await?

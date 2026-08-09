@@ -27,7 +27,10 @@ use crate::task_board::{
 };
 use chrono::{Duration, SecondsFormat, Utc};
 use harness_daemon_db_queries::AsyncAgentWorkingCopyQueries;
-use sqlx::query_scalar;
+use sqlx::{query, query_scalar};
+
+#[path = "runtime_openrouter_tests.rs"]
+mod openrouter_tests;
 
 #[test]
 fn production_tick_uses_the_runtime_seam_for_start_then_active_probe() {
@@ -174,12 +177,30 @@ async fn workspace_owned_remote_start_creates_no_session_body() {
     .await
     .expect("load executor workspace member");
     assert_eq!(assignments, vec![owner.work_item_id.clone()]);
-
+    query(
+        "UPDATE agent_workspace_members SET updated_at = 'probe-sentinel'
+         WHERE workspace_id = ?1 AND managed_agent_id = ?2",
+    )
+    .bind(&copy.workspace_id)
+    .bind(&identity.run_id)
+    .execute(fixture.db.pool())
+    .await
+    .expect("mark member before idempotent Probe");
     reconcile_task_board_remote_executor_tick(&state)
         .await
         .expect("reconnect probes the authoritative worker");
     assert_eq!(scope.start_count().await, 1);
     assert_eq!(executor_session_count(&fixture.db).await, 0);
+    let member_updated_at = query_scalar::<_, String>(
+        "SELECT updated_at FROM agent_workspace_members
+         WHERE workspace_id = ?1 AND managed_agent_id = ?2",
+    )
+    .bind(&copy.workspace_id)
+    .bind(&identity.run_id)
+    .fetch_one(fixture.db.pool())
+    .await
+    .expect("load member after idempotent Probe");
+    assert_eq!(member_updated_at, "probe-sentinel");
 
     settle_workspace_owned_run(
         &fixture,
@@ -252,94 +273,6 @@ async fn settle_workspace_owned_run(
         .await
         .expect("replay completed workspace cleanup");
     assert_eq!(scope.start_count().await, 1);
-}
-
-#[test]
-fn workspace_owned_openrouter_start_binds_the_same_sessionless_owner() {
-    run_deep_async(workspace_owned_openrouter_start_binds_owner_body);
-}
-
-async fn workspace_owned_openrouter_start_binds_owner_body() {
-    let (fixture, before) = Box::pin(live_claimed_executor_for_owner("openrouter", true)).await;
-    let identity = remote_executor_identity(&before).expect("deterministic executor identity");
-    let state = executor_state(&fixture.db, EXECUTOR_INSTANCE);
-    let scope: RuntimeSeamScope = install_deterministic_runtime_seam().await;
-
-    reconcile_task_board_remote_executor_tick(&state)
-        .await
-        .expect("start workspace-owned OpenRouter worker");
-    let copy = fixture
-        .db
-        .load_agent_working_copy(&identity.working_copy_id)
-        .await
-        .expect("load OpenRouter working copy")
-        .expect("OpenRouter working copy");
-    let run = fixture
-        .db
-        .agent_turn_run(&identity.run_id)
-        .await
-        .expect("load workspace-owned OpenRouter run")
-        .expect("workspace-owned OpenRouter run");
-    assert_eq!(run.session_id.as_deref(), Some(copy.workspace_id.as_str()));
-    assert_eq!(executor_session_count(&fixture.db).await, 0);
-
-    reconcile_task_board_remote_executor_tick(&state)
-        .await
-        .expect("reconnect probes the authoritative OpenRouter worker");
-    assert_eq!(scope.start_count().await, 1);
-    assert_eq!(executor_session_count(&fixture.db).await, 0);
-}
-
-#[test]
-fn openrouter_start_is_durable_and_restart_settles_once_without_codex_run() {
-    run_deep_async(openrouter_start_is_durable_and_restart_settles_once_body);
-}
-
-async fn openrouter_start_is_durable_and_restart_settles_once_body() {
-    let (fixture, before) = Box::pin(live_claimed_executor_for("openrouter")).await;
-    let identity = remote_executor_identity(&before).expect("deterministic executor identity");
-    let state = executor_state(&fixture.db, EXECUTOR_INSTANCE);
-    let scope: RuntimeSeamScope = install_deterministic_runtime_seam().await;
-
-    reconcile_task_board_remote_executor_tick(&state)
-        .await
-        .expect("start OpenRouter through the remote runtime seam");
-    let run = fixture
-        .db
-        .agent_turn_run(&identity.run_id)
-        .await
-        .expect("load OpenRouter run")
-        .expect("durable OpenRouter run");
-    assert_eq!(run.requested_runtime, "openrouter");
-    assert_eq!(run.actual_runtime.as_deref(), Some("openrouter"));
-    assert!(
-        fixture
-            .db
-            .codex_run(&identity.run_id)
-            .await
-            .expect("check Codex store")
-            .is_none()
-    );
-    assert_eq!(scope.calls().await.len(), 1);
-
-    assert_eq!(
-        fixture
-            .db
-            .reconcile_interrupted_agent_turn_runs()
-            .await
-            .expect("preserve correlated OpenRouter run"),
-        0
-    );
-    drop(scope);
-    reconcile_task_board_remote_executor_tick(&state)
-        .await
-        .expect("settle the turn evicted from the restarted runtime");
-    assert_eq!(
-        load_assignment(&fixture.db, &before.assignment_id)
-            .await
-            .state,
-        TaskBoardRemoteAssignmentState::Failed
-    );
 }
 
 #[test]

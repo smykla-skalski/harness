@@ -96,12 +96,11 @@ async fn ensure_remote_workspace(
         invalid_transition("remote executor assignment has no frozen checkout path")
     })?);
     let offer = record.require_offer()?;
-    let snapshot_import = materialize_repository_snapshot(db, record, offer, &origin).await?;
-    let require_source_head = require_source_head
-        || matches!(
-            &offer.source,
-            RemoteSourceMaterial::RepositorySnapshotBundle { .. }
-        );
+    let snapshot_import = if allow_create || require_source_head {
+        materialize_repository_snapshot(db, record, offer, &origin).await?
+    } else {
+        None
+    };
     if require_source_head {
         verify_repository_revision(origin.clone(), revision.to_string()).await?;
     }
@@ -226,12 +225,11 @@ pub(super) async fn ensure_remote_session(
         invalid_transition("remote executor assignment has no frozen checkout path")
     })?);
     let offer = record.require_offer()?;
-    let snapshot_import = materialize_repository_snapshot(db, record, offer, &origin).await?;
-    let require_source_head = require_source_head
-        || matches!(
-            &offer.source,
-            RemoteSourceMaterial::RepositorySnapshotBundle { .. }
-        );
+    let snapshot_import = if allow_create || require_source_head {
+        materialize_repository_snapshot(db, record, offer, &origin).await?
+    } else {
+        None
+    };
     if require_source_head {
         verify_repository_revision(origin.clone(), revision.to_string()).await?;
     }
@@ -468,11 +466,20 @@ pub(super) fn validate_remote_worktree_head(
     revision: &str,
     require_source_head: bool,
 ) -> Result<(), CliError> {
+    if !require_source_head {
+        return if worktree.is_dir() && worktree.join(".git").exists() {
+            Ok(())
+        } else {
+            Err(concurrent(
+                "remote executor working-copy repository disappeared",
+            ))
+        };
+    }
     let repository = GitRepository::discover(worktree).map_err(|error| git_error(&error))?;
     let head = repository
         .resolve_revision_to_commit("HEAD")
         .map_err(|error| git_error(&error))?;
-    if !require_source_head || head == revision {
+    if head == revision {
         Ok(())
     } else {
         Err(concurrent(
