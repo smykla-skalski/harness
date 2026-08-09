@@ -112,9 +112,22 @@ impl AgentTuiManagerHandle {
                 .map(ToString::to_string),
             effort: request.effort.clone(),
         })?;
+        let snapshot = normalize_started_workspace_snapshot(snapshot, owner.workspace_id);
         self.register_started_snapshot(&snapshot, ActiveAgentTui::new(None))?;
         Ok(snapshot)
     }
+}
+
+pub(super) fn normalize_started_workspace_snapshot(
+    mut snapshot: AgentTuiSnapshot,
+    workspace_id: &str,
+) -> AgentTuiSnapshot {
+    // A bridge can survive a daemon upgrade and still return its old
+    // Session-shaped owner until the host app restarts.
+    snapshot.session_id = workspace_id.to_string();
+    snapshot.workspace_id = Some(workspace_id.to_string());
+    snapshot.agent_id.clear();
+    snapshot
 }
 
 /// A reclaimed identity has to belong to the workspace reclaiming it. Returning

@@ -106,26 +106,30 @@ impl AgentTuiManagerHandle {
         Ok(refreshed)
     }
 
-    /// Refresh a recovered Task Board TUI while preserving its durable
-    /// workspace owner even when an older bridge still reports a Session.
-    pub(crate) fn recover_for_workspace(
+    /// Restore a Task Board TUI from durable state before bridge availability
+    /// is guaranteed, preserving a workspace owner when the dispatch has one.
+    pub(crate) fn recover_after_restart(
         &self,
         tui_id: &str,
-        workspace_id: &str,
+        workspace_id: Option<&str>,
     ) -> Result<AgentTuiSnapshot, CliError> {
         let previous = self.load_snapshot(tui_id)?;
         if self.state.sandboxed && previous.status == AgentTuiStatus::Running {
             let mut recovered = previous;
-            recovered.session_id = workspace_id.to_string();
-            recovered.workspace_id = Some(workspace_id.to_string());
-            recovered.agent_id.clear();
+            if let Some(workspace_id) = workspace_id {
+                recovered.session_id = workspace_id.to_string();
+                recovered.workspace_id = Some(workspace_id.to_string());
+                recovered.agent_id.clear();
+            }
             self.register_recovered_snapshot(&recovered)?;
             return Ok(recovered);
         }
         let mut refreshed = self.refresh_live_snapshot(previous.clone())?;
-        refreshed.session_id = workspace_id.to_string();
-        refreshed.workspace_id = Some(workspace_id.to_string());
-        refreshed.agent_id.clear();
+        if let Some(workspace_id) = workspace_id {
+            refreshed.session_id = workspace_id.to_string();
+            refreshed.workspace_id = Some(workspace_id.to_string());
+            refreshed.agent_id.clear();
+        }
         self.persist_refreshed_snapshot(&previous, &refreshed)?;
         Ok(refreshed)
     }

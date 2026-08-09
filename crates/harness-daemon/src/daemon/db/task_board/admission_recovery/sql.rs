@@ -1,6 +1,7 @@
 // The two branches keep lifetime release history out of the startup hot path:
 // active admissions use the partial current-requirement index, while released
-// settlement debt starts from unfinished progress and probes its exact intent.
+// settlement debt starts from the partial active-progress index and probes its
+// exact intent.
 pub(super) const ADMISSION_RECOVERY_SQL: &str =
     "SELECT DISTINCT ledger.managed_worker_id, intent.intent_id, intent.item_id,
         intent.session_id, intent.workspace_id, intent.working_copy_id,
@@ -20,6 +21,7 @@ pub(super) const ADMISSION_RECOVERY_SQL: &str =
         intent.work_item_id, intent.workflow_execution_id,
         intent.payload_json, intent.status AS intent_status
      FROM task_board_work_item_progress AS progress
+          INDEXED BY idx_task_board_work_item_progress_recovery
      JOIN task_board_dispatch_intents AS intent
        ON intent.item_id = progress.item_id
       AND intent.work_item_id = progress.work_item_id
@@ -29,6 +31,7 @@ pub(super) const ADMISSION_RECOVERY_SQL: &str =
       AND ledger.managed_worker_id = progress.attempt_id
      WHERE progress.completed_at IS NULL
        AND progress.state IN ('pending', 'running')
+       AND progress.attempt_id IS NOT NULL
        AND ledger.kind = 'concurrency'
        AND ledger.state = 'released'
        AND ledger.managed_worker_id IS NOT NULL

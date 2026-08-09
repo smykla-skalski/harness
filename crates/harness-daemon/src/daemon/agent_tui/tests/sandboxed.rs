@@ -14,6 +14,7 @@ use crate::session::types::SessionRole;
 use crate::workspace::utc_now;
 
 use super::support::sample_snapshot;
+use crate::daemon::agent_tui::manager_workspace_lifecycle::normalize_started_workspace_snapshot;
 
 #[test]
 fn sandboxed_bridge_snapshot_preserves_durable_workspace_owner() {
@@ -43,6 +44,24 @@ fn sandboxed_bridge_snapshot_preserves_durable_workspace_owner() {
     );
 
     let normalized = manager.normalize_bridge_snapshot(&previous, bridge);
+
+    assert_eq!(normalized.workspace_id.as_deref(), Some("workspace-owner"));
+    assert_eq!(normalized.session_id, "workspace-owner");
+    assert!(normalized.agent_id.is_empty());
+}
+
+#[test]
+fn sandboxed_workspace_start_normalizes_a_pre_upgrade_bridge_snapshot() {
+    let bridge = sample_snapshot(
+        "agent-tui-started",
+        "legacy-session",
+        "legacy-agent",
+        "codex",
+        "2026-08-09T10:00:00Z",
+        "2026-08-09T10:00:01Z",
+    );
+
+    let normalized = normalize_started_workspace_snapshot(bridge, "workspace-owner");
 
     assert_eq!(normalized.workspace_id.as_deref(), Some("workspace-owner"));
     assert_eq!(normalized.session_id, "workspace-owner");

@@ -245,6 +245,8 @@ const fn migration_floor_version(migration_version: i64) -> u64 {
         76..=79 => 68,
         // v69 adds durable worker progress and checkpoints for work items.
         80 => 69,
+        // v70 bounds startup recovery to unfinished attempt-bearing progress.
+        81 => 70,
         _ => u64::MAX,
     }
 }

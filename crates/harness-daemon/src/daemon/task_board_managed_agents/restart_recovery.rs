@@ -61,11 +61,7 @@ async fn reconcile_interactive_worker(
     let worker_id = recovery.managed_worker_id.clone();
     let workspace_id = recovery.dispatch.workspace_id.clone();
     let snapshot = run_terminal_agent_blocking(state, "startup recovery", move |manager| {
-        if let Some(workspace_id) = workspace_id.as_deref() {
-            manager.recover_for_workspace(&worker_id, workspace_id)
-        } else {
-            manager.get(&worker_id)
-        }
+        manager.recover_after_restart(&worker_id, workspace_id.as_deref())
     })
     .await?;
     let snapshot = recover_same_applied_worker(

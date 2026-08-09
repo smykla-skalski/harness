@@ -27,6 +27,12 @@ async fn startup_recovery_avoids_lifetime_ledger_scans() {
         "startup plan did not probe released debt by exact intent: {startup:#?}"
     );
     assert!(
+        startup
+            .iter()
+            .any(|detail| detail.contains("idx_task_board_work_item_progress_recovery")),
+        "startup plan did not use the active-progress index: {startup:#?}"
+    );
+    assert!(
         exact.iter().any(|detail| detail
             .contains("task_board_dispatch_admission_ledger_intent_generation")),
         "exact recovery plan did not use its intent index: {exact:#?}"
@@ -37,6 +43,13 @@ async fn startup_recovery_avoids_lifetime_ledger_scans() {
             .filter(|detail| detail.contains("SCAN ledger"))
             .all(|detail| detail.contains("current_requirement")),
         "startup plan contains a lifetime ledger scan: {startup:#?}"
+    );
+    assert!(
+        startup
+            .iter()
+            .filter(|detail| detail.contains("SCAN progress"))
+            .all(|detail| detail.contains("idx_task_board_work_item_progress_recovery")),
+        "startup plan contains a lifetime progress scan: {startup:#?}"
     );
 }
 
