@@ -121,7 +121,10 @@ actor HostBridgeRecoveryDaemonController: DaemonControlling {
 
   func installLaunchAgent() async throws -> String { "/tmp/io.harness.daemon.plist" }
   func removeLaunchAgent() async throws -> String { "removed" }
-  func repairLaunchAgentRegistration() async throws -> String { "launch agent re-registered" }
+  func repairLaunchAgentRegistration() async throws -> String {
+    operations.append("repair")
+    return "launch agent re-registered"
+  }
 
   func registerLaunchAgent() async throws -> DaemonLaunchAgentRegistrationState {
     operations.append("register")

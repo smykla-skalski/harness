@@ -56,7 +56,7 @@ func withTempDaemonFixture(
   }
   let environment = HarnessMonitorEnvironment(
     values: environmentValues,
-    homeDirectory: URL(fileURLWithPath: "/Users/example", isDirectory: true)
+    homeDirectory: root
   )
   try await perform(environment)
 }

@@ -52,9 +52,16 @@ extension DaemonController {
     var signaledManagedRecoveryManifestSignature: String?
     var lastLoggedManifestSignature: String?
     var lastLoggedRetryErrorDescription: String?
+    var runtimeLaneManifestCache: RuntimeLaneManifestCache?
     /// Captured ownership for the warm-up entry; recaptured at every
     /// site that mutates ownership. See `OwnerSnapshot`.
     var ownerSnapshot: OwnerSnapshot
+  }
+
+  struct RuntimeLaneManifestCache {
+    let lanesRoot: URL
+    let modificationDate: Date?
+    let manifestURLs: [URL]
   }
 
   struct WarmUpIterationOutcome {

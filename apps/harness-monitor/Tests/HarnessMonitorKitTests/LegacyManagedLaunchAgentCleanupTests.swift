@@ -92,6 +92,37 @@ struct LegacyManagedLaunchAgentCleanupTests {
     )
   }
 
+  @Test("Recorded names are rechecked when an older app registers them again")
+  func recordedNamesAreRecheckedAfterLegacyReregistration() throws {
+    let suiteName =
+      "io.harnessmonitor.kit-tests.legacy-cleanup.\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    defer { LegacyManagedLaunchAgentCleanup.resetForTests() }
+
+    let legacy = HarnessMonitorPaths.legacyLaunchAgentPlistNames
+      .filter { $0 != HarnessMonitorPaths.launchAgentPlistName }
+    defaults.set(
+      legacy,
+      forKey: LegacyManagedLaunchAgentCleanup.completedNamesDefaultsKey
+    )
+    defaults.set(
+      LegacyManagedLaunchAgentCleanup.strategyVersion,
+      forKey: LegacyManagedLaunchAgentCleanup.strategyVersionDefaultsKey
+    )
+    LegacyManagedLaunchAgentCleanup.resetForTests()
+    var unregistered: [String] = []
+
+    let completed = LegacyManagedLaunchAgentCleanup.runOnce(defaults: defaults) { name in
+      LegacyLaunchAgentManagerStub(state: .enabled) {
+        unregistered.append(name)
+      }
+    }
+
+    #expect(completed)
+    #expect(unregistered.sorted() == legacy.sorted())
+  }
+
   @Test("Pending names are unioned with previously completed ones")
   func pendingNamesUnionWithPreviouslyCompleted() throws {
     let suiteName =
@@ -230,26 +261,6 @@ struct LegacyManagedLaunchAgentCleanupTests {
     #expect(recorder.events().filter { $0 == "quiesced" }.count == 1)
   }
 
-  @Test("Controller fences and stops every trusted live managed daemon")
-  func controllerFencesAndStopsTrustedManagedDaemon() async throws {
-    let client = RecordingHarnessClient()
-    try await withTempDaemonFixture(pid: UInt32(getpid())) { environment in
-      let controller = DaemonController(
-        environment: environment,
-        launchAgentManager: RecordingLaunchAgentManager(state: .enabled),
-        ownership: .managed,
-        sessionFactory: { _ in client }
-      )
-
-      try await controller.quiesceManagedDaemonsAfterLegacyCleanupFailure()
-    }
-
-    let requests = client.lock.withLock {
-      client.policyCanvasSpawnKillSwitchRequests
-    }
-    #expect(requests == [true])
-    #expect(client.lock.withLock { client.stopDaemonRequestCount } == 1)
-  }
 }
 
 private final class LegacyLaunchAgentManagerStub: DaemonLaunchAgentManaging, @unchecked Sendable {

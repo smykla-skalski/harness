@@ -104,8 +104,8 @@ extension HarnessMonitorStore {
           """
       )
       return try await withBootstrapTelemetryPhase(.managedLaunchAgentRefreshRecovery) {
-        _ = try await daemonController.removeLaunchAgent()
-        let registrationState = try await daemonController.registerLaunchAgent()
+        _ = try await daemonController.repairLaunchAgentRegistration()
+        let registrationState = await daemonController.launchAgentRegistrationState()
         switch registrationState {
         case .enabled:
           break

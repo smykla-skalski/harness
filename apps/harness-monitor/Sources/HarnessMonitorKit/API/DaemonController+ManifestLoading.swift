@@ -13,8 +13,24 @@ extension DaemonController {
     from manifest: DaemonManifest,
     emitTrace: Bool = true
   ) throws -> HarnessMonitorConnection {
+    try daemonConnection(
+      from: manifest,
+      trustedDaemonRoot: externalManifestLocator.daemonRoot,
+      emitTrace: emitTrace
+    )
+  }
+
+  func daemonConnection(
+    from manifest: DaemonManifest,
+    trustedDaemonRoot: URL,
+    emitTrace: Bool = true
+  ) throws -> HarnessMonitorConnection {
     let endpoint = try endpointURL(from: manifest.endpoint)
-    let token = try loadToken(path: manifest.tokenPath, emitTrace: emitTrace)
+    let token = try loadToken(
+      path: manifest.tokenPath,
+      trustedDaemonRoot: trustedDaemonRoot,
+      emitTrace: emitTrace
+    )
     return HarnessMonitorConnection(endpoint: endpoint, token: token)
   }
 
@@ -38,7 +54,19 @@ extension DaemonController {
   }
 
   func loadToken(path: String, emitTrace: Bool = true) throws -> String {
-    let tokenURL = try validatedTokenURL(from: path)
+    try loadToken(
+      path: path,
+      trustedDaemonRoot: externalManifestLocator.daemonRoot,
+      emitTrace: emitTrace
+    )
+  }
+
+  func loadToken(
+    path: String,
+    trustedDaemonRoot: URL,
+    emitTrace: Bool = true
+  ) throws -> String {
+    let tokenURL = try validatedTokenURL(from: path, trustedDaemonRoot: trustedDaemonRoot)
     let token = try String(contentsOf: tokenURL, encoding: .utf8)
       .trimmingCharacters(in: .whitespacesAndNewlines)
     if emitTrace {
@@ -163,6 +191,13 @@ extension DaemonController {
   }
 
   func validatedTokenURL(from path: String) throws -> URL {
+    try validatedTokenURL(from: path, trustedDaemonRoot: externalManifestLocator.daemonRoot)
+  }
+
+  func validatedTokenURL(
+    from path: String,
+    trustedDaemonRoot: URL
+  ) throws -> URL {
     guard (path as NSString).isAbsolutePath else {
       throw DaemonControlError.invalidManifest("token path must be absolute")
     }
@@ -173,7 +208,7 @@ extension DaemonController {
       throw DaemonControlError.invalidManifest("token path must not include symlinks")
     }
 
-    let daemonRoot = externalManifestLocator.daemonRoot
+    let daemonRoot = trustedDaemonRoot
       .standardizedFileURL
       .resolvingSymlinksInPath()
     guard Self.isWithinDirectory(resolvedTokenURL, root: daemonRoot) else {
@@ -268,7 +303,9 @@ extension DaemonController {
 
   func loadManifest(
     at manifestURL: URL,
-    emitTrace: Bool
+    emitTrace: Bool,
+    activate: Bool = true,
+    recoverEndpoint: Bool = true
   ) throws -> DaemonManifest {
     guard FileManager.default.fileExists(atPath: manifestURL.path) else {
       throw DaemonControlError.manifestMissing
@@ -280,8 +317,10 @@ extension DaemonController {
 
     let wire = try PolicyWireCoding.decoder.decode(DaemonManifestWire.self, from: data)
     let manifest = DaemonManifest(wire: wire)
-    externalManifestLocator.activate(manifestURL)
-    let resolvedManifest = recoverManifestEndpointIfNeeded(manifest)
+    if activate {
+      externalManifestLocator.activate(manifestURL)
+    }
+    let resolvedManifest = recoverEndpoint ? recoverManifestEndpointIfNeeded(manifest) : manifest
     if emitTrace {
       let manifestFilePath = manifestURL.path
       let pid = resolvedManifest.pid

@@ -90,7 +90,7 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     await store.bootstrap()
 
     #expect(store.connectionState == .online)
-    #expect(await daemon.recordedOperations() == ["warm-up", "remove", "register", "warm-up"])
+    #expect(await daemon.recordedOperations() == ["warm-up", "repair", "warm-up"])
   }
 
   @Test("Bootstrap recovers when the daemon becomes healthy after warm-up gives up")
@@ -103,7 +103,7 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     #expect(store.connectionState == .online)
     #expect(
       await daemon.recordedOperations()
-        == ["warm-up", "remove", "register", "warm-up", "bootstrap"]
+        == ["warm-up", "repair", "warm-up", "bootstrap"]
     )
   }
 

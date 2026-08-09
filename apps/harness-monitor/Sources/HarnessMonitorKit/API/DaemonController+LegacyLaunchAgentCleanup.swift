@@ -94,20 +94,15 @@ public enum LegacyManagedLaunchAgentCleanup {
       usesCurrentStrategy
       ? Set(defaults.stringArray(forKey: completedNamesDefaultsKey) ?? [])
       : []
-    let pendingNames = HarnessMonitorPaths.legacyLaunchAgentPlistNames
-      .filter {
-        $0 != currentName
-          && !completedNames.contains($0)
-      }
-    guard pendingNames.isEmpty == false else {
-      defaults.set(strategyVersion, forKey: strategyVersionDefaultsKey)
-      return CleanupAttempt(isComplete: true, currentServiceWasUnregistered: false)
-    }
-
     var failedNames: [String] = []
-    for legacyName in pendingNames {
+    for legacyName in HarnessMonitorPaths.legacyLaunchAgentPlistNames
+    where legacyName != currentName {
       let legacyService = managerFactory(legacyName)
       let state = legacyService.registrationState()
+      if completedNames.contains(legacyName), state == .notRegistered || state == .notFound {
+        continue
+      }
+      completedNames.remove(legacyName)
       HarnessMonitorLogger.lifecycle.info(
         """
         Legacy SMAppService cleanup: legacy_plist=\(legacyName, privacy: .public) \
@@ -116,7 +111,7 @@ public enum LegacyManagedLaunchAgentCleanup {
         """
       )
       let completed =
-        state == .notRegistered
+        state == .notRegistered || state == .notFound
         || attemptUnregister(legacyService, name: legacyName)
       if completed {
         completedNames.insert(legacyName)
@@ -224,6 +219,12 @@ private actor LegacyManagedLaunchAgentCleanupCoordinator {
   }
 }
 
+private enum ManagedDaemonQuiescenceAction {
+  case finish
+  case wait
+  case requestStop
+}
+
 extension DaemonController {
   public func requireLegacyManagedLaunchAgentCleanup() async throws {
     guard LegacyManagedLaunchAgentCleanup.completedInThisProcess() == false else {
@@ -251,32 +252,121 @@ extension DaemonController {
   }
 
   func quiesceManagedDaemonsAfterLegacyCleanupFailure() async throws {
-    let manifestURLs = HarnessMonitorPaths.liveManagedDaemonManifestURLs(using: environment)
-    for manifestURL in manifestURLs {
-      let manifest = try loadManifest(at: manifestURL, emitTrace: false)
-      let endpoint = try endpointURL(from: manifest.endpoint)
-      guard Self.isTrustedManagedEndpoint(endpoint) else {
-        throw DaemonControlError.invalidManifest(
-          "managed daemon endpoints must use loopback http(s): \(manifest.endpoint)"
-        )
-      }
-      let connection = try daemonConnection(from: manifest, emitTrace: false)
-      let client = sessionFactory(connection)
+    let candidates = HarnessMonitorPaths.managedDaemonRootCandidates(using: environment)
+    var failures: [String] = []
+    var stoppedCount = 0
+    for candidate in candidates {
       do {
-        _ = try? await client.setPolicyCanvasSpawnKillSwitch(
-          request: PolicyCanvasSetSpawnKillSwitchRequest(enabled: true)
-        )
-        _ = try await client.stopDaemon()
-        await client.shutdown()
+        if try await quiesceManagedDaemon(at: candidate) {
+          stoppedCount += 1
+        }
       } catch {
-        await client.shutdown()
-        throw error
+        failures.append("\(candidate.rootURL.path): \(error.localizedDescription)")
       }
     }
-    if manifestURLs.isEmpty == false {
+    guard failures.isEmpty else {
+      throw DaemonControlError.commandFailed(
+        "Managed daemon quiescence failed: \(failures.joined(separator: "; "))"
+      )
+    }
+    if stoppedCount > 0 {
       HarnessMonitorLogger.lifecycle.fault(
         "Stopped managed automation after legacy daemon cleanup failed"
       )
+    }
+  }
+
+  private func quiesceManagedDaemon(
+    at candidate: ManagedDaemonRootCandidate
+  ) async throws -> Bool {
+    let deadline = ContinuousClock.now + managedStaleManifestGracePeriod
+    var stopRequestedPID: Int32?
+    var stoppedAny = false
+    while true {
+      let lockIsHeld = daemonSingletonLockIsHeld(at: candidate.singletonLockURL)
+      switch HarnessMonitorPaths.probeManagedDaemonManifest(at: candidate.manifestURL) {
+      case .absent, .invalid:
+        guard lockIsHeld else {
+          return stoppedAny
+        }
+      case .external:
+        return stoppedAny
+      case .managed(let pid):
+        switch managedDaemonQuiescenceAction(
+          pid: pid,
+          lockIsHeld: lockIsHeld,
+          stopRequestedPID: stopRequestedPID
+        ) {
+        case .finish:
+          return stoppedAny
+        case .wait:
+          break
+        case .requestStop:
+          let manifest = try loadManifest(
+            at: candidate.manifestURL,
+            emitTrace: false,
+            activate: false,
+            recoverEndpoint: false
+          )
+          guard manifest.pid == Int(pid) else {
+            continue
+          }
+          try await requestManagedDaemonQuiescence(
+            manifest,
+            trustedDaemonRoot: candidate.rootURL
+          )
+          stopRequestedPID = pid
+          stoppedAny = true
+        }
+      }
+      guard ContinuousClock.now < deadline else {
+        throw DaemonControlError.commandFailed(
+          "managed daemon did not release its singleton lock before timeout"
+        )
+      }
+      try await Task.sleep(for: .milliseconds(50))
+    }
+  }
+
+  private func managedDaemonQuiescenceAction(
+    pid: Int32,
+    lockIsHeld: Bool,
+    stopRequestedPID: Int32?
+  ) -> ManagedDaemonQuiescenceAction {
+    if stopRequestedPID == pid {
+      return lockIsHeld ? .wait : .finish
+    }
+    if processLiveness(pid) == .dead {
+      return lockIsHeld ? .wait : .finish
+    }
+    return .requestStop
+  }
+
+  private func requestManagedDaemonQuiescence(
+    _ manifest: DaemonManifest,
+    trustedDaemonRoot: URL
+  ) async throws {
+    let endpoint = try endpointURL(from: manifest.endpoint)
+    guard Self.isTrustedManagedEndpoint(endpoint) else {
+      throw DaemonControlError.invalidManifest(
+        "managed daemon endpoints must use loopback http(s): \(manifest.endpoint)"
+      )
+    }
+    let connection = try daemonConnection(
+      from: manifest,
+      trustedDaemonRoot: trustedDaemonRoot,
+      emitTrace: false
+    )
+    let client = sessionFactory(connection)
+    do {
+      _ = try? await client.setPolicyCanvasSpawnKillSwitch(
+        request: PolicyCanvasSetSpawnKillSwitchRequest(enabled: true)
+      )
+      _ = try await client.stopDaemon()
+      await client.shutdown()
+    } catch {
+      await client.shutdown()
+      throw error
     }
   }
 }

@@ -6,6 +6,25 @@ import Foundation
   import Glibc
 #endif
 
+struct ManagedDaemonRootCandidate: Equatable, Sendable {
+  let rootURL: URL
+
+  var manifestURL: URL {
+    rootURL.appendingPathComponent("manifest.json")
+  }
+
+  var singletonLockURL: URL {
+    rootURL.appendingPathComponent("daemon.lock")
+  }
+}
+
+enum ManagedDaemonManifestProbeResult: Equatable, Sendable {
+  case absent
+  case invalid
+  case external
+  case managed(pid: Int32)
+}
+
 extension HarnessMonitorPaths {
   /// Enumerate every live managed daemon manifest in the app-group family.
   /// A daemon's singleton lock prevents two processes from sharing one data
@@ -16,6 +35,21 @@ extension HarnessMonitorPaths {
     fileManager: FileManager = .default,
     pidIsLive: (Int32) -> Bool = HarnessMonitorPaths.defaultPidIsLive
   ) -> [URL] {
+    managedDaemonRootCandidates(using: environment, fileManager: fileManager)
+      .map(\.manifestURL)
+      .filter {
+        isLiveManagedManifest(
+          at: $0,
+          fileManager: fileManager,
+          pidIsLive: pidIsLive
+        )
+      }
+  }
+
+  static func managedDaemonRootCandidates(
+    using environment: HarnessMonitorEnvironment,
+    fileManager: FileManager = .default
+  ) -> [ManagedDaemonRootCandidate] {
     var dataHomes: [URL] = []
     if let configured = configuredDataHomeRoot(using: environment) {
       appendUnique(configured, to: &dataHomes)
@@ -44,24 +78,47 @@ extension HarnessMonitorPaths {
       }
     }
 
-    return dataHomes.flatMap { dataHome in
+    var candidates: [ManagedDaemonRootCandidate] = []
+    for dataHome in dataHomes {
       let daemonBase =
         dataHome
         .appendingPathComponent("harness", isDirectory: true)
         .appendingPathComponent("daemon", isDirectory: true)
-      return [
+      for rootURL in [
         daemonBase
-          .appendingPathComponent(DaemonOwnership.managed.rawValue, isDirectory: true)
-          .appendingPathComponent("manifest.json"),
-        daemonBase.appendingPathComponent("manifest.json"),
-      ].filter {
-        isLiveManagedManifest(
-          at: $0,
-          fileManager: fileManager,
-          pidIsLive: pidIsLive
-        )
+          .appendingPathComponent(DaemonOwnership.managed.rawValue, isDirectory: true),
+        daemonBase,
+      ] {
+        let candidate = ManagedDaemonRootCandidate(rootURL: rootURL.standardizedFileURL)
+        if candidates.contains(candidate) == false {
+          candidates.append(candidate)
+        }
       }
     }
+    return candidates
+  }
+
+  static func probeManagedDaemonManifest(
+    at manifestURL: URL,
+    fileManager: FileManager = .default
+  ) -> ManagedDaemonManifestProbeResult {
+    guard fileManager.fileExists(atPath: manifestURL.path) else {
+      return .absent
+    }
+    guard let data = try? Data(contentsOf: manifestURL),
+      let manifest = try? JSONDecoder().decode(DaemonManifestProbe.self, from: data)
+    else {
+      return .invalid
+    }
+    if let ownership = manifest.ownership {
+      guard let parsed = DaemonOwnership(rawValue: ownership) else {
+        return .invalid
+      }
+      guard parsed == .managed else {
+        return .external
+      }
+    }
+    return .managed(pid: manifest.pid)
   }
 
   /// Pick a data-home root by probing for a daemon whose ownership-scoped
@@ -189,17 +246,15 @@ extension HarnessMonitorPaths {
     fileManager: FileManager,
     pidIsLive: (Int32) -> Bool
   ) -> Bool {
-    guard fileManager.fileExists(atPath: manifestURL.path),
-      let data = try? Data(contentsOf: manifestURL),
-      let manifest = try? JSONDecoder().decode(DaemonManifestProbe.self, from: data),
-      pidIsLive(manifest.pid)
+    guard
+      case .managed(let pid) = probeManagedDaemonManifest(
+        at: manifestURL,
+        fileManager: fileManager
+      )
     else {
       return false
     }
-    guard let ownership = manifest.ownership else {
-      return true
-    }
-    return DaemonOwnership(rawValue: ownership) == .managed
+    return pidIsLive(pid)
   }
 
   private static func appGroupContainerCandidate(

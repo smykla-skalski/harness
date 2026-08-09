@@ -13,12 +13,9 @@ extension DaemonController {
     case contended
   }
 
-  /// Try-acquire `flock(LOCK_EX|LOCK_NB)` on a daemon-root sentinel
-  /// file, holding it across the supplied closure. The lock
-  /// serializes the marker-read / decide / IPC / marker-write
-  /// transaction across sibling Monitor processes that resolve to
-  /// the same daemon root (e.g. two processes with no
-  /// `HARNESS_MONITOR_RUNTIME_LANE`).
+  /// Try-acquire `flock(LOCK_EX|LOCK_NB)` on the app-group service sentinel,
+  /// holding it across the supplied closure. Every runtime lane controls the
+  /// same SMAppService identity, so the lock must not follow daemon data roots.
   ///
   /// Lock semantics:
   /// - `flock(2)` is per open-file-description on Darwin, so two
@@ -108,7 +105,12 @@ extension DaemonController {
   /// can lose a race with a daemon acquiring it at the same instant, which is
   /// the same tradeoff the daemon-side probe already accepts.
   func daemonSingletonLockIsHeld() -> Bool {
-    let url = HarnessMonitorPaths.daemonSingletonLockURL(using: environment)
+    daemonSingletonLockIsHeld(
+      at: HarnessMonitorPaths.daemonSingletonLockURL(using: environment)
+    )
+  }
+
+  func daemonSingletonLockIsHeld(at url: URL) -> Bool {
     let fd = Darwin.open(url.path, O_RDWR | O_CLOEXEC)
     guard fd >= 0 else {
       return false

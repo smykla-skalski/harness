@@ -98,7 +98,7 @@ extension HarnessMonitorPaths {
   public static func managedLaunchAgentOwnerURL(
     using environment: HarnessMonitorEnvironment = .current
   ) -> URL {
-    Self.daemonRoot(ownership: .managed, using: environment)
+    Self.managedLaunchAgentControlRoot(using: environment)
       .appendingPathComponent("managed-launch-agent-owner.json")
   }
 }

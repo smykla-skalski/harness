@@ -8,7 +8,7 @@ import Testing
 // Bind the BSD `flock(2)` C symbol to a private name so test
 // helpers can hold/release the lock unambiguously.
 @_silgen_name("flock")
-private func bsdFlock(_ fd: Int32, _ operation: Int32) -> Int32
+func testBSDFileLock(_ fd: Int32, _ operation: Int32) -> Int32
 
 @Suite("DaemonController managed launch-agent lock")
 struct DaemonControllerLaunchAgentLockTests {
@@ -57,8 +57,8 @@ struct DaemonControllerLaunchAgentLockTests {
       let externalFD = Darwin.open(lockURL.path, O_RDWR | O_CREAT | O_CLOEXEC, 0o600)
       #expect(externalFD >= 0)
       defer { _ = Darwin.close(externalFD) }
-      #expect(bsdFlock(externalFD, LOCK_EX | LOCK_NB) == 0)
-      defer { _ = bsdFlock(externalFD, LOCK_UN) }
+      #expect(testBSDFileLock(externalFD, LOCK_EX | LOCK_NB) == 0)
+      defer { _ = testBSDFileLock(externalFD, LOCK_UN) }
 
       let controller = DaemonController(environment: environment, ownership: .managed)
       let started = Date()
@@ -90,19 +90,41 @@ struct DaemonControllerLaunchAgentLockTests {
       let fd = Darwin.open(lockURL.path, O_RDWR | O_CREAT | O_CLOEXEC, 0o600)
       #expect(fd >= 0)
       defer { _ = Darwin.close(fd) }
-      let lockResult = bsdFlock(fd, LOCK_EX | LOCK_NB)
+      let lockResult = testBSDFileLock(fd, LOCK_EX | LOCK_NB)
       #expect(lockResult == 0, "Lock should be free after wrapper closure exits")
-      _ = bsdFlock(fd, LOCK_UN)
+      _ = testBSDFileLock(fd, LOCK_UN)
     }
   }
 
-  @Test("Lock URL lives under the daemon root next to the manifest")
-  func lockURLLivesUnderDaemonRootNextToManifest() async throws {
-    try await withTempDaemonFixture(pid: 1) { environment in
-      let lockURL = HarnessMonitorPaths.managedLaunchAgentLockURL(using: environment)
-      let manifestURL = HarnessMonitorPaths.manifestURL(using: environment)
-      #expect(lockURL.deletingLastPathComponent() == manifestURL.deletingLastPathComponent())
-      #expect(lockURL.lastPathComponent == "managed-launch-agent.lock")
-    }
+  @Test("Service coordination URLs are shared across runtime lanes")
+  func serviceCoordinationURLsAreSharedAcrossRuntimeLanes() {
+    let homeDirectory = FileManager.default.temporaryDirectory
+      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    let laneA = HarnessMonitorEnvironment(
+      values: [HarnessMonitorRuntimeLane.environmentKey: "lane-a"],
+      homeDirectory: homeDirectory
+    )
+    let laneB = HarnessMonitorEnvironment(
+      values: [
+        HarnessMonitorRuntimeLane.environmentKey: "lane-b",
+        HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey:
+          homeDirectory
+          .appendingPathComponent("custom-data", isDirectory: true).path,
+      ],
+      homeDirectory: homeDirectory
+    )
+
+    #expect(
+      HarnessMonitorPaths.managedLaunchAgentLockURL(using: laneA)
+        == HarnessMonitorPaths.managedLaunchAgentLockURL(using: laneB)
+    )
+    #expect(
+      HarnessMonitorPaths.managedLaunchAgentOwnerURL(using: laneA)
+        == HarnessMonitorPaths.managedLaunchAgentOwnerURL(using: laneB)
+    )
+    #expect(
+      HarnessMonitorPaths.managedLaunchAgentBundleStampURL(using: laneA)
+        == HarnessMonitorPaths.managedLaunchAgentBundleStampURL(using: laneB)
+    )
   }
 }

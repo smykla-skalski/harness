@@ -307,7 +307,7 @@ private func externalAppGroupRoot(homeDirectory: URL) -> URL {
     .appendingPathComponent(HarnessMonitorAppGroup.identifier, isDirectory: true)
 }
 
-private func writeExternalManifestFixture(
+func writeExternalManifestFixture(
   at manifestURL: URL,
   pid: Int,
   endpoint: String,

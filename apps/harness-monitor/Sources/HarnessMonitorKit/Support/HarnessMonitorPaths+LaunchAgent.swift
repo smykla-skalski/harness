@@ -24,4 +24,25 @@ extension HarnessMonitorPaths {
   public static var launchAgentBundleRelativePath: String {
     "Contents/Library/LaunchAgents/\(launchAgentPlistName)"
   }
+
+  public static func managedLaunchAgentBundleStampURL(
+    using environment: HarnessMonitorEnvironment = .current
+  ) -> URL {
+    managedLaunchAgentControlRoot(using: environment)
+      .appendingPathComponent("managed-launch-agent-bundle-stamp.json")
+  }
+
+  public static func managedLaunchAgentLockURL(
+    using environment: HarnessMonitorEnvironment = .current
+  ) -> URL {
+    managedLaunchAgentControlRoot(using: environment)
+      .appendingPathComponent("managed-launch-agent.lock")
+  }
+
+  static func managedLaunchAgentControlRoot(
+    using environment: HarnessMonitorEnvironment = .current
+  ) -> URL {
+    appGroupHarnessRoot(using: environment)
+      .appendingPathComponent("managed-launch-agent", isDirectory: true)
+  }
 }

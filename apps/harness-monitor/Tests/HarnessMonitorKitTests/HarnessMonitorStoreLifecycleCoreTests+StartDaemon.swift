@@ -73,7 +73,7 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     await store.startDaemon()
 
     #expect(store.connectionState == .online)
-    #expect(await daemon.recordedOperations() == ["warm-up", "remove", "register", "warm-up"])
+    #expect(await daemon.recordedOperations() == ["warm-up", "repair", "warm-up"])
   }
 
   @Test("startDaemon recovers when the daemon becomes healthy after warm-up gives up")
@@ -86,7 +86,7 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     #expect(store.connectionState == .online)
     #expect(
       await daemon.recordedOperations()
-        == ["warm-up", "remove", "register", "warm-up", "bootstrap"]
+        == ["warm-up", "repair", "warm-up", "bootstrap"]
     )
   }
 
@@ -98,7 +98,7 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     await store.startDaemon()
 
     #expect(store.connectionState == .online)
-    #expect(await daemon.recordedOperations() == ["warm-up", "remove", "register", "warm-up"])
+    #expect(await daemon.recordedOperations() == ["warm-up", "repair", "warm-up"])
   }
 
   @Test("startDaemon keeps a manifest watcher armed after managed warm-up failure")
@@ -160,7 +160,7 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     }
     #expect(
       await daemon.recordedOperations()
-        == ["warm-up", "remove", "register", "warm-up", "warm-up"]
+        == ["warm-up", "repair", "warm-up", "warm-up"]
     )
   }
 
@@ -175,8 +175,8 @@ extension HarnessMonitorStoreLifecycleCoreTests {
       await store.reconnect()
     }
 
-    let registerCount = await daemon.recordedOperations().filter { $0 == "register" }.count
-    #expect(registerCount == 2)
+    let repairCount = await daemon.recordedOperations().filter { $0 == "repair" }.count
+    #expect(repairCount == 2)
     #expect(store.managedDaemonRecoveryExhausted)
   }
 
