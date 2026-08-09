@@ -5,6 +5,8 @@ use super::{CliError, Connection, DaemonDb, Path, SchemaRepairHooks, db_error};
 
 const TABLE_EXISTS_SQL: &str =
     "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name = ?1";
+const INDEX_EXISTS_SQL: &str =
+    "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name = ?1";
 const COLUMN_EXISTS_SQL: &str = "SELECT COUNT(*) FROM pragma_table_info(?1) WHERE name = ?2";
 const SCHEMA_VERSION_SQL: &str = "SELECT value FROM schema_meta WHERE key = 'version'";
 const SQLX_MIGRATIONS_TABLE_SQL: &str = "
@@ -102,6 +104,13 @@ async fn migration_effect_observed(
     }
     if migration_version == 80 {
         return table_exists(pool, "task_board_work_item_progress").await;
+    }
+    if migration_version == 82 {
+        return index_exists(
+            pool,
+            "idx_task_board_dispatch_intents_recovery",
+        )
+        .await;
     }
     let Some((table, column)) = migration_effect_column(migration_version) else {
         return Ok(false);
@@ -247,6 +256,8 @@ const fn migration_floor_version(migration_version: i64) -> u64 {
         80 => 69,
         // v70 bounds startup recovery to unfinished attempt-bearing progress.
         81 => 70,
+        // v71 gives that bounded progress scan an exact intent lookup.
+        82 => 71,
         _ => u64::MAX,
     }
 }
@@ -391,6 +402,15 @@ async fn table_exists(pool: &SqlitePool, table_name: &str) -> Result<bool, CliEr
         .await
         .map(|count| count > 0)
         .map_err(|error| db_error(format!("check async table {table_name} existence: {error}")))
+}
+
+async fn index_exists(pool: &SqlitePool, index_name: &str) -> Result<bool, CliError> {
+    query_scalar::<_, i64>(INDEX_EXISTS_SQL)
+        .bind(index_name)
+        .fetch_one(pool)
+        .await
+        .map(|count| count > 0)
+        .map_err(|error| db_error(format!("check async index {index_name} existence: {error}")))
 }
 
 async fn column_exists(

@@ -190,6 +190,7 @@ async fn terminal_snapshot_with_released_admission_replays_progress_after_restar
         let (controller, db, _tempdir) =
             controller_with_async_session_state(bound_in_progress_state()).await;
         let (intent_id, dispatch) = Box::pin(seed_committed_admission(&db, &["concurrency"])).await;
+        seed_selected_legacy_workspace(&db).await;
         seed_running_progress(&db).await;
         let mut run = codex_run_snapshot(CodexRunStatus::Failed);
         run.task_id = Some(TASK_ID.into());
@@ -212,6 +213,13 @@ async fn terminal_snapshot_with_released_admission_replays_progress_after_restar
             .await
             .expect("replay terminal progress");
 
+        let recovered = db
+            .codex_run(WORKER_ID)
+            .await
+            .expect("load normalized terminal run")
+            .expect("normalized terminal run");
+        assert_eq!(recovered.session_id, WORKSPACE_ID);
+        assert!(recovered.session_agent_id.is_none());
         let progress = db
             .task_board_work_item_progress(ITEM_ID)
             .await

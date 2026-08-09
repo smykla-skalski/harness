@@ -77,6 +77,7 @@ impl CodexControllerHandle {
         if let Some(workspace_id) = recovery.dispatch.workspace_id.as_ref() {
             run.session_id.clone_from(workspace_id);
             run.session_agent_id = None;
+            db.save_codex_run(&run).await?;
         }
         if !run.status.is_active() {
             db.release_task_board_admission_for_managed_worker(&run.run_id)

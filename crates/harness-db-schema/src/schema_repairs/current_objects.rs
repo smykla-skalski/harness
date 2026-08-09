@@ -192,6 +192,7 @@ const CURRENT_SCHEMA_INDEXES: &[&str] = &[
     "idx_task_board_items_workspace",
     "idx_task_board_dispatch_workspace_work_item",
     "idx_task_board_work_item_progress_recovery",
+    "idx_task_board_dispatch_intents_recovery",
     "idx_agent_workspace_activity_sources_session",
     "idx_agent_workspace_signals_member",
     "idx_agent_workspace_signals_source",

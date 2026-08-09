@@ -30,7 +30,7 @@ use crate::daemon::db::task_board::prelude::{
 use crate::daemon::db_handle::{AsyncDaemonDbHandle, DaemonDbOwnedHandle};
 use harness_daemon_managed_agents::{AgentTuiSnapshot, AgentTuiStatus, lock};
 
-const LIVE_REFRESH_RETRY_LIMIT: std::time::Duration = std::time::Duration::from_secs(2);
+const LIVE_REFRESH_RETRY_LIMIT: std::time::Duration = std::time::Duration::from_secs(30);
 
 impl AgentTuiManagerHandle {
     pub(super) fn db(&self) -> Result<Arc<Mutex<DaemonDbOwnedHandle>>, CliError> {
@@ -291,19 +291,24 @@ impl AgentTuiManagerHandle {
 
     fn run_live_refresh_loop(&self, tui_id: &str, stop_flag: &AtomicBool) {
         let mut delay = LIVE_REFRESH_INTERVAL;
+        let mut failure_count = 0_u32;
         loop {
             if !Self::wait_for_live_refresh_tick(stop_flag, delay) {
                 break;
             }
             match self.live_refresh_step(tui_id) {
-                Ok(true) => delay = LIVE_REFRESH_INTERVAL,
+                Ok(true) => {
+                    delay = LIVE_REFRESH_INTERVAL;
+                    failure_count = 0;
+                }
                 Ok(false) => break,
                 Err(error) => {
-                    Self::warn_live_refresh_failure(tui_id, &error);
+                    failure_count = failure_count.saturating_add(1);
+                    Self::log_live_refresh_failure(tui_id, &error, failure_count);
                     if !self.state.sandboxed {
                         break;
                     }
-                    delay = (delay * 2).min(LIVE_REFRESH_RETRY_LIMIT);
+                    delay = Self::live_refresh_retry_delay(delay);
                 }
             }
         }
@@ -317,6 +322,12 @@ impl AgentTuiManagerHandle {
         }
         thread::sleep(delay);
         !stop_flag.load(Ordering::Relaxed)
+    }
+
+    pub(super) fn live_refresh_retry_delay(
+        current: std::time::Duration,
+    ) -> std::time::Duration {
+        (current * 2).min(LIVE_REFRESH_RETRY_LIMIT)
     }
 
     fn live_refresh_step(&self, tui_id: &str) -> Result<bool, CliError> {
@@ -361,8 +372,16 @@ impl AgentTuiManagerHandle {
         clippy::cognitive_complexity,
         reason = "tracing macro expansion in a leaf logging helper"
     )]
-    pub(super) fn warn_live_refresh_failure(tui_id: &str, error: &CliError) {
-        tracing::warn!(tui_id = %tui_id, %error, "terminal agent live refresh failed");
+    pub(super) fn log_live_refresh_failure(
+        tui_id: &str,
+        error: &CliError,
+        failure_count: u32,
+    ) {
+        if failure_count == 1 {
+            tracing::warn!(tui_id = %tui_id, %error, "terminal agent live refresh failed");
+        } else {
+            tracing::debug!(tui_id = %tui_id, %error, failure_count, "terminal agent live refresh still unavailable");
+        }
     }
 
     pub(super) fn save_and_broadcast(

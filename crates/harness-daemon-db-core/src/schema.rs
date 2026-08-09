@@ -181,7 +181,7 @@ impl DaemonDb {
         self.apply_pending_migrations_v54(version_number)?;
         self.apply_pending_migrations_v55(version_number)?;
         self.apply_pending_migrations_v56(version_number)?;
-        self.apply_pending_migrations_v57_to_v70(version_number)
+        self.apply_pending_migrations_v57_to_v71(version_number)
     }
 
     #[expect(

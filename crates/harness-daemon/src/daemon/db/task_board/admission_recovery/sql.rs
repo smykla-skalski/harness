@@ -23,6 +23,7 @@ pub(super) const ADMISSION_RECOVERY_SQL: &str =
      FROM task_board_work_item_progress AS progress
           INDEXED BY idx_task_board_work_item_progress_recovery
      JOIN task_board_dispatch_intents AS intent
+          INDEXED BY idx_task_board_dispatch_intents_recovery
        ON intent.item_id = progress.item_id
       AND intent.work_item_id = progress.work_item_id
      JOIN task_board_dispatch_admission_ledger AS ledger

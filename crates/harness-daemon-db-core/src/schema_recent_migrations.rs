@@ -1,7 +1,7 @@
 use super::{CliError, DaemonDb};
 
 impl DaemonDb {
-    pub(super) fn apply_pending_migrations_v57_to_v70(
+    pub(super) fn apply_pending_migrations_v57_to_v71(
         &self,
         version_number: u8,
     ) -> Result<(), CliError> {
@@ -46,6 +46,9 @@ impl DaemonDb {
         }
         if version_number <= 69 {
             harness_db_schema::schema_v70::run(&self.conn)?;
+        }
+        if version_number <= 70 {
+            harness_db_schema::schema_v71::run(&self.conn)?;
         }
         Ok(())
     }

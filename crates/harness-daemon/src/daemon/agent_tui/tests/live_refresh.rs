@@ -108,6 +108,19 @@ fn manager_publishes_terminal_output_without_manual_refresh() {
 }
 
 #[test]
+fn sandboxed_live_refresh_retry_backs_off_to_thirty_seconds() {
+    let mut delay = std::time::Duration::from_millis(100);
+    for _ in 0..16 {
+        delay = AgentTuiManagerHandle::live_refresh_retry_delay(delay);
+    }
+    assert_eq!(delay, std::time::Duration::from_secs(30));
+    assert_eq!(
+        AgentTuiManagerHandle::live_refresh_retry_delay(delay),
+        std::time::Duration::from_secs(30)
+    );
+}
+
+#[test]
 fn live_refresh_step_skips_persist_when_db_updated_concurrently() {
     let tmp = tempfile::tempdir().expect("tempdir");
     let project_dir = tmp.path().join("project");
