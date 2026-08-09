@@ -346,7 +346,7 @@ public struct DaemonController: DaemonControlling {
   {
     let helperURL = Bundle.main.bundleURL
       .appendingPathComponent("Contents", isDirectory: true)
-      .appendingPathComponent("Helpers", isDirectory: true)
+      .appendingPathComponent("Resources", isDirectory: true)
       .appendingPathComponent("harness-daemon")
     guard FileManager.default.fileExists(atPath: helperURL.path) else {
       return nil

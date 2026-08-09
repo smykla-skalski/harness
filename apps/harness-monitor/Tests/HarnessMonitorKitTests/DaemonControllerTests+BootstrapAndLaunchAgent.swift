@@ -329,7 +329,7 @@ extension DaemonControllerTests {
 
     let snapshot = await controller.launchAgentSnapshot()
 
-    #expect(snapshot.label == "Q498EB36N4.io.harnessmonitor.daemon")
-    #expect(snapshot.serviceTarget == "Q498EB36N4.io.harnessmonitor.daemon")
+    #expect(snapshot.label == "Q498EB36N4.io.harnessmonitor.agent")
+    #expect(snapshot.serviceTarget == "Q498EB36N4.io.harnessmonitor.agent")
   }
 }

@@ -54,6 +54,7 @@ public enum BuildPhases {
                 "$(PROJECT_DIR)/Scripts/lib/daemon-input-state.py",
                 "$(PROJECT_DIR)/Scripts/lib/monitor-lanes.sh",
                 "$(PROJECT_DIR)/Scripts/lib/swift-tool-env.sh",
+                "$(PROJECT_DIR)/Resources/LaunchAgents/Q498EB36N4.io.harnessmonitor.agent.plist",
                 "$(PROJECT_DIR)/Resources/LaunchAgents/Q498EB36N4.io.harnessmonitor.daemon.plist",
                 "$(PROJECT_DIR)/Resources/LaunchAgents/io.harnessmonitor.daemon.managed.plist",
                 "$(PROJECT_DIR)/Resources/LaunchAgents/io.harnessmonitor.daemon.plist",
@@ -71,12 +72,13 @@ public enum BuildPhases {
                 "$(PROJECT_TEMP_DIR)/HarnessMonitor-daemon-staged-ready.id.staging"
             ],
             outputPaths: [
-                "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/harness-daemon",
-                "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/harness-daemon.cstemp",
-                "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/harness-daemon.staging",
-                "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/harness-daemon.staging.cstemp",
+                "$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/harness-daemon",
+                "$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/harness-daemon.cstemp",
+                "$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/harness-daemon.staging",
+                "$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/harness-daemon.staging.cstemp",
+                "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/Q498EB36N4.io.harnessmonitor.agent.plist",
+                "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/Q498EB36N4.io.harnessmonitor.agent.plist.staging",
                 "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/Q498EB36N4.io.harnessmonitor.daemon.plist",
-                "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/Q498EB36N4.io.harnessmonitor.daemon.plist.staging",
                 "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/io.harnessmonitor.daemon.managed.plist",
                 "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/io.harnessmonitor.daemon.plist",
                 "$(DERIVED_FILE_DIR)/$(TARGET_NAME)-bundle-daemon-agent.stamp"

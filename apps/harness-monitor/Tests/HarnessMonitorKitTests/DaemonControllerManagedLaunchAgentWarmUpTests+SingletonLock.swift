@@ -12,7 +12,7 @@ private func bsdFlock(_ fd: Int32, _ operation: Int32) -> Int32
 
 private let managedLaunchAgentHelperPathFixture =
   "/Users/example/Library/Developer/Xcode/DerivedData/HarnessMonitor/Build/Products/Debug/"
-  + "Harness Monitor.app/Contents/Helpers/harness-daemon"
+  + "Harness Monitor.app/Contents/Resources/harness-daemon"
 
 extension DaemonControllerManagedLaunchAgentWarmUpTests {
   /// The stale manifest names the previous daemon's pid, which is already dead
@@ -26,7 +26,7 @@ extension DaemonControllerManagedLaunchAgentWarmUpTests {
       let client = PreviewHarnessClient()
       try writeManagedLaunchAgentBundleStampFixture(
         ManagedLaunchAgentBundleStampFixture(
-          helperPath: "/Applications/Harness Monitor.app/Contents/Helpers/harness-daemon",
+          helperPath: "/Applications/Harness Monitor.app/Contents/Resources/harness-daemon",
           deviceIdentifier: 41,
           inode: 84,
           fileSize: 16_384,

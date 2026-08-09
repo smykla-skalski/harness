@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import plistlib
@@ -33,7 +34,7 @@ DAEMON_LAUNCH_AGENT_PLIST_PATH = (
     Path(__file__).resolve().parents[2]
     / "Resources"
     / "LaunchAgents"
-    / "Q498EB36N4.io.harnessmonitor.daemon.plist"
+    / "Q498EB36N4.io.harnessmonitor.agent.plist"
 )
 
 
@@ -88,22 +89,41 @@ def _read_source_manifest(path: Path) -> list[Path]:
     ]
 
 
-def _bundle_stamp_lines(daemon_source: Path) -> list[str]:
+def _bundle_stamp_lines(
+    daemon_source: Path,
+    project_dir: Path | None = None,
+) -> list[str]:
     daemon_stat = daemon_source.stat()
+    daemon_info_plist = (
+        project_dir
+        / "Resources"
+        / "LaunchAgents"
+        / "io.harnessmonitor.daemon.Info.plist"
+        if project_dir is not None
+        else None
+    )
+    daemon_info_plist_sha = (
+        hashlib.sha256(daemon_info_plist.read_bytes()).hexdigest()
+        if daemon_info_plist is not None and daemon_info_plist.is_file()
+        else "missing"
+    )
     return [
+        "bundle_stamp_schema=2",
         f"daemon_source={daemon_source}",
         f"daemon_source_stat={int(daemon_stat.st_mtime)}:{daemon_stat.st_size}",
         "codesign_identity=fake-identity",
         "timestamp_flag=--timestamp=none",
-        "launch_agent_label=Q498EB36N4.io.harnessmonitor.daemon",
+        "launch_agent_label=Q498EB36N4.io.harnessmonitor.agent",
         "app_group_id=test.group",
         "marketing_version=1.2.3",
         "daemon_data_home=/tmp/test-daemon-home",
         "codex_ws_port=4242",
         "runtime_lane=test-lane",
+        f"daemon_info_plist_sha={daemon_info_plist_sha}",
         "daemon_plist_sha=missing",
         "legacy_managed_plist_sha=missing",
         "legacy_plist_sha=missing",
+        "legacy_team_plist_sha=missing",
         "entitlements_sha=missing",
         "unsealable_plugin=-",
     ]
@@ -171,11 +191,17 @@ class DaemonInfoPlistTests(unittest.TestCase):
 
         self.assertEqual(payload["CFBundlePackageType"], "APPL")
         self.assertEqual(payload["CFBundleExecutable"], "harness-daemon")
+        self.assertEqual(
+            payload["CFBundleIdentifier"],
+            "Q498EB36N4.io.harnessmonitor.agent",
+        )
 
+
+class DaemonLaunchAgentPlistTests(unittest.TestCase):
     def test_launch_agent_uses_dedicated_daemon_command(self) -> None:
         payload = plistlib.loads(DAEMON_LAUNCH_AGENT_PLIST_PATH.read_bytes())
 
-        self.assertEqual(payload["BundleProgram"], "Contents/Helpers/harness-daemon")
+        self.assertEqual(payload["BundleProgram"], "Contents/Resources/harness-daemon")
         self.assertEqual(
             payload["ProgramArguments"][:2],
             ["harness-daemon", "serve"],
@@ -305,6 +331,8 @@ class BuildDaemonBinaryTests(unittest.TestCase):
             captured = captured_env_path.read_text()
             self.assertIn("CARGO_ARGS=rustc --package harness-daemon-bin --bin harness-daemon", captured)
             self.assertIn("--features harness-daemon/tokio-console", captured)
+            self.assertIn("-Wl,-no_compact_unwind", captured)
+            self.assertIn("__info_plist", captured)
 
     def test_unsets_xcode_only_swift_debug_environment_before_cargo(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -1017,13 +1045,13 @@ class BundleStampShortcutTests(unittest.TestCase):
         target_build_dir = root / "build"
         derived_dir = root / "derived"
         daemon_source = root / "daemon-source"
-        daemon_target = target_build_dir / "Contents" / "Helpers" / "harness-daemon"
+        daemon_target = target_build_dir / "Contents" / "Resources" / "harness-daemon"
         plist_target = (
             target_build_dir
             / "Contents"
             / "Library"
             / "LaunchAgents"
-            / "Q498EB36N4.io.harnessmonitor.daemon.plist"
+            / "Q498EB36N4.io.harnessmonitor.agent.plist"
         )
         bundle_stamp_path = derived_dir / "HarnessMonitor-bundle-daemon-agent.stamp"
 
@@ -1049,6 +1077,7 @@ class BundleStampShortcutTests(unittest.TestCase):
             "PROJECT_DIR": str(project_dir),
             "TARGET_BUILD_DIR": str(target_build_dir),
             "CONTENTS_FOLDER_PATH": "Contents",
+            "UNLOCALIZED_RESOURCES_FOLDER_PATH": "Contents/Resources",
             "DERIVED_FILE_DIR": str(derived_dir),
             "TARGET_NAME": "HarnessMonitor",
             "HARNESS_MONITOR_DAEMON_BINARY": str(daemon_source),
@@ -1183,14 +1212,14 @@ class BundleStampShortcutTests(unittest.TestCase):
             target_build_dir = root / "build"
             derived_dir = root / "derived"
             daemon_target = (
-                target_build_dir / "Contents" / "Helpers" / "harness-daemon"
+                target_build_dir / "Contents" / "Resources" / "harness-daemon"
             )
             plist_target = (
                 target_build_dir
                 / "Contents"
                 / "Library"
                 / "LaunchAgents"
-                / "Q498EB36N4.io.harnessmonitor.daemon.plist"
+                / "Q498EB36N4.io.harnessmonitor.agent.plist"
             )
             daemon_target.parent.mkdir(parents=True)
             plist_target.parent.mkdir(parents=True)
@@ -1202,11 +1231,12 @@ class BundleStampShortcutTests(unittest.TestCase):
                 derived_dir / "HarnessMonitor-bundle-daemon-agent.stamp"
             )
             bundle_stamp_path.write_text(
-                "\n".join(_bundle_stamp_lines(staged_binary)) + "\n"
+                "\n".join(_bundle_stamp_lines(staged_binary, project_dir)) + "\n"
             )
             env.update(
                 {
                     "CONTENTS_FOLDER_PATH": "Contents",
+                    "UNLOCALIZED_RESOURCES_FOLDER_PATH": "Contents/Resources",
                     "DERIVED_FILE_DIR": str(derived_dir),
                     "EXPANDED_CODE_SIGN_IDENTITY": "fake-identity",
                     "HARNESS_APP_GROUP_ID": "test.group",
@@ -1267,7 +1297,7 @@ def _setup_fake_daemon_layout(tmp_dir: Path):
 <plist version="1.0">
 <dict>
     <key>CFBundleIdentifier</key>
-    <string>Q498EB36N4.io.harnessmonitor.daemon</string>
+    <string>Q498EB36N4.io.harnessmonitor.agent</string>
 </dict>
 </plist>
 """

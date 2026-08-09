@@ -16,6 +16,8 @@
 		<string>managed</string>
 		<key>HARNESS_SANDBOXED</key>
 		<string>1</string>
+		<key>HARNESS_TOKIO_CONSOLE</key>
+		<string>1</string>
 	</dict>
 	<key>KeepAlive</key>
 	<dict>
@@ -25,7 +27,7 @@
 		<true/>
 	</dict>
 	<key>Label</key>
-	<string>io.harnessmonitor.daemon</string>
+	<string>Q498EB36N4.io.harnessmonitor.agent</string>
 	<key>LimitLoadToSessionType</key>
 	<string>Aqua</string>
 	<key>ProcessType</key>

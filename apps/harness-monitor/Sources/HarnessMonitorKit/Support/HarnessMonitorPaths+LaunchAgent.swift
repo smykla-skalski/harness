@@ -9,6 +9,7 @@ extension HarnessMonitorPaths {
   /// orphaned SMAppService entries on first launch under the new layout.
   public static var legacyLaunchAgentPlistNames: [String] {
     [
+      "Q498EB36N4.io.harnessmonitor.daemon.plist",
       "io.harnessmonitor.daemon.managed.plist",
       "io.harnessmonitor.daemon.plist",
     ]
