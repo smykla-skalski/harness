@@ -43,6 +43,7 @@ pub struct AgentWorkingCopy {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WorkspaceManagedAgentKind {
     Terminal,
+    Acp,
     Codex,
 }
 
@@ -51,6 +52,7 @@ impl WorkspaceManagedAgentKind {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Terminal => "tui",
+            Self::Acp => "acp",
             Self::Codex => "codex",
         }
     }

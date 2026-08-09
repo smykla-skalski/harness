@@ -94,7 +94,7 @@ async fn predecessor_partial_workspace() -> (
     )
     .await
     .expect("persist predecessor partial workspace");
-    (fixture, accepted, authority, workspace)
+    (fixture, accepted, authority, workspace.path().to_path_buf())
 }
 
 async fn assert_predecessor_cleanup(

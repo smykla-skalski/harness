@@ -86,7 +86,7 @@ pub(super) async fn prepare_fresh_remote_worker_start(
     if shutdown_observed(shutdown_rx) {
         return Ok(None);
     }
-    match claim_or_cleanup_remote_start_io(db, Some(&authority), &workspace).await? {
+    match claim_or_cleanup_remote_start_io(db, Some(&authority), workspace.path()).await? {
         TaskBoardRemoteExecutorStartIoPermitOutcome::Acquired(permit) => {
             Ok(Some(PreparedRemoteWorker {
                 workspace,

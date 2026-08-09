@@ -4,7 +4,8 @@ use super::wire::{
     RemoteArtifactEntry, RemoteArtifactManifest, RemoteAttemptBinding, RemoteCancelRequest,
     RemoteClaimRequest, RemoteLeaseRenewRequest, RemoteOfferDisposition, RemoteOfferRequest,
     RemoteOfferResponse, RemoteSettledRequest, RemoteSourceMaterial, RemoteTypedResult,
-    RemoteWireError, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION, test_codex_launch,
+    RemoteWireError, RemoteWorkOwnerBinding, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
+    test_codex_launch,
 };
 use crate::{
     TASK_BOARD_LOCAL_ATTEMPT_RESULT_SCHEMA_VERSION, TaskBoardAttemptResultArtifact,
@@ -87,6 +88,42 @@ fn offer_deadline_is_absolute_canonical_and_digest_bound() {
             .validate()
             .expect_err("noncanonical deadline denied"),
         RemoteWireError::InvalidTimestamp("deadline_at")
+    );
+}
+
+#[test]
+fn offer_owner_is_source_daemon_namespaced_and_attempt_bound() {
+    let owner = RemoteWorkOwnerBinding {
+        source_daemon_id: "source-daemon-a".into(),
+        workspace_id: "workspace-shared".into(),
+        working_copy_id: "copy-shared".into(),
+        work_item_id: "work-shared".into(),
+        managed_agent_id: "attempt-key".into(),
+    };
+    let mut first = offer_request();
+    first.work_owner = Some(owner.clone());
+    let first = first.seal().expect("seal first source owner");
+    first.validate().expect("validate source owner");
+
+    let mut second = offer_request();
+    second.work_owner = Some(RemoteWorkOwnerBinding {
+        source_daemon_id: "source-daemon-b".into(),
+        ..owner
+    });
+    let second = second.seal().expect("seal colliding second source owner");
+    assert_ne!(first.request_sha256, second.request_sha256);
+
+    let mut mismatched = first;
+    mismatched
+        .work_owner
+        .as_mut()
+        .expect("source owner")
+        .managed_agent_id = "other-attempt".into();
+    mismatched.request_sha256.clear();
+    let mismatched = mismatched.seal().expect("reseal mismatched owner");
+    assert_eq!(
+        mismatched.validate(),
+        Err(RemoteWireError::ResultBindingMismatch)
     );
 }
 
@@ -230,6 +267,7 @@ pub(super) fn offer_request() -> RemoteOfferRequest {
     RemoteOfferRequest {
         schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
         binding: binding(),
+        work_owner: None,
         lease_seconds: 60,
         deadline_at: "2026-07-19T12:10:00Z".into(),
         launch: test_codex_launch(

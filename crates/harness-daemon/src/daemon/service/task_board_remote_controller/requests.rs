@@ -9,7 +9,7 @@ use crate::task_board::remote_wire::wire::{
     RemoteArtifactEntry, RemoteArtifactFetchRequest, RemoteArtifactManifest,
     RemoteAssignmentWireState, RemoteAttemptBinding, RemoteClaimRequest, RemoteLeaseRenewRequest,
     RemoteOfferRequest, RemoteRuntimeLaunchEnvelope, RemoteSettledRequest, RemoteSourceMaterial,
-    RemoteStatusRequest, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
+    RemoteStatusRequest, RemoteWorkOwnerBinding, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
 use crate::task_board::remote_wire::wire_cleanup::RemoteCleanupObservationRequest;
 use crate::task_board::{
@@ -44,6 +44,7 @@ pub(super) fn prepare_offer(
     execution: &TaskBoardWorkflowExecutionRecord,
     attempt: &TaskBoardExecutionAttemptRecord,
     host: &TaskBoardRemoteHostSelection,
+    work_owner: RemoteWorkOwnerBinding,
     prepared_source: PreparedRemoteSource,
     now: &str,
 ) -> Result<Option<PreparedRemoteOffer>, CliError> {
@@ -69,6 +70,7 @@ pub(super) fn prepare_offer(
     let request = RemoteOfferRequest {
         schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
         binding,
+        work_owner: Some(work_owner),
         lease_seconds: REMOTE_LEASE_SECONDS,
         deadline_at: canonical(deadline_at),
         launch: RemoteRuntimeLaunchEnvelope::from_run_request(runtime, &launch)

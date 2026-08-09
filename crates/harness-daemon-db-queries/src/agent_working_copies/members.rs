@@ -103,12 +103,23 @@ async fn bind_runtime_owner_in_tx(
             .fetch_optional(transaction.as_mut())
             .await
         }
+        super::model::WorkspaceManagedAgentKind::Acp => {
+            query_as::<_, (Option<String>,)>(
+                "SELECT session_id FROM agent_turn_runs WHERE run_id = ?1",
+            )
+            .bind(&registration.managed_agent_id)
+            .fetch_optional(transaction.as_mut())
+            .await
+        }
     }
     .map_err(|error| db_error(format!("load managed worker workspace owner: {error}")))?;
-    if current
-        .and_then(|(workspace_id,)| workspace_id)
-        .is_some_and(|workspace_id| workspace_id != registration.workspace_id)
-    {
+    let current_owner = current.and_then(|(workspace_id,)| workspace_id);
+    let owner_matches = current_owner.as_deref().is_none_or(|workspace_id| {
+        workspace_id == registration.workspace_id
+            || (registration.kind == super::model::WorkspaceManagedAgentKind::Acp
+                && workspace_id == registration.managed_agent_id)
+    });
+    if !owner_matches {
         return Err(db_error(format!(
             "managed worker '{}' already belongs to another workspace",
             registration.managed_agent_id
@@ -136,6 +147,13 @@ async fn bind_runtime_owner_in_tx(
             .bind(&registration.workspace_id)
             .execute(transaction.as_mut())
             .await
+        }
+        super::model::WorkspaceManagedAgentKind::Acp => {
+            query("UPDATE agent_turn_runs SET session_id = ?2 WHERE run_id = ?1")
+                .bind(&registration.managed_agent_id)
+                .bind(&registration.workspace_id)
+                .execute(transaction.as_mut())
+                .await
         }
     };
     result

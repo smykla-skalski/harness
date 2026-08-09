@@ -11,10 +11,15 @@ use tokio::sync::Barrier;
 use tokio::task::spawn_blocking;
 
 use super::source_bundle::{cleanup_repository_snapshot_import, materialize_repository_snapshot};
-use super::{RemoteWorkerIdentity, concurrent, invalid_transition};
+use super::{PreparedRemoteWorkspace, RemoteWorkerIdentity, concurrent, invalid_transition};
 use crate::daemon::db::{TaskBoardRemoteAssignmentRecord, db_error};
 use crate::daemon::protocol::SessionStartRequest;
 use crate::daemon::service::start_session_direct_async;
+use crate::daemon::service::workspace_checkout::{
+    PreparedWorkspaceCheckout, WorkspaceCheckoutPlan, discard_workspace_checkout,
+    prepare_workspace_checkout,
+};
+use crate::daemon::state;
 use crate::git::GitError;
 use crate::git::GitRepository;
 use crate::session::types::SessionState;
@@ -27,6 +32,7 @@ use harness_kernel::errors::{CliError, CliErrorKind};
 use super::source_bundle::apply_prior_phase_bundle;
 use crate::daemon::db::AsyncSessionSummaryQueries;
 use crate::daemon::db_handle::AsyncDaemonDbHandle;
+use harness_daemon_db_queries::AsyncAgentWorkingCopyQueries;
 
 pub(super) async fn prepare_remote_workspace(
     db: &AsyncDaemonDbHandle,
@@ -34,7 +40,7 @@ pub(super) async fn prepare_remote_workspace(
     offer: &RemoteOfferRequest,
     identity: &RemoteWorkerIdentity,
     starts_worker: bool,
-) -> Result<PathBuf, CliError> {
+) -> Result<PreparedRemoteWorkspace, CliError> {
     if starts_worker && !executor_settings_match(db, record, offer).await? {
         return Err(concurrent(
             "remote executor settings changed before worker start",
@@ -44,17 +50,31 @@ pub(super) async fn prepare_remote_workspace(
         starts_worker || offer.binding.phase != TaskBoardExecutionPhase::Implementation;
     let revision = initial_source_revision(offer)?;
     let repository_source = matches!(offer.source, RemoteSourceMaterial::Repository { .. });
-    let workspace = ensure_remote_session(
-        db,
-        record,
-        identity,
-        revision,
-        starts_worker,
-        require_source_head && repository_source,
-    )
-    .await?;
+    let workspace = if offer.work_owner.is_some() {
+        ensure_remote_workspace(
+            db,
+            record,
+            identity,
+            revision,
+            starts_worker,
+            require_source_head && repository_source,
+        )
+        .await?
+    } else {
+        PreparedRemoteWorkspace::legacy(
+            ensure_remote_session(
+                db,
+                record,
+                identity,
+                revision,
+                starts_worker,
+                require_source_head && repository_source,
+            )
+            .await?,
+        )
+    };
     if require_source_head && !repository_source {
-        apply_prior_phase_bundle(db, record, offer, identity, &workspace).await?;
+        apply_prior_phase_bundle(db, record, offer, identity, workspace.path()).await?;
     }
     if starts_worker && !executor_settings_match(db, record, offer).await? {
         return Err(concurrent(
@@ -62,6 +82,132 @@ pub(super) async fn prepare_remote_workspace(
         ));
     }
     Ok(workspace)
+}
+
+async fn ensure_remote_workspace(
+    db: &AsyncDaemonDbHandle,
+    record: &TaskBoardRemoteAssignmentRecord,
+    identity: &RemoteWorkerIdentity,
+    revision: &str,
+    allow_create: bool,
+    require_source_head: bool,
+) -> Result<PreparedRemoteWorkspace, CliError> {
+    let origin = PathBuf::from(record.executor_checkout_path.as_deref().ok_or_else(|| {
+        invalid_transition("remote executor assignment has no frozen checkout path")
+    })?);
+    let offer = record.require_offer()?;
+    let snapshot_import = materialize_repository_snapshot(db, record, offer, &origin).await?;
+    let require_source_head = require_source_head
+        || matches!(
+            &offer.source,
+            RemoteSourceMaterial::RepositorySnapshotBundle { .. }
+        );
+    if require_source_head {
+        verify_repository_revision(origin.clone(), revision.to_string()).await?;
+    }
+    let workspace = match db
+        .load_agent_working_copy(&identity.working_copy_id)
+        .await?
+    {
+        Some(recorded) if !recorded.released => {
+            validate_recorded_workspace(&recorded, &origin, revision, require_source_head).await?;
+            PreparedRemoteWorkspace::owned(
+                PathBuf::from(recorded.worktree_path),
+                recorded.workspace_id,
+            )
+        }
+        Some(_) | None if !allow_create => {
+            cleanup_repository_snapshot_import(snapshot_import).await?;
+            return Err(concurrent(
+                "started remote assignment has no durable executor working copy",
+            ));
+        }
+        Some(_) | None => {
+            provision_remote_workspace(db, identity, &origin, revision, require_source_head).await?
+        }
+    };
+    cleanup_repository_snapshot_import(snapshot_import).await?;
+    Ok(workspace)
+}
+
+async fn provision_remote_workspace(
+    db: &AsyncDaemonDbHandle,
+    identity: &RemoteWorkerIdentity,
+    origin: &Path,
+    revision: &str,
+    require_source_head: bool,
+) -> Result<PreparedRemoteWorkspace, CliError> {
+    #[cfg(test)]
+    super::test_seam::record_provision();
+    let daemon_id = spawn_blocking(state::ensure_daemon_identity)
+        .await
+        .map_err(|error| CliErrorKind::workflow_io(format!("join daemon identity read: {error}")))??
+        .daemon_id;
+    let plan = WorkspaceCheckoutPlan {
+        daemon_id,
+        working_copy_id: identity.working_copy_id.clone(),
+        project_dir: origin.to_string_lossy().into_owned(),
+        base_ref: Some(revision.to_string()),
+    };
+    let prepared = spawn_blocking(move || prepare_workspace_checkout(&plan))
+        .await
+        .map_err(|error| {
+            CliErrorKind::workflow_io(format!("join remote checkout worker: {error}"))
+        })??;
+    let worktree = prepared.request.worktree_path.clone();
+    let provisioned = match db
+        .provision_agent_workspace_checkout(&prepared.request)
+        .await
+    {
+        Ok(provisioned) => provisioned,
+        Err(error) => {
+            discard_prepared_workspace(prepared).await;
+            return Err(error);
+        }
+    };
+    validate_remote_worktree_head(Path::new(&worktree), revision, require_source_head)?;
+    Ok(PreparedRemoteWorkspace::owned(
+        PathBuf::from(worktree),
+        provisioned.workspace_id,
+    ))
+}
+
+async fn validate_recorded_workspace(
+    recorded: &harness_daemon_db_queries::AgentWorkingCopy,
+    origin: &Path,
+    revision: &str,
+    require_source_head: bool,
+) -> Result<(), CliError> {
+    let expected_origin = origin.to_path_buf();
+    let actual_origin = PathBuf::from(&recorded.origin_path);
+    let worktree = PathBuf::from(&recorded.worktree_path);
+    let branch = recorded.branch_ref.clone();
+    let expected_branch = format!("harness/{}", recorded.working_copy_id);
+    let revision = revision.to_string();
+    spawn_blocking(move || {
+        if expected_origin
+            .canonicalize()
+            .map_err(|error| io_error(&error))?
+            != actual_origin
+                .canonicalize()
+                .map_err(|error| io_error(&error))?
+            || branch != expected_branch
+        {
+            return Err(concurrent(
+                "remote executor working-copy identity mismatched",
+            ));
+        }
+        validate_remote_worktree_head(&worktree, &revision, require_source_head)
+    })
+    .await
+    .map_err(|error| CliErrorKind::workflow_io(format!("join remote workspace check: {error}")))?
+}
+
+async fn discard_prepared_workspace(prepared: PreparedWorkspaceCheckout) {
+    let _ = spawn_blocking(move || {
+        discard_workspace_checkout(&prepared.canonical_origin, &prepared.layout);
+    })
+    .await;
 }
 
 #[expect(

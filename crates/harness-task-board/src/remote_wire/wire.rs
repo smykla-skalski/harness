@@ -132,6 +132,40 @@ pub struct RemoteAttemptBinding {
     pub expected_head_revision: Option<String>,
 }
 
+/// Controller-owned work identity sealed into a remote offer.
+///
+/// These identifiers are provenance, not executor-local lookup keys. The
+/// source daemon id namespaces the remaining values so two daemons with the
+/// same project or checkout names can never address each other's workspace.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[derive(utoipa::ToSchema)]
+pub struct RemoteWorkOwnerBinding {
+    pub source_daemon_id: String,
+    pub workspace_id: String,
+    pub working_copy_id: String,
+    pub work_item_id: String,
+    pub managed_agent_id: String,
+}
+
+impl RemoteWorkOwnerBinding {
+    /// # Errors
+    /// Returns [`RemoteWireError`] when any owner identifier is missing,
+    /// oversized, or not canonical.
+    pub fn validate(&self) -> Result<(), RemoteWireError> {
+        for (name, value) in [
+            ("source_daemon_id", self.source_daemon_id.as_str()),
+            ("workspace_id", self.workspace_id.as_str()),
+            ("working_copy_id", self.working_copy_id.as_str()),
+            ("work_item_id", self.work_item_id.as_str()),
+            ("managed_agent_id", self.managed_agent_id.as_str()),
+        ] {
+            require_canonical_identity(name, value, 256)?;
+        }
+        Ok(())
+    }
+}
+
 impl RemoteAttemptBinding {
     /// # Errors
     /// Returns [`RemoteWireError`] if a required field is missing,
@@ -211,6 +245,11 @@ fn valid_revision(value: &str) -> bool {
 pub struct RemoteOfferRequest {
     pub schema_version: u32,
     pub binding: RemoteAttemptBinding,
+    /// Absent only on an offer persisted by a pre-workspace daemon. New
+    /// offers require this binding and executors use its presence to select
+    /// the Session-free path.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub work_owner: Option<RemoteWorkOwnerBinding>,
     pub lease_seconds: u32,
     pub deadline_at: String,
     pub launch: RemoteRuntimeLaunchEnvelope,

@@ -18,7 +18,8 @@ use crate::daemon::server_state::DaemonErrorBody;
 use crate::task_board::remote_wire::wire::{
     RemoteArtifactFetchRequest, RemoteCancelRequest, RemoteCancelResponse, RemoteClaimRequest,
     RemoteLeaseRenewRequest, RemoteLeaseRenewResponse, RemoteOfferRequest, RemoteSettledRequest,
-    RemoteSourceBundleUploadRequest, RemoteStatusRequest, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
+    RemoteSourceBundleUploadRequest, RemoteStatusRequest, RemoteWireError,
+    TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
 use crate::task_board::remote_wire::wire::{
     RemoteArtifactFetchResponse, RemoteClaimResponse, RemoteHostAdvertisement, RemoteOfferResponse,
@@ -261,6 +262,10 @@ async fn offer(
     map_route_result(
         async {
             request.validate().map_err(|error| wire_error(&error))?;
+            request
+                .work_owner
+                .as_ref()
+                .ok_or_else(|| wire_error(&RemoteWireError::MissingField("work_owner")))?;
             let (db, principal) =
                 assignment_route(&headers, &state, "offer", &request.binding).await?;
             let outcome = db

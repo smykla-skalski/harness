@@ -134,7 +134,12 @@ pub struct TaskBoardHeldDispatchSummary {
 pub struct TaskBoardHeldDispatchItem {
     pub intent_id: String,
     pub board_item_id: String,
-    pub session_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub working_copy_id: Option<String>,
     pub work_item_id: String,
 }
 

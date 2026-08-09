@@ -128,13 +128,24 @@ public struct TaskBoardHeldDispatchSummary: Codable, Equatable, Sendable {
 public struct TaskBoardHeldDispatchItem: Codable, Equatable, Sendable {
   public var intentId: String
   public var boardItemId: String
-  public var sessionId: String
+  public var sessionId: String?
+  public var workspaceId: String?
+  public var workingCopyId: String?
   public var workItemId: String
 
-  public init(intentId: String, boardItemId: String, sessionId: String, workItemId: String) {
+  public init(
+    intentId: String,
+    boardItemId: String,
+    sessionId: String? = nil,
+    workspaceId: String? = nil,
+    workingCopyId: String? = nil,
+    workItemId: String
+  ) {
     self.intentId = intentId
     self.boardItemId = boardItemId
     self.sessionId = sessionId
+    self.workspaceId = workspaceId
+    self.workingCopyId = workingCopyId
     self.workItemId = workItemId
   }
 
@@ -142,6 +153,8 @@ public struct TaskBoardHeldDispatchItem: Codable, Equatable, Sendable {
     case intentId = "intent_id"
     case boardItemId = "board_item_id"
     case sessionId = "session_id"
+    case workspaceId = "workspace_id"
+    case workingCopyId = "working_copy_id"
     case workItemId = "work_item_id"
   }
 }

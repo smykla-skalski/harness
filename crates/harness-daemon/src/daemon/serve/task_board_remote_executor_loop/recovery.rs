@@ -1,9 +1,9 @@
 use super::{
     PreparedRemoteWorker, PreparedRemoteWorkerAction, RemoteWorkerAction, RemoteWorkerIdentity,
     TaskBoardRemoteAssignmentRecord, TaskBoardRemoteExecutorStartIoPermit, concurrent,
-    executor_start_authority, reconcile_persisted_start_without_run, utc_now,
+    executor_start_authority, prepare_remote_workspace, reconcile_persisted_start_without_run,
+    utc_now,
 };
-use crate::daemon::db::AsyncSessionSummaryQueries;
 use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use harness_kernel::errors::CliError;
@@ -44,11 +44,10 @@ pub(super) async fn prepare_recovery(
         reconcile_persisted_start_without_run(db, record, permit).await?;
         return Ok(None);
     }
-    let Some(session) = db.resolve_session(&identity.session_id).await? else {
-        return Ok(None);
-    };
+    let offer = record.require_offer()?;
+    let workspace = prepare_remote_workspace(db, record, offer, identity, false).await?;
     Ok(Some(PreparedRemoteWorker {
-        workspace: session.state.worktree_path,
+        workspace,
         action: PreparedRemoteWorkerAction::Probe(persisted_permit),
     }))
 }

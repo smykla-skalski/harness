@@ -1,8 +1,8 @@
 use std::future::Future;
 
 use super::disabled_tests::{
-    EXECUTOR_INSTANCE, configure_checkout, executor_state, git_repository, load_assignment,
-    request_for_revision,
+    EXECUTOR_INSTANCE, configure_checkout, executor_session_count, executor_state, git_repository,
+    load_assignment, request_for_revision,
 };
 use super::test_seam::{self, RuntimeSeamAction, RuntimeSeamCall};
 use crate::daemon::db::prelude::*;
@@ -16,12 +16,18 @@ use crate::daemon::protocol::CodexRunStatus;
 use crate::daemon::serve::test_support::{
     RuntimeSeamScope, install_deterministic_runtime_seam, reconcile_task_board_remote_executor_tick,
 };
+use crate::task_board::remote_wire::wire::{
+    RemoteAssignmentWireState, RemoteSettledRequest, RemoteWorkOwnerBinding,
+    TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
+};
 use crate::task_board::{
     TASK_BOARD_LOCAL_ATTEMPT_RESULT_SCHEMA_VERSION, TaskBoardAttemptResultArtifact,
     TaskBoardLocalAttemptResult, TaskBoardPhaseVerdict, TaskBoardRemoteAssignmentState,
     TaskBoardReviewResult, TaskBoardReviewerOutcome,
 };
 use chrono::{Duration, SecondsFormat, Utc};
+use harness_daemon_db_queries::AsyncAgentWorkingCopyQueries;
+use sqlx::query_scalar;
 
 #[test]
 fn production_tick_uses_the_runtime_seam_for_start_then_active_probe() {
@@ -111,6 +117,177 @@ async fn production_tick_uses_the_runtime_seam_for_start_then_active_probe_body(
     );
     drop(scope);
     assert!(!test_seam::runtime_seam_installed());
+}
+
+#[test]
+fn workspace_owned_remote_start_creates_no_session_and_reuses_one_authoritative_run() {
+    run_deep_async(workspace_owned_remote_start_creates_no_session_body);
+}
+
+async fn workspace_owned_remote_start_creates_no_session_body() {
+    let (fixture, before) = Box::pin(live_claimed_executor_for_owner("codex", true)).await;
+    let offer = before.require_offer().expect("sealed executor offer");
+    let owner = offer.work_owner.as_ref().expect("workspace owner");
+    let identity = remote_executor_identity(&before).expect("deterministic executor identity");
+    let state = executor_state(&fixture.db, EXECUTOR_INSTANCE);
+    let scope: RuntimeSeamScope = install_deterministic_runtime_seam().await;
+
+    reconcile_task_board_remote_executor_tick(&state)
+        .await
+        .expect("start workspace-owned remote worker");
+    assert_eq!(executor_session_count(&fixture.db).await, 0);
+    let copy = fixture
+        .db
+        .load_agent_working_copy(&identity.working_copy_id)
+        .await
+        .expect("load executor working copy")
+        .expect("executor working copy");
+    assert!(!copy.released);
+    let run = fixture
+        .db
+        .codex_run(&identity.run_id)
+        .await
+        .expect("load workspace-owned run")
+        .expect("workspace-owned run");
+    assert_eq!(run.session_id, copy.workspace_id);
+    let started = load_assignment(&fixture.db, &before.assignment_id).await;
+    let receipt = started.start_receipt.expect("workspace start receipt");
+    assert_eq!(
+        receipt.workspace_id.as_deref(),
+        Some(copy.workspace_id.as_str())
+    );
+    assert_eq!(
+        receipt.working_copy_id.as_deref(),
+        Some(identity.working_copy_id.as_str())
+    );
+    assert_eq!(
+        receipt.managed_agent_id.as_deref(),
+        Some(identity.run_id.as_str())
+    );
+    let assignments = query_scalar::<_, String>(
+        "SELECT assignment_id FROM agent_workspace_members
+         WHERE workspace_id = ?1 AND managed_agent_id = ?2",
+    )
+    .bind(&copy.workspace_id)
+    .bind(&identity.run_id)
+    .fetch_all(fixture.db.pool())
+    .await
+    .expect("load executor workspace member");
+    assert_eq!(assignments, vec![owner.work_item_id.clone()]);
+
+    reconcile_task_board_remote_executor_tick(&state)
+        .await
+        .expect("reconnect probes the authoritative worker");
+    assert_eq!(scope.start_count().await, 1);
+    assert_eq!(executor_session_count(&fixture.db).await, 0);
+
+    settle_workspace_owned_run(
+        &fixture,
+        &before,
+        &identity,
+        &state,
+        &scope,
+        &copy.worktree_path,
+    )
+    .await;
+}
+
+async fn settle_workspace_owned_run(
+    fixture: &RemoteExecutorFixture,
+    before: &TaskBoardRemoteAssignmentRecord,
+    identity: &crate::daemon::db::TaskBoardRemoteExecutorIdentity,
+    state: &crate::daemon::http::DaemonHttpState,
+    scope: &RuntimeSeamScope,
+    worktree_path: &str,
+) {
+    scope
+        .arm_completed(&identity.run_id, completed_message(before))
+        .await
+        .expect("arm workspace-owned completion");
+    reconcile_task_board_remote_executor_tick(state)
+        .await
+        .expect("persist workspace-owned terminal result");
+    let completed = load_assignment(&fixture.db, &before.assignment_id).await;
+    assert_eq!(completed.state, TaskBoardRemoteAssignmentState::Completed);
+    let offer = completed
+        .require_offer()
+        .expect("completed workspace offer");
+    let settlement = RemoteSettledRequest {
+        schema_version: TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
+        binding: offer.binding.clone(),
+        lease_id: completed.lease_id.clone().expect("settlement lease"),
+        offer_request_sha256: offer.request_sha256.clone(),
+        terminal_state: RemoteAssignmentWireState::Completed,
+        result_sha256: completed.result_sha256.clone(),
+        request_sha256: String::new(),
+    }
+    .seal()
+    .expect("seal workspace settlement");
+    fixture
+        .db
+        .settle_task_board_remote_assignment(
+            &settlement,
+            REMOTE_EXECUTOR_PRINCIPAL,
+            &crate::workspace::utc_now(),
+        )
+        .await
+        .expect("persist workspace settlement");
+
+    reconcile_task_board_remote_executor_tick(state)
+        .await
+        .expect("release workspace-owned executor state");
+    let cleaned = load_assignment(&fixture.db, &before.assignment_id).await;
+    assert!(cleaned.cleanup_completed_at.is_some());
+    let copy = fixture
+        .db
+        .load_agent_working_copy(&identity.working_copy_id)
+        .await
+        .expect("reload released executor working copy")
+        .expect("released executor working copy remains auditable");
+    assert!(copy.released);
+    assert!(!std::path::Path::new(worktree_path).exists());
+    assert_eq!(executor_session_count(&fixture.db).await, 0);
+
+    reconcile_task_board_remote_executor_tick(state)
+        .await
+        .expect("replay completed workspace cleanup");
+    assert_eq!(scope.start_count().await, 1);
+}
+
+#[test]
+fn workspace_owned_openrouter_start_binds_the_same_sessionless_owner() {
+    run_deep_async(workspace_owned_openrouter_start_binds_owner_body);
+}
+
+async fn workspace_owned_openrouter_start_binds_owner_body() {
+    let (fixture, before) = Box::pin(live_claimed_executor_for_owner("openrouter", true)).await;
+    let identity = remote_executor_identity(&before).expect("deterministic executor identity");
+    let state = executor_state(&fixture.db, EXECUTOR_INSTANCE);
+    let scope: RuntimeSeamScope = install_deterministic_runtime_seam().await;
+
+    reconcile_task_board_remote_executor_tick(&state)
+        .await
+        .expect("start workspace-owned OpenRouter worker");
+    let copy = fixture
+        .db
+        .load_agent_working_copy(&identity.working_copy_id)
+        .await
+        .expect("load OpenRouter working copy")
+        .expect("OpenRouter working copy");
+    let run = fixture
+        .db
+        .agent_turn_run(&identity.run_id)
+        .await
+        .expect("load workspace-owned OpenRouter run")
+        .expect("workspace-owned OpenRouter run");
+    assert_eq!(run.session_id.as_deref(), Some(copy.workspace_id.as_str()));
+    assert_eq!(executor_session_count(&fixture.db).await, 0);
+
+    reconcile_task_board_remote_executor_tick(&state)
+        .await
+        .expect("reconnect probes the authoritative OpenRouter worker");
+    assert_eq!(scope.start_count().await, 1);
+    assert_eq!(executor_session_count(&fixture.db).await, 0);
 }
 
 #[test]
@@ -258,6 +435,13 @@ async fn live_claimed_executor() -> (RemoteExecutorFixture, TaskBoardRemoteAssig
 async fn live_claimed_executor_for(
     runtime: &str,
 ) -> (RemoteExecutorFixture, TaskBoardRemoteAssignmentRecord) {
+    live_claimed_executor_for_owner(runtime, false).await
+}
+
+async fn live_claimed_executor_for_owner(
+    runtime: &str,
+    workspace_owned: bool,
+) -> (RemoteExecutorFixture, TaskBoardRemoteAssignmentRecord) {
     let fixture = remote_executor_fixture(1).await;
     let (origin, revision) = git_repository(fixture.temp_dir.path());
     configure_checkout(&fixture.db, &origin).await;
@@ -266,6 +450,15 @@ async fn live_claimed_executor_for(
     let claimed_at = (now - Duration::seconds(1)).to_rfc3339_opts(SecondsFormat::AutoSi, true);
     let mut request = request_for_revision(&fixture.request, &revision);
     request.launch.runtime = runtime.into();
+    if workspace_owned {
+        request.work_owner = Some(RemoteWorkOwnerBinding {
+            source_daemon_id: "source-daemon-a".into(),
+            workspace_id: "source-workspace-a".into(),
+            working_copy_id: "source-copy-a".into(),
+            work_item_id: "source-work-item-a".into(),
+            managed_agent_id: request.binding.idempotency_key.clone(),
+        });
+    }
     request.deadline_at =
         (now + Duration::minutes(10)).to_rfc3339_opts(SecondsFormat::AutoSi, true);
     request.request_sha256.clear();

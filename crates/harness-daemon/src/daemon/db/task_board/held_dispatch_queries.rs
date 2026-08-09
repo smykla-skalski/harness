@@ -22,8 +22,18 @@ use crate::task_board::{TaskBoardHeldDispatchItem, TaskBoardHeldDispatchSummary}
 pub(in crate::daemon::db::task_board) async fn held_task_board_dispatch_summary(
     db: &AsyncDaemonDb,
 ) -> Result<TaskBoardHeldDispatchSummary, CliError> {
-    let rows = query_as::<_, (String, String, String, String)>(
-        "SELECT intent_id, item_id, session_id, work_item_id
+    let rows = query_as::<
+        _,
+        (
+            String,
+            String,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            String,
+        ),
+    >(
+        "SELECT intent_id, item_id, session_id, workspace_id, working_copy_id, work_item_id
              FROM task_board_dispatch_intents WHERE status = 'held'
              ORDER BY created_at, intent_id",
     )
@@ -33,10 +43,19 @@ pub(in crate::daemon::db::task_board) async fn held_task_board_dispatch_summary(
     let items = rows
         .into_iter()
         .map(
-            |(intent_id, board_item_id, session_id, work_item_id)| TaskBoardHeldDispatchItem {
+            |(
                 intent_id,
                 board_item_id,
                 session_id,
+                workspace_id,
+                working_copy_id,
+                work_item_id,
+            )| TaskBoardHeldDispatchItem {
+                intent_id,
+                board_item_id,
+                session_id,
+                workspace_id,
+                working_copy_id,
                 work_item_id,
             },
         )

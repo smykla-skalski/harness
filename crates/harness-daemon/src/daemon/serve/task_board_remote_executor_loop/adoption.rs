@@ -1,7 +1,5 @@
 //! Exact executor snapshot validation, start adoption, and terminal handoff.
 
-use std::path::Path;
-
 use crate::daemon::db::{
     REMOTE_START_INTERRUPTED_WITHOUT_RUN_ERROR_CODE,
     REMOTE_START_INTERRUPTED_WITHOUT_RUN_FAILURE_CLASS, REMOTE_START_PREFLIGHT_ERROR_CODE,
@@ -25,7 +23,9 @@ use super::runtime::{
 use super::stop::claim_and_settle_invalid_remote_run;
 use super::stop::settle_lifecycle_settings_drift;
 use super::terminal::persist_terminal_snapshot;
-use super::{RemoteWorkerIdentity, claim_active_lifecycle_owner, concurrent};
+use super::{
+    PreparedRemoteWorkspace, RemoteWorkerIdentity, claim_active_lifecycle_owner, concurrent,
+};
 use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
@@ -40,7 +40,7 @@ pub(super) async fn execute_and_reconcile_remote_worker(
     offer: &RemoteOfferRequest,
     identity: &RemoteWorkerIdentity,
     action: &PreparedRemoteWorkerAction,
-    workspace: &Path,
+    workspace: &PreparedRemoteWorkspace,
 ) -> Result<(), CliError> {
     let snapshot =
         match execute_remote_worker_action(state, db, offer, identity, action, workspace).await {
@@ -88,7 +88,7 @@ pub(super) async fn execute_and_reconcile_remote_worker(
             &state.daemon_epoch,
             &record,
             &snapshot,
-            workspace,
+            workspace.path(),
         ))
         .await;
     }
@@ -104,7 +104,7 @@ async fn reconcile_claimed_adoption(
     db: &AsyncDaemonDbHandle,
     permit: Option<&TaskBoardRemoteExecutorStartIoPermit>,
     snapshot: &TaskBoardRemoteExecutorRun,
-    workspace: &Path,
+    workspace: &PreparedRemoteWorkspace,
 ) -> Result<Option<TaskBoardRemoteAssignmentRecord>, CliError> {
     let permit = permit
         .ok_or_else(|| concurrent("claimed remote worker has no durable Start I/O permit"))?;
@@ -319,12 +319,12 @@ async fn adopt_remote_start(
     db: &AsyncDaemonDbHandle,
     permit: &TaskBoardRemoteExecutorStartIoPermit,
     snapshot: &TaskBoardRemoteExecutorRun,
-    workspace: &Path,
+    workspace: &PreparedRemoteWorkspace,
 ) -> Result<Option<TaskBoardRemoteAssignmentRecord>, CliError> {
     let outcome = db
         .adopt_task_board_remote_executor_start_owned(
             permit,
-            workspace,
+            workspace.path(),
             &snapshot.created_at,
             &state.daemon_epoch,
             &utc_now(),

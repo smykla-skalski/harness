@@ -288,6 +288,7 @@ fn repository_offer(phase: TaskBoardExecutionPhase) -> RemoteOfferRequest {
             base_revision: REVISION.into(),
             expected_head_revision,
         },
+        work_owner: None,
         lease_seconds: 60,
         deadline_at: "2026-07-20T12:00:00Z".into(),
         launch: test_codex_launch(

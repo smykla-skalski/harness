@@ -66,7 +66,7 @@ async fn provisioned_authority() -> ProvisionedAuthority {
         accepted,
         authority,
         identity,
-        workspace,
+        workspace: workspace.path().to_path_buf(),
     }
 }
 

@@ -13,7 +13,7 @@ use crate::task_board::TaskBoardRemoteAssignmentState;
 use crate::task_board::remote_wire::wire::RemoteOfferRequest;
 use crate::workspace::utc_now;
 use harness_kernel::errors::{CliError, CliErrorKind};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::Duration;
 use tokio::sync::watch;
 use tokio::task::JoinHandle;
@@ -40,21 +40,24 @@ mod source_bundle;
 mod stop;
 #[path = "task_board_remote_executor_loop/terminal.rs"]
 mod terminal;
+#[path = "task_board_remote_executor_loop/workspace.rs"]
+mod workspace;
 use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use adoption::execute_and_reconcile_remote_worker;
 use adoption::reconcile_persisted_start_without_run;
 use cleanup::{cleanup_unstarted_executor_provisioning, reconcile_settled_executor_cleanup};
 use fences::{concurrent, invalid_transition, require_executor_identity, shutdown_observed};
 use recovery::{abandon_predecessor_claim, prepare_recovery};
-#[cfg(test)]
-use runtime::remote_run_request;
 use runtime::{
     PreparedRemoteWorkerAction, RemoteWorkerAction, start_window_is_open, stop_remote_run,
-    validate_run_identity, worker_action,
+    worker_action,
 };
+#[cfg(test)]
+use runtime::{remote_run_request, validate_run_identity};
 use scan::executor_assignment_ids;
 use source::prepare_remote_workspace;
 use stop::{reconcile_stop_pending, settle_lifecycle_settings_drift};
+use workspace::PreparedRemoteWorkspace;
 pub(super) type RemoteWorkerIdentity = TaskBoardRemoteExecutorIdentity;
 pub(super) const REMOTE_START_EXPIRED_REASON: &str =
     "remote assignment expired before executor start";
@@ -284,7 +287,7 @@ async fn reconcile_active_remote_worker(
 }
 
 struct PreparedRemoteWorker {
-    workspace: PathBuf,
+    workspace: PreparedRemoteWorkspace,
     action: PreparedRemoteWorkerAction,
 }
 
@@ -464,7 +467,7 @@ async fn stop_terminal_remote_worker(
         return Ok(());
     };
     require_executor_identity(record)?;
-    validate_run_identity(&snapshot, offer, identity)?;
+    cleanup::validate_cleanup_run(db, record, identity, &snapshot).await?;
     if !snapshot.status.is_active() {
         return Ok(());
     }

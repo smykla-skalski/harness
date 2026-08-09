@@ -102,7 +102,7 @@ pub(crate) async fn claim_task_board_remote_executor_start_io_permit(
         return Ok(TaskBoardRemoteExecutorStartIoPermitOutcome::Stale);
     }
     if let Some(permit) = executor_start_io_permit(&record)? {
-        if !exact_provisioned_session(&mut transaction, &record, &permit.identity, &project_dir)
+        if !exact_provisioned_owner(&mut transaction, &record, &permit.identity, &project_dir)
             .await?
         {
             return Err(concurrent(
@@ -129,7 +129,7 @@ pub(crate) async fn claim_task_board_remote_executor_start_io_permit(
     }
     if !executor_settings_still_match(&mut transaction, &record).await?
         || !start_authority_eligible(&record, host_instance_id, permitted_at)?
-        || !exact_provisioned_session(&mut transaction, &record, &authority.identity, &project_dir)
+        || !exact_provisioned_owner(&mut transaction, &record, &authority.identity, &project_dir)
             .await?
     {
         commit_noop(transaction, "unavailable remote executor Start I/O permit").await?;
@@ -330,13 +330,38 @@ pub(crate) fn start_io_permit_digest_from_evidence(
     Ok(hex::encode(hasher.finalize()))
 }
 
-async fn exact_provisioned_session(
+async fn exact_provisioned_owner(
     transaction: &mut Transaction<'_, Sqlite>,
     record: &TaskBoardRemoteAssignmentRecord,
     identity: &TaskBoardRemoteExecutorIdentity,
     project_dir: &str,
 ) -> Result<bool, CliError> {
     let origin_path = canonical_executor_checkout_path(record)?;
+    if record.require_offer()?.work_owner.is_some() {
+        return query_scalar::<_, bool>(
+            "SELECT EXISTS(
+               SELECT 1 FROM agent_working_copies AS copy
+               JOIN agent_workspaces AS workspace
+                 ON workspace.workspace_id = copy.workspace_id
+               WHERE copy.working_copy_id = ?1 AND copy.status = 'active'
+                 AND copy.worktree_path = ?2 AND copy.origin_path = ?3
+                 AND copy.branch_ref = ?4
+                 AND workspace.orchestration_authority = 'workspace'
+                 AND workspace.selected_legacy_session_id IS NULL
+             )",
+        )
+        .bind(&identity.working_copy_id)
+        .bind(project_dir)
+        .bind(origin_path)
+        .bind(format!("harness/{}", identity.working_copy_id))
+        .fetch_one(transaction.as_mut())
+        .await
+        .map_err(|error| {
+            db_error(format!(
+                "verify provisioned remote executor working copy: {error}"
+            ))
+        });
+    }
     query_scalar::<_, bool>(
         "SELECT EXISTS(
            SELECT 1 FROM sessions

@@ -20,7 +20,8 @@ use crate::task_board::remote_wire::wire::{
     RemoteLeaseRenewResponse, RemoteOfferDisposition, RemoteOfferRequest, RemoteOfferResponse,
     RemoteSettledRequest, RemoteSettledResponse, RemoteSourceBundleUploadRequest,
     RemoteSourceBundleUploadResponse, RemoteSourceMaterial, RemoteStatusRequest,
-    RemoteStatusResponse, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION, test_codex_launch,
+    RemoteStatusResponse, RemoteWorkOwnerBinding, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
+    test_codex_launch,
 };
 use crate::task_board::{
     TaskBoardExecutionPhase, TaskBoardLocalExecutionHostConfig,
@@ -95,6 +96,14 @@ async fn executor_offer_replay_and_digest_tamper_are_fail_closed() {
 
     let denied = authenticated_post(&client, &base_url, OFFER_PATH, OPERATOR, &offer).await;
     assert_eq!(denied.status(), StatusCode::FORBIDDEN);
+
+    let mut legacy = offer.clone();
+    legacy.work_owner = None;
+    legacy.request_sha256.clear();
+    let legacy = legacy.seal().expect("seal legacy Session-owned offer");
+    let rejected_legacy =
+        authenticated_post(&client, &base_url, OFFER_PATH, HOST_ID, &legacy).await;
+    assert_eq!(rejected_legacy.status(), StatusCode::BAD_REQUEST);
 
     let first = authenticated_post(&client, &base_url, OFFER_PATH, HOST_ID, &offer).await;
     assert_eq!(first.status(), StatusCode::OK);
@@ -278,6 +287,13 @@ fn offer_request(assignment_id: &str, idempotency_key: &str) -> RemoteOfferReque
             base_revision: "1111111111111111111111111111111111111111".into(),
             expected_head_revision: Some("1111111111111111111111111111111111111111".into()),
         },
+        work_owner: Some(RemoteWorkOwnerBinding {
+            source_daemon_id: "source-daemon-route-test".into(),
+            workspace_id: "source-workspace-route-test".into(),
+            working_copy_id: "source-copy-route-test".into(),
+            work_item_id: "source-work-item-route-test".into(),
+            managed_agent_id: idempotency_key.into(),
+        }),
         lease_seconds: 60,
         deadline_at: (Utc::now() + Duration::minutes(10))
             .to_rfc3339_opts(SecondsFormat::AutoSi, true),

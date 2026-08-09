@@ -94,7 +94,7 @@ pub(super) async fn apply_prior_phase_bundle(
     };
     let plan = SourceBundleImportPlan {
         workspace: workspace.to_path_buf(),
-        branch_ref: format!("refs/heads/harness/{}", identity.session_id),
+        branch_ref: executor_branch_ref(offer, identity),
         base_revision: base_revision.clone(),
         result_revision: revision.clone(),
         advertised_ref: advertised_ref.clone(),
@@ -150,7 +150,7 @@ pub(super) async fn cleanup_prior_phase_import_ref(
         .map(Path::to_path_buf)
         .or_else(|| record.executor_checkout_path.as_deref().map(PathBuf::from))
         .ok_or_else(|| concurrent("remote bundle cleanup has no frozen repository"))?;
-    let branch_ref = format!("refs/heads/harness/{}", identity.session_id);
+    let branch_ref = executor_branch_ref(offer, identity);
     let base_revision = base_revision.clone();
     let result_revision = revision.clone();
     let advertised_ref = advertised_ref.clone();
@@ -169,6 +169,15 @@ pub(super) async fn cleanup_prior_phase_import_ref(
     })
     .await
     .map_err(|error| CliErrorKind::workflow_io(format!("join remote bundle cleanup: {error}")))?
+}
+
+fn executor_branch_ref(offer: &RemoteOfferRequest, identity: &RemoteWorkerIdentity) -> String {
+    let owner_id = if offer.work_owner.is_some() {
+        &identity.working_copy_id
+    } else {
+        &identity.session_id
+    };
+    format!("refs/heads/harness/{owner_id}")
 }
 
 fn import_ref(offer: &RemoteOfferRequest, bundle_sha256: &str) -> String {

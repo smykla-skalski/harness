@@ -1,5 +1,5 @@
 use chrono::{Duration, SecondsFormat, Utc};
-use sqlx::query_scalar;
+use sqlx::{query, query_as, query_scalar};
 
 use super::{TaskBoardRemoteControllerReport, canonical_now, offer_remote_candidates};
 use crate::daemon::db::task_board::prelude::*;
@@ -54,6 +54,59 @@ async fn eligible_initial_attempt_selects_remote_before_any_local_run() {
     );
     assert_eq!(assignment_count(&fixture).await, 1);
     assert_eq!(codex_run_count(&fixture).await, 0);
+    let item = fixture
+        .db
+        .task_board_item(&fixture.execution.item_id)
+        .await
+        .expect("load source work owner");
+    assert_eq!(
+        offered_owner(&fixture).await,
+        (
+            "source-daemon".into(),
+            item.workspace_id.expect("source workspace"),
+            item.working_copy_id.expect("source working copy"),
+            item.work_item_id.expect("source work item"),
+            fixture.attempt.idempotency_key.clone(),
+        )
+    );
+}
+
+#[tokio::test]
+async fn legacy_session_owned_candidate_stays_local_without_a_remote_offer() {
+    let fixture = Box::pin(remote_controller_fixture(1)).await;
+    query(
+        "UPDATE task_board_items
+         SET session_id = 'legacy-source-session', workspace_id = NULL,
+             working_copy_id = NULL
+         WHERE item_id = ?1",
+    )
+    .bind(&fixture.execution.item_id)
+    .execute(fixture.db.pool())
+    .await
+    .expect("restore legacy Session ownership");
+    refresh_fixture_observation(&fixture, 1, 0).await;
+    let mut report = TaskBoardRemoteControllerReport::default();
+
+    offer_remote_candidates(&fixture.db, &mut report)
+        .await
+        .expect("keep legacy Session-owned work local");
+
+    assert_eq!(report.offered_attempts, 0);
+    assert_eq!(assignment_count(&fixture).await, 0);
+    let selected = fixture
+        .db
+        .task_board_workflow_execution(&fixture.execution.execution_id)
+        .await
+        .expect("load local selection")
+        .expect("local selection");
+    assert_eq!(
+        selected
+            .ownership
+            .resources
+            .get(TASK_BOARD_EXECUTION_TARGET_RESOURCE)
+            .map(String::as_str),
+        Some("local")
+    );
 }
 
 #[tokio::test]
@@ -331,4 +384,21 @@ async fn offered_runtime(fixture: &crate::daemon::db::RemoteControllerFixture) -
     .fetch_one(fixture.db.pool())
     .await
     .expect("load offered runtime")
+}
+
+async fn offered_owner(
+    fixture: &crate::daemon::db::RemoteControllerFixture,
+) -> (String, String, String, String, String) {
+    query_as(
+        "SELECT json_extract(request_json, '$.work_owner.source_daemon_id'),
+                json_extract(request_json, '$.work_owner.workspace_id'),
+                json_extract(request_json, '$.work_owner.working_copy_id'),
+                json_extract(request_json, '$.work_owner.work_item_id'),
+                json_extract(request_json, '$.work_owner.managed_agent_id')
+         FROM task_board_remote_assignments WHERE execution_id = ?1",
+    )
+    .bind(&fixture.execution.execution_id)
+    .fetch_one(fixture.db.pool())
+    .await
+    .expect("load offered work owner")
 }

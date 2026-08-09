@@ -15,10 +15,13 @@ use crate::task_board::TaskBoardRemoteAssignmentState;
 use crate::task_board::remote_wire::wire::RemoteOfferRequest;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
-use super::RemoteWorkerIdentity;
+use super::{PreparedRemoteWorkspace, RemoteWorkerIdentity};
 use crate::daemon::db::prelude::*;
 use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db_handle::AsyncDaemonDbHandle;
+use harness_daemon_db_queries::{
+    AsyncAgentWorkingCopyQueries, WorkspaceManagedAgentKind, WorkspaceMemberRegistration,
+};
 
 /// The action the loop plans from durable state before it has authority to
 /// execute it. Only [`Start`](Self::Start)/[`Probe`](Self::Probe) can reach a
@@ -67,33 +70,79 @@ pub(super) async fn execute_remote_worker_action(
     offer: &RemoteOfferRequest,
     identity: &RemoteWorkerIdentity,
     action: &PreparedRemoteWorkerAction,
-    workspace: &Path,
+    workspace: &PreparedRemoteWorkspace,
 ) -> Result<TaskBoardRemoteExecutorRun, CliError> {
     #[cfg(test)]
-    if let Some(snapshot) =
-        super::test_seam::execute_runtime_seam(db, offer, identity, action, workspace).await?
-    {
-        return Ok(snapshot);
-    }
-    match (offer.launch.runtime.as_str(), action) {
-        ("codex", PreparedRemoteWorkerAction::Start(_)) => {
-            start_codex_run(state, identity, remote_run_request(offer))
-                .await
-                .map(TaskBoardRemoteExecutorRun::from)
-        }
-        ("codex", PreparedRemoteWorkerAction::Probe(_)) => probe_codex_run(state, &identity.run_id)
+    let seam_snapshot =
+        super::test_seam::execute_runtime_seam(db, offer, identity, action, workspace).await?;
+    #[cfg(not(test))]
+    let seam_snapshot: Option<TaskBoardRemoteExecutorRun> = None;
+    let snapshot = if let Some(snapshot) = seam_snapshot {
+        snapshot
+    } else {
+        match (offer.launch.runtime.as_str(), action) {
+            ("codex", PreparedRemoteWorkerAction::Start(_)) => start_codex_run(
+                state,
+                offer,
+                identity,
+                remote_run_request(offer),
+                workspace.path(),
+            )
             .await
             .map(TaskBoardRemoteExecutorRun::from),
-        ("openrouter", PreparedRemoteWorkerAction::Start(_)) => {
-            start_openrouter_run(state, db, offer, identity, workspace).await
-        }
-        ("openrouter", PreparedRemoteWorkerAction::Probe(_)) => {
-            probe_openrouter_run(state, db, offer, identity, workspace).await
-        }
-        (runtime, _) => Err(invalid_transition(format!(
-            "unsupported remote executor runtime '{runtime}'"
-        ))),
+            ("codex", PreparedRemoteWorkerAction::Probe(_)) => {
+                probe_codex_run(state, &identity.run_id)
+                    .await
+                    .map(TaskBoardRemoteExecutorRun::from)
+            }
+            ("openrouter", PreparedRemoteWorkerAction::Start(_)) => {
+                start_openrouter_run(state, db, offer, identity, workspace).await
+            }
+            ("openrouter", PreparedRemoteWorkerAction::Probe(_)) => {
+                probe_openrouter_run(state, db, offer, identity, workspace).await
+            }
+            (runtime, _) => Err(invalid_transition(format!(
+                "unsupported remote executor runtime '{runtime}'"
+            ))),
+        }?
+    };
+    bind_workspace_owned_run(db, offer, identity, workspace).await?;
+    if offer.work_owner.is_some() {
+        return db
+            .task_board_remote_executor_run(offer, &identity.run_id)
+            .await?
+            .ok_or_else(|| concurrent("workspace-owned remote run disappeared after binding"));
     }
+    Ok(snapshot)
+}
+
+async fn bind_workspace_owned_run(
+    db: &AsyncDaemonDbHandle,
+    offer: &RemoteOfferRequest,
+    identity: &RemoteWorkerIdentity,
+    workspace: &PreparedRemoteWorkspace,
+) -> Result<(), CliError> {
+    let Some(source_owner) = offer.work_owner.as_ref() else {
+        return Ok(());
+    };
+    let workspace_id = workspace.workspace_id().ok_or_else(|| {
+        concurrent("workspace-owned remote offer resolved to a legacy Session checkout")
+    })?;
+    let kind = match offer.launch.runtime.as_str() {
+        "codex" => WorkspaceManagedAgentKind::Codex,
+        "openrouter" => WorkspaceManagedAgentKind::Acp,
+        _ => return Err(concurrent("remote workspace uses an unsupported runtime")),
+    };
+    db.register_workspace_managed_member(&WorkspaceMemberRegistration {
+        workspace_id: workspace_id.to_string(),
+        kind,
+        managed_agent_id: identity.run_id.clone(),
+        runtime_kind: offer.launch.runtime.clone(),
+        display_name: offer.launch.display_name.clone(),
+        assignment_id: Some(source_owner.work_item_id.clone()),
+    })
+    .await
+    .map(|_| ())
 }
 
 pub(super) fn remote_run_request(offer: &RemoteOfferRequest) -> CodexRunRequest {
@@ -105,7 +154,7 @@ async fn start_openrouter_run(
     db: &AsyncDaemonDbHandle,
     offer: &RemoteOfferRequest,
     identity: &RemoteWorkerIdentity,
-    workspace: &Path,
+    workspace: &PreparedRemoteWorkspace,
 ) -> Result<TaskBoardRemoteExecutorRun, CliError> {
     #[cfg(test)]
     super::test_seam::record_start();
@@ -127,7 +176,7 @@ async fn probe_openrouter_run(
     db: &AsyncDaemonDbHandle,
     offer: &RemoteOfferRequest,
     identity: &RemoteWorkerIdentity,
-    workspace: &Path,
+    workspace: &PreparedRemoteWorkspace,
 ) -> Result<TaskBoardRemoteExecutorRun, CliError> {
     let run = db
         .agent_turn_run(&identity.run_id)
@@ -145,7 +194,7 @@ fn openrouter_runtime(
     state: &DaemonHttpState,
     offer: &RemoteOfferRequest,
     identity: &RemoteWorkerIdentity,
-    workspace: &Path,
+    workspace: &PreparedRemoteWorkspace,
 ) -> Result<OpenRouterAgentTurnRuntime, CliError> {
     let store = state.async_db.get().cloned().ok_or_else(|| {
         CliError::from(CliErrorKind::workflow_io(
@@ -154,8 +203,11 @@ fn openrouter_runtime(
     })?;
     Ok(OpenRouterAgentTurnRuntime::new_correlated(
         state.acp_agent_manager.clone(),
-        identity.session_id.clone(),
-        Some(workspace.to_string_lossy().into_owned()),
+        workspace
+            .workspace_id()
+            .unwrap_or(&identity.session_id)
+            .to_string(),
+        Some(workspace.path().to_string_lossy().into_owned()),
         store,
         OpenRouterRunCorrelation {
             run_id: identity.run_id.clone(),
@@ -191,15 +243,23 @@ fn parse_start_window_instant(value: &str) -> Result<chrono::DateTime<chrono::Ut
 
 async fn start_codex_run(
     state: &DaemonHttpState,
+    offer: &RemoteOfferRequest,
     identity: &RemoteWorkerIdentity,
     request: CodexRunRequest,
+    workspace: &Path,
 ) -> Result<CodexRunSnapshot, CliError> {
     #[cfg(test)]
     super::test_seam::record_start();
-    let session_id = identity.session_id.clone();
+    let project_dir = workspace.to_string_lossy().into_owned();
     let run_id = identity.run_id.clone();
+    let workspace_owned = offer.work_owner.is_some();
+    let session_id = identity.session_id.clone();
     run_codex_agent_blocking(state, "remote Task Board worker start", move |controller| {
-        controller.start_run_with_id(&session_id, &request, run_id)
+        if workspace_owned {
+            controller.start_standalone_run_with_id(&project_dir, &request, run_id)
+        } else {
+            controller.start_run_with_id(&session_id, &request, run_id)
+        }
     })
     .await
 }
@@ -252,14 +312,22 @@ pub(super) fn validate_run_snapshot<S>(
     snapshot: &S,
     offer: &RemoteOfferRequest,
     identity: &RemoteWorkerIdentity,
-    workspace: &Path,
+    workspace: &PreparedRemoteWorkspace,
 ) -> Result<(), CliError>
 where
     S: Clone + Into<TaskBoardRemoteExecutorRun>,
 {
     let snapshot = snapshot.clone().into();
     validate_run_identity(&snapshot, offer, identity)?;
-    if Path::new(&snapshot.project_dir) != workspace {
+    if workspace
+        .workspace_id()
+        .is_some_and(|workspace_id| snapshot.session_id != workspace_id)
+    {
+        return Err(concurrent(
+            "remote runtime run uses a different executor workspace",
+        ));
+    }
+    if Path::new(&snapshot.project_dir) != workspace.path() {
         return Err(concurrent(
             "remote runtime run uses a different executor worktree",
         ));
@@ -277,9 +345,14 @@ where
 {
     let snapshot = snapshot.clone().into();
     let expected = remote_run_request(offer);
+    let owner_matches = if offer.work_owner.is_some() {
+        !snapshot.session_id.trim().is_empty()
+    } else {
+        snapshot.session_id == identity.session_id
+    };
     if snapshot.run_id != identity.run_id
         || snapshot.runtime != offer.launch.runtime
-        || snapshot.session_id != identity.session_id
+        || !owner_matches
         || snapshot.task_id != expected.task_id
         || snapshot.board_item_id != expected.board_item_id
         || snapshot.display_name != expected.name

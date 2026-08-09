@@ -29,6 +29,10 @@ pub(crate) use runtime::{
     authorize_and_start_executor, persist_executor_run, persist_pre_permit_executor_run,
 };
 
+#[path = "remote_assignment_test_support/work_owner.rs"]
+mod work_owner;
+use work_owner::seed_remote_item_owner;
+
 #[path = "remote_assignment_test_support/cancel_targets.rs"]
 mod cancel_targets;
 use crate::daemon::db::task_board::item_core_queries::ItemCoreQueries;
@@ -233,6 +237,7 @@ pub(super) fn detached_offer(assignment_id: &str, idempotency_key: &str) -> Remo
             base_revision: SOURCE_REVISION.into(),
             expected_head_revision: Some(SOURCE_REVISION.into()),
         },
+        work_owner: None,
         lease_seconds: 60,
         deadline_at: DEADLINE.into(),
         launch: test_codex_launch(
@@ -327,6 +332,7 @@ async fn seeded_review_execution(
 ) -> TaskBoardWorkflowExecutionRecord {
     let item_id = format!("item-{label}");
     let execution_id = format!("execution-{label}");
+    let (workspace_id, working_copy_id, work_item_id) = seed_remote_item_owner(db, label).await;
     let mut item = crate::task_board::TaskBoardItem::new(
         item_id.clone(),
         "Remote review".into(),
@@ -335,6 +341,10 @@ async fn seeded_review_execution(
     );
     item.workflow_kind = TaskBoardWorkflowKind::Review;
     item.execution_repository = Some(REPOSITORY.into());
+    item.workflow.execution_id = Some(execution_id.clone());
+    item.workspace_id = Some(workspace_id);
+    item.working_copy_id = Some(working_copy_id);
+    item.work_item_id = Some(work_item_id);
     let mutation = db.create_task_board_item(item).await.expect("create item");
     let settings = db
         .task_board_orchestrator_settings_snapshot()
@@ -452,6 +462,7 @@ pub(super) fn offer_request(
             base_revision: SOURCE_REVISION.into(),
             expected_head_revision: Some(SOURCE_REVISION.into()),
         },
+        work_owner: None,
         lease_seconds: 60,
         deadline_at: DEADLINE.into(),
         launch: RemoteRuntimeLaunchEnvelope::from_run_request(

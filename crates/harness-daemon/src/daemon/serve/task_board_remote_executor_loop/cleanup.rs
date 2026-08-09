@@ -17,15 +17,26 @@ use crate::daemon::http::DaemonHttpState;
 use crate::session::storage as session_storage;
 use crate::session::types::SessionState;
 use crate::task_board::TaskBoardRemoteAssignmentState;
-use crate::task_board::remote_wire::wire::RemoteSettledRequest;
 use crate::workspace::layout::SessionLayout;
 use crate::workspace::utc_now;
 use crate::workspace::worktree::WorktreeController;
+use harness_daemon_db_queries::AsyncAgentWorkingCopyQueries;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
+#[path = "cleanup/fences.rs"]
+mod fences;
 #[path = "cleanup/layout.rs"]
 mod layout;
+#[path = "cleanup/workspace.rs"]
+mod workspace;
+use fences::{
+    exact_unstarted_provisioning, preclaim_superseded_cleanup_is_empty,
+    require_exact_cleanup_generation,
+};
 use layout::{cleanup_layout, deterministic_session_layout};
+use workspace::{
+    cleanup_executor_workspace, cleanup_unstarted_executor_workspace, validate_cleanup_workspace,
+};
 
 pub(super) async fn reconcile_settled_executor_cleanup(
     state: &DaemonHttpState,
@@ -91,12 +102,21 @@ async fn release_executor_local_state(
             return Ok(true);
         }
     }
-    let workspace = db
-        .resolve_session(&identity.session_id)
-        .await?
-        .map(|session| session.state.worktree_path);
+    let workspace = if offer.work_owner.is_some() {
+        db.load_agent_working_copy(&identity.working_copy_id)
+            .await?
+            .map(|copy| PathBuf::from(copy.worktree_path))
+    } else {
+        db.resolve_session(&identity.session_id)
+            .await?
+            .map(|session| session.state.worktree_path)
+    };
     cleanup_prior_phase_import_ref(record, identity, workspace.as_deref()).await?;
-    cleanup_executor_session(db, record, identity).await?;
+    if offer.work_owner.is_some() {
+        cleanup_executor_workspace(db, record, identity).await?;
+    } else {
+        cleanup_executor_session(db, record, identity).await?;
+    }
     Ok(false)
 }
 
@@ -126,6 +146,15 @@ pub(super) async fn cleanup_unstarted_executor_provisioning(
     let origin = PathBuf::from(record.executor_checkout_path.as_deref().ok_or_else(|| {
         concurrent("remote executor provisioning cleanup has no frozen checkout path")
     })?);
+    if offer.work_owner.is_some() {
+        let workspace = db
+            .load_agent_working_copy(&authority.identity.working_copy_id)
+            .await?
+            .map(|copy| PathBuf::from(copy.worktree_path));
+        cleanup_prior_phase_import_ref(&record, &authority.identity, workspace.as_deref()).await?;
+        cleanup_unstarted_executor_workspace(db, &record, &authority.identity).await?;
+        return Ok(true);
+    }
     let (layout, had_session_row) =
         resolve_provisioning_layout(db, &record, authority, &origin).await?;
     let workspace = layout.workspace();
@@ -175,75 +204,6 @@ async fn resolve_provisioning_layout(
     Ok((layout, true))
 }
 
-fn exact_unstarted_provisioning(
-    record: &TaskBoardRemoteAssignmentRecord,
-    authority: &TaskBoardRemoteExecutorStartAuthority,
-) -> bool {
-    record.state == TaskBoardRemoteAssignmentState::Claimed
-        && record.fencing_epoch == authority.fencing_epoch
-        && record.executor_start_authority_sha256.as_deref() == Some(authority.sha256.as_str())
-        && record.executor_start_authority_at.as_deref() == Some(authority.acquired_at.as_str())
-        && record.start_receipt.is_none()
-        && record.started_at.is_none()
-        && record.workspace_ref.is_none()
-        && record.executor_lifecycle_owner.is_none()
-        && record.executor_stop_pending.is_none()
-}
-
-async fn preclaim_superseded_cleanup_is_empty(
-    db: &AsyncDaemonDbHandle,
-    record: &TaskBoardRemoteAssignmentRecord,
-    identity: &RemoteWorkerIdentity,
-) -> Result<bool, CliError> {
-    if record.state != TaskBoardRemoteAssignmentState::Superseded {
-        return Ok(false);
-    }
-    let exact = record.claimed_at.is_none()
-        && record.started_at.is_none()
-        && record.workspace_ref.is_none()
-        && record.claim_receipt.is_none()
-        && record.start_receipt.is_none()
-        && record.executor_start_authority_sha256.is_none()
-        && record.executor_lifecycle_owner.is_none()
-        && record.executor_stop_pending.is_none()
-        && record.status_response.is_none()
-        && record.status_sha256.is_none()
-        && record.result_sha256.is_none();
-    if !exact {
-        return Err(concurrent(
-            "preclaim superseded cleanup contains executor work evidence",
-        ));
-    }
-    let offer = record.require_offer()?;
-    if db
-        .task_board_remote_executor_run(offer, &identity.run_id)
-        .await?
-        .is_some()
-        || db.resolve_session(&identity.session_id).await?.is_some()
-    {
-        return Err(concurrent(
-            "preclaim superseded cleanup found unexpected executor state",
-        ));
-    }
-    Ok(true)
-}
-
-fn require_exact_cleanup_generation(
-    record: &TaskBoardRemoteAssignmentRecord,
-    request: &RemoteSettledRequest,
-) -> Result<(), CliError> {
-    let offer = record.require_offer()?;
-    if request.binding != offer.binding
-        || request.offer_request_sha256 != offer.request_sha256
-        || request.lease_id != record.lease_id.as_deref().unwrap_or_default()
-    {
-        return Err(concurrent(
-            "remote executor cleanup receipt belongs to another assignment generation",
-        ));
-    }
-    Ok(())
-}
-
 async fn cleanup_executor_session(
     db: &AsyncDaemonDbHandle,
     record: &TaskBoardRemoteAssignmentRecord,
@@ -273,22 +233,50 @@ async fn cleanup_executor_session(
     Ok(())
 }
 
-async fn validate_cleanup_run(
+pub(super) async fn validate_cleanup_run(
     db: &AsyncDaemonDbHandle,
     record: &TaskBoardRemoteAssignmentRecord,
     identity: &RemoteWorkerIdentity,
     run: &TaskBoardRemoteExecutorRun,
 ) -> Result<(), CliError> {
     if let Some(start) = record.start_receipt.as_ref() {
+        if let Some(workspace_id) = start.workspace_id.clone() {
+            return validate_run_snapshot(
+                run,
+                record.require_offer()?,
+                identity,
+                &super::PreparedRemoteWorkspace::owned(
+                    PathBuf::from(&start.project_dir),
+                    workspace_id,
+                ),
+            );
+        }
         return validate_run_snapshot(
             run,
             record.require_offer()?,
             identity,
-            Path::new(&start.project_dir),
+            &super::PreparedRemoteWorkspace::legacy(PathBuf::from(&start.project_dir)),
         );
     }
     require_unadopted_stop_cleanup(record)?;
-    if run.run_id != identity.run_id || run.session_id != identity.session_id {
+    if run.run_id != identity.run_id {
+        return Err(concurrent(
+            "unadopted remote cleanup run identity mismatched",
+        ));
+    }
+    if record.require_offer()?.work_owner.is_some() {
+        let copy = db
+            .load_agent_working_copy(&identity.working_copy_id)
+            .await?
+            .ok_or_else(|| concurrent("unadopted remote cleanup run has no working copy"))?;
+        if run.session_id != copy.workspace_id || run.project_dir != copy.worktree_path {
+            return Err(concurrent(
+                "unadopted remote cleanup run uses another workspace",
+            ));
+        }
+        return validate_cleanup_workspace(record, identity, &copy);
+    }
+    if run.session_id != identity.session_id {
         return Err(concurrent(
             "unadopted remote cleanup run identity mismatched",
         ));
