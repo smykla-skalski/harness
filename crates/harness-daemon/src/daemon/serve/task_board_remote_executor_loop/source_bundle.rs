@@ -105,6 +105,22 @@ pub(super) async fn apply_prior_phase_bundle(
         .map_err(|error| CliErrorKind::workflow_io(format!("join remote source import: {error}")))?
 }
 
+pub(super) async fn require_prior_phase_bundle_applied(
+    offer: &RemoteOfferRequest,
+    identity: &RemoteWorkerIdentity,
+    workspace: &Path,
+) -> Result<(), CliError> {
+    let import = prior_phase_import_plan(offer, identity, workspace).await?;
+    spawn_blocking(move || {
+        import
+            .require_applied()
+            .map(|_| ())
+            .map_err(|error| git_error(&error))
+    })
+    .await
+    .map_err(|error| CliErrorKind::workflow_io(format!("join remote source audit: {error}")))?
+}
+
 async fn prior_phase_import_plan(
     offer: &RemoteOfferRequest,
     identity: &RemoteWorkerIdentity,

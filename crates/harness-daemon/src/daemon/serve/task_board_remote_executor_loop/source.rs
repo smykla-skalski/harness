@@ -29,7 +29,7 @@ use crate::task_board::{
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
 
-use super::source_bundle::apply_prior_phase_bundle;
+use super::source_bundle::{apply_prior_phase_bundle, require_prior_phase_bundle_applied};
 use crate::daemon::db::AsyncSessionSummaryQueries;
 use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use harness_daemon_db_queries::AsyncAgentWorkingCopyQueries;
@@ -85,8 +85,6 @@ pub(super) async fn prepare_remote_workspace(
 }
 
 pub(super) async fn validate_terminal_remote_source(
-    db: &AsyncDaemonDbHandle,
-    record: &TaskBoardRemoteAssignmentRecord,
     offer: &RemoteOfferRequest,
     identity: &RemoteWorkerIdentity,
     workspace: &PreparedRemoteWorkspace,
@@ -95,7 +93,7 @@ pub(super) async fn validate_terminal_remote_source(
         return Ok(());
     }
     if matches!(offer.source, RemoteSourceMaterial::PriorPhaseBundle { .. }) {
-        return apply_prior_phase_bundle(db, record, offer, identity, workspace.path()).await;
+        return require_prior_phase_bundle_applied(offer, identity, workspace.path()).await;
     }
     let worktree = workspace.path().to_path_buf();
     let revision = initial_source_revision(offer)?.to_string();

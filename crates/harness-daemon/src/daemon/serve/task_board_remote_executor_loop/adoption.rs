@@ -84,7 +84,7 @@ pub(super) async fn execute_and_reconcile_remote_worker(
         record = adopted;
     }
     if !snapshot.status.is_active() {
-        validate_terminal_remote_source(db, &record, offer, identity, workspace).await?;
+        validate_terminal_remote_source(offer, identity, workspace).await?;
         return Box::pin(persist_terminal_snapshot(
             db,
             &state.daemon_epoch,
