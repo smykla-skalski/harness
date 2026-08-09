@@ -28,6 +28,8 @@ const EXPIRED_AT: &str = "2026-07-19T10:11:00Z";
 
 #[path = "source_bundle_cleanup_recovery_tests.rs"]
 mod cleanup_recovery_tests;
+#[path = "source_bundle_probe_tests.rs"]
+mod probe_tests;
 
 #[tokio::test]
 async fn prior_phase_import_ref_is_cleaned_before_durable_cleanup_marker() {
@@ -114,61 +116,6 @@ async fn prior_phase_import_ref_is_cleaned_before_durable_cleanup_marker() {
                     .await
                     .expect("load retained source-bundle evidence")
                     .is_some()
-            );
-        },
-    ))
-    .await;
-}
-
-#[tokio::test]
-async fn workspace_prior_phase_probe_reuses_attached_bundle_without_loading_blob() {
-    let data = tempfile::tempdir().expect("create isolated data root");
-    let data_path = data.path().to_string_lossy().into_owned();
-    Box::pin(temp_env::async_with_vars(
-        [
-            ("XDG_DATA_HOME", Some(data_path.as_str())),
-            ("CLAUDE_SESSION_ID", Some("remote-bundle-probe-test")),
-        ],
-        async {
-            let source = BundleSource::new();
-            let fixture = remote_executor_fixture(1).await;
-            configure_executor(&fixture, source.repository.path()).await;
-            let (offer, _) = workspace_owned_bundle_offer(&fixture.request, &source);
-            upload_bundle(&fixture, &offer, &source.bytes).await;
-            let (assignment, _authority) =
-                Box::pin(claim_with_start_authority(&fixture, &offer)).await;
-            let identity = remote_executor_identity(&assignment).expect("executor identity");
-            let workspace = super::super::source::prepare_remote_workspace(
-                &fixture.db,
-                &assignment,
-                &offer,
-                &identity,
-                true,
-            )
-            .await
-            .expect("prepare prior-phase workspace Start");
-            assert_eq!(
-                super::git(workspace.path(), &["rev-parse", "HEAD"]),
-                source.result
-            );
-            let reads_after_start =
-                super::super::source_bundle::materialized_request_read_count(&assignment);
-
-            let recovered = super::super::source::prepare_remote_workspace(
-                &fixture.db,
-                &assignment,
-                &offer,
-                &identity,
-                false,
-            )
-            .await
-            .expect("Probe accepts the already attached prior-phase result");
-
-            assert_eq!(recovered.path(), workspace.path());
-            assert_eq!(
-                super::super::source_bundle::materialized_request_read_count(&assignment),
-                reads_after_start,
-                "repeat Probe must not load the retained source-bundle blob"
             );
         },
     ))

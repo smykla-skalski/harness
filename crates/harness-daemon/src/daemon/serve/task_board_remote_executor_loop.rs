@@ -55,7 +55,7 @@ use runtime::{
 #[cfg(test)]
 use runtime::{remote_run_request, validate_run_identity};
 use scan::executor_assignment_ids;
-use source::prepare_remote_workspace;
+use source::{prepare_remote_workspace, validate_terminal_remote_source};
 use stop::{reconcile_stop_pending, settle_lifecycle_settings_drift};
 use workspace::PreparedRemoteWorkspace;
 pub(super) type RemoteWorkerIdentity = TaskBoardRemoteExecutorIdentity;

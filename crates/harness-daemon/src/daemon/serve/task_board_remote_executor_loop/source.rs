@@ -46,8 +46,7 @@ pub(super) async fn prepare_remote_workspace(
             "remote executor settings changed before worker start",
         ));
     }
-    let require_source_head =
-        starts_worker || offer.binding.phase != TaskBoardExecutionPhase::Implementation;
+    let require_source_head = starts_worker;
     let revision = initial_source_revision(offer)?;
     let prior_phase_source = matches!(offer.source, RemoteSourceMaterial::PriorPhaseBundle { .. });
     let checkout_requires_source_head = require_source_head && !prior_phase_source;
@@ -74,7 +73,7 @@ pub(super) async fn prepare_remote_workspace(
             .await?,
         )
     };
-    if require_source_head && prior_phase_source {
+    if starts_worker && prior_phase_source {
         apply_prior_phase_bundle(db, record, offer, identity, workspace.path()).await?;
     }
     if starts_worker && !executor_settings_match(db, record, offer).await? {
@@ -83,6 +82,28 @@ pub(super) async fn prepare_remote_workspace(
         ));
     }
     Ok(workspace)
+}
+
+pub(super) async fn validate_terminal_remote_source(
+    db: &AsyncDaemonDbHandle,
+    record: &TaskBoardRemoteAssignmentRecord,
+    offer: &RemoteOfferRequest,
+    identity: &RemoteWorkerIdentity,
+    workspace: &PreparedRemoteWorkspace,
+) -> Result<(), CliError> {
+    if offer.binding.phase == TaskBoardExecutionPhase::Implementation {
+        return Ok(());
+    }
+    if matches!(offer.source, RemoteSourceMaterial::PriorPhaseBundle { .. }) {
+        return apply_prior_phase_bundle(db, record, offer, identity, workspace.path()).await;
+    }
+    let worktree = workspace.path().to_path_buf();
+    let revision = initial_source_revision(offer)?.to_string();
+    spawn_blocking(move || validate_remote_worktree_head(&worktree, &revision, true))
+        .await
+        .map_err(|error| {
+            CliErrorKind::workflow_io(format!("join terminal remote source check: {error}"))
+        })?
 }
 
 async fn ensure_remote_workspace(

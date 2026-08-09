@@ -25,6 +25,7 @@ use super::stop::settle_lifecycle_settings_drift;
 use super::terminal::persist_terminal_snapshot;
 use super::{
     PreparedRemoteWorkspace, RemoteWorkerIdentity, claim_active_lifecycle_owner, concurrent,
+    validate_terminal_remote_source,
 };
 use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db_handle::AsyncDaemonDbHandle;
@@ -83,6 +84,7 @@ pub(super) async fn execute_and_reconcile_remote_worker(
         record = adopted;
     }
     if !snapshot.status.is_active() {
+        validate_terminal_remote_source(db, &record, offer, identity, workspace).await?;
         return Box::pin(persist_terminal_snapshot(
             db,
             &state.daemon_epoch,

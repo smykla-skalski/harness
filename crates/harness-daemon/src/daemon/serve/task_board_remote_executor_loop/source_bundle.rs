@@ -83,7 +83,9 @@ pub(super) async fn apply_prior_phase_bundle(
     ) {
         return Ok(());
     }
-    let import = prior_phase_import_plan(offer, identity, workspace)?;
+    #[cfg(test)]
+    record_prior_phase_application(record);
+    let import = prior_phase_import_plan(offer, identity, workspace).await?;
     let probe = import.clone();
     let already_applied = spawn_blocking(move || probe.require_applied().is_ok())
         .await
@@ -103,7 +105,7 @@ pub(super) async fn apply_prior_phase_bundle(
         .map_err(|error| CliErrorKind::workflow_io(format!("join remote source import: {error}")))?
 }
 
-fn prior_phase_import_plan(
+async fn prior_phase_import_plan(
     offer: &RemoteOfferRequest,
     identity: &RemoteWorkerIdentity,
     workspace: &Path,
@@ -120,15 +122,25 @@ fn prior_phase_import_plan(
             "remote source bundle materialization requires bundle source",
         ));
     };
-    GitBundleImportPlan::new(
-        workspace,
-        executor_branch_ref(offer, identity),
-        base_revision.clone(),
-        revision.clone(),
-        advertised_ref.clone(),
-        import_ref(offer, &bundle.sha256),
-    )
-    .map_err(|error| git_error(&error))
+    let workspace = workspace.to_path_buf();
+    let branch_ref = executor_branch_ref(offer, identity);
+    let base_revision = base_revision.clone();
+    let result_revision = revision.clone();
+    let advertised_ref = advertised_ref.clone();
+    let import_ref = import_ref(offer, &bundle.sha256);
+    spawn_blocking(move || {
+        GitBundleImportPlan::new(
+            &workspace,
+            branch_ref,
+            base_revision,
+            result_revision,
+            advertised_ref,
+            import_ref,
+        )
+        .map_err(|error| git_error(&error))
+    })
+    .await
+    .map_err(|error| CliErrorKind::workflow_io(format!("join remote source plan: {error}")))?
 }
 
 pub(super) async fn cleanup_prior_phase_import_ref(
@@ -269,11 +281,31 @@ pub(super) fn materialized_request_read_count(record: &TaskBoardRemoteAssignment
 }
 
 #[cfg(test)]
+pub(super) fn prior_phase_application_count(record: &TaskBoardRemoteAssignmentRecord) -> usize {
+    prior_phase_applications()
+        .lock()
+        .expect("lock prior-phase application counts")
+        .get(&materialized_request_key(record))
+        .copied()
+        .unwrap_or_default()
+}
+
+#[cfg(test)]
 fn record_materialized_request_read(record: &TaskBoardRemoteAssignmentRecord) {
     let mut reads = materialized_request_reads()
         .lock()
         .expect("lock remote source read counts");
     *reads.entry(materialized_request_key(record)).or_default() += 1;
+}
+
+#[cfg(test)]
+fn record_prior_phase_application(record: &TaskBoardRemoteAssignmentRecord) {
+    let mut applications = prior_phase_applications()
+        .lock()
+        .expect("lock prior-phase application counts");
+    *applications
+        .entry(materialized_request_key(record))
+        .or_default() += 1;
 }
 
 #[cfg(test)]
@@ -289,6 +321,12 @@ fn materialized_request_key(record: &TaskBoardRemoteAssignmentRecord) -> String 
 fn materialized_request_reads() -> &'static Mutex<HashMap<String, usize>> {
     static READS: OnceLock<Mutex<HashMap<String, usize>>> = OnceLock::new();
     READS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+#[cfg(test)]
+fn prior_phase_applications() -> &'static Mutex<HashMap<String, usize>> {
+    static APPLICATIONS: OnceLock<Mutex<HashMap<String, usize>>> = OnceLock::new();
+    APPLICATIONS.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
 fn git_error(error: &GitError) -> CliError {
