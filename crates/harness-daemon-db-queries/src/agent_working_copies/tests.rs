@@ -314,3 +314,94 @@ async fn a_started_worker_joins_its_workspace_team_once() {
         "stopping a runtime must not remove the membership behind it"
     );
 }
+
+#[tokio::test]
+async fn joining_a_worker_atomically_binds_its_runtime_to_the_workspace() {
+    let fixture = Fixture::new().await;
+    let request = fixture.request("zeta", "copy-zeta");
+    let provisioned = fixture
+        .db
+        .provision_agent_workspace_checkout(&request)
+        .await
+        .expect("provision checkout");
+    sqlx::query(
+        "INSERT INTO codex_runs (
+            run_id, session_id, session_agent_id, project_dir, mode, status, prompt,
+            created_at, updated_at
+         ) VALUES ('codex-recovered', NULL, 'legacy-agent', '/tmp/worktree',
+                   'approval', 'running', 'work', 'created', 'updated')",
+    )
+    .execute(fixture.db.pool())
+    .await
+    .expect("seed interrupted runtime start");
+    let registration = WorkspaceMemberRegistration {
+        workspace_id: provisioned.workspace_id.clone(),
+        kind: WorkspaceManagedAgentKind::Codex,
+        managed_agent_id: "codex-recovered".to_string(),
+        runtime_kind: "codex".to_string(),
+        display_name: "Task Board: recover".to_string(),
+        assignment_id: Some("work-item-zeta".to_string()),
+    };
+
+    fixture
+        .db
+        .register_workspace_managed_member(&registration)
+        .await
+        .expect("adopt interrupted runtime");
+
+    let owner = sqlx::query_as::<_, (Option<String>, Option<String>, Option<String>)>(
+        "SELECT workspace_id, session_id, session_agent_id
+         FROM codex_runs WHERE run_id = 'codex-recovered'",
+    )
+    .fetch_one(fixture.db.pool())
+    .await
+    .expect("load durable runtime owner");
+    assert_eq!(owner, (Some(provisioned.workspace_id), None, None));
+}
+
+#[tokio::test]
+async fn joining_a_terminal_worker_atomically_binds_its_runtime_to_the_workspace() {
+    let fixture = Fixture::new().await;
+    let request = fixture.request("eta", "copy-eta");
+    let provisioned = fixture
+        .db
+        .provision_agent_workspace_checkout(&request)
+        .await
+        .expect("provision checkout");
+    sqlx::query(
+        "INSERT INTO agent_tuis (
+            tui_id, session_id, workspace_id, agent_id, runtime, status, argv_json,
+            project_dir, rows, cols, cursor_row, cursor_col, screen_text,
+            transcript_path, created_at, updated_at
+         ) VALUES ('terminal-recovered', NULL, ?1, 'legacy-agent', 'codex', 'running', '[]',
+                   '/tmp/worktree', 30, 120, 0, 0, '', '/tmp/transcript',
+                   'created', 'updated')",
+    )
+    .bind(&provisioned.workspace_id)
+    .execute(fixture.db.pool())
+    .await
+    .expect("seed interrupted terminal start");
+    let registration = WorkspaceMemberRegistration {
+        workspace_id: provisioned.workspace_id.clone(),
+        kind: WorkspaceManagedAgentKind::Terminal,
+        managed_agent_id: "terminal-recovered".to_string(),
+        runtime_kind: "codex".to_string(),
+        display_name: "Task Board: recover".to_string(),
+        assignment_id: Some("work-item-eta".to_string()),
+    };
+
+    fixture
+        .db
+        .register_workspace_managed_member(&registration)
+        .await
+        .expect("adopt interrupted terminal");
+
+    let owner = sqlx::query_as::<_, (Option<String>, Option<String>, String)>(
+        "SELECT workspace_id, session_id, agent_id
+         FROM agent_tuis WHERE tui_id = 'terminal-recovered'",
+    )
+    .fetch_one(fixture.db.pool())
+    .await
+    .expect("load durable terminal owner");
+    assert_eq!(owner, (Some(provisioned.workspace_id), None, String::new()));
+}

@@ -26,18 +26,22 @@ mod requests;
 use requests::{codex_worker_request, terminal_worker_request};
 
 mod workflow_launch;
-use workflow_launch::{validate_recovered_workflow_worker, validate_workflow_launch};
+use workflow_launch::{validate_recovered_worker_identity, validate_workflow_launch};
 
 mod claim_settlement;
 pub(crate) use claim_settlement::settle_claimed_task_board_worker;
 
 mod workspace_ownership;
+use workspace_ownership::applied_worker_owner;
+pub(crate) use workspace_ownership::join_worker_to_workspace;
 pub(crate) use workspace_ownership::settle_compensated_workspace_worker;
 pub(crate) use workspace_ownership::worker_lock_owner;
-use workspace_ownership::{applied_worker_owner, join_worker_to_workspace};
 
 mod worker_start;
 use worker_start::{start_codex_worker, start_interactive_worker};
+
+mod restart_recovery;
+pub(crate) use restart_recovery::reconcile_interactive_workers_after_restart;
 
 pub(crate) struct TaskBoardDispatchClaimHeartbeat {
     task: JoinHandle<()>,
@@ -151,8 +155,16 @@ async fn start_worker_for_applied_task_in_lane(
         .await
         .map_err(TaskBoardWorkerStartError::uncertain)?;
     if let Some(snapshot) = existing {
-        return recover_same_applied_worker(snapshot, applied, worker_id)
-            .map_err(TaskBoardWorkerStartError::uncertain);
+        let snapshot = recover_same_applied_worker(snapshot, applied, worker_id)
+            .map_err(TaskBoardWorkerStartError::uncertain)?;
+        join_worker_to_workspace(
+            require_async_db(state, "task-board recovered worker workspace join")?,
+            applied,
+            worker_id,
+        )
+        .await
+        .map_err(TaskBoardWorkerStartError::uncertain)?;
+        return Ok(snapshot);
     }
     // Fail-closed recheck at the shared worker-start seam: this guards the
     // claim+start path used by both the route executor and the recovery loop, so
@@ -182,12 +194,21 @@ async fn start_or_recover_worker(
     dispatch_intent_id: &str,
     worker_id: &str,
 ) -> Result<ManagedAgentSnapshot, TaskBoardWorkerStartError> {
-    let start_error = match start_worker_by_mode(state, applied, dispatch_intent_id).await {
-        Ok(snapshot) => return Ok(snapshot),
-        Err(error) => error,
+    let snapshot = match start_worker_by_mode(state, applied, dispatch_intent_id).await {
+        Ok(snapshot) => snapshot,
+        Err(start_error) => {
+            let probe = probe_existing_worker(state, applied, worker_id).await;
+            resolve_start_failure(start_error, probe, applied, worker_id)?
+        }
     };
-    let probe = probe_existing_worker(state, applied, worker_id).await;
-    resolve_start_failure(start_error, probe, applied, worker_id)
+    join_worker_to_workspace(
+        require_async_db(state, "task-board worker workspace join")?,
+        applied,
+        worker_id,
+    )
+    .await
+    .map_err(TaskBoardWorkerStartError::uncertain)?;
+    Ok(snapshot)
 }
 
 fn resolve_start_failure(
@@ -362,11 +383,18 @@ fn exact_worker_not_found(error: &CliError, mode: AgentMode, worker_id: &str) ->
     error.message() == expected
 }
 
-fn recover_same_applied_worker(
+pub(crate) fn recover_same_applied_worker(
     snapshot: ManagedAgentSnapshot,
     applied: &DispatchAppliedTask,
     worker_id: &str,
 ) -> Result<ManagedAgentSnapshot, CliError> {
+    if snapshot.agent_id() != worker_id {
+        return Err(CliErrorKind::session_agent_conflict(format!(
+            "managed worker '{}' does not match reclaimed identity '{worker_id}'",
+            snapshot.agent_id()
+        ))
+        .into());
+    }
     // A workspace-owned runtime reports its workspace where a session id would
     // go, and a standalone Codex run reports its own run id. Both are the owner
     // the reclaim has to match; comparing anything else would hand this dispatch
@@ -384,7 +412,7 @@ fn recover_same_applied_worker(
         ))
         .into());
     }
-    validate_recovered_workflow_worker(&snapshot, applied)?;
+    validate_recovered_worker_identity(&snapshot, applied)?;
     Ok(snapshot)
 }
 
@@ -403,15 +431,6 @@ async fn start_worker_by_mode(
     }?;
     let snapshot =
         crate::daemon::automation_kill_switch::fence_started_managed_agent(state, snapshot).await?;
-    // Every start path funnels through here - direct, workflow, and recovery -
-    // so this is the one place that sees a worker come into existence and can
-    // record its membership exactly once.
-    join_worker_to_workspace(
-        require_async_db(state, "task-board worker workspace join")?,
-        applied,
-        &managed_worker_id(applied, dispatch_intent_id),
-    )
-    .await?;
     Ok(snapshot)
 }
 
@@ -483,6 +502,10 @@ mod tests;
 #[cfg(test)]
 #[path = "task_board_managed_agents/worker_lane_tests.rs"]
 mod worker_lane_tests;
+
+#[cfg(test)]
+#[path = "task_board_managed_agents/restart_recovery_tests.rs"]
+mod restart_recovery_tests;
 
 #[cfg(test)]
 #[path = "task_board_managed_agents/read_only_start_revision_tests.rs"]

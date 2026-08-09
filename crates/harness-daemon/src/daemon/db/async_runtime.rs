@@ -44,7 +44,7 @@ const CODEX_RUN_SQL: &str =
     project_dir, thread_id, turn_id, mode,
     status, prompt, latest_summary, final_message, error,
     pending_approvals_json, resolved_approvals_json, events_json,
-    created_at, updated_at, model, effort
+    created_at, updated_at, model, effort, workspace_id
  FROM codex_runs
  WHERE run_id = ?1";
 const CODEX_RUNS_BY_ID_SQL: &str =
@@ -53,7 +53,7 @@ const CODEX_RUNS_BY_ID_SQL: &str =
     project_dir, thread_id, turn_id, mode,
     status, prompt, latest_summary, final_message, error,
     pending_approvals_json, resolved_approvals_json, events_json,
-    created_at, updated_at, model, effort
+    created_at, updated_at, model, effort, workspace_id
  FROM codex_runs
  WHERE run_id IN (";
 const LIST_CODEX_RUNS_SQL: &str =
@@ -62,9 +62,9 @@ const LIST_CODEX_RUNS_SQL: &str =
     project_dir, thread_id, turn_id, mode,
     status, prompt, latest_summary, final_message, error,
     pending_approvals_json, resolved_approvals_json, events_json,
-    created_at, updated_at, model, effort
+    created_at, updated_at, model, effort, workspace_id
  FROM codex_runs
- WHERE session_id = ?1
+ WHERE session_id = ?1 OR workspace_id = ?1
  ORDER BY updated_at DESC";
 const UPSERT_AGENT_TUI_SQL: &str = "INSERT INTO agent_tuis (
     tui_id, session_id, workspace_id, agent_id, runtime, status, argv_json,
@@ -353,15 +353,20 @@ struct AsyncCodexRunRow {
     updated_at: String,
     model: Option<String>,
     effort: Option<String>,
+    workspace_id: Option<String>,
 }
 
 impl AsyncCodexRunRow {
     fn into_snapshot(self) -> Result<CodexRunSnapshot, CliError> {
         Ok(CodexRunSnapshot {
-            // A session-less standalone run persists NULL for `session_id`
-            // (see `save_codex_run`); the wire type stays non-optional, so a
-            // NULL falls back to the run's own id rather than surfacing here.
-            session_id: self.session_id.unwrap_or_else(|| self.run_id.clone()),
+            // A workspace-owned or standalone run persists NULL for
+            // `session_id` (see `save_codex_run`); the wire type stays
+            // non-optional, so use its durable workspace owner before falling
+            // back to the run id.
+            session_id: self
+                .session_id
+                .or(self.workspace_id)
+                .unwrap_or_else(|| self.run_id.clone()),
             run_id: self.run_id,
             task_id: self.task_id,
             board_item_id: self.board_item_id,

@@ -23,7 +23,7 @@ pub(super) async fn validate_workflow_launch(
     launch_revision_fence(applied)
 }
 
-pub(super) fn validate_recovered_workflow_worker(
+pub(super) fn validate_recovered_worker_identity(
     snapshot: &ManagedAgentSnapshot,
     applied: &DispatchAppliedTask,
 ) -> Result<(), CliError> {
@@ -48,7 +48,7 @@ pub(super) fn validate_recovered_workflow_worker(
                 Some(applied.work_item_id.as_str()),
             )
         }
-        (None, None) => return Ok(()),
+        (None, None) => return validate_recovered_direct_worker(snapshot, applied),
     };
     let ManagedAgentSnapshot::Codex(run) = snapshot else {
         return Err(workflow_recovery_conflict(snapshot.agent_id()));
@@ -78,6 +78,40 @@ pub(super) fn validate_recovered_workflow_worker(
         note_recovered_prompt_change(&run.run_id);
     }
     Ok(())
+}
+
+fn validate_recovered_direct_worker(
+    snapshot: &ManagedAgentSnapshot,
+    applied: &DispatchAppliedTask,
+) -> Result<(), CliError> {
+    match (applied.item.agent_mode, snapshot) {
+        (crate::task_board::AgentMode::Interactive, ManagedAgentSnapshot::Terminal(_)) => Ok(()),
+        (crate::task_board::AgentMode::Interactive, _) => {
+            Err(direct_worker_recovery_conflict(snapshot.agent_id()))
+        }
+        (_, ManagedAgentSnapshot::Codex(run)) => {
+            let expected = codex_worker_identity(applied);
+            let matches = run.board_item_id.as_deref() == Some(applied.board_item_id.as_str())
+                && run.workflow_execution_id == applied.item.workflow.execution_id
+                && run.task_id.as_deref() == Some(applied.work_item_id.as_str())
+                && run.mode == expected.mode
+                && run.model == expected.model
+                && run.effort == expected.effort;
+            if matches {
+                Ok(())
+            } else {
+                Err(direct_worker_recovery_conflict(&run.run_id))
+            }
+        }
+        (_, _) => Err(direct_worker_recovery_conflict(snapshot.agent_id())),
+    }
+}
+
+fn direct_worker_recovery_conflict(worker_id: &str) -> CliError {
+    CliErrorKind::session_agent_conflict(format!(
+        "managed worker '{worker_id}' does not match the reclaimed task"
+    ))
+    .into()
 }
 
 #[expect(

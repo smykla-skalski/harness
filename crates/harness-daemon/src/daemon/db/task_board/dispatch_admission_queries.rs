@@ -63,6 +63,8 @@ pub(crate) trait DispatchAdmissionQueries: Send + Sync {
         &self,
     ) -> Result<Vec<TaskBoardAdmissionWorkerRecovery>, CliError>;
 
+    async fn migrate_legacy_task_board_admission_worker_owners(&self) -> Result<usize, CliError>;
+
     async fn reconcile_missing_task_board_admission_worker(
         &self,
         expected: &TaskBoardAdmissionWorkerRecovery,
@@ -245,6 +247,10 @@ impl DispatchAdmissionQueries for AsyncDaemonDb {
         &self,
     ) -> Result<Vec<TaskBoardAdmissionWorkerRecovery>, CliError> {
         super::admission_recovery::task_board_admission_worker_recoveries(self).await
+    }
+
+    async fn migrate_legacy_task_board_admission_worker_owners(&self) -> Result<usize, CliError> {
+        super::admission_recovery::migrate_legacy_task_board_admission_worker_owners(self).await
     }
 
     async fn reconcile_missing_task_board_admission_worker(

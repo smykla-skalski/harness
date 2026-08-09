@@ -1,7 +1,7 @@
 use harness_daemon_db_core::db_error;
 use harness_kernel::errors::CliError;
 use harness_workspace::workspace::utc_now;
-use sqlx::{Sqlite, Transaction, query};
+use sqlx::{Sqlite, Transaction, query, query_as};
 
 use crate::agent_workspaces::identity::digest_fields;
 
@@ -18,6 +18,7 @@ pub(super) async fn register_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     registration: &WorkspaceMemberRegistration,
 ) -> Result<String, CliError> {
+    bind_runtime_owner_in_tx(transaction, registration).await?;
     let member_id = registration.member_id();
     let now = utc_now();
     let evidence = format!("family={};status=started", registration.runtime_kind);
@@ -79,6 +80,67 @@ pub(super) async fn register_in_tx(
     .await
     .map_err(|error| db_error(format!("mark workspace team reconciled: {error}")))?;
     Ok(member_id)
+}
+
+async fn bind_runtime_owner_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    registration: &WorkspaceMemberRegistration,
+) -> Result<(), CliError> {
+    let current = match registration.kind {
+        super::model::WorkspaceManagedAgentKind::Codex => {
+            query_as::<_, (Option<String>,)>(
+                "SELECT workspace_id FROM codex_runs WHERE run_id = ?1",
+            )
+            .bind(&registration.managed_agent_id)
+            .fetch_optional(transaction.as_mut())
+            .await
+        }
+        super::model::WorkspaceManagedAgentKind::Terminal => {
+            query_as::<_, (Option<String>,)>(
+                "SELECT workspace_id FROM agent_tuis WHERE tui_id = ?1",
+            )
+            .bind(&registration.managed_agent_id)
+            .fetch_optional(transaction.as_mut())
+            .await
+        }
+    }
+    .map_err(|error| db_error(format!("load managed worker workspace owner: {error}")))?;
+    if current
+        .and_then(|(workspace_id,)| workspace_id)
+        .is_some_and(|workspace_id| workspace_id != registration.workspace_id)
+    {
+        return Err(db_error(format!(
+            "managed worker '{}' already belongs to another workspace",
+            registration.managed_agent_id
+        )));
+    }
+    let result = match registration.kind {
+        super::model::WorkspaceManagedAgentKind::Codex => {
+            query(
+                "UPDATE codex_runs
+             SET workspace_id = ?2, session_id = NULL, session_agent_id = NULL
+             WHERE run_id = ?1",
+            )
+            .bind(&registration.managed_agent_id)
+            .bind(&registration.workspace_id)
+            .execute(transaction.as_mut())
+            .await
+        }
+        super::model::WorkspaceManagedAgentKind::Terminal => {
+            query(
+                "UPDATE agent_tuis
+             SET workspace_id = ?2, session_id = NULL, agent_id = ''
+             WHERE tui_id = ?1",
+            )
+            .bind(&registration.managed_agent_id)
+            .bind(&registration.workspace_id)
+            .execute(transaction.as_mut())
+            .await
+        }
+    };
+    result
+        .map(|_| ())
+        .map_err(|error| db_error(format!("bind managed worker to workspace: {error}")))
 }
 
 /// Record that a managed worker's runtime stopped, without removing the member.

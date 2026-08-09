@@ -25,7 +25,7 @@ use super::DISPATCH_WORKER_RUNTIME;
 /// rather than waiting for the agent to announce itself the way a Session
 /// auto-join does. Idempotent on the managed identity, so a reclaimed start
 /// updates the existing member instead of adding a second one.
-pub(super) async fn join_worker_to_workspace(
+pub(crate) async fn join_worker_to_workspace(
     db: &AsyncDaemonDbHandle,
     applied: &DispatchAppliedTask,
     worker_id: &str,
