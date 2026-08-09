@@ -14,8 +14,8 @@ use std::sync::{Arc, Mutex, OnceLock};
 
 use tokio::sync::{Mutex as AsyncMutex, OwnedMutexGuard};
 
-use super::RemoteWorkerIdentity;
 use super::runtime::PreparedRemoteWorkerAction;
+use super::{PreparedRemoteWorkspace, RemoteWorkerIdentity};
 use crate::daemon::db::prelude::*;
 use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db::{AgentTurnRunSnapshot, AgentTurnRunStatus, TaskBoardRemoteExecutorRun};
@@ -108,7 +108,7 @@ pub(super) async fn execute_runtime_seam(
     offer: &RemoteOfferRequest,
     identity: &RemoteWorkerIdentity,
     action: &PreparedRemoteWorkerAction,
-    workspace: &Path,
+    workspace: &PreparedRemoteWorkspace,
 ) -> Result<Option<TaskBoardRemoteExecutorRun>, CliError> {
     let seam = runtime_seam_slot()
         .lock()
@@ -117,7 +117,7 @@ pub(super) async fn execute_runtime_seam(
     let Some(seam) = seam else {
         return Ok(None);
     };
-    let outcome = record_runtime_call(&seam, offer, identity, action, workspace).await?;
+    let outcome = record_runtime_call(&seam, offer, identity, action, workspace.path()).await?;
     let snapshot = runtime_snapshot(db, offer, identity, workspace, &outcome).await?;
     if let Some(final_message) = outcome.armed_final_message() {
         disarm_completed_probe(&seam, identity, final_message).await;
@@ -229,7 +229,7 @@ async fn runtime_snapshot(
     db: &AsyncDaemonDbHandle,
     offer: &RemoteOfferRequest,
     identity: &RemoteWorkerIdentity,
-    workspace: &Path,
+    workspace: &PreparedRemoteWorkspace,
     outcome: &RuntimeSeamOutcome,
 ) -> Result<TaskBoardRemoteExecutorRun, CliError> {
     if offer.launch.runtime == "openrouter" {
@@ -241,7 +241,7 @@ async fn runtime_snapshot(
     }
     match outcome {
         RuntimeSeamOutcome::Start => {
-            let snapshot = deterministic_start_snapshot(offer, identity, workspace);
+            let snapshot = deterministic_start_snapshot(offer, identity, workspace.path());
             db.save_codex_run(&snapshot).await?;
             Ok(TaskBoardRemoteExecutorRun::from(snapshot))
         }
@@ -266,7 +266,7 @@ async fn persist_agent_turn_snapshot(
     db: &AsyncDaemonDbHandle,
     offer: &RemoteOfferRequest,
     identity: &RemoteWorkerIdentity,
-    workspace: &Path,
+    workspace: &PreparedRemoteWorkspace,
     outcome: &RuntimeSeamOutcome,
 ) -> Result<(), CliError> {
     let now = utc_now();
@@ -275,11 +275,16 @@ async fn persist_agent_turn_snapshot(
         .await?
         .unwrap_or_else(|| AgentTurnRunSnapshot {
             run_id: identity.run_id.clone(),
-            session_id: Some(identity.session_id.clone()),
+            session_id: Some(
+                workspace
+                    .workspace_id()
+                    .unwrap_or(&identity.session_id)
+                    .to_string(),
+            ),
             task_id: offer.launch.task_id.clone(),
             board_item_id: Some(offer.launch.board_item_id.clone()),
             workflow_execution_id: Some(offer.launch.workflow_execution_id.clone()),
-            project_dir: Some(workspace.to_string_lossy().into_owned()),
+            project_dir: Some(workspace.path().to_string_lossy().into_owned()),
             runtime_turn_id: Some(format!("acp:{}", identity.run_id)),
             requested_runtime: "openrouter".into(),
             actual_runtime: Some("openrouter".into()),

@@ -149,7 +149,12 @@ async fn create_reassigned_successor_in_tx(
     reassignment: &TaskBoardRemoteSourceOfferReassignment<'_>,
     evidence: SourceReassignmentEvidence<'_>,
 ) -> Result<TaskBoardRemoteAssignmentRecord, CliError> {
-    let parties = resolve_reassignment_parties_in_tx(transaction, reassignment, evidence).await?;
+    let parties = Box::pin(resolve_reassignment_parties_in_tx(
+        transaction,
+        reassignment,
+        evidence,
+    ))
+    .await?;
     validate_replacement(
         &parties.parent,
         &parties.predecessor,

@@ -145,6 +145,15 @@ async fn held_delivery_rechecks_kill_switch_then_advances_worker_state() {
             .count,
         1
     );
+    let held = fixture
+        .db
+        .held_task_board_dispatch_summary()
+        .await
+        .expect("held owners")
+        .items
+        .remove(0);
+    assert!(held.session_id.is_none());
+    assert!(held.working_copy_id.is_some());
     assert!(
         fixture
             .db
@@ -188,7 +197,7 @@ async fn held_delivery_rechecks_kill_switch_then_advances_worker_state() {
     assert_eq!(completed.workflow.status, TaskBoardWorkflowStatus::Running);
     assert_eq!(
         completed.workflow.current_step_id.as_deref(),
-        Some("worker_running")
+        Some("worker_pending")
     );
 }
 

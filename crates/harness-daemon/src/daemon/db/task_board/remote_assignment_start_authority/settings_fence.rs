@@ -384,7 +384,15 @@ async fn require_empty_executor_identity(
             .fetch_one(transaction.as_mut())
             .await
             .map_err(|error| db_error(format!("check pre-Start executor session: {error}")))?;
-    if run_exists || session_exists {
+    let working_copy_exists = query_scalar::<_, bool>(
+        "SELECT EXISTS(SELECT 1 FROM agent_working_copies
+         WHERE working_copy_id = ?1 AND status = 'active')",
+    )
+    .bind(&identity.working_copy_id)
+    .fetch_one(transaction.as_mut())
+    .await
+    .map_err(|error| db_error(format!("check pre-Start executor working copy: {error}")))?;
+    if run_exists || session_exists || working_copy_exists {
         Err(concurrent(
             "remote executor Start cleanup found durable provisioning evidence",
         ))

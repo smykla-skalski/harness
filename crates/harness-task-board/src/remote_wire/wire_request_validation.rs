@@ -164,6 +164,12 @@ impl RemoteArtifactFetchRequest {
 
 fn validate_offer_payload(value: &RemoteOfferRequest) -> Result<(), RemoteWireError> {
     value.binding.validate()?;
+    if let Some(owner) = &value.work_owner {
+        owner.validate()?;
+        if owner.managed_agent_id != value.binding.idempotency_key {
+            return Err(RemoteWireError::ResultBindingMismatch);
+        }
+    }
     value.launch.validate(&value.binding)?;
     if value.lease_seconds == 0 || value.lease_seconds > 3_600 {
         return Err(RemoteWireError::MissingField("lease_seconds"));

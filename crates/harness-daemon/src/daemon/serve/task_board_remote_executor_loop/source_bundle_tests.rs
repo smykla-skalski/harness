@@ -16,7 +16,7 @@ use crate::git::bundle_export::GitBundleExportPlan;
 use crate::task_board::remote_wire::wire::{
     RemoteArtifactEntry, RemoteArtifactManifest, RemoteAssignmentWireState, RemoteOfferRequest,
     RemoteSettledRequest, RemoteSourceBundleUploadRequest, RemoteSourceMaterial,
-    TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
+    RemoteWorkOwnerBinding, TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION,
 };
 use crate::task_board::{TaskBoardLocalExecutionRepositoryConfig, TaskBoardWorkflowKind};
 
@@ -25,6 +25,11 @@ const AUTHORITY_AT: &str = "2026-07-19T10:00:20Z";
 const STARTED_AT: &str = "2026-07-19T10:00:30Z";
 const UNKNOWN_AT: &str = "2026-07-19T10:00:40Z";
 const EXPIRED_AT: &str = "2026-07-19T10:11:00Z";
+
+#[path = "source_bundle_cleanup_recovery_tests.rs"]
+mod cleanup_recovery_tests;
+#[path = "source_bundle_probe_tests.rs"]
+mod probe_tests;
 
 #[tokio::test]
 async fn prior_phase_import_ref_is_cleaned_before_durable_cleanup_marker() {
@@ -248,6 +253,25 @@ fn bundle_offer(
     };
     offer.request_sha256.clear();
     (offer.seal().expect("seal bundle offer"), bundle_sha256)
+}
+
+fn workspace_owned_bundle_offer(
+    template: &RemoteOfferRequest,
+    source: &BundleSource,
+) -> (RemoteOfferRequest, String) {
+    let (mut offer, bundle_sha256) = bundle_offer(template, source);
+    offer.work_owner = Some(RemoteWorkOwnerBinding {
+        source_daemon_id: "source-daemon".into(),
+        workspace_id: "source-workspace".into(),
+        working_copy_id: "source-copy".into(),
+        work_item_id: "source-work-item".into(),
+        managed_agent_id: offer.binding.idempotency_key.clone(),
+    });
+    offer.request_sha256.clear();
+    (
+        offer.seal().expect("seal workspace-owned bundle offer"),
+        bundle_sha256,
+    )
 }
 
 async fn upload_bundle(

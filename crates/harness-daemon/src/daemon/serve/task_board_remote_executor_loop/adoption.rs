@@ -1,7 +1,5 @@
 //! Exact executor snapshot validation, start adoption, and terminal handoff.
 
-use std::path::Path;
-
 use crate::daemon::db::{
     REMOTE_START_INTERRUPTED_WITHOUT_RUN_ERROR_CODE,
     REMOTE_START_INTERRUPTED_WITHOUT_RUN_FAILURE_CLASS, REMOTE_START_PREFLIGHT_ERROR_CODE,
@@ -24,23 +22,22 @@ use super::runtime::{
 };
 use super::stop::claim_and_settle_invalid_remote_run;
 use super::stop::settle_lifecycle_settings_drift;
-use super::terminal::persist_terminal_snapshot;
-use super::{RemoteWorkerIdentity, claim_active_lifecycle_owner, concurrent};
+use super::terminal::{persist_terminal_snapshot, persist_terminal_source_failure};
+use super::{
+    PreparedRemoteWorkspace, RemoteWorkerIdentity, claim_active_lifecycle_owner, concurrent,
+    validate_terminal_remote_source,
+};
 use crate::daemon::db::task_board::prelude::*;
 use crate::daemon::db_handle::AsyncDaemonDbHandle;
 
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "sequential start/validate/adopt/settle pipeline, each step already its own helper"
-)]
 pub(super) async fn execute_and_reconcile_remote_worker(
     state: &DaemonHttpState,
     db: &AsyncDaemonDbHandle,
-    mut record: TaskBoardRemoteAssignmentRecord,
+    record: TaskBoardRemoteAssignmentRecord,
     offer: &RemoteOfferRequest,
     identity: &RemoteWorkerIdentity,
     action: &PreparedRemoteWorkerAction,
-    workspace: &Path,
+    workspace: &PreparedRemoteWorkspace,
 ) -> Result<(), CliError> {
     let snapshot =
         match execute_remote_worker_action(state, db, offer, identity, action, workspace).await {
@@ -56,7 +53,59 @@ pub(super) async fn execute_and_reconcile_remote_worker(
                 };
             }
         };
-    let permit = action.permit();
+    Box::pin(reconcile_remote_worker_snapshot(
+        state,
+        db,
+        record,
+        offer,
+        identity,
+        action.permit(),
+        snapshot,
+        workspace,
+    ))
+    .await
+}
+
+pub(super) async fn reconcile_persisted_terminal_remote_worker(
+    state: &DaemonHttpState,
+    db: &AsyncDaemonDbHandle,
+    record: TaskBoardRemoteAssignmentRecord,
+    offer: &RemoteOfferRequest,
+    identity: &RemoteWorkerIdentity,
+    snapshot: &TaskBoardRemoteExecutorRun,
+) -> Result<(), CliError> {
+    let receipt = record
+        .start_receipt
+        .as_ref()
+        .ok_or_else(|| concurrent("terminal remote worker has no durable start receipt"))?;
+    let workspace = PreparedRemoteWorkspace::from_start_receipt(receipt);
+    Box::pin(reconcile_remote_worker_snapshot(
+        state,
+        db,
+        record,
+        offer,
+        identity,
+        None,
+        snapshot.clone(),
+        &workspace,
+    ))
+    .await
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the exact record, offer, runtime, owner, and workspace evidence stay explicit"
+)]
+async fn reconcile_remote_worker_snapshot(
+    state: &DaemonHttpState,
+    db: &AsyncDaemonDbHandle,
+    mut record: TaskBoardRemoteAssignmentRecord,
+    offer: &RemoteOfferRequest,
+    identity: &RemoteWorkerIdentity,
+    permit: Option<&TaskBoardRemoteExecutorStartIoPermit>,
+    snapshot: TaskBoardRemoteExecutorRun,
+    workspace: &PreparedRemoteWorkspace,
+) -> Result<(), CliError> {
     if record.state == TaskBoardRemoteAssignmentState::Claimed && permit.is_none() {
         return stop_pre_permit_remote_run(state, db, &record, &snapshot).await;
     }
@@ -83,16 +132,48 @@ pub(super) async fn execute_and_reconcile_remote_worker(
         record = adopted;
     }
     if !snapshot.status.is_active() {
-        return Box::pin(persist_terminal_snapshot(
-            db,
-            &state.daemon_epoch,
-            &record,
-            &snapshot,
-            workspace,
-        ))
+        return persist_valid_terminal_snapshot(
+            state, db, &record, offer, identity, &snapshot, workspace,
+        )
         .await;
     }
     mark_running_if_active(db, &record, &snapshot).await
+}
+
+async fn persist_valid_terminal_snapshot(
+    state: &DaemonHttpState,
+    db: &AsyncDaemonDbHandle,
+    record: &TaskBoardRemoteAssignmentRecord,
+    offer: &RemoteOfferRequest,
+    identity: &RemoteWorkerIdentity,
+    snapshot: &TaskBoardRemoteExecutorRun,
+    workspace: &PreparedRemoteWorkspace,
+) -> Result<(), CliError> {
+    let source_result = match workspace.require_repository().await {
+        Ok(()) => validate_terminal_remote_source(record, offer, identity, workspace).await,
+        Err(error) => Err(error),
+    };
+    if let Err(error) = source_result {
+        tracing::warn!(
+            %error,
+            assignment_id = %record.assignment_id,
+            "remote executor terminal source audit failed"
+        );
+        return Box::pin(persist_terminal_source_failure(
+            db,
+            &state.daemon_epoch,
+            record,
+        ))
+        .await;
+    }
+    Box::pin(persist_terminal_snapshot(
+        db,
+        &state.daemon_epoch,
+        record,
+        snapshot,
+        workspace.path(),
+    ))
+    .await
 }
 
 /// Adopts a claimed worker's start and takes its lifecycle ownership.
@@ -104,7 +185,7 @@ async fn reconcile_claimed_adoption(
     db: &AsyncDaemonDbHandle,
     permit: Option<&TaskBoardRemoteExecutorStartIoPermit>,
     snapshot: &TaskBoardRemoteExecutorRun,
-    workspace: &Path,
+    workspace: &PreparedRemoteWorkspace,
 ) -> Result<Option<TaskBoardRemoteAssignmentRecord>, CliError> {
     let permit = permit
         .ok_or_else(|| concurrent("claimed remote worker has no durable Start I/O permit"))?;
@@ -319,12 +400,12 @@ async fn adopt_remote_start(
     db: &AsyncDaemonDbHandle,
     permit: &TaskBoardRemoteExecutorStartIoPermit,
     snapshot: &TaskBoardRemoteExecutorRun,
-    workspace: &Path,
+    workspace: &PreparedRemoteWorkspace,
 ) -> Result<Option<TaskBoardRemoteAssignmentRecord>, CliError> {
     let outcome = db
         .adopt_task_board_remote_executor_start_owned(
             permit,
-            workspace,
+            workspace.path(),
             &snapshot.created_at,
             &state.daemon_epoch,
             &utc_now(),

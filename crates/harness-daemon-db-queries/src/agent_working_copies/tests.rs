@@ -264,7 +264,6 @@ async fn a_started_worker_joins_its_workspace_team_once() {
         display_name: "Task Board: ship it".to_string(),
         assignment_id: Some("task-board-1".to_string()),
     };
-
     let member_id = fixture
         .db
         .register_workspace_managed_member(&registration)
@@ -342,12 +341,26 @@ async fn joining_a_worker_atomically_binds_its_runtime_to_the_workspace() {
         display_name: "Task Board: recover".to_string(),
         assignment_id: Some("work-item-zeta".to_string()),
     };
+    assert!(
+        !fixture
+            .db
+            .workspace_managed_member_is_current(&registration)
+            .await
+            .expect("check unbound registration")
+    );
 
     fixture
         .db
         .register_workspace_managed_member(&registration)
         .await
         .expect("adopt interrupted runtime");
+    assert!(
+        fixture
+            .db
+            .workspace_managed_member_is_current(&registration)
+            .await
+            .expect("check current registration")
+    );
 
     let owner = sqlx::query_as::<_, (Option<String>, Option<String>, Option<String>)>(
         "SELECT workspace_id, session_id, session_agent_id
@@ -357,6 +370,22 @@ async fn joining_a_worker_atomically_binds_its_runtime_to_the_workspace() {
     .await
     .expect("load durable runtime owner");
     assert_eq!(owner, (Some(provisioned.workspace_id), None, None));
+    fixture
+        .db
+        .record_workspace_member_runtime_stop(
+            &registration.workspace_id,
+            &registration.member_id(),
+            "completed",
+        )
+        .await
+        .expect("stop registered runtime");
+    assert!(
+        !fixture
+            .db
+            .workspace_managed_member_is_current(&registration)
+            .await
+            .expect("check stopped registration")
+    );
 }
 
 #[tokio::test]

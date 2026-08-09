@@ -49,7 +49,7 @@ private enum TaskBoardDispatchAppliedRowsPreviewFixture {
           AppliedTaskPayload(
             boardItemId: items[1].id,
             sessionId: nil,
-            workspaceId: "workspace-release-build",
+            workspaceId: nil,
             workingCopyId: "working-copy-release-build",
             workItemId: "task-sessionless-dispatch",
             item: items[1]

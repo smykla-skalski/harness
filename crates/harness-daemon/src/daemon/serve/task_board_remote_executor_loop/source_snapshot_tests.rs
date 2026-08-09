@@ -13,7 +13,8 @@ use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::git::source_bundle_export::GitSourceBundleExportPlan;
 use crate::task_board::remote_wire::wire::{
     RemoteArtifactEntry, RemoteArtifactManifest, RemoteOfferRequest,
-    RemoteSourceBundleUploadRequest, RemoteSourceMaterial, test_codex_launch,
+    RemoteSourceBundleUploadRequest, RemoteSourceMaterial, RemoteWorkOwnerBinding,
+    test_codex_launch,
 };
 use crate::task_board::{
     TaskBoardExecutionPhase, TaskBoardLocalExecutionRepositoryConfig,
@@ -104,6 +105,81 @@ async fn snapshot_import_survives_restart_then_creates_exact_session_and_cleans_
                 &target,
                 &snapshot_import_ref(&offer, &source)
             ));
+        },
+    ))
+    .await;
+}
+
+#[tokio::test]
+async fn workspace_snapshot_start_rejects_drift_while_implementation_probe_accepts_it() {
+    let data = tempfile::tempdir().expect("create isolated data root");
+    let data_path = data.path().to_string_lossy().into_owned();
+    Box::pin(temp_env::async_with_vars(
+        [
+            ("XDG_DATA_HOME", Some(data_path.as_str())),
+            ("CLAUDE_SESSION_ID", Some("remote-snapshot-probe-test")),
+        ],
+        async {
+            let source = SnapshotSource::new();
+            let fixture = remote_executor_fixture(1).await;
+            let target = fixture.temp_dir.path().join("configured-checkout");
+            init_repository(&target, "target-only\n");
+            configure_executor(&fixture, &target).await;
+            let offer = workspace_owned_snapshot_offer(&fixture.request, &source);
+            upload_snapshot(&fixture, &offer, &source.bytes).await;
+            let assignment = Box::pin(claim_assignment(&fixture, &offer)).await;
+            let identity = remote_executor_identity(&assignment).expect("executor identity");
+            let workspace = super::super::source::prepare_remote_workspace(
+                &fixture.db,
+                &assignment,
+                &offer,
+                &identity,
+                true,
+            )
+            .await
+            .expect("prepare workspace-owned snapshot start");
+
+            std::fs::write(workspace.path().join("implementation.txt"), "implemented\n")
+                .expect("write implementation output");
+            git(workspace.path(), &["add", "implementation.txt"]);
+            git(
+                workspace.path(),
+                &["commit", "-qm", "implementation result"],
+            );
+            let implementation_head = git(workspace.path(), &["rev-parse", "HEAD"]);
+            assert_ne!(implementation_head, source.revision);
+
+            let error = super::super::source::prepare_remote_workspace(
+                &fixture.db,
+                &assignment,
+                &offer,
+                &identity,
+                true,
+            )
+            .await
+            .expect_err("fresh Start rejects a workspace that drifted from its sealed snapshot");
+            assert!(
+                error
+                    .to_string()
+                    .contains("worktree head drifted before start"),
+                "unexpected snapshot Start fence: {error}"
+            );
+
+            let recovered = super::super::source::prepare_remote_workspace(
+                &fixture.db,
+                &assignment,
+                &offer,
+                &identity,
+                false,
+            )
+            .await
+            .expect("Probe preserves the implementation workspace head");
+            assert_eq!(recovered.path(), workspace.path());
+            assert_eq!(recovered.workspace_id(), workspace.workspace_id());
+            assert_eq!(
+                git(recovered.path(), &["rev-parse", "HEAD"]),
+                implementation_head
+            );
         },
     ))
     .await;
@@ -209,6 +285,22 @@ fn snapshot_offer(template: &RemoteOfferRequest, source: &SnapshotSource) -> Rem
     };
     offer.request_sha256.clear();
     offer.seal().expect("seal snapshot offer")
+}
+
+fn workspace_owned_snapshot_offer(
+    template: &RemoteOfferRequest,
+    source: &SnapshotSource,
+) -> RemoteOfferRequest {
+    let mut offer = snapshot_offer(template, source);
+    offer.work_owner = Some(RemoteWorkOwnerBinding {
+        source_daemon_id: "source-daemon".into(),
+        workspace_id: "source-workspace".into(),
+        working_copy_id: "source-copy".into(),
+        work_item_id: "source-work-item".into(),
+        managed_agent_id: offer.binding.idempotency_key.clone(),
+    });
+    offer.request_sha256.clear();
+    offer.seal().expect("seal workspace-owned snapshot offer")
 }
 
 struct SnapshotSource {

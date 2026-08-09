@@ -5,6 +5,37 @@ import Testing
 
 @Suite("Task-board orchestrator presentation")
 struct TaskBoardOrchestratorPresentationTests {
+  @Test("Dispatch owners fall back through workspace, Session, and working copy")
+  func dispatchOwnerUsesEverySupportedIdentity() {
+    let item = taskBoardItem(id: "board-owner", status: .inProgress)
+    let direct = TaskBoardDispatchAppliedTask(
+      boardItemId: item.id,
+      sessionId: nil,
+      workspaceId: nil,
+      workingCopyId: "working-copy-owner",
+      workItemId: "task-owner",
+      item: item
+    )
+    let orchestrated = TaskBoardOrchestratorAppliedTask(
+      boardItemId: item.id,
+      sessionId: "session-owner",
+      workspaceId: "workspace-owner",
+      workingCopyId: "working-copy-owner",
+      workItemId: "task-owner",
+      itemTitle: item.title
+    )
+    let held = TaskBoardHeldDispatchItem(
+      intentId: "intent-owner",
+      boardItemId: item.id,
+      workingCopyId: "working-copy-owner",
+      workItemId: "task-owner"
+    )
+
+    #expect(direct.ownerId == "working-copy-owner")
+    #expect(orchestrated.ownerId == "workspace-owner")
+    #expect(held.ownerId == "working-copy-owner")
+  }
+
   @Test("Applied count de-duplicates a board item updated by dispatch and evaluation")
   func appliedCountUsesUniqueBoardItemIDs() {
     let item = taskBoardItem(id: "board-1", status: .inProgress)

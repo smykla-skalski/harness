@@ -16,6 +16,7 @@ Suites:
   task-board-lane-alignment
   task-board-inspector
   task-board-review-report
+  task-board-step-rail
   task-board-workflow-progress
   task-board-worker-progress
   task-board-filters
@@ -36,6 +37,7 @@ if [[ "${1:-}" == "--list" ]]; then
     task-board-lane-alignment \
     task-board-inspector \
     task-board-review-report \
+    task-board-step-rail \
     task-board-workflow-progress \
     task-board-worker-progress \
     task-board-filters \
@@ -53,7 +55,7 @@ if [[ -z "$suite" ]]; then
 fi
 
 case "$suite" in
-  dashboard-agents|dashboard-audit-navigation|dashboard-diff-lab|dashboard-reviews-timeout|session-create-bridge-banner|task-board-lane-alignment|task-board-inspector|task-board-review-report|task-board-workflow-progress|task-board-worker-progress|task-board-filters|task-board-repository-scope|settings-repository-scope|session-window-removal|secret-migration-consent) ;;
+  dashboard-agents|dashboard-audit-navigation|dashboard-diff-lab|dashboard-reviews-timeout|session-create-bridge-banner|task-board-lane-alignment|task-board-inspector|task-board-review-report|task-board-step-rail|task-board-workflow-progress|task-board-worker-progress|task-board-filters|task-board-repository-scope|settings-repository-scope|session-window-removal|secret-migration-consent) ;;
   *)
     printf 'error: unknown preview suite: %s\n' "$suite" >&2
     usage >&2
@@ -240,6 +242,9 @@ case "$suite" in
     ;;
   task-board-review-report)
     HARNESS_TASK_BOARD_REVIEW_REPORT_PREVIEW_DUMP="$staging_directory" "$host"
+    ;;
+  task-board-step-rail)
+    HARNESS_TASK_BOARD_STEP_RAIL_PREVIEW_DUMP="$staging_directory" "$host"
     ;;
   task-board-workflow-progress)
     HARNESS_TASK_BOARD_WORKFLOW_PROGRESS_PREVIEW_DUMP="$staging_directory" "$host"

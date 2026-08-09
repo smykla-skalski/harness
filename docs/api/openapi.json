@@ -24837,6 +24837,17 @@
           },
           "source": {
             "$ref": "#/components/schemas/RemoteSourceMaterial"
+          },
+          "work_owner": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RemoteWorkOwnerBinding",
+                "description": "Absent only on an offer persisted by a pre-workspace daemon. New\noffers require this binding and executors use its presence to select\nthe Session-free path."
+              }
+            ]
           }
         },
         "additionalProperties": false
@@ -25890,6 +25901,35 @@
             "$ref": "#/components/schemas/TaskBoardLocalAttemptResult"
           },
           "result_sha256": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RemoteWorkOwnerBinding": {
+        "type": "object",
+        "description": "Controller-owned work identity sealed into a remote offer.\n\nThese identifiers are provenance, not executor-local lookup keys. The\nsource daemon id namespaces the remaining values so two daemons with the\nsame project or checkout names can never address each other's workspace.",
+        "required": [
+          "source_daemon_id",
+          "workspace_id",
+          "working_copy_id",
+          "work_item_id",
+          "managed_agent_id"
+        ],
+        "properties": {
+          "managed_agent_id": {
+            "type": "string"
+          },
+          "source_daemon_id": {
+            "type": "string"
+          },
+          "work_item_id": {
+            "type": "string"
+          },
+          "working_copy_id": {
+            "type": "string"
+          },
+          "workspace_id": {
             "type": "string"
           }
         },
@@ -32632,7 +32672,6 @@
         "required": [
           "intent_id",
           "board_item_id",
-          "session_id",
           "work_item_id"
         ],
         "properties": {
@@ -32643,10 +32682,25 @@
             "type": "string"
           },
           "session_id": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "work_item_id": {
             "type": "string"
+          },
+          "working_copy_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspace_id": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },

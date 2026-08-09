@@ -18,6 +18,10 @@ use crate::task_board::remote_wire::wire::{
 const START_RECEIPT_DOMAIN: &str = "harness.task-board.remote-executor-start-receipt.v1";
 const MAX_START_RECEIPT_BYTES: usize = 32_768;
 
+#[path = "remote_start_receipts/workspace.rs"]
+mod workspace;
+use workspace::durable_workspace_start_receipt_run_matches;
+
 /// Immutable proof of the exact local run adopted for one remote assignment.
 ///
 /// The receipt deliberately preserves the initial lifecycle owner. Later owner
@@ -38,6 +42,12 @@ pub(crate) struct TaskBoardRemoteExecutorStartReceipt {
     pub(crate) start_io_lease_expires_at: String,
     pub(crate) start_io_deadline_at: String,
     pub(crate) session_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) workspace_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) working_copy_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) managed_agent_id: Option<String>,
     pub(crate) run_id: String,
     pub(crate) workspace_ref: String,
     pub(crate) project_dir: String,
@@ -63,6 +73,7 @@ pub(super) fn start_receipt(
     record: &TaskBoardRemoteAssignmentRecord,
     permit: &TaskBoardRemoteExecutorStartIoPermit,
     project_dir: &str,
+    workspace_id: Option<&str>,
     started_at: &str,
     owner: &InitialLifecycleOwner<'_>,
 ) -> Result<TaskBoardRemoteExecutorStartReceipt, CliError> {
@@ -85,6 +96,15 @@ pub(super) fn start_receipt(
         start_io_lease_expires_at: permit.lease_expires_at.clone(),
         start_io_deadline_at: permit.deadline_at.clone(),
         session_id: permit.identity.session_id.clone(),
+        workspace_id: workspace_id.map(str::to_owned),
+        working_copy_id: offer
+            .work_owner
+            .as_ref()
+            .map(|_| permit.identity.working_copy_id.clone()),
+        managed_agent_id: offer
+            .work_owner
+            .as_ref()
+            .map(|_| permit.identity.run_id.clone()),
         run_id: permit.identity.run_id.clone(),
         workspace_ref: permit.identity.workspace_ref.clone(),
         project_dir: project_dir.into(),
@@ -171,6 +191,16 @@ pub(super) fn receipt_matches_permit(
         && receipt.start_io_lease_expires_at == permit.lease_expires_at
         && receipt.start_io_deadline_at == permit.deadline_at
         && receipt.session_id == permit.identity.session_id
+        && receipt.working_copy_id.as_deref()
+            == receipt
+                .workspace_id
+                .as_ref()
+                .map(|_| permit.identity.working_copy_id.as_str())
+        && receipt.managed_agent_id.as_deref()
+            == receipt
+                .workspace_id
+                .as_ref()
+                .map(|_| permit.identity.run_id.as_str())
         && receipt.run_id == permit.identity.run_id
         && receipt.workspace_ref == permit.identity.workspace_ref
         && receipt.project_dir == project_dir
@@ -183,6 +213,15 @@ pub(super) async fn durable_start_receipt_run_matches(
     receipt: &TaskBoardRemoteExecutorStartReceipt,
 ) -> Result<bool, CliError> {
     let offer = record.require_offer()?;
+    if let Some(workspace_id) = receipt.workspace_id.as_deref() {
+        return durable_workspace_start_receipt_run_matches(
+            transaction,
+            record,
+            receipt,
+            workspace_id,
+        )
+        .await;
+    }
     if offer.launch.runtime == "openrouter" {
         return query_scalar::<_, bool>(
             "SELECT EXISTS(
@@ -291,6 +330,16 @@ fn validate_receipt_evidence(
             "remote executor start receipt contradicts immutable assignment evidence",
         ));
     }
+    let expected_workspace_owner = offer.work_owner.is_some();
+    if expected_workspace_owner
+        != (receipt.workspace_id.is_some()
+            && receipt.working_copy_id.is_some()
+            && receipt.managed_agent_id.is_some())
+    {
+        return Err(db_error(
+            "remote executor start receipt has inconsistent workspace ownership",
+        ));
+    }
     validate_receipt_identity(record, receipt)?;
     validate_receipt_times(receipt)
 }
@@ -316,6 +365,14 @@ fn validate_receipt_identity(
             .components()
             .any(|component| matches!(component, Component::CurDir | Component::ParentDir))
         || receipt.session_id != identity.session_id
+        || receipt
+            .working_copy_id
+            .as_deref()
+            .is_some_and(|value| value != identity.working_copy_id)
+        || receipt
+            .managed_agent_id
+            .as_deref()
+            .is_some_and(|value| value != identity.run_id)
         || receipt.run_id != identity.run_id
         || receipt.workspace_ref != identity.workspace_ref
         || receipt.initial_owner_epoch != 1

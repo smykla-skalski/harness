@@ -66,6 +66,15 @@ pub trait AsyncAgentWorkingCopyQueries: Send + Sync {
         registration: &WorkspaceMemberRegistration,
     ) -> impl Future<Output = Result<String, CliError>> + Send;
 
+    /// Return whether the managed runtime and member already match this registration.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when the current registration cannot be read.
+    fn workspace_managed_member_is_current(
+        &self,
+        registration: &WorkspaceMemberRegistration,
+    ) -> impl Future<Output = Result<bool, CliError>> + Send;
+
     /// Record that a managed worker's runtime stopped, leaving its membership
     /// in place.
     ///
@@ -157,6 +166,13 @@ impl AsyncAgentWorkingCopyQueries for AsyncDaemonDb {
             .await
             .map_err(|error| db_error(format!("commit workspace member join: {error}")))?;
         Ok(member_id)
+    }
+
+    async fn workspace_managed_member_is_current(
+        &self,
+        registration: &WorkspaceMemberRegistration,
+    ) -> Result<bool, CliError> {
+        members::registration_is_current(self.pool(), registration).await
     }
 
     async fn record_workspace_member_runtime_stop(

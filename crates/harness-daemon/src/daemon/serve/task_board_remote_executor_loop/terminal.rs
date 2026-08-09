@@ -47,6 +47,38 @@ where
 {
     let snapshot = snapshot.clone().into();
     let evidence = terminal_evidence(record, &snapshot, workspace).await?;
+    Box::pin(persist_terminal_evidence(
+        db,
+        owner_instance_id,
+        record,
+        evidence,
+    ))
+    .await
+}
+
+pub(super) async fn persist_terminal_source_failure(
+    db: &AsyncDaemonDbHandle,
+    owner_instance_id: &str,
+    record: &TaskBoardRemoteAssignmentRecord,
+) -> Result<(), CliError> {
+    Box::pin(persist_terminal_evidence(
+        db,
+        owner_instance_id,
+        record,
+        TerminalEvidence::Failed {
+            error_code: "executor_source_invalid",
+            failure_class: TaskBoardFailureClass::Permanent,
+        },
+    ))
+    .await
+}
+
+async fn persist_terminal_evidence(
+    db: &AsyncDaemonDbHandle,
+    owner_instance_id: &str,
+    record: &TaskBoardRemoteAssignmentRecord,
+    evidence: TerminalEvidence,
+) -> Result<(), CliError> {
     let owner_at = utc_now();
     let Some(claim) = db
         .claim_task_board_remote_executor_lifecycle_owner_with_settings(

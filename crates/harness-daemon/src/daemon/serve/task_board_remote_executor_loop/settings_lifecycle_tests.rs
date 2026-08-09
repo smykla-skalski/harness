@@ -289,5 +289,11 @@ async fn adopted_worker() -> (
             .status,
         CodexRunStatus::Running
     );
-    (fixture, claimed, started, permit, workspace)
+    (
+        fixture,
+        claimed,
+        started,
+        permit,
+        workspace.path().to_path_buf(),
+    )
 }

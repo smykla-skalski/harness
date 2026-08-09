@@ -10,7 +10,7 @@ use crate::{
 };
 use harness_kernel::errors::{CliError, CliErrorKind};
 
-pub const TASK_BOARD_REMOTE_PROTOCOL_VERSION: u32 = 1;
+pub const TASK_BOARD_REMOTE_PROTOCOL_VERSION: u32 = 2;
 pub const TASK_BOARD_REMOTE_HEARTBEAT_TTL_SECONDS: i64 = 300;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

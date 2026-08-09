@@ -30,7 +30,14 @@ pub(super) async fn durable_run_matches_snapshot(
     snapshot: &TaskBoardRemoteExecutorRun,
 ) -> Result<bool, CliError> {
     let identity = remote_executor_identity(record)?;
-    if snapshot.run_id != identity.run_id || snapshot.session_id != identity.session_id {
+    let runtime_owner_matches = match (&record.require_offer()?.work_owner, &record.start_receipt) {
+        (None, _) => snapshot.session_id == identity.session_id,
+        (Some(_), Some(receipt)) => {
+            receipt.workspace_id.as_deref() == Some(snapshot.session_id.as_str())
+        }
+        (Some(_), None) => !snapshot.session_id.trim().is_empty(),
+    };
+    if snapshot.run_id != identity.run_id || !runtime_owner_matches {
         return Ok(false);
     }
     let Some(stored) = stored_launch_evidence(
@@ -93,6 +100,13 @@ pub(super) fn settled_stop_replays(
         .claim_receipt
         .as_ref()
         .ok_or_else(|| db_error("settled remote executor stop has no claim receipt"))?;
+    let runtime_owner_matches = match (&offer.work_owner, &record.start_receipt) {
+        (None, _) => pending.session_id == identity.session_id,
+        (Some(_), Some(receipt)) => {
+            receipt.workspace_id.as_deref() == Some(pending.session_id.as_str())
+        }
+        (Some(_), None) => !pending.session_id.trim().is_empty(),
+    };
     Ok(record.state == TaskBoardRemoteAssignmentState::Unknown
         && record.fencing_epoch == pending.fencing_epoch
         && offer.request_sha256 == pending.offer_request_sha256
@@ -110,7 +124,7 @@ pub(super) fn settled_stop_replays(
         && record.executor_checkout_path.as_deref()
             == Some(pending.executor_checkout_path.as_str())
         && offer.source == pending.source
-        && identity.session_id == pending.session_id
+        && runtime_owner_matches
         && identity.run_id == pending.run_id
         && identity.workspace_ref == pending.workspace_ref
         && record.error.as_deref() == Some(pending.reason.message())
@@ -144,6 +158,24 @@ async fn stored_launch_evidence(
         .bind(mode_label(offer.launch.mode))
         .bind(&offer.launch.prompt)
         .bind(&offer.launch.effort)
+        .fetch_optional(transaction.as_mut())
+        .await
+        .map_err(|error| db_error(format!("verify remote executor stop run: {error}")));
+    }
+    if offer.work_owner.is_some() {
+        return query_as::<_, StoredLaunchEvidence>(
+            "SELECT runs.run_id, COALESCE(runs.workspace_id, ''), runs.task_id,
+                    runs.board_item_id, runs.workflow_execution_id, runs.display_name,
+                    runs.project_dir, runs.mode, runs.prompt, runs.created_at,
+                    runs.model, runs.effort
+             FROM codex_runs AS runs
+             WHERE runs.run_id = ?1 AND runs.session_id IS NULL
+               AND runs.workspace_id = ?2
+               AND (?3 = 0 OR runs.status IN ('completed', 'failed', 'cancelled'))",
+        )
+        .bind(run_id)
+        .bind(session_id)
+        .bind(require_terminal)
         .fetch_optional(transaction.as_mut())
         .await
         .map_err(|error| db_error(format!("verify remote executor stop run: {error}")));

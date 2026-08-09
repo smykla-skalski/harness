@@ -42,7 +42,10 @@ use crate::task_board::TaskBoardRemoteAssignmentState;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TaskBoardRemoteExecutorIdentity {
+    /// Compatibility owner for an offer persisted before workspace-owned
+    /// remote execution. New offers never create or resolve this Session.
     pub(crate) session_id: String,
+    pub(crate) working_copy_id: String,
     pub(crate) run_id: String,
     pub(crate) workspace_ref: String,
 }

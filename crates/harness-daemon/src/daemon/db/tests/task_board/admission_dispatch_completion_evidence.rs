@@ -267,6 +267,7 @@ pub(super) fn remote_offer(
             base_revision: "1111111111111111111111111111111111111111".into(),
             expected_head_revision: Some("1111111111111111111111111111111111111111".into()),
         },
+        work_owner: None,
         lease_seconds: 60,
         deadline_at: "2026-07-19T10:10:00Z".into(),
         launch: RemoteRuntimeLaunchEnvelope::from_run_request("codex", &request)

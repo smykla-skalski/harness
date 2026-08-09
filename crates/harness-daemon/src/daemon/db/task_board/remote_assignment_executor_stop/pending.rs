@@ -111,7 +111,7 @@ pub(super) fn stop_pending(
         authority_kind: authority.kind(),
         authority_sha256: authority.sha256().into(),
         authority_acquired_at: authority.acquired_at().into(),
-        session_id: identity.session_id,
+        session_id: snapshot.session_id.clone(),
         run_id: identity.run_id,
         workspace_ref: identity.workspace_ref,
         project_dir: snapshot.project_dir.clone(),
@@ -137,6 +137,13 @@ fn validate_stop_pending(
 ) -> Result<(), CliError> {
     let offer = record.require_offer()?;
     let identity = remote_executor_identity(record)?;
+    let runtime_owner_matches = match (&offer.work_owner, &record.start_receipt) {
+        (None, _) => pending.session_id == identity.session_id,
+        (Some(_), Some(receipt)) => {
+            receipt.workspace_id.as_deref() == Some(pending.session_id.as_str())
+        }
+        (Some(_), None) => !pending.session_id.trim().is_empty(),
+    };
     if pending.schema_version != TASK_BOARD_REMOTE_WIRE_SCHEMA_VERSION
         || pending.assignment_id != record.assignment_id
         || pending.fencing_epoch != record.fencing_epoch
@@ -154,7 +161,7 @@ fn validate_stop_pending(
         || pending.executor_checkout_path
             != required(record.executor_checkout_path.as_ref(), "checkout")?
         || pending.source != offer.source
-        || pending.session_id != identity.session_id
+        || !runtime_owner_matches
         || pending.run_id != identity.run_id
         || pending.workspace_ref != identity.workspace_ref
     {

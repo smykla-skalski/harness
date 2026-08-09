@@ -1,4 +1,5 @@
 use crate::daemon::db::{TaskBoardRemoteOfferOutcome, TaskBoardRemoteOfferWindow};
+use crate::task_board::remote_wire::wire::RemoteWorkOwnerBinding;
 use crate::task_board::{
     TaskBoardExecutionAttemptCas, TaskBoardWorkflowExecutionCas, TaskBoardWorkflowExecutionRecord,
 };
@@ -23,10 +24,14 @@ pub(super) async fn offer_remote_candidate(
     let Some(attempt) = remote_preparing_attempt(execution) else {
         return Ok(());
     };
+    let now = canonical_now();
+    let Some(work_owner) = remote_work_owner(db, execution, attempt).await? else {
+        select_local_target(db, execution, attempt, &now).await?;
+        return Ok(());
+    };
     let Some(phase) = execution.transition.phase else {
         return Ok(());
     };
-    let now = canonical_now();
     let prior_bundle = if requests::requires_prior_bundle(execution, phase) {
         db.task_board_remote_prior_phase_bundle(execution, phase)
             .await?
@@ -57,14 +62,16 @@ pub(super) async fn offer_remote_candidate(
     // from dispatching on every tick until the daemon restarted. Refusing
     // remote and letting it run locally is what the neighbouring branches
     // already do when a candidate cannot go remote.
-    let prepared = match requests::prepare_offer(execution, attempt, &host, prepared_source, &now) {
-        Ok(prepared) => prepared,
-        Err(error) => {
-            warn_offer_render_refused(&execution.execution_id, &error);
-            select_local_target(db, execution, attempt, &now).await?;
-            return Ok(());
-        }
-    };
+    let prepared =
+        match requests::prepare_offer(execution, attempt, &host, work_owner, prepared_source, &now)
+        {
+            Ok(prepared) => prepared,
+            Err(error) => {
+                warn_offer_render_refused(&execution.execution_id, &error);
+                select_local_target(db, execution, attempt, &now).await?;
+                return Ok(());
+            }
+        };
     let Some(prepared) = prepared else {
         select_local_target(db, execution, attempt, &now).await?;
         return Ok(());
@@ -100,4 +107,49 @@ pub(super) async fn offer_remote_candidate(
         TaskBoardRemoteOfferOutcome::Unavailable | TaskBoardRemoteOfferOutcome::Stale => {}
     }
     Ok(())
+}
+
+/// Freeze the current workspace-owned item into the offer. A legacy
+/// Session-owned item is intentionally local: new remote work must not recreate
+/// that Session ownership on another daemon.
+async fn remote_work_owner(
+    db: &AsyncDaemonDbHandle,
+    execution: &TaskBoardWorkflowExecutionRecord,
+    attempt: &crate::task_board::TaskBoardExecutionAttemptRecord,
+) -> Result<Option<RemoteWorkOwnerBinding>, CliError> {
+    let row = sqlx::query_as::<_, (String, String, String, Option<String>)>(
+        "SELECT workspace.daemon_id, item.workspace_id, item.working_copy_id,
+                item.work_item_id
+         FROM task_board_items AS item
+         JOIN agent_workspaces AS workspace ON workspace.workspace_id = item.workspace_id
+         JOIN agent_working_copies AS copy
+           ON copy.working_copy_id = item.working_copy_id
+          AND copy.workspace_id = item.workspace_id
+          AND copy.status = 'active'
+         WHERE item.item_id = ?1 AND item.session_id IS NULL
+           AND item.deleted_at IS NULL
+           AND workspace.orchestration_authority = 'workspace'
+           AND workspace.selected_legacy_session_id IS NULL
+           AND json_extract(item.workflow_json, '$.execution_id') = ?2",
+    )
+    .bind(&execution.item_id)
+    .bind(&execution.execution_id)
+    .fetch_optional(db.pool())
+    .await
+    .map_err(|error| {
+        CliError::from(CliErrorKind::workflow_io(format!(
+            "load remote work owner: {error}"
+        )))
+    })?;
+    Ok(row.and_then(
+        |(source_daemon_id, workspace_id, working_copy_id, work_item_id)| {
+            Some(RemoteWorkOwnerBinding {
+                source_daemon_id,
+                workspace_id,
+                working_copy_id,
+                work_item_id: work_item_id?,
+                managed_agent_id: attempt.idempotency_key.clone(),
+            })
+        },
+    ))
 }

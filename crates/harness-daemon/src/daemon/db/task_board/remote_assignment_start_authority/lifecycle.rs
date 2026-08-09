@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use sqlx::{query, query_scalar};
+use sqlx::{Sqlite, Transaction, query, query_scalar};
 
 use super::super::remote_assignment_lease::{commit_noop, finish_mutation, require_assignment};
 use super::super::remote_assignment_lifecycle_owner::lifecycle_owner_expiry;
@@ -18,7 +18,7 @@ use super::{
     start_adoption_replays,
 };
 use crate::daemon::db::prelude::*;
-use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
+use crate::daemon::db::{AsyncDaemonDb, CliError, TaskBoardRemoteAssignmentRecord, db_error};
 
 pub(in super::super) async fn adopt_task_board_remote_executor_start(
     db: &AsyncDaemonDb,
@@ -111,7 +111,16 @@ pub(in super::super) async fn adopt_task_board_remote_executor_start_owned(
         acquired_at: owner_at,
         expires_at: &owner_expires_at,
     };
-    let receipt = start_receipt(&record, permit, &project_dir, started_at, &initial_owner)?;
+    let workspace_id =
+        workspace_owner_in_tx(&mut transaction, &record, permit, &project_dir).await?;
+    let receipt = start_receipt(
+        &record,
+        permit,
+        &project_dir,
+        workspace_id.as_deref(),
+        started_at,
+        &initial_owner,
+    )?;
     if !durable_start_receipt_run_matches(&mut transaction, &record, &receipt).await? {
         commit_noop(transaction, "stale durable remote executor start").await?;
         return Ok(TaskBoardRemoteMutationOutcome::Stale(record));
@@ -135,6 +144,28 @@ pub(in super::super) async fn adopt_task_board_remote_executor_start_owned(
         "executor start adoption",
     )
     .await
+}
+
+async fn workspace_owner_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    record: &TaskBoardRemoteAssignmentRecord,
+    permit: &TaskBoardRemoteExecutorStartIoPermit,
+    project_dir: &str,
+) -> Result<Option<String>, CliError> {
+    if record.require_offer()?.work_owner.is_none() {
+        return Ok(None);
+    }
+    query_scalar::<_, String>(
+        "SELECT workspace_id FROM agent_working_copies
+         WHERE working_copy_id = ?1 AND worktree_path = ?2 AND status = 'active'",
+    )
+    .bind(&permit.identity.working_copy_id)
+    .bind(project_dir)
+    .fetch_optional(transaction.as_mut())
+    .await
+    .map_err(|error| db_error(format!("load remote executor workspace owner: {error}")))?
+    .map(Some)
+    .ok_or_else(|| db_error("remote executor working copy has no workspace owner"))
 }
 
 #[expect(
@@ -191,7 +222,15 @@ pub(in super::super) async fn expire_task_board_remote_executor_start_without_ru
             .fetch_one(transaction.as_mut())
             .await
             .map_err(|error| db_error(format!("check remote executor start session: {error}")))?;
-    if run_exists || session_exists {
+    let working_copy_exists = query_scalar::<_, bool>(
+        "SELECT EXISTS(SELECT 1 FROM agent_working_copies
+         WHERE working_copy_id = ?1 AND status = 'active')",
+    )
+    .bind(&authority.identity.working_copy_id)
+    .fetch_one(transaction.as_mut())
+    .await
+    .map_err(|error| db_error(format!("check remote executor start working copy: {error}")))?;
+    if run_exists || session_exists || working_copy_exists {
         return Err(concurrent(
             "remote executor start authority has durable provisioning evidence",
         ));

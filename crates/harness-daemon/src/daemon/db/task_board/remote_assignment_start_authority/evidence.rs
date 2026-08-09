@@ -43,6 +43,7 @@ pub(crate) fn remote_executor_identity_from_parts(
     let suffix = hex::encode(&digest[..16]);
     TaskBoardRemoteExecutorIdentity {
         session_id: Uuid::from_bytes(uuid_bytes).to_string(),
+        working_copy_id: format!("remote-copy-{suffix}"),
         run_id: format!("remote-codex-{suffix}"),
         workspace_ref: format!("remote-workspace-{suffix}"),
     }
