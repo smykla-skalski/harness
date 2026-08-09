@@ -3,7 +3,7 @@ import Testing
 
 @testable import HarnessMonitorKit
 
-@Suite("Legacy managed launch agent cleanup")
+@Suite("Legacy managed launch agent cleanup", .serialized)
 struct LegacyManagedLaunchAgentCleanupTests {
   @Test("First run records every attempted legacy plist name")
   func firstRunRecordsCompletedNames() throws {
@@ -121,53 +121,76 @@ struct LegacyManagedLaunchAgentCleanupTests {
     #expect(stored.sorted() == legacy.sorted())
   }
 
-  @Test("Failed unregister retries are bounded and never recorded as complete")
-  func failedUnregisterRetriesAreBounded() throws {
+  @Test("Failed unregister disables the current service and retries next launch")
+  func failedUnregisterDisablesCurrentServiceAndRetries() throws {
     let suiteName =
       "io.harnessmonitor.kit-tests.legacy-cleanup.\(UUID().uuidString)"
     let defaults = try #require(UserDefaults(suiteName: suiteName))
     defer { defaults.removePersistentDomain(forName: suiteName) }
     defer { LegacyManagedLaunchAgentCleanup.resetForTests() }
 
-    for expectedAttempt in 1...LegacyManagedLaunchAgentCleanup.maximumAttempts {
-      LegacyManagedLaunchAgentCleanup.resetForTests()
-      LegacyManagedLaunchAgentCleanup.runOnce(defaults: defaults) { _ in
-        LegacyLaunchAgentManagerStub(state: .enabled, unregisterFails: true)
+    var currentServiceUnregisterCount = 0
+    let firstResult = LegacyManagedLaunchAgentCleanup.runOnce(defaults: defaults) { name in
+      if name == HarnessMonitorPaths.launchAgentPlistName {
+        return LegacyLaunchAgentManagerStub(state: .enabled) {
+          currentServiceUnregisterCount += 1
+        }
       }
-      let counts = try #require(
-        defaults.dictionary(
-          forKey: LegacyManagedLaunchAgentCleanup.attemptCountsDefaultsKey
-        ) as? [String: Int]
-      )
-      for name in HarnessMonitorPaths.legacyLaunchAgentPlistNames {
-        #expect(counts[name] == expectedAttempt)
-      }
+      return LegacyLaunchAgentManagerStub(state: .enabled, unregisterFails: true)
     }
 
-    LegacyManagedLaunchAgentCleanup.resetForTests()
-    var createdManager = false
-    LegacyManagedLaunchAgentCleanup.runOnce(defaults: defaults) { _ in
-      createdManager = true
-      return LegacyLaunchAgentManagerStub(state: .enabled)
-    }
-
-    #expect(createdManager == false)
-    let completedNames =
+    #expect(firstResult == false)
+    #expect(currentServiceUnregisterCount == 1)
+    let completedAfterFailure =
       defaults.stringArray(
         forKey: LegacyManagedLaunchAgentCleanup.completedNamesDefaultsKey
       ) ?? []
-    #expect(completedNames.isEmpty)
+    #expect(completedAfterFailure.isEmpty)
+
+    var retriedInSameProcess = false
+    let cachedResult = LegacyManagedLaunchAgentCleanup.runOnce(defaults: defaults) { _ in
+      retriedInSameProcess = true
+      return LegacyLaunchAgentManagerStub(state: .notRegistered)
+    }
+    #expect(cachedResult == false)
+    #expect(retriedInSameProcess == false)
+
+    LegacyManagedLaunchAgentCleanup.resetForTests()
+    let retryResult = LegacyManagedLaunchAgentCleanup.runOnce(defaults: defaults) { _ in
+      LegacyLaunchAgentManagerStub(state: .notRegistered)
+    }
+
+    #expect(retryResult)
+    let completedAfterRetry =
+      defaults.stringArray(
+        forKey: LegacyManagedLaunchAgentCleanup.completedNamesDefaultsKey
+      ) ?? []
+    let expected = HarnessMonitorPaths.legacyLaunchAgentPlistNames
+      .filter { $0 != HarnessMonitorPaths.launchAgentPlistName }
+    #expect(completedAfterRetry.sorted() == expected.sorted())
   }
 }
 
-private struct LegacyLaunchAgentManagerStub: DaemonLaunchAgentManaging {
+private final class LegacyLaunchAgentManagerStub: DaemonLaunchAgentManaging, @unchecked Sendable {
   let state: DaemonLaunchAgentRegistrationState
-  var unregisterFails = false
+  let unregisterFails: Bool
+  let onUnregister: () -> Void
+
+  init(
+    state: DaemonLaunchAgentRegistrationState,
+    unregisterFails: Bool = false,
+    onUnregister: @escaping () -> Void = {}
+  ) {
+    self.state = state
+    self.unregisterFails = unregisterFails
+    self.onUnregister = onUnregister
+  }
 
   func registrationState() -> DaemonLaunchAgentRegistrationState { state }
   func register() throws {}
 
   func unregister() throws {
+    onUnregister()
     if unregisterFails {
       throw LegacyLaunchAgentManagerStubError.unregisterFailed
     }

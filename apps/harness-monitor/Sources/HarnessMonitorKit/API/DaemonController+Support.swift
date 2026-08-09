@@ -58,29 +58,35 @@ public struct ServiceManagementDaemonLaunchAgentManager: DaemonLaunchAgentManagi
 public enum LegacyManagedLaunchAgentCleanup {
   public static let completedNamesDefaultsKey =
     "HarnessMonitor.LegacyLaunchAgentCleanup.CompletedNames"
-  static let attemptCountsDefaultsKey =
-    "HarnessMonitor.LegacyLaunchAgentCleanup.AttemptCounts"
   static let strategyVersionDefaultsKey =
     "HarnessMonitor.LegacyLaunchAgentCleanup.StrategyVersion"
   static let strategyVersion = 2
-  static let maximumAttempts = 3
   private static let lock = NSLock()
-  nonisolated(unsafe) private static var didAttempt = false
+  nonisolated(unsafe) private static var cachedResult: Bool?
 
-  /// Runs once per process. Subsequent calls are no-ops. Within the first
-  /// call, also skips any legacy plist name already recorded in `defaults`.
+  /// Runs once per process and returns whether every legacy registration was
+  /// removed. A failed result remains retryable on the next app launch.
+  @discardableResult
   public static func runOnce(
     defaults: UserDefaults = .standard,
     managerFactory: (String) -> any DaemonLaunchAgentManaging = {
       ServiceManagementDaemonLaunchAgentManager(plistName: $0)
     }
-  ) {
+  ) -> Bool {
     lock.lock()
-    let alreadyAttempted = didAttempt
-    didAttempt = true
-    lock.unlock()
-    guard !alreadyAttempted else { return }
+    defer { lock.unlock() }
+    if let cachedResult {
+      return cachedResult
+    }
+    let result = performCleanup(defaults: defaults, managerFactory: managerFactory)
+    cachedResult = result
+    return result
+  }
 
+  private static func performCleanup(
+    defaults: UserDefaults,
+    managerFactory: (String) -> any DaemonLaunchAgentManaging
+  ) -> Bool {
     let currentName = HarnessMonitorPaths.launchAgentPlistName
     let usesCurrentStrategy =
       defaults.integer(forKey: strategyVersionDefaultsKey) == strategyVersion
@@ -88,21 +94,17 @@ public enum LegacyManagedLaunchAgentCleanup {
       usesCurrentStrategy
       ? Set(defaults.stringArray(forKey: completedNamesDefaultsKey) ?? [])
       : []
-    var attemptCounts =
-      usesCurrentStrategy
-      ? defaults.dictionary(forKey: attemptCountsDefaultsKey) as? [String: Int] ?? [:]
-      : [:]
     let pendingNames = HarnessMonitorPaths.legacyLaunchAgentPlistNames
       .filter {
         $0 != currentName
           && !completedNames.contains($0)
-          && attemptCounts[$0, default: 0] < maximumAttempts
       }
     guard pendingNames.isEmpty == false else {
       defaults.set(strategyVersion, forKey: strategyVersionDefaultsKey)
-      return
+      return true
     }
 
+    var failedNames: [String] = []
     for legacyName in pendingNames {
       let legacyService = managerFactory(legacyName)
       let state = legacyService.registrationState()
@@ -118,23 +120,48 @@ public enum LegacyManagedLaunchAgentCleanup {
         || attemptUnregister(legacyService, name: legacyName)
       if completed {
         completedNames.insert(legacyName)
-        attemptCounts.removeValue(forKey: legacyName)
       } else {
-        attemptCounts[legacyName, default: 0] += 1
+        failedNames.append(legacyName)
       }
     }
 
     defaults.set(completedNames.sorted(), forKey: completedNamesDefaultsKey)
-    defaults.set(attemptCounts, forKey: attemptCountsDefaultsKey)
     defaults.set(strategyVersion, forKey: strategyVersionDefaultsKey)
+    guard failedNames.isEmpty else {
+      disableCurrentService(managerFactory(currentName), name: currentName)
+      return false
+    }
+    return true
   }
 
   /// Test-only escape hatch: clears the once-guard so a unit test can verify
   /// the runOnce path more than once in the same process.
   public static func resetForTests() {
     lock.lock()
-    didAttempt = false
+    cachedResult = nil
     lock.unlock()
+  }
+
+  private static func disableCurrentService(
+    _ service: any DaemonLaunchAgentManaging,
+    name: String
+  ) {
+    switch service.registrationState() {
+    case .notRegistered, .notFound:
+      return
+    case .enabled, .requiresApproval:
+      break
+    }
+    do {
+      try service.unregister()
+      HarnessMonitorLogger.lifecycle.notice(
+        "Disabled current SMAppService after legacy cleanup failed: \(name, privacy: .public)"
+      )
+    } catch {
+      HarnessMonitorLogger.lifecycle.fault(
+        "Could not disable current SMAppService \(name, privacy: .public): \(error.localizedDescription, privacy: .public)"
+      )
+    }
   }
 
   private static func attemptUnregister(
