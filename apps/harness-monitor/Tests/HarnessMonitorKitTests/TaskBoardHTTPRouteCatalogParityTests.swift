@@ -144,7 +144,7 @@ private let swiftAPIDirectory = "apps/harness-monitor/Sources/HarnessMonitorKit/
 
 private func daemonRouteContractFiles() throws -> [URL] {
   try repoDirectoryFiles(relativePath: daemonContractDirectory).filter {
-    $0.lastPathComponent.hasPrefix("routes_") && $0.pathExtension == "rs"
+    $0.pathExtension == "rs"
   }
 }
 
@@ -154,9 +154,24 @@ private func swiftAPIClientFiles() throws -> [URL] {
 
 private func repoDirectoryFiles(relativePath: String) throws -> [URL] {
   let directory = try repoFileURL(relativePath: relativePath)
-  return try FileManager.default
-    .contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+  return try repoDirectoryFiles(at: directory)
     .sorted { $0.lastPathComponent < $1.lastPathComponent }
+}
+
+private func repoDirectoryFiles(at directory: URL) throws -> [URL] {
+  try FileManager.default.contentsOfDirectory(
+    at: directory,
+    includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey]
+  ).flatMap { entry -> [URL] in
+    let values = try entry.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+    guard values.isSymbolicLink != true else {
+      return []
+    }
+    if values.isDirectory == true {
+      return try repoDirectoryFiles(at: entry)
+    }
+    return [entry]
+  }
 }
 
 /// The daemon spells a path parameter `{name}`; the Swift client interpolates

@@ -119,6 +119,9 @@ if (( first_seed_status != 0 || second_seed_status != 0 )); then
   exit 1
 fi
 
+printf '==> cache canary: removing the donor before validating the seeded lane\n' >&2
+rm -rf "$TARGET_A"
+
 printf '==> cache canary: building the identical crate from a second checkout\n' >&2
 run_cargo "$PROJECT_B" "$TARGET_B" "$SANDBOX/second-build.log"
 if ! grep -Fq "Fresh harness_cache_canary" "$SANDBOX/second-build.log"; then
@@ -131,7 +134,6 @@ if grep -Fq "Compiling harness_cache_canary" "$SANDBOX/second-build.log"; then
 fi
 
 printf '==> cache canary: rebuilding a branch-local change without the donor\n' >&2
-rm -rf "$TARGET_A"
 cat >>"$PROJECT_B/src/lib.rs" <<'EOF'
 
 pub fn branch_change() -> u8 {

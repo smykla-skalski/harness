@@ -290,6 +290,11 @@ pub(super) async fn complete_task_board_dispatch(
     let item = apply_dispatch_completion_in_tx(&mut transaction, *screened, intent_id).await?;
     settle_dispatch_intent_in_tx(&mut transaction, intent_id, claim_token, managed_worker_id)
         .await?;
+    let item = super::work_item_progress_dispatch::reconcile_progress_after_dispatch_in_tx(
+        &mut transaction,
+        &item.id,
+    )
+    .await?;
     transaction
         .commit()
         .await

@@ -43,6 +43,10 @@ struct PreviewHostApp: App {
         "HARNESS_TASK_BOARD_WORKFLOW_PROGRESS_PREVIEW_DUMP",
         TaskBoardWorkflowProgressPreviewRenderer.dump
       ),
+      (
+        "HARNESS_TASK_BOARD_WORKER_PROGRESS_PREVIEW_DUMP",
+        TaskBoardWorkerProgressPreviewRenderer.dump
+      ),
       ("HARNESS_TASK_BOARD_FILTERS_PREVIEW_DUMP", TaskBoardFilterPreviewRenderer.dump),
       (
         "HARNESS_TASK_BOARD_REPOSITORY_SCOPE_PREVIEW_DUMP",

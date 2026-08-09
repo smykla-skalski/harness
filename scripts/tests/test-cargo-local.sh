@@ -312,11 +312,11 @@ EOF
   : >"$log"
 }
 
-scenario_nextest_build_phase_keeps_the_whole_pool() {
-  local key; key="$(test_pool_key buildphase)"
+scenario_nextest_uses_one_bounded_invocation() {
+  local key; key="$(test_pool_key bounded-nextest)"
   local fake="$SANDBOX/token-cargo"
   local log="$SANDBOX/token-log"
-  local scratch="$SANDBOX/buildphase-tmp"
+  local scratch="$SANDBOX/bounded-nextest-tmp"
   mkdir -p "$fake" "$scratch"
   write_token_counting_cargo "$fake/cargo" "$log"
 
@@ -334,7 +334,7 @@ scenario_nextest_build_phase_keeps_the_whole_pool() {
       PATH="$(fifo_capable_make_path):$PATH" \
       TOKEN_LOG="$log" \
       SCCACHE_BIN='' RUSTC_WRAPPER='' \
-      CODEX_SESSION_ID="cargo-local-buildphase-$$" \
+      CODEX_SESSION_ID="cargo-local-bounded-nextest-$$" \
       HARNESS_CARGO_SKIP_LEASE=1 \
       HARNESS_CARGO_ACTIVE_BUILD_COUNT=1 \
       HARNESS_JOBSERVER_POOL_KEY="$key" \
@@ -344,68 +344,21 @@ scenario_nextest_build_phase_keeps_the_whole_pool() {
   stop_pool_for_key "$key"
 
   # cargo-local probes the binary with `cargo -V` before doing anything, so
-  # count only the invocations that carry the subcommand.
-  local build_tokens run_tokens
-  build_tokens="$(awk '/nextest/ {print $1; exit}' "$log")"
-  run_tokens="$(awk '/nextest/ {n++; if (n == 2) {print $1; exit}}' "$log")"
+  # count only the invocation that carries the subcommand.
+  local invocations available_tokens
+  invocations="$(grep -c nextest "$log")"
+  available_tokens="$(awk '/nextest/ {print $1; exit}' "$log")"
 
-  if [[ ! "$build_tokens" =~ ^[0-9]+$ ]] || [[ ! "$run_tokens" =~ ^[0-9]+$ ]]; then
-    fail "nextest was not split into a build and a run phase: $(tr '\n' '|' <"$log")"
+  if [[ "$invocations" != "1" ]]; then
+    fail "nextest should use one Cargo invocation, saw $invocations: $(tr '\n' '|' <"$log")"
     return
   fi
-  # The build must see the full pool. Holding the block across it starved the
-  # compile that produces the very binaries the block is reserved for.
-  if (( build_tokens < budget )); then
-    fail "nextest build phase was starved: saw $build_tokens of $budget tokens"
+  if [[ ! "$available_tokens" =~ ^[0-9]+$ ]] \
+    || (( available_tokens < 1 || available_tokens >= budget )); then
+    fail "nextest should reserve only its fair share: saw $available_tokens of $budget free tokens"
     return
   fi
-  if (( run_tokens != 0 )); then
-    fail "nextest run phase did not hold the block: $run_tokens tokens still free"
-    return
-  fi
-  pass "the nextest build phase keeps the whole pool, the run phase holds it"
-}
-
-scenario_build_only_flag_precedes_a_separator() {
-  local key; key="$(test_pool_key sep)"
-  local fake="$SANDBOX/sep-cargo"
-  local log="$SANDBOX/sep-log"
-  local scratch="$SANDBOX/sep-tmp"
-  mkdir -p "$fake" "$scratch"
-  write_token_counting_cargo "$fake/cargo" "$log"
-
-  local cpu budget
-  cpu="$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.logicalcpu)"
-  budget=$((cpu - 1)); (( budget < 1 )) && budget=1
-  python3 "$ROOT/scripts/harness-jobserver.py" ensure \
-    --repo-root "$key" --budget "$budget" >/dev/null 2>&1 || true
-
-  (
-    unset HARNESS_CARGO_TARGET_DIR MAKEFLAGS MFLAGS CARGO_MAKEFLAGS
-    unset NEXTEST_TEST_THREADS HARNESS_NEXTEST_JOBS
-    CARGO_TARGET_DIR="$scratch/target" \
-      TMPDIR="$scratch/" \
-      PATH="$(fifo_capable_make_path):$PATH" \
-      TOKEN_LOG="$log" \
-      SCCACHE_BIN='' RUSTC_WRAPPER='' \
-      CODEX_SESSION_ID="cargo-local-sep-$$" \
-      HARNESS_CARGO_SKIP_LEASE=1 \
-      HARNESS_CARGO_ACTIVE_BUILD_COUNT=1 \
-      HARNESS_JOBSERVER_POOL_KEY="$key" \
-      HARNESS_CARGO_BIN="$fake/cargo" \
-      "$ROOT/scripts/cargo-local.sh" nextest run --lib -- --exact >/dev/null 2>&1
-  )
-  stop_pool_for_key "$key"
-
-  local build_args
-  build_args="$(awk '/nextest/ {sub(/^[0-9]+ /, ""); print; exit}' "$log")"
-  # Appended at the end, --no-run would sit past the caller's separator and
-  # reach the test binary, so the build phase would run the suite instead.
-  if [[ "$build_args" != *"--no-run -- --exact" ]]; then
-    fail "--no-run did not precede the caller's separator: '$build_args'"
-    return
-  fi
-  pass "the build-only flag precedes a caller's argument separator"
+  pass "nextest uses one Cargo invocation while reserving only its fair test share"
 }
 
 scenario_nextest_detection_skips_global_flag_values() {
@@ -441,24 +394,30 @@ scenario_nextest_detection_skips_global_flag_values() {
   }
 
   # `--color always` puts a bare word before the subcommand, and reading it as
-  # the subcommand dropped the split silently.
+  # the subcommand would silently skip the test-share reservation.
   : >"$log"
   run_flagvalue --color always nextest run --lib
-  local split_invocations; split_invocations="$(grep -c nextest "$log")"
+  local nextest_invocations nextest_tokens
+  nextest_invocations="$(grep -c nextest "$log")"
+  nextest_tokens="$(awk '/nextest/ {print $1; exit}' "$log")"
 
-  # Same shape without nextest, which must still not split. Count only the
+  # Same shape without nextest, which must not reserve test capacity. Count only the
   # forwarded command; cargo-local also probes the binary with a bare -V.
   : >"$log"
   run_flagvalue --color always run
-  local plain_invocations; plain_invocations="$(grep -c -- '--color' "$log")"
+  local plain_invocations plain_tokens
+  plain_invocations="$(grep -c -- '--color' "$log")"
+  plain_tokens="$(awk '/--color/ {print $1; exit}' "$log")"
   stop_pool_for_key "$key"
 
-  if [[ "$split_invocations" != "2" ]]; then
-    fail "a value-taking global flag broke the split ($split_invocations cargo invocations)"
+  if [[ "$nextest_invocations" != "1" ]] \
+    || [[ ! "$nextest_tokens" =~ ^[0-9]+$ ]] \
+    || (( nextest_tokens >= budget )); then
+    fail "a value-taking global flag bypassed nextest reservation: $(tr '\n' '|' <"$log")"
     return
   fi
-  if [[ "$plain_invocations" != "1" ]]; then
-    fail "cargo run after a global flag should not split ($plain_invocations cargo invocations)"
+  if [[ "$plain_invocations" != "1" ]] || [[ "$plain_tokens" != "$budget" ]]; then
+    fail "cargo run after a global flag should keep the pool ($plain_invocations invocations, $plain_tokens tokens)"
     return
   fi
   pass "nextest detection skips the value of a global flag"
@@ -497,23 +456,29 @@ scenario_nextest_detection_handles_toolchain_and_list() {
   }
 
   # A toolchain selector sits before the subcommand and is not a flag; missing
-  # it silently dropped the split for `cargo +nightly nextest run`.
+  # it would silently drop the reservation for `cargo +nightly nextest run`.
   : >"$log"
   run_detect +nightly nextest run --lib
-  local toolchain_invocations; toolchain_invocations="$(grep -c nextest "$log")"
+  local toolchain_invocations toolchain_tokens
+  toolchain_invocations="$(grep -c nextest "$log")"
+  toolchain_tokens="$(awk '/nextest/ {print $1; exit}' "$log")"
 
   # `nextest list` builds but runs nothing, so it wants no test block.
   : >"$log"
   run_detect nextest list
-  local list_invocations; list_invocations="$(grep -c nextest "$log")"
+  local list_invocations list_tokens
+  list_invocations="$(grep -c nextest "$log")"
+  list_tokens="$(awk '/nextest/ {print $1; exit}' "$log")"
   stop_pool_for_key "$key"
 
-  if [[ "$toolchain_invocations" != "2" ]]; then
-    fail "toolchain-prefixed nextest run was not split ($toolchain_invocations cargo invocations)"
+  if [[ "$toolchain_invocations" != "1" ]] \
+    || [[ ! "$toolchain_tokens" =~ ^[0-9]+$ ]] \
+    || (( toolchain_tokens >= budget )); then
+    fail "toolchain-prefixed nextest run bypassed reservation ($toolchain_invocations invocations, $toolchain_tokens tokens)"
     return
   fi
-  if [[ "$list_invocations" != "1" ]]; then
-    fail "nextest list should not be split ($list_invocations cargo invocations)"
+  if [[ "$list_invocations" != "1" ]] || [[ "$list_tokens" != "$budget" ]]; then
+    fail "nextest list should keep the pool ($list_invocations invocations, $list_tokens tokens)"
     return
   fi
   pass "nextest detection handles a toolchain prefix and skips list"
@@ -1527,8 +1492,8 @@ EOF
 
   # Two checkout roots under one git common root. The socket follows the
   # repository, so it must match while the build caches stay distinct. The
-  # server also needs every source and target root up front: it reads basedirs
-  # only when starting, and either checkout may be the one that starts it.
+  # server needs every source root up front, but target lanes must stay out of
+  # normalization because their Rust dep-info is not relocatable.
   for co in alpha beta; do
     mkdir -p "$base/$co/scripts/lib"
     cp "$ROOT/scripts/cargo-local.sh" "$base/$co/scripts/cargo-local.sh"
@@ -1563,13 +1528,13 @@ EOF
     fi
   done
 
-  expected_bases="$common_root:$base/alpha:$base/beta:$common_root/target/dev/$(cargo_lane_main_segment):$a_target:$b_target"
+  expected_bases="$common_root:$base/alpha:$base/beta"
   if [[ -n "$a_sock" ]] \
     && [[ "$a_target" != "$b_target" ]] \
     && [[ "$a_sock" == "$b_sock" ]] \
     && [[ "$a_bases" == "$expected_bases" ]] \
     && [[ "$b_bases" == "$expected_bases" ]]; then
-    pass "one sccache server normalizes every checkout and target lane"
+    pass "one sccache server normalizes source checkouts but not target lanes"
   else
     fail "sccache sharing drifted: sockets=$a_sock,$b_sock targets=$a_target,$b_target basedirs=$a_bases,$b_bases"
   fi
@@ -1610,7 +1575,7 @@ EOF
       "$base/alpha/scripts/cargo-local.sh" --print-env \
       | awk -F= '$1 == "SCCACHE_BASEDIRS" { print substr($0, index($0, "=") + 1) }'
   )"
-  if [[ "$failure_bases" == "$base/alpha:$a_target" ]]; then
+  if [[ "$failure_bases" == "$base/alpha" ]]; then
     pass "a failed worktree query uses the single-checkout basedir fallback"
   else
     fail "failed worktree query did not use fallback basedirs: $failure_bases"
@@ -2131,8 +2096,7 @@ CARGO_LOCAL_TEST_SCENARIOS=(
   scenario_pool_endpoint_never_reaches_make
   scenario_old_make_keeps_the_pool_at_arms_length
   scenario_explicit_job_override_beats_the_pool
-  scenario_nextest_build_phase_keeps_the_whole_pool
-  scenario_build_only_flag_precedes_a_separator
+  scenario_nextest_uses_one_bounded_invocation
   scenario_nextest_detection_handles_toolchain_and_list
   scenario_nextest_detection_skips_global_flag_values
   scenario_missing_tmpdir_uses_short_external_fallback

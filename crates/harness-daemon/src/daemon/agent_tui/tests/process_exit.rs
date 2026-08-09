@@ -3,7 +3,10 @@ use std::sync::{Arc, Mutex, OnceLock};
 use tokio::sync::broadcast;
 
 use crate::daemon::agent_tui::{AgentTuiManagerHandle, AgentTuiSnapshot, AgentTuiStatus};
+use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::DaemonDb;
+use crate::daemon::db::task_board::work_item_progress::TaskBoardWorkItemReportRequest;
+use crate::daemon::db_open::AsyncDaemonDbConnect;
 use crate::session::service as session_service;
 use crate::session::types::SessionRole;
 use crate::workspace::utc_now;
@@ -12,7 +15,11 @@ use super::support::{
     WAIT_TIMEOUT, recv_broadcast_events, sample_snapshot, wait_until, with_agent_tui_home,
 };
 use crate::daemon::db::prelude::*;
-use crate::daemon::db_handle::DaemonDbOwnedHandle;
+use crate::daemon::db::task_board::prelude::{ItemCoreQueries, WorkItemProgressQueries};
+use crate::daemon::db_handle::{AsyncDaemonDbHandle, DaemonDbOwnedHandle};
+use crate::task_board::{
+    AgentMode, TaskBoardItem, TaskBoardStatus, TaskBoardWorkItemState, TaskBoardWorkflowStatus,
+};
 
 // `saw_sessions_updated`/`saw_session_updated` deliberately mirror the two
 // event names under test (`sessions_updated_delta` and `session_updated`);
@@ -259,4 +266,88 @@ fn live_refresh_disconnects_joined_agent_when_child_process_exits() {
                 .is_some_and(|agent| agent.status.is_disconnected())
         });
     });
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn workspace_terminal_exit_blocks_pending_work_item_progress() {
+    let directory = tempfile::tempdir().expect("tempdir");
+    let async_db = Arc::new(AsyncDaemonDbHandle(
+        AsyncDaemonDb::connect(&directory.path().join("harness.db"))
+            .await
+            .expect("open async db"),
+    ));
+    let mut item = TaskBoardItem::new(
+        "board-tui-exit".into(),
+        "Interactive task".into(),
+        "Body".into(),
+        "2026-08-08T00:00:00Z".into(),
+    );
+    item.agent_mode = AgentMode::Interactive;
+    item.status = TaskBoardStatus::InProgress;
+    item.work_item_id = Some("work-tui-exit".into());
+    item.workflow.execution_id = Some("execution-tui-exit".into());
+    item.workflow.status = TaskBoardWorkflowStatus::Running;
+    async_db
+        .create_task_board_item(item)
+        .await
+        .expect("create item");
+    sqlx::query(
+        "INSERT INTO task_board_dispatch_intents (
+             intent_id, item_id, session_id, work_item_id, workflow_execution_id,
+             payload_json, status, available_at, created_at, updated_at, completed_at
+         ) VALUES ('dispatch-intent-tui-exit', 'board-tui-exit', '', 'work-tui-exit',
+                   'execution-tui-exit', '{}', 'completed', 'now', 'now', 'now', 'now')",
+    )
+    .execute(async_db.pool())
+    .await
+    .expect("seed dispatch intent");
+    async_db
+        .report_task_board_work_item_progress(&TaskBoardWorkItemReportRequest {
+            board_item_id: "board-tui-exit".into(),
+            work_item_id: "work-tui-exit".into(),
+            actor: "worker".into(),
+            state: Some(TaskBoardWorkItemState::Running),
+            summary: None,
+            progress_percent: None,
+            blocked_reason: None,
+            sequence: None,
+        })
+        .await
+        .expect("seed worker progress");
+
+    let sync_slot = Arc::new(OnceLock::new());
+    let async_slot = Arc::new(OnceLock::new());
+    async_slot
+        .set(Arc::clone(&async_db))
+        .expect("install async db");
+    let (sender, _) = broadcast::channel(8);
+    let manager = AgentTuiManagerHandle::new_with_async_db(sender, sync_slot, async_slot, false);
+    let mut exited = sample_snapshot(
+        "agent-tui-dispatch-intent-tui-exit",
+        "workspace-tui-exit",
+        "",
+        "codex",
+        "2026-08-08T00:00:00Z",
+        "2026-08-08T00:01:00Z",
+    );
+    exited.workspace_id = Some("workspace-tui-exit".into());
+    exited.status = AgentTuiStatus::Exited;
+    exited.exit_code = Some(0);
+
+    manager
+        .reconcile_terminal_agent_state(&exited)
+        .expect("reconcile workspace terminal exit");
+
+    let progress = async_db
+        .task_board_work_item_progress("board-tui-exit")
+        .await
+        .expect("read progress")
+        .expect("progress exists");
+    assert_eq!(progress.state, TaskBoardWorkItemState::Blocked);
+    assert!(
+        progress
+            .blocked_reason
+            .as_deref()
+            .is_some_and(|reason| reason.contains("before reporting completion"))
+    );
 }

@@ -303,15 +303,20 @@ async fn managed_worker_is_terminal_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     managed_worker_id: &str,
 ) -> Result<bool, CliError> {
-    let status = query_scalar::<_, String>("SELECT status FROM codex_runs WHERE run_id = ?1")
-        .bind(managed_worker_id)
-        .fetch_optional(transaction.as_mut())
-        .await
-        .map_err(|error| db_error(format!("load managed worker status: {error}")))?;
-    Ok(
-        status
-            .is_some_and(|status| matches!(status.as_str(), "completed" | "failed" | "cancelled")),
+    query_scalar::<_, bool>(
+        "SELECT EXISTS(
+             SELECT 1 FROM codex_runs
+             WHERE run_id = ?1 AND status IN ('completed', 'failed', 'cancelled')
+         ) OR EXISTS(
+             SELECT 1 FROM task_board_work_item_progress
+             WHERE attempt_id = ?1 AND completed_at IS NOT NULL
+               AND worker_settled_at IS NOT NULL
+         )",
     )
+    .bind(managed_worker_id)
+    .fetch_one(transaction.as_mut())
+    .await
+    .map_err(|error| db_error(format!("load managed worker terminal state: {error}")))
 }
 
 pub(super) async fn release_dispatch_admission_in_tx(
@@ -341,7 +346,19 @@ pub(super) async fn release_item_admission_in_tx(
         "UPDATE task_board_dispatch_admission_ledger
          SET state = 'released', expires_at = NULL, released_at = ?2
          WHERE item_id = ?1
-           AND (state = 'reserved' OR (kind = 'concurrency' AND state = 'committed'))",
+           AND (
+               state = 'reserved'
+               OR (
+                   kind = 'concurrency' AND state = 'committed'
+                   AND NOT EXISTS (
+                       SELECT 1 FROM task_board_work_item_progress AS progress
+                       WHERE progress.item_id = task_board_dispatch_admission_ledger.item_id
+                         AND progress.attempt_id = task_board_dispatch_admission_ledger.managed_worker_id
+                         AND progress.completed_at IS NOT NULL
+                         AND progress.worker_settled_at IS NULL
+                   )
+               )
+           )",
     )
     .bind(item_id)
     .bind(now)
@@ -357,8 +374,16 @@ pub(super) async fn ensure_item_admission_can_terminate_in_tx(
 ) -> Result<(), CliError> {
     let active = query_scalar::<_, bool>(
         "SELECT EXISTS(
-             SELECT 1 FROM task_board_dispatch_admission_ledger
-             WHERE item_id = ?1 AND kind = 'concurrency' AND state = 'committed'
+             SELECT 1 FROM task_board_dispatch_admission_ledger AS ledger
+             WHERE ledger.item_id = ?1 AND ledger.kind = 'concurrency'
+               AND ledger.state = 'committed'
+               AND NOT EXISTS (
+                   SELECT 1 FROM task_board_work_item_progress AS progress
+                   WHERE progress.item_id = ledger.item_id
+                     AND progress.attempt_id = ledger.managed_worker_id
+                     AND progress.completed_at IS NOT NULL
+                     AND progress.worker_settled_at IS NULL
+               )
          )",
     )
     .bind(item_id)

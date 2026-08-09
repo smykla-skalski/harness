@@ -12,7 +12,7 @@ fi
 # Any change that makes an old Cargo target unsafe or misleading as a seed must
 # increment this value. The version belongs in every segment name so a fresh
 # lane can only clone artifacts produced under the same cache contract.
-HARNESS_CARGO_LANE_FORMAT_VERSION=2
+HARNESS_CARGO_LANE_FORMAT_VERSION=3
 
 cargo_lane_main_segment() {
   printf 'local-v%s\n' "$HARNESS_CARGO_LANE_FORMAT_VERSION"

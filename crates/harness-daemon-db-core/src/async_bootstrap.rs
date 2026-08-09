@@ -100,6 +100,9 @@ async fn migration_effect_observed(
     if migration_version == 71 {
         return table_exists(pool, "agent_workspace_activity_state").await;
     }
+    if migration_version == 80 {
+        return table_exists(pool, "task_board_work_item_progress").await;
+    }
     let Some((table, column)) = migration_effect_column(migration_version) else {
         return Ok(false);
     };
@@ -240,6 +243,8 @@ const fn migration_floor_version(migration_version: i64) -> u64 {
         72..=75 => 67,
         // v68 snapshots the exact runtime route used for each native signal.
         76..=79 => 68,
+        // v69 adds durable worker progress and checkpoints for work items.
+        80 => 69,
         _ => u64::MAX,
     }
 }

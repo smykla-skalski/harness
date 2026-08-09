@@ -24,6 +24,9 @@ use super::manager::{ActiveAgentTui, AgentTuiManagerHandle};
 use super::model::session_disconnect_reason;
 use super::support::{agent_id_for_tui, lock_db};
 use crate::daemon::db::prelude::*;
+use crate::daemon::db::task_board::prelude::{
+    TaskBoardRuntimeTerminalReport, WorkItemProgressQueries,
+};
 use crate::daemon::db_handle::{AsyncDaemonDbHandle, DaemonDbOwnedHandle};
 use harness_daemon_managed_agents::{AgentTuiSnapshot, AgentTuiStatus, lock};
 
@@ -386,19 +389,34 @@ impl AgentTuiManagerHandle {
         }
     }
 
-    fn reconcile_terminal_agent_state(&self, snapshot: &AgentTuiSnapshot) -> Result<(), CliError> {
+    pub(super) fn reconcile_terminal_agent_state(
+        &self,
+        snapshot: &AgentTuiSnapshot,
+    ) -> Result<(), CliError> {
         let Some(reason) = session_disconnect_reason(snapshot.status) else {
             return Ok(());
         };
-        if snapshot.agent_id.is_empty() {
-            return Ok(());
-        }
 
         let session_id = snapshot.session_id.clone();
         let agent_id = snapshot.agent_id.clone();
+        let attempt_id = snapshot.tui_id.clone();
+        let workspace_terminal = snapshot.workspace_id.is_some() && agent_id.is_empty();
+        let terminal_report = TaskBoardRuntimeTerminalReport::from_terminal_agent(
+            snapshot.status,
+            snapshot.error.as_deref(),
+            snapshot.signal.as_deref(),
+        );
         let sender = self.state.sender.clone();
         let reason_owned = reason.to_string();
         if let Some(result) = self.run_with_async_db(|async_db| async move {
+            if workspace_terminal && let Some(report) = terminal_report.as_ref() {
+                async_db
+                    .project_task_board_runtime_terminal_for_attempt(&attempt_id, report)
+                    .await?;
+            }
+            if agent_id.is_empty() {
+                return Ok(());
+            }
             let disconnected =
                 disconnect_agent_direct_async(&session_id, &agent_id, &reason_owned, &async_db)
                     .await?;
@@ -408,6 +426,10 @@ impl AgentTuiManagerHandle {
             Ok(())
         }) {
             return result;
+        }
+
+        if snapshot.agent_id.is_empty() {
+            return Ok(());
         }
 
         let db = self.db()?;

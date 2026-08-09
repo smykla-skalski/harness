@@ -221,6 +221,20 @@ async fn terminal_run_before_dispatch_commit_releases_only_concurrency() {
     complete_write_preparation(&db, &preparation, "branch", "/tmp/worktree")
         .await
         .expect("complete preparation");
+    let progress = db
+        .task_board_work_item_progress("admission-fast-terminal")
+        .await
+        .expect("load initial worker progress")
+        .expect("dispatch creates worker progress");
+    assert_eq!(
+        progress.state,
+        crate::task_board::TaskBoardWorkItemState::Pending
+    );
+    let expected_worker_id = format!("codex-{intent}");
+    assert_eq!(
+        progress.attempt_id.as_deref(),
+        Some(expected_worker_id.as_str())
+    );
     let claim = db
         .claim_task_board_dispatch("admission-fast-terminal")
         .await

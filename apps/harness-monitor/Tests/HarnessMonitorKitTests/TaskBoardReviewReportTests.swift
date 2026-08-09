@@ -194,6 +194,24 @@ struct TaskBoardReviewReportTests {
     #expect(initial != terminal)
   }
 
+  @Test("Worker progress reload key advances for checkpoint-only changes")
+  func workerProgressReloadKeyUsesTaskBoardRevision() {
+    let initial = TaskBoardWorkerProgressLoadKey(
+      itemID: "item-1",
+      workItemID: "work-1",
+      updatedAt: "2026-07-29T19:40:00Z",
+      taskBoardRevision: 41
+    )
+    let checkpoint = TaskBoardWorkerProgressLoadKey(
+      itemID: initial.itemID,
+      workItemID: initial.workItemID,
+      updatedAt: initial.updatedAt,
+      taskBoardRevision: 42
+    )
+
+    #expect(initial != checkpoint)
+  }
+
   private func terminalReport(
     status: TaskBoardAiReviewReportStatus,
     partialOutput: String? = nil,

@@ -40,6 +40,16 @@ pub(super) fn register(registry: &mut ToolRegistry) {
                 input_schema: id_only_schema,
             },
             TaskBoardToolDescriptor {
+                name: ws_methods::TASK_BOARD_PROGRESS_GET,
+                description: "Fetch one task-board item's worker progress and checkpoint log.",
+                input_schema: id_only_schema,
+            },
+            TaskBoardToolDescriptor {
+                name: ws_methods::TASK_BOARD_PROGRESS_REPORT,
+                description: "Report worker progress against one dispatched task-board item. A report that arrives after the work settled, or out of order, is an unapplied no-op rather than an error.",
+                input_schema: progress_report_schema,
+            },
+            TaskBoardToolDescriptor {
                 name: ws_methods::TASK_BOARD_POSITION_GET,
                 description: "Fetch one task-board item's canonical lane position snapshot.",
                 input_schema: id_only_schema,
@@ -204,6 +214,29 @@ fn id_only_schema() -> Value {
     })
 }
 
+fn progress_report_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "id": { "type": "string" },
+            "work_item_id": { "type": "string" },
+            "state": {
+                "type": "string",
+                "enum": [
+                    "pending", "running", "awaiting_review", "in_review",
+                    "changes_requested", "blocked", "done"
+                ]
+            },
+            "summary": { "type": "string" },
+            "progress_percent": { "type": "integer", "minimum": 0, "maximum": 100 },
+            "blocked_reason": { "type": "string" },
+            "sequence": { "type": "integer", "minimum": 1 }
+        },
+        "required": ["id", "work_item_id"],
+        "additionalProperties": false
+    })
+}
+
 fn position_set_schema() -> Value {
     json!({
         "type": "object",
@@ -325,7 +358,7 @@ mod tests {
     use super::{
         TASK_BOARD_LIST_MAX_CURSOR_CHARS, TASK_BOARD_LIST_MAX_LIMIT,
         TASK_BOARD_LIST_MAX_QUERY_CHARS, TASK_BOARD_LIST_MAX_TAGS, create_schema, list_schema,
-        update_schema,
+        progress_report_schema, update_schema,
     };
 
     /// A `minLength` of 1 would still advertise a whitespace-only title as
@@ -397,6 +430,17 @@ mod tests {
         assert_eq!(
             schema["allOf"][1]["not"]["required"],
             json!(["estimated_cost_microusd", "clear_estimated_cost_microusd"])
+        );
+    }
+
+    #[test]
+    fn progress_report_requires_the_exact_dispatch_identity() {
+        let schema = progress_report_schema();
+
+        assert_eq!(schema["required"], json!(["id", "work_item_id"]));
+        assert_eq!(
+            schema["properties"]["work_item_id"]["type"],
+            json!("string")
         );
     }
 }

@@ -12,6 +12,7 @@ use crate::daemon::db::{
 };
 use crate::daemon::db_handle::AsyncDaemonDbHandle;
 use crate::daemon::http::DaemonHttpState;
+use crate::daemon::service::settle_pending_worker;
 use crate::daemon::service::task_board::prepare_claimed_task_board_dispatch;
 use crate::daemon::task_board_managed_agents::{
     maintain_task_board_dispatch_claim, resume_worker_compensation,
@@ -57,6 +58,8 @@ async fn run_task_board_dispatch_loop(
     reason = "recovery drains preparation and worker intent queues while preserving per-claim errors"
 )]
 async fn recover_pending_dispatches(state: &DaemonHttpState, db: &AsyncDaemonDbHandle) {
+    recover_terminal_agent_tui_progress(db).await;
+    recover_pending_worker_settlements(state, db).await;
     match crate::daemon::automation_kill_switch::enforce_automation_kill_switch(state, db).await {
         Ok(true) => return,
         Ok(false) => {}
@@ -114,6 +117,47 @@ async fn recover_pending_dispatches(state: &DaemonHttpState, db: &AsyncDaemonDbH
     }
     if let Err(error) = Box::pin(reconcile_task_board_read_only_workflows(state, db)).await {
         warn!(%error, "read-only workflow recovery failed");
+    }
+}
+
+async fn recover_terminal_agent_tui_progress(db: &AsyncDaemonDbHandle) {
+    let attempts = match db
+        .terminal_task_board_worker_attempts(MAX_RECOVERIES_PER_TICK)
+        .await
+    {
+        Ok(attempts) => attempts,
+        Err(error) => {
+            warn!(%error, "terminal task board worker recovery failed");
+            return;
+        }
+    };
+    for attempt in attempts {
+        if let Err(error) = db
+            .project_task_board_runtime_terminal_for_attempt(&attempt.attempt_id, &attempt.report)
+            .await
+        {
+            warn!(
+                attempt_id = %attempt.attempt_id,
+                %error,
+                "terminal task board worker progress projection failed"
+            );
+        }
+    }
+}
+
+async fn recover_pending_worker_settlements(state: &DaemonHttpState, db: &AsyncDaemonDbHandle) {
+    let settlements = match db
+        .pending_task_board_work_item_worker_settlements(MAX_RECOVERIES_PER_TICK)
+        .await
+    {
+        Ok(settlements) => settlements,
+        Err(error) => {
+            warn!(%error, "work item worker settlement recovery failed");
+            return;
+        }
+    };
+    for settlement in settlements {
+        settle_pending_worker(state, db, &settlement).await;
     }
 }
 
@@ -191,6 +235,10 @@ fn compensation_reason(action: &TaskBoardDispatchClaimAction) -> Option<&str> {
         TaskBoardDispatchClaimAction::Compensate { reason } => Some(reason.as_str()),
     }
 }
+
+#[cfg(test)]
+#[path = "task_board_dispatch_loop_tests.rs"]
+mod recovery_tests;
 
 #[expect(
     clippy::cognitive_complexity,

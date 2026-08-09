@@ -70,6 +70,8 @@ pub const TASK_BOARD_ITEM: &str = "/v1/task-board/items/{item_id}";
 pub const TASK_BOARD_ITEM_REVIEW_REPORT: &str = "/v1/task-board/items/{item_id}/review-report";
 pub const TASK_BOARD_ITEM_WORKFLOW_PROGRESS: &str =
     "/v1/task-board/items/{item_id}/workflow-progress";
+pub const TASK_BOARD_ITEM_PROGRESS: &str = "/v1/task-board/items/{item_id}/progress";
+pub const TASK_BOARD_ITEM_PROGRESS_REPORT: &str = "/v1/task-board/items/{item_id}/progress/report";
 pub const TASK_BOARD_ITEM_POSITION: &str = "/v1/task-board/items/{item_id}/position";
 pub const TASK_BOARD_ITEM_POSITION_RESET: &str = "/v1/task-board/items/{item_id}/position/reset";
 pub const TASK_BOARD_ITEM_TRIAGE: &str = "/v1/task-board/items/{item_id}/triage";

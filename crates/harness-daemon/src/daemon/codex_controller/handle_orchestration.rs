@@ -7,13 +7,18 @@ use crate::workspace::utc_now;
 use harness_kernel::errors::CliError;
 
 use super::handle::{CodexControllerHandle, lock_db};
-use super::handle_orchestration_lifecycle::apply_bound_task_terminal_transition;
+use super::handle_orchestration_lifecycle::{
+    SessionlessWorkItemTerminalReport, apply_bound_task_terminal_transition,
+    sessionless_work_item_terminal_report,
+};
 use super::orchestration::{
     orchestration_status_for_codex_run, rollback_codex_registration,
     update_codex_orchestration_status,
 };
 use super::orchestration_registration::{RegisteredOrchestrationAgent, RegistrationMutation};
 use crate::daemon::db::prelude::*;
+use crate::daemon::db::task_board::prelude::TaskBoardRuntimeTerminalReport;
+use crate::daemon::db::task_board::prelude::WorkItemProgressQueries;
 
 fn should_reconcile_board_item(
     state: &SessionState,
@@ -29,6 +34,26 @@ fn should_reconcile_board_item(
             .as_deref()
             .and_then(|task_id| state.tasks.get(task_id))
             .is_some_and(|task| task.status != TaskStatus::InProgress)
+}
+
+async fn persist_sessionless_work_item_terminal_async(
+    db: &crate::daemon::db_handle::AsyncDaemonDbHandle,
+    board_item_id: &str,
+    work_item_id: &str,
+    attempt_id: &str,
+    report: SessionlessWorkItemTerminalReport,
+) -> Result<bool, CliError> {
+    db.project_task_board_runtime_terminal(
+        board_item_id,
+        work_item_id,
+        attempt_id,
+        &TaskBoardRuntimeTerminalReport {
+            state: report.state,
+            summary: report.summary,
+            blocked_reason: report.blocked_reason,
+        },
+    )
+    .await
 }
 
 impl CodexControllerHandle {
@@ -68,7 +93,7 @@ impl CodexControllerHandle {
         status: AgentStatus,
     ) -> Result<bool, CliError> {
         let Some(session_agent_id) = run.session_agent_id.clone() else {
-            return Ok(false);
+            return self.persist_sessionless_work_item_terminal(run);
         };
         let managed_agent = ManagedAgentRef::codex(run.run_id.as_str());
         if let Some(result) = self.persist_orchestration_status_async(
@@ -80,6 +105,33 @@ impl CodexControllerHandle {
             return result;
         }
         self.persist_orchestration_status_sync(run, &session_agent_id, &managed_agent, status)
+    }
+
+    fn persist_sessionless_work_item_terminal(
+        &self,
+        run: &CodexRunSnapshot,
+    ) -> Result<bool, CliError> {
+        let (Some(board_item_id), Some(work_item_id), Some(report)) = (
+            run.board_item_id.clone(),
+            run.task_id.clone(),
+            sessionless_work_item_terminal_report(run),
+        ) else {
+            return Ok(false);
+        };
+        let attempt_id = run.run_id.clone();
+        let Some(result) = self.run_with_async_db(|db| async move {
+            persist_sessionless_work_item_terminal_async(
+                &db,
+                &board_item_id,
+                &work_item_id,
+                &attempt_id,
+                report,
+            )
+            .await
+        }) else {
+            return Ok(false);
+        };
+        result
     }
 
     fn persist_orchestration_status_async(

@@ -28,6 +28,13 @@ struct TaskBoardWorkflowProgressLoadKey: Hashable {
   let updatedAt: String
 }
 
+struct TaskBoardWorkerProgressLoadKey: Hashable {
+  let itemID: String
+  let workItemID: String
+  let updatedAt: String
+  let taskBoardRevision: UInt64
+}
+
 @MainActor private let taskBoardApprovedAtSubmissionFormatter: ISO8601DateFormatter = {
   let formatter = ISO8601DateFormatter()
   formatter.formatOptions = [.withInternetDateTime]

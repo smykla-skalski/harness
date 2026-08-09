@@ -210,6 +210,35 @@ def clone_debug_tree(source: Path, destination: Path, log: Log) -> None:
     raise RuntimeError(error or f"copy command exited {return_code}")
 
 
+def relocate_dependency_metadata(
+    debug_dir: Path,
+    donor: Path,
+    destination: Path,
+) -> None:
+    replacements = (
+        (os.fsencode(donor), os.fsencode(destination)),
+        (
+            os.fsencode(donor).replace(b" ", b"\\ "),
+            os.fsencode(destination).replace(b" ", b"\\ "),
+        ),
+    )
+    for root, directories, files in os.walk(debug_dir, followlinks=False):
+        root_path = Path(root)
+        directories[:] = [
+            name for name in directories if not (root_path / name).is_symlink()
+        ]
+        for name in files:
+            path = root_path / name
+            if path.suffix != ".d" or path.is_symlink() or not path.is_file():
+                continue
+            contents = path.read_bytes()
+            relocated = contents
+            for source, target in replacements:
+                relocated = relocated.replace(source, target)
+            if relocated != contents:
+                path.write_bytes(relocated)
+
+
 def validate_layout(
     repo_root_arg: Path,
     target_arg: Path,
@@ -290,6 +319,11 @@ def seed_from_donor(
             f"{donor.segment} with copy-on-write"
         )
         clone(donor.path / "debug", temporary / "debug", log)
+        relocate_dependency_metadata(
+            temporary / "debug",
+            donor.path,
+            target,
+        )
         rustc_info = donor.path / ".rustc_info.json"
         if rustc_info.is_file() and not rustc_info.is_symlink():
             shutil.copy2(rustc_info, temporary / rustc_info.name)

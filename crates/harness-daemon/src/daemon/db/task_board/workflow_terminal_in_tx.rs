@@ -15,6 +15,7 @@ use crate::daemon::db::task_board::lane_order::{
     LaneTransitionKind, record_lane_transition_audit_in_tx, replace_with_lane_transition_in_tx,
 };
 use crate::daemon::db::{CliError, db_error, utc_now};
+use crate::task_board::{TaskBoardExecutionState, TaskBoardWorkItemState};
 use crate::task_board::{TaskBoardItem, TaskBoardWorkflowExecutionRecord};
 
 pub(in crate::daemon::db::task_board) async fn project_terminal_execution_in_tx(
@@ -62,7 +63,7 @@ async fn project_foreign_terminal_item_in_tx(
     prepared: &PreparedDispatchSettlement,
 ) -> Result<TaskBoardWorkflowTerminalProjection, CliError> {
     let committed_released = release_managed_worker_admission_in_tx(transaction, owner).await?;
-    publish_settled_dispatch_change_in_tx(transaction, prepared, committed_released).await?;
+    publish_settled_dispatch_change_in_tx(transaction, prepared, committed_released, false).await?;
     Ok(TaskBoardWorkflowTerminalProjection {
         item,
         item_revision,
@@ -84,11 +85,37 @@ async fn project_matched_terminal_item_in_tx(
     let target = terminal_target(execution)?;
     let before = item.clone();
     let item_changed = apply_terminal_target(&mut item, &target);
+    let now = utc_now();
+    let progress_state =
+        if execution.transition.execution_state == TaskBoardExecutionState::Completed {
+            TaskBoardWorkItemState::Done
+        } else {
+            TaskBoardWorkItemState::Blocked
+        };
+    let progress_summary = execution
+        .artifacts
+        .terminal_outcome
+        .as_ref()
+        .map(|outcome| outcome.summary.as_str());
+    let progress_changed =
+        super::super::work_item_progress_workflow::project_workflow_terminal_progress_in_tx(
+            transaction,
+            &super::super::work_item_progress_workflow::WorkflowTerminalProgressUpdate {
+                board_item_id: &item.id,
+                work_item_id: item.work_item_id.as_deref(),
+                execution_id: &execution.execution_id,
+                state: progress_state,
+                summary: progress_summary,
+                blocked_reason: target.last_error.as_deref(),
+                now: &now,
+            },
+        )
+        .await?;
     let committed_released = release_managed_worker_admission_in_tx(transaction, owner).await?;
     let admission_released = prepared.admission_released || committed_released;
     ensure_item_admission_can_terminate_in_tx(transaction, &execution.item_id).await?;
     let projected_revision = if item_changed {
-        item.updated_at = utc_now();
+        item.updated_at = now;
         let (written, written_revision) = write_terminal_lane_transition_in_tx(
             transaction,
             before,
@@ -99,7 +126,13 @@ async fn project_matched_terminal_item_in_tx(
         item = written;
         written_revision
     } else {
-        publish_settled_dispatch_change_in_tx(transaction, prepared, committed_released).await?;
+        publish_settled_dispatch_change_in_tx(
+            transaction,
+            prepared,
+            committed_released,
+            progress_changed,
+        )
+        .await?;
         item_revision
     };
     Ok(TaskBoardWorkflowTerminalProjection {
@@ -150,8 +183,9 @@ async fn publish_settled_dispatch_change_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     prepared: &PreparedDispatchSettlement,
     committed_released: bool,
+    progress_changed: bool,
 ) -> Result<(), CliError> {
-    if prepared.changed && !committed_released {
+    if (prepared.changed || progress_changed) && !committed_released {
         bump_change_in_tx(transaction, ITEMS_CHANGE_SCOPE).await?;
     }
     Ok(())

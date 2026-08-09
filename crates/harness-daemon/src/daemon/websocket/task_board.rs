@@ -50,7 +50,7 @@ pub(crate) async fn dispatch_task_board_method(
     if let Some(response) = sync::dispatch_method(request, state).await {
         return Some(response);
     }
-    if let Some(response) = dispatch_read_method(request, state, connection).await {
+    if let Some(response) = Box::pin(read::dispatch_method(request, state, connection)).await {
         return Some(response);
     }
     match request.method.as_str() {
@@ -120,34 +120,6 @@ pub(crate) async fn dispatch_task_board_method(
             Some(dispatch_task_board_host_set_project_types(request, state).await)
         }
         _ => Box::pin(policy::dispatch_policy_method(request, state)).await,
-    }
-}
-
-async fn dispatch_read_method(
-    request: &WsRequest,
-    state: &DaemonHttpState,
-    connection: &Arc<Mutex<ConnectionState>>,
-) -> Option<WsResponse> {
-    match request.method.as_str() {
-        ws_methods::TASK_BOARD_CAPABILITIES => {
-            Some(read::dispatch_task_board_capabilities(request, state).await)
-        }
-        ws_methods::TASK_BOARD_LIST => {
-            Some(read::dispatch_task_board_list(request, state, connection).await)
-        }
-        ws_methods::TASK_BOARD_GET => {
-            Some(read::dispatch_task_board_get(request, state, connection).await)
-        }
-        ws_methods::TASK_BOARD_REVIEW_REPORT_GET => {
-            Some(read::dispatch_task_board_review_report_get(request, state, connection).await)
-        }
-        ws_methods::TASK_BOARD_WORKFLOW_PROGRESS_GET => {
-            Some(read::dispatch_task_board_workflow_progress_get(request, state, connection).await)
-        }
-        ws_methods::TASK_BOARD_POSITION_GET => {
-            Some(read::dispatch_task_board_position_get(request, state, connection).await)
-        }
-        _ => None,
     }
 }
 

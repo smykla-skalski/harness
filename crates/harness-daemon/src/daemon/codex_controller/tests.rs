@@ -16,6 +16,7 @@ mod dependency_fixer;
 mod registration_recovery;
 mod request_validation;
 mod task_lifecycle;
+mod task_lifecycle_sessionless;
 pub(super) mod test_support;
 mod turn_lifecycle;
 
