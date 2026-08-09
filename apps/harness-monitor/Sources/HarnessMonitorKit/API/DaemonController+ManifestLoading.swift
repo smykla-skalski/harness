@@ -89,8 +89,11 @@ extension DaemonController {
     return url
   }
 
-  private func recoverManifestEndpointIfNeeded(_ manifest: DaemonManifest) -> DaemonManifest {
-    guard let event = latestDaemonListeningEvent(),
+  private func recoverManifestEndpointIfNeeded(
+    _ manifest: DaemonManifest,
+    daemonRoot: URL
+  ) -> DaemonManifest {
+    guard let event = latestDaemonListeningEvent(in: daemonRoot),
       shouldRecoverManifestEndpoint(manifest, with: event)
     else {
       return manifest
@@ -131,9 +134,8 @@ extension DaemonController {
     return event.recordedAt > manifestTimestamp
   }
 
-  private func latestDaemonListeningEvent() -> DaemonListeningEvent? {
-    let eventsURL = externalManifestLocator.daemonRoot
-      .appendingPathComponent("events.jsonl")
+  private func latestDaemonListeningEvent(in daemonRoot: URL) -> DaemonListeningEvent? {
+    let eventsURL = daemonRoot.appendingPathComponent("events.jsonl")
     guard let handle = try? FileHandle(forReadingFrom: eventsURL) else {
       return nil
     }
@@ -268,7 +270,7 @@ extension DaemonController {
         installed: true,
         loaded: true,
         label: label,
-        path: HarnessMonitorPaths.launchAgentBundleRelativePath,
+        path: HarnessMonitorPaths.launchAgentBundleRelativePath(using: environment),
         serviceTarget: label,
         state: "enabled"
       )
@@ -277,7 +279,7 @@ extension DaemonController {
         installed: true,
         loaded: false,
         label: label,
-        path: HarnessMonitorPaths.launchAgentBundleRelativePath,
+        path: HarnessMonitorPaths.launchAgentBundleRelativePath(using: environment),
         serviceTarget: label,
         statusError: "Approval required in System Settings > General > Login Items"
       )
@@ -286,7 +288,7 @@ extension DaemonController {
         installed: false,
         loaded: false,
         label: label,
-        path: HarnessMonitorPaths.launchAgentBundleRelativePath,
+        path: HarnessMonitorPaths.launchAgentBundleRelativePath(using: environment),
         serviceTarget: label
       )
     case .notFound:
@@ -294,7 +296,7 @@ extension DaemonController {
         installed: false,
         loaded: false,
         label: label,
-        path: HarnessMonitorPaths.launchAgentBundleRelativePath,
+        path: HarnessMonitorPaths.launchAgentBundleRelativePath(using: environment),
         serviceTarget: label,
         statusError: "Bundled daemon launch agent plist was not found"
       )
@@ -320,7 +322,13 @@ extension DaemonController {
     if activate {
       externalManifestLocator.activate(manifestURL)
     }
-    let resolvedManifest = recoverEndpoint ? recoverManifestEndpointIfNeeded(manifest) : manifest
+    let resolvedManifest =
+      recoverEndpoint
+      ? recoverManifestEndpointIfNeeded(
+        manifest,
+        daemonRoot: manifestURL.deletingLastPathComponent()
+      )
+      : manifest
     if emitTrace {
       let manifestFilePath = manifestURL.path
       let pid = resolvedManifest.pid

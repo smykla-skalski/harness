@@ -13,6 +13,8 @@ public struct DaemonController: DaemonControlling {
   let transportPreference: TransportPreference
   let autoTransportWebSocketGracePeriod: Duration
   let launchAgentManager: any DaemonLaunchAgentManaging
+  let legacyLaunchAgentManagerFactory: @Sendable (String) -> any DaemonLaunchAgentManaging
+  let legacyLaunchAgentCleanupDefaults: SendableUserDefaults
   let ownership: DaemonOwnership
   let remoteConnectionSource: any RemoteDaemonConnectionSourcing
   let endpointProbe: @Sendable (URL) async -> Bool
@@ -24,14 +26,18 @@ public struct DaemonController: DaemonControlling {
   let managedLaunchAgentCurrentBundleStamp: @Sendable () throws -> ManagedLaunchAgentBundleStamp?
   let managedLaunchAgentDeferredRefreshState: ManagedLaunchAgentDeferredRefreshState
   let processLiveness: ProcessLivenessProbe
+  let processSignal: ProcessSignal
+  let managedDaemonProcessIdentityValidator: ManagedProcessValidator
   let bootSessionUUID: BootSessionUUIDProbe
   let externalManifestLocator: ExternalDaemonManifestLocator
 
   public init(
     environment: HarnessMonitorEnvironment = .current,
     transportPreference: TransportPreference = .webSocket,
-    launchAgentManager: any DaemonLaunchAgentManaging =
-      ServiceManagementDaemonLaunchAgentManager(),
+    launchAgentManager: (any DaemonLaunchAgentManaging)? = nil,
+    legacyLaunchAgentManagerFactory:
+      (@Sendable (String) -> any DaemonLaunchAgentManaging)? = nil,
+    legacyLaunchAgentCleanupDefaults: UserDefaults = .standard,
     ownership: DaemonOwnership = .managed,
     remoteConnectionSource: (any RemoteDaemonConnectionSourcing)? = nil,
     autoTransportWebSocketGracePeriod: Duration = .seconds(2),
@@ -72,13 +78,33 @@ public struct DaemonController: DaemonControlling {
         try Self.currentManagedLaunchAgentBundleStamp()
       },
     processLiveness: @escaping ProcessLivenessProbe = Self.defaultProcessLiveness,
+    processSignal: @escaping ProcessSignal = { kill($0, $1) },
+    managedDaemonProcessIdentityValidator:
+      @escaping ManagedProcessValidator =
+      Self.defaultManagedProcessValidator,
     bootSessionUUID: @escaping BootSessionUUIDProbe = Self.defaultBootSessionUUID,
     externalManifestDefaults: UserDefaults = .standard
   ) {
+    let launchAgentManagerWasInjected = launchAgentManager != nil
     self.environment = environment
     self.transportPreference = transportPreference
     self.autoTransportWebSocketGracePeriod = autoTransportWebSocketGracePeriod
-    self.launchAgentManager = launchAgentManager
+    self.launchAgentManager =
+      launchAgentManager
+      ?? ServiceManagementDaemonLaunchAgentManager(
+        plistName: HarnessMonitorPaths.launchAgentPlistName(using: environment)
+      )
+    self.legacyLaunchAgentManagerFactory =
+      legacyLaunchAgentManagerFactory
+      ?? { plistName in
+        if launchAgentManagerWasInjected {
+          return InactiveDaemonLaunchAgentManager()
+        }
+        return ServiceManagementDaemonLaunchAgentManager(plistName: plistName)
+      }
+    self.legacyLaunchAgentCleanupDefaults = SendableUserDefaults(
+      legacyLaunchAgentCleanupDefaults
+    )
     self.ownership = ownership
     self.remoteConnectionSource =
       remoteConnectionSource ?? DisabledRemoteDaemonConnectionSource()
@@ -93,6 +119,8 @@ public struct DaemonController: DaemonControlling {
     self.managedLaunchAgentCurrentBundleStamp = managedLaunchAgentCurrentBundleStamp
     self.managedLaunchAgentDeferredRefreshState = ManagedLaunchAgentDeferredRefreshState()
     self.processLiveness = processLiveness
+    self.processSignal = processSignal
+    self.managedDaemonProcessIdentityValidator = managedDaemonProcessIdentityValidator
     self.bootSessionUUID = bootSessionUUID
     self.externalManifestLocator = ExternalDaemonManifestLocator(
       environment: environment,

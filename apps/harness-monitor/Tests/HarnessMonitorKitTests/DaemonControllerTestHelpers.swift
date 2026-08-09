@@ -4,6 +4,28 @@ import Testing
 
 @testable import HarnessMonitorKit
 
+final class TempHarnessMonitorEnvironmentFixture: @unchecked Sendable {
+  let rootURL: URL
+  let environment: HarnessMonitorEnvironment
+
+  init() {
+    let rootURL = FileManager.default.temporaryDirectory
+      .appendingPathComponent("harness-monitor-environment-\(UUID().uuidString)", isDirectory: true)
+    self.rootURL = rootURL
+    self.environment = HarnessMonitorEnvironment(
+      values: [
+        HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey:
+          rootURL.appendingPathComponent("data-home", isDirectory: true).path
+      ],
+      homeDirectory: rootURL
+    )
+  }
+
+  deinit {
+    try? FileManager.default.removeItem(at: rootURL)
+  }
+}
+
 func withTempDaemonFixture(
   pid: UInt32,
   version: String = "19.4.1",

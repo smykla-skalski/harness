@@ -47,6 +47,9 @@ def _isolated_subprocess_env() -> dict:
     is the equivalent isolation."""
     isolated = dict(os.environ)
     isolated.pop("BASH_ENV", None)
+    isolated["HARNESS_MONITOR_DAEMON_LAUNCH_AGENT_LABEL"] = (
+        "Q498EB36N4.io.harnessmonitor.agent"
+    )
     return isolated
 
 
@@ -138,6 +141,22 @@ class BundleDaemonAgentScriptTests(unittest.TestCase):
             script,
         )
         self.assertIn("if is_test_bundle_target; then", script)
+
+    def test_lane_service_keeps_the_base_plist_for_legacy_cleanup(self) -> None:
+        script = SCRIPT_PATH.read_text(encoding="utf-8")
+
+        self.assertIn(
+            "Q498EB36N4.io.harnessmonitor.agent.plist \\",
+            script,
+        )
+        self.assertIn(
+            '[ "$legacy_plist_name" = "$plist_name" ]',
+            script,
+        )
+        self.assertIn(
+            '[ -f "$legacy_agent_plist_target" ]',
+            script,
+        )
 
 
 class DaemonInputStateScriptTests(unittest.TestCase):
@@ -1090,6 +1109,9 @@ class BundleStampShortcutTests(unittest.TestCase):
             "TARGET_NAME": "HarnessMonitor",
             "HARNESS_MONITOR_DAEMON_BINARY": str(daemon_source),
             "HARNESS_MONITOR_RUNTIME_LANE": "test-lane",
+            "HARNESS_MONITOR_DAEMON_LAUNCH_AGENT_LABEL": (
+                "Q498EB36N4.io.harnessmonitor.agent"
+            ),
             "HARNESS_DAEMON_DATA_HOME": "/tmp/test-daemon-home",
             "HARNESS_CODEX_WS_PORT": "4242",
             "HARNESS_APP_GROUP_ID": "test.group",

@@ -15,40 +15,51 @@ public enum LegacyManagedLaunchAgentCleanup {
     "Legacy daemon cleanup failed; daemon startup remains disabled to prevent duplicate automation"
   private static let lock = NSLock()
   private static let coordinator = LegacyManagedLaunchAgentCleanupCoordinator()
-  nonisolated(unsafe) private static var didComplete = false
 
   private struct CleanupAttempt: Sendable {
     let isComplete: Bool
     let currentServiceWasUnregistered: Bool
   }
 
-  /// Retries failed cleanup calls and caches success for the process lifetime.
+  /// Rechecks persisted successes because an older app can register a legacy
+  /// service again while this process is still running.
   @discardableResult
   static func runOnce(
     defaults: UserDefaults = .standard,
+    currentName: String = HarnessMonitorPaths.launchAgentPlistName,
+    legacyNames: [String] = HarnessMonitorPaths.legacyLaunchAgentPlistNames,
     managerFactory: (String) -> any DaemonLaunchAgentManaging = {
       ServiceManagementDaemonLaunchAgentManager(plistName: $0)
     }
   ) -> Bool {
-    serializedAttempt(defaults: defaults, managerFactory: managerFactory).isComplete
+    serializedAttempt(
+      defaults: defaults,
+      currentName: currentName,
+      legacyNames: legacyNames,
+      managerFactory: managerFactory
+    ).isComplete
   }
 
   static func requireComplete(
     defaults: UserDefaults = .standard,
+    currentName: String = HarnessMonitorPaths.launchAgentPlistName,
+    legacyNames: [String] = HarnessMonitorPaths.legacyLaunchAgentPlistNames,
     managerFactory: @escaping @Sendable (String) -> any DaemonLaunchAgentManaging = {
       ServiceManagementDaemonLaunchAgentManager(plistName: $0)
     },
     afterCurrentServiceUnregister: @escaping @Sendable () async -> Void,
     quiesceOnFailure: @escaping @Sendable () async throws -> Void
   ) async throws {
-    guard completedInThisProcess() == false else {
-      return
-    }
     let sendableDefaults = SendableUserDefaults(defaults)
     try await coordinator.run {
       while true {
         let attempt = await Task.detached(priority: .userInitiated) {
-          serializedAttempt(defaults: sendableDefaults.value, managerFactory: managerFactory)
+          serializedAttempt(
+            defaults: sendableDefaults.value,
+            currentName: currentName,
+            legacyNames: legacyNames,
+            managerFactory: managerFactory
+          )
         }.value
         if attempt.isComplete {
           return
@@ -63,31 +74,28 @@ public enum LegacyManagedLaunchAgentCleanup {
     }
   }
 
-  static func completedInThisProcess() -> Bool {
-    lock.lock()
-    defer { lock.unlock() }
-    return didComplete
-  }
-
   private static func serializedAttempt(
     defaults: UserDefaults,
+    currentName: String,
+    legacyNames: [String],
     managerFactory: (String) -> any DaemonLaunchAgentManaging
   ) -> CleanupAttempt {
     lock.lock()
     defer { lock.unlock() }
-    if didComplete {
-      return CleanupAttempt(isComplete: true, currentServiceWasUnregistered: false)
-    }
-    let result = performCleanup(defaults: defaults, managerFactory: managerFactory)
-    didComplete = result.isComplete
-    return result
+    return performCleanup(
+      defaults: defaults,
+      currentName: currentName,
+      legacyNames: legacyNames,
+      managerFactory: managerFactory
+    )
   }
 
   private static func performCleanup(
     defaults: UserDefaults,
+    currentName: String,
+    legacyNames: [String],
     managerFactory: (String) -> any DaemonLaunchAgentManaging
   ) -> CleanupAttempt {
-    let currentName = HarnessMonitorPaths.launchAgentPlistName
     let usesCurrentStrategy =
       defaults.integer(forKey: strategyVersionDefaultsKey) == strategyVersion
     var completedNames =
@@ -95,11 +103,11 @@ public enum LegacyManagedLaunchAgentCleanup {
       ? Set(defaults.stringArray(forKey: completedNamesDefaultsKey) ?? [])
       : []
     var failedNames: [String] = []
-    for legacyName in HarnessMonitorPaths.legacyLaunchAgentPlistNames
+    for legacyName in legacyNames
     where legacyName != currentName {
       let legacyService = managerFactory(legacyName)
       let state = legacyService.registrationState()
-      if completedNames.contains(legacyName), state == .notRegistered || state == .notFound {
+      if completedNames.contains(legacyName), state == .notRegistered {
         continue
       }
       completedNames.remove(legacyName)
@@ -111,7 +119,7 @@ public enum LegacyManagedLaunchAgentCleanup {
         """
       )
       let completed =
-        state == .notRegistered || state == .notFound
+        state == .notRegistered
         || attemptUnregister(legacyService, name: legacyName)
       if completed {
         completedNames.insert(legacyName)
@@ -134,22 +142,14 @@ public enum LegacyManagedLaunchAgentCleanup {
     return CleanupAttempt(isComplete: true, currentServiceWasUnregistered: false)
   }
 
-  /// Test-only escape hatch: clears the once-guard so a unit test can verify
-  /// the runOnce path more than once in the same process.
-  static func resetForTests() {
-    lock.lock()
-    didComplete = false
-    lock.unlock()
-  }
-
   private static func disableCurrentService(
     _ service: any DaemonLaunchAgentManaging,
     name: String
   ) -> Bool {
     switch service.registrationState() {
-    case .notRegistered, .notFound:
+    case .notRegistered:
       return false
-    case .enabled, .requiresApproval:
+    case .enabled, .requiresApproval, .notFound:
       break
     }
     do {
@@ -193,7 +193,7 @@ public enum LegacyManagedLaunchAgentCleanup {
 
 /// Foundation documents UserDefaults as thread-safe. This wrapper makes that
 /// contract explicit while cleanup executes outside the main actor.
-private struct SendableUserDefaults: @unchecked Sendable {
+struct SendableUserDefaults: @unchecked Sendable {
   let value: UserDefaults
 
   init(_ value: UserDefaults) {
@@ -219,19 +219,14 @@ private actor LegacyManagedLaunchAgentCleanupCoordinator {
   }
 }
 
-private enum ManagedDaemonQuiescenceAction {
-  case finish
-  case wait
-  case requestStop
-}
-
 extension DaemonController {
   public func requireLegacyManagedLaunchAgentCleanup() async throws {
-    guard LegacyManagedLaunchAgentCleanup.completedInThisProcess() == false else {
-      return
-    }
     let outcome = try await withManagedLaunchAgentLock(totalTimeout: .seconds(2)) {
       try await LegacyManagedLaunchAgentCleanup.requireComplete(
+        defaults: legacyLaunchAgentCleanupDefaults.value,
+        currentName: HarnessMonitorPaths.launchAgentPlistName(using: environment),
+        legacyNames: HarnessMonitorPaths.legacyLaunchAgentPlistNames,
+        managerFactory: legacyLaunchAgentManagerFactory,
         afterCurrentServiceUnregister: {
           clearManagedLaunchAgentBundleStamp()
           clearManagedLaunchAgentOwner()
@@ -250,123 +245,14 @@ extension DaemonController {
       )
     }
   }
+}
 
-  func quiesceManagedDaemonsAfterLegacyCleanupFailure() async throws {
-    let candidates = HarnessMonitorPaths.managedDaemonRootCandidates(using: environment)
-    var failures: [String] = []
-    var stoppedCount = 0
-    for candidate in candidates {
-      do {
-        if try await quiesceManagedDaemon(at: candidate) {
-          stoppedCount += 1
-        }
-      } catch {
-        failures.append("\(candidate.rootURL.path): \(error.localizedDescription)")
-      }
-    }
-    guard failures.isEmpty else {
-      throw DaemonControlError.commandFailed(
-        "Managed daemon quiescence failed: \(failures.joined(separator: "; "))"
-      )
-    }
-    if stoppedCount > 0 {
-      HarnessMonitorLogger.lifecycle.fault(
-        "Stopped managed automation after legacy daemon cleanup failed"
-      )
-    }
+struct InactiveDaemonLaunchAgentManager: DaemonLaunchAgentManaging {
+  func registrationState() -> DaemonLaunchAgentRegistrationState {
+    .notRegistered
   }
 
-  private func quiesceManagedDaemon(
-    at candidate: ManagedDaemonRootCandidate
-  ) async throws -> Bool {
-    let deadline = ContinuousClock.now + managedStaleManifestGracePeriod
-    var stopRequestedPID: Int32?
-    var stoppedAny = false
-    while true {
-      let lockIsHeld = daemonSingletonLockIsHeld(at: candidate.singletonLockURL)
-      switch HarnessMonitorPaths.probeManagedDaemonManifest(at: candidate.manifestURL) {
-      case .absent, .invalid:
-        guard lockIsHeld else {
-          return stoppedAny
-        }
-      case .external:
-        return stoppedAny
-      case .managed(let pid):
-        switch managedDaemonQuiescenceAction(
-          pid: pid,
-          lockIsHeld: lockIsHeld,
-          stopRequestedPID: stopRequestedPID
-        ) {
-        case .finish:
-          return stoppedAny
-        case .wait:
-          break
-        case .requestStop:
-          let manifest = try loadManifest(
-            at: candidate.manifestURL,
-            emitTrace: false,
-            activate: false,
-            recoverEndpoint: false
-          )
-          guard manifest.pid == Int(pid) else {
-            continue
-          }
-          try await requestManagedDaemonQuiescence(
-            manifest,
-            trustedDaemonRoot: candidate.rootURL
-          )
-          stopRequestedPID = pid
-          stoppedAny = true
-        }
-      }
-      guard ContinuousClock.now < deadline else {
-        throw DaemonControlError.commandFailed(
-          "managed daemon did not release its singleton lock before timeout"
-        )
-      }
-      try await Task.sleep(for: .milliseconds(50))
-    }
-  }
+  func register() throws {}
 
-  private func managedDaemonQuiescenceAction(
-    pid: Int32,
-    lockIsHeld: Bool,
-    stopRequestedPID: Int32?
-  ) -> ManagedDaemonQuiescenceAction {
-    if stopRequestedPID == pid {
-      return lockIsHeld ? .wait : .finish
-    }
-    if processLiveness(pid) == .dead {
-      return lockIsHeld ? .wait : .finish
-    }
-    return .requestStop
-  }
-
-  private func requestManagedDaemonQuiescence(
-    _ manifest: DaemonManifest,
-    trustedDaemonRoot: URL
-  ) async throws {
-    let endpoint = try endpointURL(from: manifest.endpoint)
-    guard Self.isTrustedManagedEndpoint(endpoint) else {
-      throw DaemonControlError.invalidManifest(
-        "managed daemon endpoints must use loopback http(s): \(manifest.endpoint)"
-      )
-    }
-    let connection = try daemonConnection(
-      from: manifest,
-      trustedDaemonRoot: trustedDaemonRoot,
-      emitTrace: false
-    )
-    let client = sessionFactory(connection)
-    do {
-      _ = try? await client.setPolicyCanvasSpawnKillSwitch(
-        request: PolicyCanvasSetSpawnKillSwitchRequest(enabled: true)
-      )
-      _ = try await client.stopDaemon()
-      await client.shutdown()
-    } catch {
-      await client.shutdown()
-      throw error
-    }
-  }
+  func unregister() throws {}
 }

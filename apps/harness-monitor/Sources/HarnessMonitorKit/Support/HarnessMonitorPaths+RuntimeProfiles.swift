@@ -53,6 +53,15 @@ extension HarnessMonitorPaths {
       return URL(fileURLWithPath: daemonDataHomeValue, isDirectory: true)
     }
 
+    if let bundledDataHome = embeddedBundleValue(
+      for: "HarnessMonitorManagedDaemonDataHome",
+      using: environment
+    ),
+      (bundledDataHome as NSString).isAbsolutePath
+    {
+      return URL(fileURLWithPath: bundledDataHome, isDirectory: true)
+    }
+
     let xdgDataHomeValue = environment.values["XDG_DATA_HOME"]?
       .trimmingCharacters(in: .whitespacesAndNewlines)
     if let xdgDataHomeValue, !xdgDataHomeValue.isEmpty {

@@ -14,7 +14,7 @@ extension DaemonControllerTests {
 
     let environment = HarnessMonitorEnvironment(
       values: [HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey: daemonHome.path],
-      homeDirectory: URL(fileURLWithPath: "/Users/example", isDirectory: true)
+      homeDirectory: root
     )
     let controller = DaemonController(
       environment: environment,
@@ -46,7 +46,7 @@ extension DaemonControllerTests {
 
     let environment = HarnessMonitorEnvironment(
       values: [HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey: daemonHome.path],
-      homeDirectory: URL(fileURLWithPath: "/Users/example", isDirectory: true)
+      homeDirectory: root
     )
     let controller = DaemonController(
       environment: environment,
@@ -158,8 +158,12 @@ extension DaemonControllerTests {
 
   @Test("Installing launch agent registers the bundled service")
   func installingLaunchAgentRegistersBundledService() async throws {
+    let environmentFixture = TempHarnessMonitorEnvironmentFixture()
     let manager = RecordingLaunchAgentManager(state: .notRegistered)
-    let controller = DaemonController(launchAgentManager: manager)
+    let controller = DaemonController(
+      environment: environmentFixture.environment,
+      launchAgentManager: manager
+    )
 
     let result = try await controller.installLaunchAgent()
 
@@ -171,9 +175,11 @@ extension DaemonControllerTests {
 
   @Test("Removing launch agent unregisters enabled service")
   func removingLaunchAgentUnregistersEnabledService() async throws {
+    let environmentFixture = TempHarnessMonitorEnvironmentFixture()
     let manager = RecordingLaunchAgentManager(state: .enabled)
     let settleRecorder = DurationRecorder()
     let controller = DaemonController(
+      environment: environmentFixture.environment,
       launchAgentManager: manager,
       managedLaunchAgentBTMSettleSleep: { duration in
         await settleRecorder.record(duration)
@@ -194,8 +200,12 @@ extension DaemonControllerTests {
 
   @Test("Approval-required launch agent does not re-register")
   func approvalRequiredLaunchAgentDoesNotRegister() async throws {
+    let environmentFixture = TempHarnessMonitorEnvironmentFixture()
     let manager = RecordingLaunchAgentManager(state: .requiresApproval)
-    let controller = DaemonController(launchAgentManager: manager)
+    let controller = DaemonController(
+      environment: environmentFixture.environment,
+      launchAgentManager: manager
+    )
 
     await #expect(throws: DaemonControlError.self) {
       _ = try await controller.installLaunchAgent()
@@ -205,8 +215,12 @@ extension DaemonControllerTests {
 
   @Test("registerLaunchAgent returns enabled after registering notRegistered agent")
   func registerLaunchAgentReturnsEnabledState() async throws {
+    let environmentFixture = TempHarnessMonitorEnvironmentFixture()
     let manager = RecordingLaunchAgentManager(state: .notRegistered)
-    let controller = DaemonController(launchAgentManager: manager)
+    let controller = DaemonController(
+      environment: environmentFixture.environment,
+      launchAgentManager: manager
+    )
 
     let state = try await controller.registerLaunchAgent()
 
@@ -216,11 +230,15 @@ extension DaemonControllerTests {
 
   @Test("registerLaunchAgent surfaces requiresApproval when SMAppService needs consent")
   func registerLaunchAgentSurfacesApprovalRequired() async throws {
+    let environmentFixture = TempHarnessMonitorEnvironmentFixture()
     let manager = RecordingLaunchAgentManager(
       state: .notRegistered,
       registerResult: .requiresApproval
     )
-    let controller = DaemonController(launchAgentManager: manager)
+    let controller = DaemonController(
+      environment: environmentFixture.environment,
+      launchAgentManager: manager
+    )
 
     let state = try await controller.registerLaunchAgent()
 
@@ -230,8 +248,12 @@ extension DaemonControllerTests {
 
   @Test("awaitLaunchAgentState throws daemonDidNotStart when state never matches")
   func awaitLaunchAgentStateTimesOut() async throws {
+    let environmentFixture = TempHarnessMonitorEnvironmentFixture()
     let manager = RecordingLaunchAgentManager(state: .notRegistered)
-    let controller = DaemonController(launchAgentManager: manager)
+    let controller = DaemonController(
+      environment: environmentFixture.environment,
+      launchAgentManager: manager
+    )
 
     await #expect(throws: DaemonControlError.daemonDidNotStart) {
       try await controller.awaitLaunchAgentState(
@@ -243,8 +265,12 @@ extension DaemonControllerTests {
 
   @Test("awaitLaunchAgentState returns immediately when state already matches")
   func awaitLaunchAgentStateReturnsWhenReady() async throws {
+    let environmentFixture = TempHarnessMonitorEnvironmentFixture()
     let manager = RecordingLaunchAgentManager(state: .enabled)
-    let controller = DaemonController(launchAgentManager: manager)
+    let controller = DaemonController(
+      environment: environmentFixture.environment,
+      launchAgentManager: manager
+    )
 
     try await controller.awaitLaunchAgentState(
       .enabled,
@@ -254,8 +280,12 @@ extension DaemonControllerTests {
 
   @Test("launchAgentSnapshot mirrors current registration state")
   func launchAgentSnapshotMirrorsRegistrationState() async throws {
+    let environmentFixture = TempHarnessMonitorEnvironmentFixture()
     let manager = RecordingLaunchAgentManager(state: .enabled)
-    let controller = DaemonController(launchAgentManager: manager)
+    let controller = DaemonController(
+      environment: environmentFixture.environment,
+      launchAgentManager: manager
+    )
 
     let enabledSnapshot = await controller.launchAgentSnapshot()
     #expect(enabledSnapshot.installed == true)
@@ -270,8 +300,10 @@ extension DaemonControllerTests {
 
   @Test("refreshManagedLaunchAgentForLaunch skips when the helper stamp is unchanged")
   func refreshManagedLaunchAgentForLaunchSkipsWhenStampUnchanged() async throws {
+    let environmentFixture = TempHarnessMonitorEnvironmentFixture()
     let manager = RecordingLaunchAgentManager(state: .enabled)
     let controller = DaemonController(
+      environment: environmentFixture.environment,
       launchAgentManager: manager,
       ownership: .managed,
       // Returning nil keeps the comparison at the no-stamp branch which
@@ -289,8 +321,13 @@ extension DaemonControllerTests {
 
   @Test("refreshManagedLaunchAgentForLaunch skips when nothing is currently bound")
   func refreshManagedLaunchAgentForLaunchSkipsWhenAbsent() async throws {
+    let environmentFixture = TempHarnessMonitorEnvironmentFixture()
     let manager = RecordingLaunchAgentManager(state: .notRegistered)
-    let controller = DaemonController(launchAgentManager: manager, ownership: .managed)
+    let controller = DaemonController(
+      environment: environmentFixture.environment,
+      launchAgentManager: manager,
+      ownership: .managed
+    )
 
     let refreshed = try await controller.refreshManagedLaunchAgentForLaunch()
 
@@ -304,8 +341,13 @@ extension DaemonControllerTests {
 
   @Test("refreshManagedLaunchAgentForLaunch is a no-op in external ownership")
   func refreshManagedLaunchAgentForLaunchSkipsInExternalOwnership() async throws {
+    let environmentFixture = TempHarnessMonitorEnvironmentFixture()
     let manager = RecordingLaunchAgentManager(state: .enabled)
-    let controller = DaemonController(launchAgentManager: manager, ownership: .external)
+    let controller = DaemonController(
+      environment: environmentFixture.environment,
+      launchAgentManager: manager,
+      ownership: .external
+    )
 
     let refreshed = try await controller.refreshManagedLaunchAgentForLaunch()
 
@@ -329,7 +371,7 @@ extension DaemonControllerTests {
 
     let snapshot = await controller.launchAgentSnapshot()
 
-    #expect(snapshot.label == "Q498EB36N4.io.harnessmonitor.agent")
-    #expect(snapshot.serviceTarget == "Q498EB36N4.io.harnessmonitor.agent")
+    #expect(snapshot.label == "Q498EB36N4.io.harnessmonitor.agent-bart-dev")
+    #expect(snapshot.serviceTarget == "Q498EB36N4.io.harnessmonitor.agent-bart-dev")
   }
 }

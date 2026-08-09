@@ -139,13 +139,9 @@ public enum HarnessMonitorPaths {
   /// two diverge, which manifests as a managed-daemon bootstrap that loops
   /// on `Bootstrapping daemon client for managed daemon mode` without ever
   /// spawning a daemon process. Lane identity therefore flows through the
-  /// `HARNESS_MONITOR_RUNTIME_LANE` env entry in the plist, not the label.
-  ///
   /// For sandboxed SMAppService launch agents, the service name must be an
-  /// immediate child of the app group. Keep this as
-  /// `<app-group>.<single-component>` so backgroundtaskmanagementd can resolve
-  /// the helper's full path instead of rejecting registration with a
-  /// `job-creation` sandbox denial.
+  /// immediate child of the app group. A lane suffix is joined with `-`, not
+  /// another `.`, so the service remains `<app-group>.<single-component>`.
   public static func launchAgentLabel(
     using environment: HarnessMonitorEnvironment = .current
   ) -> String {
@@ -154,7 +150,16 @@ public enum HarnessMonitorPaths {
     ) {
       return explicitLabel
     }
-    return managedLaunchAgentLabelBase()
+    if let embeddedLabel = embeddedBundleValue(
+      for: "HarnessMonitorManagedLaunchAgentLabel",
+      using: environment
+    ) {
+      return embeddedLabel
+    }
+    guard let lane = resolvedRuntimeLane(using: environment) else {
+      return managedLaunchAgentLabelBase()
+    }
+    return "\(managedLaunchAgentLabelBase())-\(lane)"
   }
 
   static func managedLaunchAgentLabelBase() -> String {

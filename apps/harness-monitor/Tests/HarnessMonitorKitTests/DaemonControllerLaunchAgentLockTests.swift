@@ -96,8 +96,57 @@ struct DaemonControllerLaunchAgentLockTests {
     }
   }
 
-  @Test("Service coordination URLs are shared across runtime lanes")
-  func serviceCoordinationURLsAreSharedAcrossRuntimeLanes() {
+  @Test("Launch refresh revalidates the helper stamp after acquiring the lock")
+  func launchRefreshRevalidatesStampUnderLock() async throws {
+    try await withTempDaemonFixture(pid: 1) { environment in
+      let lockURL = HarnessMonitorPaths.managedLaunchAgentLockURL(using: environment)
+      try FileManager.default.createDirectory(
+        at: lockURL.deletingLastPathComponent(),
+        withIntermediateDirectories: true
+      )
+      let externalFD = Darwin.open(lockURL.path, O_RDWR | O_CREAT | O_CLOEXEC, 0o600)
+      #expect(externalFD >= 0)
+      defer { _ = Darwin.close(externalFD) }
+      #expect(testBSDFileLock(externalFD, LOCK_EX | LOCK_NB) == 0)
+
+      let stamp = ManagedLaunchAgentBundleStamp(
+        helperPath: "/Applications/Harness Monitor.app/Contents/Resources/harness-daemon",
+        deviceIdentifier: 1,
+        inode: 2,
+        fileSize: 3,
+        modificationTimeIntervalSince1970: 4
+      )
+      let stampReads = ManagedLaunchAgentStampReadCounter(stamp: stamp)
+      let manager = RecordingLaunchAgentManager(state: .enabled)
+      let controller = DaemonController(
+        environment: environment,
+        launchAgentManager: manager,
+        ownership: .managed,
+        managedLaunchAgentCurrentBundleStamp: { stampReads.read() }
+      )
+      let refresh = Task {
+        try await controller.refreshManagedLaunchAgentForLaunch()
+      }
+
+      for _ in 0..<100 where stampReads.count < 1 {
+        try await Task.sleep(for: .milliseconds(5))
+      }
+      #expect(stampReads.count >= 1)
+      try controller.persistManagedLaunchAgentBundleStamp(
+        stamp,
+        to: HarnessMonitorPaths.managedLaunchAgentBundleStampURL(using: environment)
+      )
+      #expect(testBSDFileLock(externalFD, LOCK_UN) == 0)
+
+      #expect(try await refresh.value == false)
+      #expect(stampReads.count >= 2)
+      #expect(manager.unregisterCallCount == 0)
+      #expect(manager.registerCallCount == 0)
+    }
+  }
+
+  @Test("Service coordination URLs follow the lane-specific service identity")
+  func serviceCoordinationURLsFollowServiceIdentity() {
     let homeDirectory = FileManager.default.temporaryDirectory
       .appendingPathComponent(UUID().uuidString, isDirectory: true)
     let laneA = HarnessMonitorEnvironment(
@@ -116,15 +165,36 @@ struct DaemonControllerLaunchAgentLockTests {
 
     #expect(
       HarnessMonitorPaths.managedLaunchAgentLockURL(using: laneA)
-        == HarnessMonitorPaths.managedLaunchAgentLockURL(using: laneB)
+        != HarnessMonitorPaths.managedLaunchAgentLockURL(using: laneB)
     )
     #expect(
       HarnessMonitorPaths.managedLaunchAgentOwnerURL(using: laneA)
-        == HarnessMonitorPaths.managedLaunchAgentOwnerURL(using: laneB)
+        != HarnessMonitorPaths.managedLaunchAgentOwnerURL(using: laneB)
     )
     #expect(
       HarnessMonitorPaths.managedLaunchAgentBundleStampURL(using: laneA)
-        == HarnessMonitorPaths.managedLaunchAgentBundleStampURL(using: laneB)
+        != HarnessMonitorPaths.managedLaunchAgentBundleStampURL(using: laneB)
     )
+  }
+}
+
+private final class ManagedLaunchAgentStampReadCounter: @unchecked Sendable {
+  private let lock = NSLock()
+  private let stamp: ManagedLaunchAgentBundleStamp
+  private var protectedCount = 0
+
+  init(stamp: ManagedLaunchAgentBundleStamp) {
+    self.stamp = stamp
+  }
+
+  var count: Int {
+    lock.withLock { protectedCount }
+  }
+
+  func read() -> ManagedLaunchAgentBundleStamp {
+    lock.withLock {
+      protectedCount += 1
+      return stamp
+    }
   }
 }

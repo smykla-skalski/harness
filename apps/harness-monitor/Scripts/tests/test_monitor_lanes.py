@@ -125,11 +125,13 @@ class MonitorLaneHelperTests(unittest.TestCase):
                 ),
             )
             self.assertEqual(port, expected_port(expected_lane))
-            # The launch-agent label MUST equal the bundled plist filename
-            # without `.plist` or SMAppService.register on macOS 26 returns
-            # `error: 22 (EINVAL)`. Lane identity flows via the
-            # `HARNESS_MONITOR_RUNTIME_LANE` plist env entry, not the label.
-            self.assertEqual(label, "Q498EB36N4.io.harnessmonitor.agent")
+            # The label and generated plist filename share the same lane
+            # suffix. Keeping the suffix in one component satisfies the app
+            # group child-service rule while isolating launchd jobs.
+            self.assertEqual(
+                label,
+                f"Q498EB36N4.io.harnessmonitor.agent-{expected_lane}",
+            )
 
     def test_legacy_profile_env_is_rejected(self) -> None:
         env = base_env()

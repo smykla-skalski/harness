@@ -47,8 +47,7 @@ extension DaemonController {
     case .ownedByLiveSibling:
       // A sibling Monitor instance is currently the launch-agent owner.
       // Defer the refresh decision to that owner so two Monitor processes
-      // never race on `unregister`/`register` for the shared
-      // `io.harnessmonitor.daemon` lane.
+      // never race on `unregister`/`register` for this lane's service.
       return nil
     case .staleOwnership:
       // Marker survived a previous instance's hard exit. Reclaim it now
@@ -81,12 +80,11 @@ extension DaemonController {
         HarnessMonitorLogger.lifecycle.warning(
           """
           Refusing managed launch-agent refresh: another live Monitor instance \
-          owns io.harnessmonitor.daemon. \
+          owns (HarnessMonitorPaths.launchAgentLabel(using: environment), privacy: .public). \
           sibling_pid=\(owner.pid, privacy: .public) \
           sibling_executable=\(owner.executablePath, privacy: .public) \
           registered_at=\(owner.registeredAt.timeIntervalSince1970, privacy: .public). \
-          Set HARNESS_MONITOR_RUNTIME_LANE on this build to claim a \
-          separate lane.
+          Wait for that instance to finish its refresh.
           """
         )
         return .skippedSiblingOwnsLane(owner)

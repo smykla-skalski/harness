@@ -1,5 +1,12 @@
+import Foundation
 import ProjectDescription
 import ProjectDescriptionHelpers
+
+private let managedDaemonLaunchAgentLabel =
+  ProcessInfo.processInfo.environment["TUIST_MANAGED_DAEMON_LAUNCH_AGENT_LABEL"]
+  ?? "Q498EB36N4.io.harnessmonitor.agent"
+private let managedDaemonDataHome =
+  ProcessInfo.processInfo.environment["TUIST_MANAGED_DAEMON_DATA_HOME"] ?? ""
 
 private let macOSDestinations: Destinations = [.mac]
 private let macOSDeploymentTargets: DeploymentTargets = .macOS("26.0")
@@ -226,6 +233,7 @@ private let kitDependencies: [TargetDependency] = {
     .sdk(name: "Speech", type: .framework),
     .sdk(name: "IOKit", type: .framework),
     .sdk(name: "ServiceManagement", type: .framework),
+    .sdk(name: "Security", type: .framework),
     .sdk(name: "UserNotifications", type: .framework),
     .external(name: "HarnessMonitorRegistry"),
     .target(name: "HarnessMonitorCloudKit"),
@@ -737,6 +745,8 @@ private let monitorAppSettings: Settings = .settings(
     "ENABLE_OUTGOING_NETWORK_CONNECTIONS": "YES",
     "GENERATE_INFOPLIST_FILE": "NO",
     "INFOPLIST_FILE": "Resources/HarnessMonitor-Info.plist",
+    "HARNESS_MONITOR_DAEMON_LAUNCH_AGENT_LABEL": .string(managedDaemonLaunchAgentLabel),
+    "HARNESS_MONITOR_BUNDLED_DAEMON_DATA_HOME": .string(managedDaemonDataHome),
     "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.app",
     "PRODUCT_MODULE_NAME": "HarnessMonitor",
     "PRODUCT_NAME": "Harness Monitor",
@@ -792,6 +802,8 @@ private let externalDaemonAppSettings: Settings = .settings(
     "ENABLE_OUTGOING_NETWORK_CONNECTIONS": "YES",
     "GENERATE_INFOPLIST_FILE": "NO",
     "INFOPLIST_FILE": "Resources/HarnessMonitor-Info.plist",
+    "HARNESS_MONITOR_DAEMON_LAUNCH_AGENT_LABEL": .string(managedDaemonLaunchAgentLabel),
+    "HARNESS_MONITOR_BUNDLED_DAEMON_DATA_HOME": .string(managedDaemonDataHome),
     "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.app",
     "PRODUCT_MODULE_NAME": "HarnessMonitor",
     "PRODUCT_NAME": "Harness Monitor (External Daemon)",
@@ -834,6 +846,8 @@ private let uiTestHostSettings: Settings = .settings(
     "ENABLE_OUTGOING_NETWORK_CONNECTIONS": "YES",
     "GENERATE_INFOPLIST_FILE": "NO",
     "INFOPLIST_FILE": "Resources/HarnessMonitor-Info.plist",
+    "HARNESS_MONITOR_DAEMON_LAUNCH_AGENT_LABEL": .string(managedDaemonLaunchAgentLabel),
+    "HARNESS_MONITOR_BUNDLED_DAEMON_DATA_HOME": .string(managedDaemonDataHome),
     "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.app.ui-testing",
     "PRODUCT_NAME": "Harness Monitor UI Testing",
     "REGISTER_APP_GROUPS": "YES",
@@ -879,6 +893,8 @@ private let isolatedAppSettings: Settings = .settings(
     "ENABLE_OUTGOING_NETWORK_CONNECTIONS": "YES",
     "GENERATE_INFOPLIST_FILE": "NO",
     "INFOPLIST_FILE": "Resources/HarnessMonitor-Info.plist",
+    "HARNESS_MONITOR_DAEMON_LAUNCH_AGENT_LABEL": .string(managedDaemonLaunchAgentLabel),
+    "HARNESS_MONITOR_BUNDLED_DAEMON_DATA_HOME": .string(managedDaemonDataHome),
     "PRODUCT_BUNDLE_IDENTIFIER": .string(isolatedAppBundleId),
     "PRODUCT_NAME": "Harness Monitor Isolated",
     "REGISTER_APP_GROUPS": "NO",

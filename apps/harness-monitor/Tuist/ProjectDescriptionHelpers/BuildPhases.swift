@@ -1,6 +1,22 @@
+import Foundation
 import ProjectDescription
 
 public enum BuildPhases {
+  private static let managedDaemonBaseLaunchAgentLabel =
+    "Q498EB36N4.io.harnessmonitor.agent"
+  private static let managedDaemonLaunchAgentLabel =
+    ProcessInfo.processInfo.environment["TUIST_MANAGED_DAEMON_LAUNCH_AGENT_LABEL"]
+    ?? managedDaemonBaseLaunchAgentLabel
+
+  private static var managedDaemonLegacyAgentOutputs: [Path] {
+    guard managedDaemonLaunchAgentLabel != managedDaemonBaseLaunchAgentLabel else {
+      return []
+    }
+    return [
+      "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/\(managedDaemonBaseLaunchAgentLabel).plist"
+    ]
+  }
+
   private static func scriptPhaseBody(
     projectVariable: String,
     script: String,
@@ -76,8 +92,9 @@ public enum BuildPhases {
         "$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/harness-daemon.cstemp",
         "$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/harness-daemon.staging",
         "$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/harness-daemon.staging.cstemp",
-        "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/Q498EB36N4.io.harnessmonitor.agent.plist",
-        "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/Q498EB36N4.io.harnessmonitor.agent.plist.staging",
+        "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/\(managedDaemonLaunchAgentLabel).plist",
+        "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/\(managedDaemonLaunchAgentLabel).plist.staging",
+      ] + managedDaemonLegacyAgentOutputs + [
         "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/Q498EB36N4.io.harnessmonitor.daemon.plist",
         "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/io.harnessmonitor.daemon.managed.plist",
         "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/io.harnessmonitor.daemon.plist",

@@ -6,6 +6,25 @@ import Testing
 
 @Suite("Legacy managed daemon quiescence", .serialized)
 struct LegacyManagedDaemonQuiescenceTests {
+  @Test("Managed helper identity accepts isolated lanes and known legacy helpers")
+  func managedHelperIdentityAcceptsIsolatedLanes() {
+    #expect(
+      DaemonController.isTrustedManagedHelperIdentifier(
+        "Q498EB36N4.io.harnessmonitor.agent-fix-automation-6245e82a"
+      )
+    )
+    #expect(
+      DaemonController.isTrustedManagedHelperIdentifier(
+        "Q498EB36N4.io.harnessmonitor.daemon"
+      )
+    )
+    #expect(
+      DaemonController.isTrustedManagedHelperIdentifier(
+        "Q498EB36N4.io.harnessmonitor.agentforeign"
+      ) == false
+    )
+  }
+
   @Test("Controller fences and stops every trusted live managed daemon")
   func controllerFencesAndStopsTrustedManagedDaemon() async throws {
     let client = RecordingHarnessClient()
@@ -131,6 +150,124 @@ struct LegacyManagedDaemonQuiescenceTests {
 
     #expect(controller.externalManifestLocator.manifestURL == selectedManifest)
   }
+
+  @Test("Controller discovers a runtime lane created during quiescence")
+  func controllerDiscoversRuntimeLaneCreatedDuringQuiescence() async throws {
+    let fixture = try ManagedDaemonQuiescenceFixture(name: "late-lane")
+    defer { fixture.remove() }
+    let client = RecordingHarnessClient()
+    let controller = DaemonController(
+      environment: fixture.environment,
+      ownership: .managed,
+      sessionFactory: { _ in client }
+    )
+    let quiescence = Task {
+      try await controller.quiesceManagedDaemonsAfterLegacyCleanupFailure()
+    }
+
+    try await Task.sleep(for: .milliseconds(75))
+    let candidate = fixture.runtimeLaneCandidate("appeared-late")
+    try fixture.writeManifest(at: candidate, endpoint: "http://127.0.0.1:65105")
+    try await quiescence.value
+
+    #expect(client.lock.withLock { client.stopDaemonRequestCount } == 1)
+  }
+
+  @Test("Controller bounds all-root waits by one shared deadline")
+  func controllerBoundsAllRootWaitsByOneSharedDeadline() async throws {
+    let fixture = try ManagedDaemonQuiescenceFixture(name: "shared-deadline")
+    defer { fixture.remove() }
+    var lockFDs: [Int32] = []
+    defer {
+      for fd in lockFDs {
+        _ = testBSDFileLock(fd, LOCK_UN)
+        _ = Darwin.close(fd)
+      }
+    }
+    for lane in ["one", "two", "three"] {
+      lockFDs.append(try fixture.lock(fixture.runtimeLaneCandidate(lane)))
+    }
+    let controller = DaemonController(
+      environment: fixture.environment,
+      ownership: .managed,
+      managedStaleManifestGracePeriod: .milliseconds(120)
+    )
+    let startedAt = ContinuousClock.now
+
+    await #expect(throws: DaemonControlError.self) {
+      try await controller.quiesceManagedDaemonsAfterLegacyCleanupFailure()
+    }
+
+    #expect(ContinuousClock.now - startedAt < .milliseconds(300))
+  }
+
+  @Test("Controller falls back to a validated process signal")
+  func controllerFallsBackToValidatedProcessSignal() async throws {
+    let fixture = try ManagedDaemonQuiescenceFixture(name: "signal-fallback")
+    defer { fixture.remove() }
+    let candidate = try #require(
+      HarnessMonitorPaths.managedDaemonRootCandidates(using: fixture.environment).first
+    )
+    let pid: Int32 = 45_612
+    try fixture.writeManifest(
+      at: candidate,
+      endpoint: "http://127.0.0.1:65106",
+      pid: pid
+    )
+    let client = RecordingHarnessClient()
+    client.stopDaemonError = ManagedDaemonQuiescenceTestError.stopFailed
+    let signalRecorder = ManagedDaemonSignalRecorder()
+    let controller = DaemonController(
+      environment: fixture.environment,
+      ownership: .managed,
+      sessionFactory: { _ in client },
+      processLiveness: { requestedPID in
+        #expect(requestedPID == pid)
+        return .alive(
+          executablePath: "/Applications/Harness Monitor.app/Contents/Resources/harness-daemon")
+      },
+      processSignal: { requestedPID, signal in
+        signalRecorder.record(pid: requestedPID, signal: signal)
+        return 0
+      },
+      managedDaemonProcessIdentityValidator: { requestedPID in
+        requestedPID == pid
+      }
+    )
+
+    try await controller.quiesceManagedDaemonsAfterLegacyCleanupFailure()
+
+    let recordedSignal = try #require(signalRecorder.value)
+    #expect(recordedSignal.0 == pid)
+    #expect(recordedSignal.1 == SIGTERM)
+  }
+
+  @Test("Controller recovers the endpoint from the candidate root")
+  func controllerRecoversEndpointFromCandidateRoot() async throws {
+    let fixture = try ManagedDaemonQuiescenceFixture(name: "endpoint-recovery")
+    defer { fixture.remove() }
+    let candidate = try #require(
+      HarnessMonitorPaths.managedDaemonRootCandidates(using: fixture.environment).first
+    )
+    try fixture.writeManifest(at: candidate, endpoint: "http://127.0.0.1:0")
+    try fixture.writeEvents(
+      at: candidate,
+      endpoint: "http://127.0.0.1:65107"
+    )
+    let capturedEndpoint = ManagedDaemonEndpointRecorder()
+    let controller = DaemonController(
+      environment: fixture.environment,
+      ownership: .managed,
+      sessionFactory: { connection in
+        capturedEndpoint.record(connection.endpoint)
+        return RecordingHarnessClient()
+      }
+    )
+
+    try await controller.quiesceManagedDaemonsAfterLegacyCleanupFailure()
+
+    #expect(capturedEndpoint.value?.port == 65_107)
+  }
 }
 
 private struct ManagedDaemonQuiescenceFixture {
@@ -174,7 +311,8 @@ private struct ManagedDaemonQuiescenceFixture {
 
   func writeManifest(
     at candidate: ManagedDaemonRootCandidate,
-    endpoint: String
+    endpoint: String,
+    pid: Int32 = getpid()
   ) throws {
     try FileManager.default.createDirectory(
       at: candidate.rootURL,
@@ -184,11 +322,76 @@ private struct ManagedDaemonQuiescenceFixture {
     try writeTokenFixture(to: tokenURL)
     try writeExternalManifestFixture(
       at: candidate.manifestURL,
-      pid: Int(getpid()),
+      pid: Int(pid),
       endpoint: endpoint,
       startedAt: "2026-08-09T20:00:00Z",
       tokenPath: tokenURL.path
     )
+  }
+
+  func runtimeLaneCandidate(_ lane: String) -> ManagedDaemonRootCandidate {
+    let dataHome =
+      homeDirectory
+      .appendingPathComponent("Library", isDirectory: true)
+      .appendingPathComponent("Group Containers", isDirectory: true)
+      .appendingPathComponent(HarnessMonitorAppGroup.identifier, isDirectory: true)
+      .appendingPathComponent(
+        HarnessMonitorRuntimeLane.dataHomeLanesDirectoryName,
+        isDirectory: true
+      )
+      .appendingPathComponent(lane, isDirectory: true)
+    return ManagedDaemonRootCandidate(
+      rootURL:
+        dataHome
+        .appendingPathComponent("harness", isDirectory: true)
+        .appendingPathComponent("daemon", isDirectory: true)
+        .appendingPathComponent(DaemonOwnership.managed.rawValue, isDirectory: true)
+    )
+  }
+
+  func writeEvents(
+    at candidate: ManagedDaemonRootCandidate,
+    endpoint: String
+  ) throws {
+    let encoder = JSONEncoder()
+    encoder.keyEncodingStrategy = .convertToSnakeCase
+    let event = DaemonAuditEventFixture(
+      recordedAt: "2026-08-09T20:00:01Z",
+      level: "info",
+      message: "daemon listening on \(endpoint)"
+    )
+    let data = try encoder.encode(event)
+    try data.write(to: candidate.rootURL.appendingPathComponent("events.jsonl"))
+  }
+}
+
+private final class ManagedDaemonSignalRecorder: @unchecked Sendable {
+  private let lock = NSLock()
+  private var recordedValue: (Int32, Int32)?
+
+  var value: (Int32, Int32)? {
+    lock.withLock { recordedValue }
+  }
+
+  func record(pid: Int32, signal: Int32) {
+    lock.withLock {
+      recordedValue = (pid, signal)
+    }
+  }
+}
+
+private final class ManagedDaemonEndpointRecorder: @unchecked Sendable {
+  private let lock = NSLock()
+  private var recordedValue: URL?
+
+  var value: URL? {
+    lock.withLock { recordedValue }
+  }
+
+  func record(_ endpoint: URL) {
+    lock.withLock {
+      recordedValue = endpoint
+    }
   }
 }
 

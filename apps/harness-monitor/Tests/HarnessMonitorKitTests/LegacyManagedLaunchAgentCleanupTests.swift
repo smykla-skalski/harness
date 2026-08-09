@@ -12,9 +12,6 @@ struct LegacyManagedLaunchAgentCleanupTests {
     let defaults = try #require(UserDefaults(suiteName: suiteName))
     defer { defaults.removePersistentDomain(forName: suiteName) }
 
-    LegacyManagedLaunchAgentCleanup.resetForTests()
-    defer { LegacyManagedLaunchAgentCleanup.resetForTests() }
-
     LegacyManagedLaunchAgentCleanup.runOnce(defaults: defaults) { _ in
       LegacyLaunchAgentManagerStub(state: .notRegistered)
     }
@@ -48,9 +45,6 @@ struct LegacyManagedLaunchAgentCleanupTests {
       forKey: LegacyManagedLaunchAgentCleanup.strategyVersionDefaultsKey
     )
 
-    LegacyManagedLaunchAgentCleanup.resetForTests()
-    defer { LegacyManagedLaunchAgentCleanup.resetForTests() }
-
     LegacyManagedLaunchAgentCleanup.runOnce(defaults: defaults) { _ in
       LegacyLaunchAgentManagerStub(state: .notRegistered)
     }
@@ -76,8 +70,6 @@ struct LegacyManagedLaunchAgentCleanupTests {
       forKey: LegacyManagedLaunchAgentCleanup.completedNamesDefaultsKey
     )
 
-    LegacyManagedLaunchAgentCleanup.resetForTests()
-    defer { LegacyManagedLaunchAgentCleanup.resetForTests() }
     var attempted: [String] = []
     LegacyManagedLaunchAgentCleanup.runOnce(defaults: defaults) { name in
       attempted.append(name)
@@ -98,8 +90,6 @@ struct LegacyManagedLaunchAgentCleanupTests {
       "io.harnessmonitor.kit-tests.legacy-cleanup.\(UUID().uuidString)"
     let defaults = try #require(UserDefaults(suiteName: suiteName))
     defer { defaults.removePersistentDomain(forName: suiteName) }
-    defer { LegacyManagedLaunchAgentCleanup.resetForTests() }
-
     let legacy = HarnessMonitorPaths.legacyLaunchAgentPlistNames
       .filter { $0 != HarnessMonitorPaths.launchAgentPlistName }
     defaults.set(
@@ -110,7 +100,6 @@ struct LegacyManagedLaunchAgentCleanupTests {
       LegacyManagedLaunchAgentCleanup.strategyVersion,
       forKey: LegacyManagedLaunchAgentCleanup.strategyVersionDefaultsKey
     )
-    LegacyManagedLaunchAgentCleanup.resetForTests()
     var unregistered: [String] = []
 
     let completed = LegacyManagedLaunchAgentCleanup.runOnce(defaults: defaults) { name in
@@ -121,6 +110,49 @@ struct LegacyManagedLaunchAgentCleanupTests {
 
     #expect(completed)
     #expect(unregistered.sorted() == legacy.sorted())
+  }
+
+  @Test("Not-found legacy services are explicitly unregistered")
+  func notFoundLegacyServicesAreExplicitlyUnregistered() throws {
+    let suiteName =
+      "io.harnessmonitor.kit-tests.legacy-cleanup.\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    var unregistered: [String] = []
+
+    let completed = LegacyManagedLaunchAgentCleanup.runOnce(defaults: defaults) { name in
+      LegacyLaunchAgentManagerStub(state: .notFound) {
+        unregistered.append(name)
+      }
+    }
+
+    let legacy = HarnessMonitorPaths.legacyLaunchAgentPlistNames
+      .filter { $0 != HarnessMonitorPaths.launchAgentPlistName }
+    #expect(completed)
+    #expect(unregistered.sorted() == legacy.sorted())
+  }
+
+  @Test("Cleanup excludes the controller lane service")
+  func cleanupExcludesControllerLaneService() throws {
+    let suiteName =
+      "io.harnessmonitor.kit-tests.legacy-cleanup.\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let currentName = "Q498EB36N4.io.harnessmonitor.agent-lane-a.plist"
+    let legacyName = "Q498EB36N4.io.harnessmonitor.agent.plist"
+    var inspectedNames: [String] = []
+
+    let completed = LegacyManagedLaunchAgentCleanup.runOnce(
+      defaults: defaults,
+      currentName: currentName,
+      legacyNames: [legacyName, currentName]
+    ) { name in
+      inspectedNames.append(name)
+      return LegacyLaunchAgentManagerStub(state: .notRegistered)
+    }
+
+    #expect(completed)
+    #expect(inspectedNames == [legacyName])
   }
 
   @Test("Pending names are unioned with previously completed ones")
@@ -137,9 +169,6 @@ struct LegacyManagedLaunchAgentCleanupTests {
       firstOnly,
       forKey: LegacyManagedLaunchAgentCleanup.completedNamesDefaultsKey
     )
-
-    LegacyManagedLaunchAgentCleanup.resetForTests()
-    defer { LegacyManagedLaunchAgentCleanup.resetForTests() }
 
     LegacyManagedLaunchAgentCleanup.runOnce(defaults: defaults) { _ in
       LegacyLaunchAgentManagerStub(state: .enabled)
@@ -158,8 +187,6 @@ struct LegacyManagedLaunchAgentCleanupTests {
       "io.harnessmonitor.kit-tests.legacy-cleanup.\(UUID().uuidString)"
     let defaults = try #require(UserDefaults(suiteName: suiteName))
     defer { defaults.removePersistentDomain(forName: suiteName) }
-    defer { LegacyManagedLaunchAgentCleanup.resetForTests() }
-
     var currentServiceUnregisterCount = 0
     let firstResult = LegacyManagedLaunchAgentCleanup.runOnce(defaults: defaults) { name in
       if name == HarnessMonitorPaths.launchAgentPlistName {
@@ -190,12 +217,12 @@ struct LegacyManagedLaunchAgentCleanupTests {
     #expect(sameProcessRetryCount > 0)
 
     var calledAfterSuccess = false
-    let cachedSuccess = LegacyManagedLaunchAgentCleanup.runOnce(defaults: defaults) { _ in
+    let recheckedSuccess = LegacyManagedLaunchAgentCleanup.runOnce(defaults: defaults) { _ in
       calledAfterSuccess = true
       return LegacyLaunchAgentManagerStub(state: .enabled)
     }
-    #expect(cachedSuccess)
-    #expect(calledAfterSuccess == false)
+    #expect(recheckedSuccess)
+    #expect(calledAfterSuccess)
     let completedAfterRetry =
       defaults.stringArray(
         forKey: LegacyManagedLaunchAgentCleanup.completedNamesDefaultsKey
@@ -211,7 +238,6 @@ struct LegacyManagedLaunchAgentCleanupTests {
       "io.harnessmonitor.kit-tests.legacy-cleanup.\(UUID().uuidString)"
     let defaults = try #require(UserDefaults(suiteName: suiteName))
     defer { defaults.removePersistentDomain(forName: suiteName) }
-    defer { LegacyManagedLaunchAgentCleanup.resetForTests() }
     let recorder = LegacyCleanupAttemptRecorder(currentUnregisterFails: false)
 
     try await LegacyManagedLaunchAgentCleanup.requireComplete(
@@ -241,7 +267,6 @@ struct LegacyManagedLaunchAgentCleanupTests {
       "io.harnessmonitor.kit-tests.legacy-cleanup.\(UUID().uuidString)"
     let defaults = try #require(UserDefaults(suiteName: suiteName))
     defer { defaults.removePersistentDomain(forName: suiteName) }
-    defer { LegacyManagedLaunchAgentCleanup.resetForTests() }
     let recorder = LegacyCleanupAttemptRecorder(currentUnregisterFails: true)
 
     await #expect(throws: DaemonControlError.self) {

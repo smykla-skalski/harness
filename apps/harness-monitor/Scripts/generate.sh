@@ -22,6 +22,10 @@ harness_monitor_apply_runtime_lane_environment "$REPO_ROOT"
 # Project.swift reads this at generation time.
 export TUIST_ISOLATED_BUNDLE_ID
 TUIST_ISOLATED_BUNDLE_ID="$(harness_monitor_isolated_bundle_id)"
+export TUIST_MANAGED_DAEMON_LAUNCH_AGENT_LABEL
+TUIST_MANAGED_DAEMON_LAUNCH_AGENT_LABEL="$HARNESS_MONITOR_DAEMON_LAUNCH_AGENT_LABEL"
+export TUIST_MANAGED_DAEMON_DATA_HOME
+TUIST_MANAGED_DAEMON_DATA_HOME="$HARNESS_DAEMON_DATA_HOME"
 
 tuist_generation_inputs=(
   "$ROOT/Project.swift"
@@ -104,6 +108,10 @@ tuist_env_fingerprint() {
     printf 'DEVELOPER_DIR=%s\n' "${DEVELOPER_DIR:-}"
     printf 'XCODEBUILD_DERIVED_DATA_PATH=%s\n' "${XCODEBUILD_DERIVED_DATA_PATH:-}"
     printf 'TUIST_ISOLATED_BUNDLE_ID=%s\n' "${TUIST_ISOLATED_BUNDLE_ID:-}"
+    printf 'TUIST_MANAGED_DAEMON_LAUNCH_AGENT_LABEL=%s\n' \
+      "${TUIST_MANAGED_DAEMON_LAUNCH_AGENT_LABEL:-}"
+    printf 'TUIST_MANAGED_DAEMON_DATA_HOME=%s\n' \
+      "${TUIST_MANAGED_DAEMON_DATA_HOME:-}"
   } | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}'
 }
 

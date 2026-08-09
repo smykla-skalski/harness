@@ -13,9 +13,9 @@ extension DaemonController {
     case contended
   }
 
-  /// Try-acquire `flock(LOCK_EX|LOCK_NB)` on the app-group service sentinel,
-  /// holding it across the supplied closure. Every runtime lane controls the
-  /// same SMAppService identity, so the lock must not follow daemon data roots.
+  /// Try-acquire `flock(LOCK_EX|LOCK_NB)` on the service-identity sentinel,
+  /// holding it across the supplied closure. Every Monitor process for one
+  /// runtime lane controls the same SMAppService identity.
   ///
   /// Lock semantics:
   /// - `flock(2)` is per open-file-description on Darwin, so two
