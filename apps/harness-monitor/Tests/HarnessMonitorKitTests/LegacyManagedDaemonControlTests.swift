@@ -108,4 +108,48 @@ struct LegacyManagedDaemonControlTests {
     #expect(recordedSignal.0 == pid)
     #expect(recordedSignal.1 == SIGTERM)
   }
+
+  @Test("Cancellation still signals the validated managed daemon")
+  func cancellationStillSignalsValidatedManagedDaemon() async throws {
+    let fixture = try ManagedDaemonQuiescenceFixture(name: "cancelled-control")
+    defer { fixture.remove() }
+    let candidate = try #require(
+      HarnessMonitorPaths.managedDaemonRootCandidates(using: fixture.environment).first
+    )
+    let pid: Int32 = 45_614
+    try fixture.writeManifest(
+      at: candidate,
+      endpoint: "http://127.0.0.1:65109",
+      pid: pid
+    )
+    let client = RecordingHarnessClient()
+    client.stopDaemonDelay = .seconds(5)
+    let signalRecorder = ManagedDaemonSignalRecorder()
+    let controller = DaemonController(
+      environment: fixture.environment,
+      ownership: .managed,
+      sessionFactory: { _ in client },
+      processLiveness: { _ in
+        .alive(
+          executablePath: "/Applications/Harness Monitor.app/Contents/Resources/harness-daemon")
+      },
+      processSignal: { requestedPID, signal in
+        signalRecorder.record(pid: requestedPID, signal: signal)
+        return 0
+      },
+      managedDaemonProcessIdentityValidator: { _ in true }
+    )
+    let quiescence = Task {
+      try await controller.quiesceManagedDaemonsAfterLegacyCleanupFailure()
+    }
+    try await Task.sleep(for: .milliseconds(50))
+    quiescence.cancel()
+
+    await #expect(throws: CancellationError.self) {
+      try await quiescence.value
+    }
+    let recordedSignal = try #require(signalRecorder.value)
+    #expect(recordedSignal.0 == pid)
+    #expect(recordedSignal.1 == SIGTERM)
+  }
 }

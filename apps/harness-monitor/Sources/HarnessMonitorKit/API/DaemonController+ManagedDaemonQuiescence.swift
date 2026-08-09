@@ -61,6 +61,7 @@ extension DaemonController {
         stoppedDaemons: stoppedDaemons,
         deadline: deadline
       )
+      try Task.checkCancellation()
       let failures = results.compactMap { result in
         result.failure.map { "\(result.rootURL.path): \($0)" }
       }
@@ -268,6 +269,10 @@ extension DaemonController {
     case .cancelled:
       request.cancel()
       Task { await client.shutdown() }
+      try terminateManagedDaemonAfterControlFailure(
+        manifest,
+        reason: "managed daemon control was cancelled"
+      )
       throw CancellationError()
     case .failed(let reason):
       try terminateManagedDaemonAfterControlFailure(manifest, reason: reason)

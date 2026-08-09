@@ -254,7 +254,7 @@ extension HarnessMonitorStore {
       await staleClient.shutdown()
     }
 
-    try await daemonController.requireLegacyManagedLaunchAgentCleanup()
+    try await requireLegacyManagedLaunchAgentCleanupOrThrow()
     _ = try await daemonController.repairLaunchAgentRegistration()
     let registrationState = await daemonController.launchAgentRegistrationState()
     switch registrationState {

@@ -19,7 +19,7 @@ extension HarnessMonitorStore {
       }
     }
 
-    try await daemonController.requireLegacyManagedLaunchAgentCleanup()
+    try await requireLegacyManagedLaunchAgentCleanupOrThrow()
     let client = try await makeMobileRelayBackgroundClient()
     mobileRelayBackgroundClient = client
     return client

@@ -26,6 +26,7 @@ extension HarnessMonitorStore {
       return
     }
     ensureLocalManifestURL()
+    guard await requireLegacyManagedLaunchAgentCleanup() else { return }
     switch daemonOwnership {
     case .external:
       await bootstrapExternalDaemon()
@@ -236,7 +237,6 @@ extension HarnessMonitorStore {
   }
 
   func bootstrapManagedDaemon() async {
-    guard await requireLegacyManagedLaunchAgentCleanup() else { return }
     await refreshManagedLaunchAgentOnFirstLaunchIfNeeded()
 
     let registrationState: DaemonLaunchAgentRegistrationState
@@ -321,7 +321,7 @@ extension HarnessMonitorStore {
   func bootstrapRemoteDaemon() async {
     restorePersistedSessionStateWhileConnectingInBackground()
     do {
-      try await daemonController.requireLegacyManagedLaunchAgentCleanup()
+      try await requireLegacyManagedLaunchAgentCleanupOrThrow()
       let client = try await withBootstrapTelemetryPhase(.remoteDaemonConnect) {
         try await daemonController.bootstrapClient()
       }

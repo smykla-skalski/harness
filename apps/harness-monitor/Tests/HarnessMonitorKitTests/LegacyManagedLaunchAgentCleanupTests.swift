@@ -261,13 +261,29 @@ struct LegacyManagedLaunchAgentCleanupTests {
     #expect(recorder.managerFactoryUsedMainThread() == false)
   }
 
-  @Test("Current service failure remains fenced until legacy cleanup succeeds")
-  func currentServiceFailureRemainsFencedUntilCleanupSucceeds() async throws {
+  @Test("Current service failure quiesces once and returns a bounded error")
+  func currentServiceFailureQuiescesOnceAndReturnsBoundedError() async throws {
     let suiteName =
       "io.harnessmonitor.kit-tests.legacy-cleanup.\(UUID().uuidString)"
     let defaults = try #require(UserDefaults(suiteName: suiteName))
     defer { defaults.removePersistentDomain(forName: suiteName) }
     let recorder = LegacyCleanupAttemptRecorder(currentUnregisterFails: true)
+
+    await #expect(throws: DaemonControlError.self) {
+      try await LegacyManagedLaunchAgentCleanup.requireComplete(
+        defaults: defaults,
+        managerFactory: { recorder.manager(for: $0) },
+        afterCurrentServiceUnregister: {
+          recorder.record("settled")
+        },
+        quiesceOnFailure: {
+          recorder.record("quiesced")
+        }
+      )
+    }
+
+    #expect(recorder.events().contains("settled") == false)
+    #expect(recorder.events().filter { $0 == "quiesced" }.count == 1)
 
     try await LegacyManagedLaunchAgentCleanup.requireComplete(
       defaults: defaults,
@@ -276,12 +292,11 @@ struct LegacyManagedLaunchAgentCleanupTests {
         recorder.record("settled")
       },
       quiesceOnFailure: {
-        recorder.record("quiesced")
+        recorder.record("quiesced-again")
       }
     )
 
-    #expect(recorder.events().contains("settled") == false)
-    #expect(recorder.events().filter { $0 == "quiesced" }.count == 1)
+    #expect(recorder.events().contains("quiesced-again") == false)
   }
 
 }

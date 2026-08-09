@@ -14,7 +14,6 @@ public enum LegacyManagedLaunchAgentCleanup {
   static let failureMessage =
     "Legacy daemon cleanup failed; daemon startup remains disabled to prevent duplicate automation"
   private static let lock = NSLock()
-  private static let coordinator = LegacyManagedLaunchAgentCleanupCoordinator()
 
   private struct CleanupAttempt: Sendable {
     let isComplete: Bool
@@ -51,38 +50,50 @@ public enum LegacyManagedLaunchAgentCleanup {
     quiesceOnFailure: @escaping @Sendable () async throws -> Void
   ) async throws {
     let sendableDefaults = SendableUserDefaults(defaults)
-    try await coordinator.run {
-      var lastQuiescenceFailure: String?
-      while true {
-        let attempt = await Task.detached(priority: .userInitiated) {
-          serializedAttempt(
-            defaults: sendableDefaults.value,
-            currentName: currentName,
-            legacyNames: legacyNames,
-            managerFactory: managerFactory
-          )
-        }.value
-        if attempt.isComplete {
-          return
-        }
-        if attempt.currentServiceWasUnregistered {
-          await afterCurrentServiceUnregister()
-          continue
-        }
-        do {
-          try await quiesceOnFailure()
-        } catch {
-          let message = error.localizedDescription
-          if message != lastQuiescenceFailure {
-            HarnessMonitorLogger.lifecycle.fault(
-              "Legacy daemon quiescence failed: \(message, privacy: .public)"
-            )
-            lastQuiescenceFailure = message
-          }
-          try await Task.sleep(for: .seconds(1))
-        }
+    var attempt = await detachedAttempt(
+      defaults: sendableDefaults,
+      currentName: currentName,
+      legacyNames: legacyNames,
+      managerFactory: managerFactory
+    )
+    if attempt.isComplete {
+      return
+    }
+    if attempt.currentServiceWasUnregistered {
+      await afterCurrentServiceUnregister()
+      try Task.checkCancellation()
+      attempt = await detachedAttempt(
+        defaults: sendableDefaults,
+        currentName: currentName,
+        legacyNames: legacyNames,
+        managerFactory: managerFactory
+      )
+      if attempt.isComplete {
+        return
+      }
+      if attempt.currentServiceWasUnregistered {
+        await afterCurrentServiceUnregister()
       }
     }
+    try Task.checkCancellation()
+    try await quiesceOnFailure()
+    throw DaemonControlError.commandFailed(failureMessage)
+  }
+
+  private static func detachedAttempt(
+    defaults: SendableUserDefaults,
+    currentName: String,
+    legacyNames: [String],
+    managerFactory: @escaping @Sendable (String) -> any DaemonLaunchAgentManaging
+  ) async -> CleanupAttempt {
+    await Task.detached(priority: .userInitiated) {
+      serializedAttempt(
+        defaults: defaults.value,
+        currentName: currentName,
+        legacyNames: legacyNames,
+        managerFactory: managerFactory
+      )
+    }.value
   }
 
   private static func serializedAttempt(
@@ -209,24 +220,6 @@ struct SendableUserDefaults: @unchecked Sendable {
 
   init(_ value: UserDefaults) {
     self.value = value
-  }
-}
-
-private actor LegacyManagedLaunchAgentCleanupCoordinator {
-  private var inFlight: Task<Void, any Error>?
-
-  func run(
-    _ operation: @escaping @Sendable () async throws -> Void
-  ) async throws {
-    if let inFlight {
-      try await inFlight.value
-      return
-    }
-
-    let task = Task { try await operation() }
-    inFlight = task
-    defer { inFlight = nil }
-    try await task.value
   }
 }
 

@@ -80,6 +80,39 @@ struct DaemonControllerLaunchAgentLockTests {
     }
   }
 
+  @Test("Cancellation stops a contended lock acquisition")
+  func cancellationStopsContendedLockAcquisition() async throws {
+    try await withTempDaemonFixture(pid: 1) { environment in
+      let lockURL = HarnessMonitorPaths.managedLaunchAgentLockURL(using: environment)
+      try FileManager.default.createDirectory(
+        at: lockURL.deletingLastPathComponent(),
+        withIntermediateDirectories: true
+      )
+      let externalFD = Darwin.open(lockURL.path, O_RDWR | O_CREAT | O_CLOEXEC, 0o600)
+      #expect(externalFD >= 0)
+      defer { _ = Darwin.close(externalFD) }
+      #expect(testBSDFileLock(externalFD, LOCK_EX | LOCK_NB) == 0)
+      defer { _ = testBSDFileLock(externalFD, LOCK_UN) }
+
+      let controller = DaemonController(environment: environment, ownership: .managed)
+      let waiter = Task {
+        try await controller.withManagedLaunchAgentLock(
+          totalTimeout: .seconds(5),
+          retryInterval: .milliseconds(20)
+        ) {
+          Issue.record("Cancelled lock closure must not run")
+          return 0
+        }
+      }
+      try await Task.sleep(for: .milliseconds(50))
+      waiter.cancel()
+
+      await #expect(throws: CancellationError.self) {
+        _ = try await waiter.value
+      }
+    }
+  }
+
   @Test("Lock releases after the closure so subsequent acquires succeed")
   func lockReleasesAfterClosureSoSubsequentAcquiresSucceed() async throws {
     try await withTempDaemonFixture(pid: 1) { environment in

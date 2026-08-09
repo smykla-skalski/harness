@@ -85,8 +85,10 @@ extension DaemonController {
 
     let deadline = ContinuousClock.now + totalTimeout
     while true {
+      try Task.checkCancellation()
       if bsdFlock(fd, LOCK_EX | LOCK_NB) == 0 {
         defer { _ = bsdFlock(fd, LOCK_UN) }
+        try Task.checkCancellation()
         return .acquired(try await perform())
       }
       let err = errno
@@ -98,7 +100,7 @@ extension DaemonController {
       if ContinuousClock.now >= deadline {
         return .contended
       }
-      try? await Task.sleep(for: retryInterval)
+      try await Task.sleep(for: retryInterval)
     }
   }
 

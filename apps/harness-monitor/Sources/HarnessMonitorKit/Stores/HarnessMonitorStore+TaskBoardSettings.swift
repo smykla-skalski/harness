@@ -278,11 +278,11 @@ extension HarnessMonitorStore {
   }
 
   private func taskBoardSettingsClient() async throws -> any HarnessMonitorClientProtocol {
-    try await daemonController.requireLegacyManagedLaunchAgentCleanup()
     if let client {
       _ = try await requireDatabaseBackedTaskBoard(using: client)
       return client
     }
+    try await requireLegacyManagedLaunchAgentCleanupOrThrow()
     await bootstrapIfNeeded()
     if let client {
       _ = try await requireDatabaseBackedTaskBoard(using: client)

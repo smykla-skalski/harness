@@ -338,6 +338,8 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var managedLaunchAgentRefreshAttempts = 0
   var managedDaemonRecoveryExhausted = false
   @ObservationIgnored var hasRefreshedManagedLaunchAgentOnLaunch = false
+  @ObservationIgnored let legacyManagedLaunchAgentContainment =
+    LegacyManagedLaunchAgentContainment()
   @ObservationIgnored var pendingAgentTuiActionRefresh: (tuiID: String, token: UInt64)?
   var pendingExtensions: SessionExtensionsPayload?
   var isNavigatingHistory = false
