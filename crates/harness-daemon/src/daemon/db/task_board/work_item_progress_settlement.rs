@@ -67,11 +67,22 @@ pub(super) async fn terminal_task_board_worker_attempts(
         "SELECT progress.attempt_id, tui.status, tui.error, tui.signal
          FROM task_board_work_item_progress AS progress
          JOIN agent_tuis AS tui ON tui.tui_id = progress.attempt_id
-         WHERE progress.state IN ('pending', 'running')
-           AND progress.completed_at IS NULL
+         JOIN task_board_items AS item
+           ON item.item_id = progress.item_id
+          AND item.work_item_id = progress.work_item_id
+          AND item.deleted_at IS NULL
+         WHERE progress.completed_at IS NULL
            AND progress.agent_mode = 'interactive'
            AND tui.workspace_id IS NOT NULL AND tui.agent_id = ''
            AND tui.status IN ('exited', 'failed', 'stopped')
+           AND (
+               progress.state IN ('pending', 'running')
+               OR EXISTS (
+                   SELECT 1 FROM task_board_dispatch_admission_ledger AS ledger
+                   WHERE ledger.managed_worker_id = progress.attempt_id
+                     AND ledger.kind = 'concurrency' AND ledger.state = 'committed'
+               )
+           )
          ORDER BY tui.updated_at, progress.item_id, progress.work_item_id
          LIMIT ?1",
     )

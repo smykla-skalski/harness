@@ -3,6 +3,7 @@
 use sqlx::{Sqlite, Transaction, query_as};
 use uuid::Uuid;
 
+use super::admission_lifecycle::release_managed_worker_admission_in_tx;
 use super::item_tx_ext::TaskBoardItemTxExt;
 use super::work_item_progress::{insert_initial_progress_in_tx, persist_outcome_in_tx};
 use super::work_item_progress_queries::TaskBoardRuntimeTerminalReport;
@@ -78,6 +79,7 @@ pub(super) async fn project_task_board_runtime_terminal_for_attempt(
             )));
         }
     };
+    release_managed_worker_admission_in_tx(&mut transaction, attempt_id).await?;
     transaction.commit().await.map_err(|error| {
         db_error(format!(
             "commit task board runtime terminal attempt projection: {error}"

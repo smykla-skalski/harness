@@ -303,15 +303,20 @@ async fn managed_worker_is_terminal_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     managed_worker_id: &str,
 ) -> Result<bool, CliError> {
-    let status = query_scalar::<_, String>("SELECT status FROM codex_runs WHERE run_id = ?1")
-        .bind(managed_worker_id)
-        .fetch_optional(transaction.as_mut())
-        .await
-        .map_err(|error| db_error(format!("load managed worker status: {error}")))?;
-    Ok(
-        status
-            .is_some_and(|status| matches!(status.as_str(), "completed" | "failed" | "cancelled")),
+    query_scalar::<_, bool>(
+        "SELECT EXISTS(
+             SELECT 1 FROM codex_runs
+             WHERE run_id = ?1 AND status IN ('completed', 'failed', 'cancelled')
+         ) OR EXISTS(
+             SELECT 1 FROM task_board_work_item_progress
+             WHERE attempt_id = ?1 AND completed_at IS NOT NULL
+               AND worker_settled_at IS NOT NULL
+         )",
     )
+    .bind(managed_worker_id)
+    .fetch_one(transaction.as_mut())
+    .await
+    .map_err(|error| db_error(format!("load managed worker terminal state: {error}")))
 }
 
 pub(super) async fn release_dispatch_admission_in_tx(
