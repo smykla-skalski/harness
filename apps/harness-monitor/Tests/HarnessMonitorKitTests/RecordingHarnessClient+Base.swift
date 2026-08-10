@@ -28,6 +28,9 @@ extension RecordingHarnessClient {
 
   func diagnostics() async throws -> DaemonDiagnosticsReport {
     recordReadCall(.diagnostics)
+    if let diagnosticsHandler {
+      return try await diagnosticsHandler()
+    }
     if let error = dequeueDiagnosticsError() {
       throw error
     }

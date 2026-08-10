@@ -227,10 +227,9 @@ extension HarnessMonitorStoreLifecycleCoreTests {
   )
   func bootstrapGoesOfflineWhenSnapshotEndpointsFailPersistently() async {
     let client = RecordingHarnessClient()
-    let persistentErrors: [any Error] = (0..<20).map { _ in
-      HarnessMonitorAPIError.server(code: 503, message: "daemon snapshot warming up")
+    client.diagnosticsHandler = {
+      throw HarnessMonitorAPIError.server(code: 503, message: "daemon snapshot warming up")
     }
-    client.configureDiagnosticsErrors(persistentErrors)
     let store = HarnessMonitorStore(
       daemonController: RecordingDaemonController(client: client)
     )

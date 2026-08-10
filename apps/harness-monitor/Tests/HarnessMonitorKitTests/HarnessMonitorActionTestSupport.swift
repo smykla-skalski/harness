@@ -31,6 +31,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var transportLatencyError: (any Error)?
   var diagnosticsDelay: Duration?
   var diagnosticsReportOverride: DaemonDiagnosticsReport?
+  var diagnosticsHandler: (@Sendable () async throws -> DaemonDiagnosticsReport)?
   var projectsDelay: Duration?
   var sessionsDelay: Duration?
   var queuedDiagnosticsErrors: [any Error] = []
