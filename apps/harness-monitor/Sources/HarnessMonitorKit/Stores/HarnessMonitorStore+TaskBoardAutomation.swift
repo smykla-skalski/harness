@@ -5,54 +5,24 @@ extension HarnessMonitorStore {
     before: String? = nil,
     limit: UInt32 = 50
   ) async -> TaskBoardAutomationHistoryResponse? {
-    guard connectionState == .online, let client = availableTaskBoardClient else { return nil }
-    do {
-      let measuredResponse = try await Self.measureOperation {
-        try await client.taskBoardAutomationRuns(
-          request: TaskBoardAutomationHistoryRequest(limit: limit, before: before)
-        )
-      }
-      recordRequestSuccess()
-      return measuredResponse.value
-    } catch is CancellationError {
-      return nil
-    } catch {
-      presentFailureFeedback(error.localizedDescription)
-      return nil
+    await readTaskBoard { client in
+      try await client.taskBoardAutomationRuns(
+        request: TaskBoardAutomationHistoryRequest(limit: limit, before: before)
+      )
     }
   }
 
   public func taskBoardAutomationRunDetail(
     runID: String
   ) async -> TaskBoardAutomationRunDetail? {
-    guard connectionState == .online, let client = availableTaskBoardClient else { return nil }
-    do {
-      let measuredDetail = try await Self.measureOperation {
-        try await client.taskBoardAutomationRunDetail(runID: runID)
-      }
-      recordRequestSuccess()
-      return measuredDetail.value
-    } catch is CancellationError {
-      return nil
-    } catch {
-      presentFailureFeedback(error.localizedDescription)
-      return nil
+    await readTaskBoard { client in
+      try await client.taskBoardAutomationRunDetail(runID: runID)
     }
   }
 
   public func taskBoardAutomationMetrics() async -> TaskBoardAutomationMetrics? {
-    guard connectionState == .online, let client = availableTaskBoardClient else { return nil }
-    do {
-      let measuredMetrics = try await Self.measureOperation {
-        try await client.taskBoardAutomationMetrics()
-      }
-      recordRequestSuccess()
-      return measuredMetrics.value
-    } catch is CancellationError {
-      return nil
-    } catch {
-      presentFailureFeedback(error.localizedDescription)
-      return nil
+    await readTaskBoard { client in
+      try await client.taskBoardAutomationMetrics()
     }
   }
 

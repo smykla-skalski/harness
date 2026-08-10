@@ -73,6 +73,9 @@ extension HarnessMonitorStore {
       }
       return false
     } catch {
+      guard (try? requireCurrentTaskBoardClientAccess(access)) != nil else {
+        return false
+      }
       if taskBoardSyncPhase == .stopping {
         finishStoppedTaskBoardSync(using: client, position: feedbackPosition)
         return false

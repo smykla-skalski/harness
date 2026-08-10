@@ -2,18 +2,8 @@ import Foundation
 
 extension HarnessMonitorStore {
   public func taskBoardItemTriageCurrent(id: String) async -> TaskBoardTriageCurrentResponse? {
-    guard connectionState == .online, let client = availableTaskBoardClient else { return nil }
-    do {
-      let measuredResponse = try await Self.measureOperation {
-        try await client.taskBoardItemTriageCurrent(id: id)
-      }
-      recordRequestSuccess()
-      return measuredResponse.value
-    } catch is CancellationError {
-      return nil
-    } catch {
-      presentFailureFeedback(error.localizedDescription)
-      return nil
+    await readTaskBoard { client in
+      try await client.taskBoardItemTriageCurrent(id: id)
     }
   }
 
@@ -22,22 +12,12 @@ extension HarnessMonitorStore {
     beforeGeneration: UInt64? = nil,
     limit: UInt32? = nil
   ) async -> TaskBoardTriageHistoryResponse? {
-    guard connectionState == .online, let client = availableTaskBoardClient else { return nil }
-    do {
-      let measuredResponse = try await Self.measureOperation {
-        try await client.taskBoardItemTriageHistory(
-          id: id,
-          beforeGeneration: beforeGeneration,
-          limit: limit
-        )
-      }
-      recordRequestSuccess()
-      return measuredResponse.value
-    } catch is CancellationError {
-      return nil
-    } catch {
-      presentFailureFeedback(error.localizedDescription)
-      return nil
+    await readTaskBoard { client in
+      try await client.taskBoardItemTriageHistory(
+        id: id,
+        beforeGeneration: beforeGeneration,
+        limit: limit
+      )
     }
   }
 
@@ -46,8 +26,9 @@ extension HarnessMonitorStore {
     id: String,
     request: TaskBoardSetTriageOverrideRequest
   ) async -> Bool {
-    await mutateTaskBoardTriageOverride(actionName: "Set triage override") { client in
-      try await client.setTaskBoardItemTriageOverride(id: id, request: request)
+    await mutateTaskBoardTriageOverride(actionName: "Set triage override") { [self] access in
+      try requireCurrentTaskBoardClientAccess(access)
+      return try await access.client.setTaskBoardItemTriageOverride(id: id, request: request)
     }
   }
 
@@ -56,15 +37,16 @@ extension HarnessMonitorStore {
     id: String,
     request: TaskBoardClearTriageOverrideRequest
   ) async -> Bool {
-    await mutateTaskBoardTriageOverride(actionName: "Clear triage override") { client in
-      try await client.clearTaskBoardItemTriageOverride(id: id, request: request)
+    await mutateTaskBoardTriageOverride(actionName: "Clear triage override") { [self] access in
+      try requireCurrentTaskBoardClientAccess(access)
+      return try await access.client.clearTaskBoardItemTriageOverride(id: id, request: request)
     }
   }
 
   private func mutateTaskBoardTriageOverride(
     actionName: String,
     operation:
-      @escaping @Sendable (any HarnessMonitorClientProtocol) async throws
+      @escaping @MainActor @Sendable (TaskBoardClientAccess) async throws
       -> TaskBoardTriageOverrideMutationResponse
   ) async -> Bool {
     guard let access = availableTaskBoardClientAccess else { return false }
@@ -76,7 +58,7 @@ extension HarnessMonitorStore {
       endTaskBoardAction()
     }
     do {
-      let response = try await Self.measureOperation { try await operation(client) }.value
+      let response = try await Self.measureOperation { try await operation(access) }.value
       try requireCurrentTaskBoardClientAccess(access)
       recordRequestSuccess()
       mergeTaskBoardItem(response.snapshot.item)
@@ -102,9 +84,9 @@ extension HarnessMonitorStore {
     reason: String?,
     actor: String = "Harness Monitor"
   ) async -> Bool {
-    await mutateTaskBoardTriageOverride(actionName: "Set triage override") { client in
-      try await Self.setTaskBoardTriageOverrideWithRetry(
-        using: client,
+    await mutateTaskBoardTriageOverride(actionName: "Set triage override") { [self] access in
+      try await setTaskBoardTriageOverrideWithRetry(
+        access: access,
         id: id,
         SetTriageOverrideParams(verdict: verdict, reason: reason, actor: actor),
         remainingRetries: Self.triageOverrideConflictRetryLimit
@@ -118,9 +100,9 @@ extension HarnessMonitorStore {
     id: String,
     actor: String = "Harness Monitor"
   ) async -> Bool {
-    await mutateTaskBoardTriageOverride(actionName: "Clear triage override") { client in
-      try await Self.clearTaskBoardTriageOverrideWithRetry(
-        using: client,
+    await mutateTaskBoardTriageOverride(actionName: "Clear triage override") { [self] access in
+      try await clearTaskBoardTriageOverrideWithRetry(
+        access: access,
         id: id,
         actor: actor,
         remainingRetries: Self.triageOverrideConflictRetryLimit
@@ -136,13 +118,16 @@ extension HarnessMonitorStore {
     let actor: String
   }
 
-  private static func setTaskBoardTriageOverrideWithRetry(
-    using client: any HarnessMonitorClientProtocol,
+  private func setTaskBoardTriageOverrideWithRetry(
+    access: TaskBoardClientAccess,
     id: String,
     _ params: SetTriageOverrideParams,
     remainingRetries: Int
   ) async throws -> TaskBoardTriageOverrideMutationResponse {
+    try requireCurrentTaskBoardClientAccess(access)
+    let client = access.client
     var snapshot = try await client.taskBoardItemPositionSnapshot(id: id)
+    try requireCurrentTaskBoardClientAccess(access)
     let initialItemRevision = snapshot.itemRevision
     var retries = remainingRetries
     while true {
@@ -154,12 +139,15 @@ extension HarnessMonitorStore {
         actor: params.actor
       )
       do {
+        try requireCurrentTaskBoardClientAccess(access)
         return try await client.setTaskBoardItemTriageOverride(id: id, request: request)
       } catch {
+        try requireCurrentTaskBoardClientAccess(access)
         guard retries > 0, error.isTriageOverrideConcurrentModification else {
           throw error
         }
         let refreshed = try await client.taskBoardItemPositionSnapshot(id: id)
+        try requireCurrentTaskBoardClientAccess(access)
         guard refreshed.itemRevision == initialItemRevision else {
           throw error
         }
@@ -169,13 +157,16 @@ extension HarnessMonitorStore {
     }
   }
 
-  private static func clearTaskBoardTriageOverrideWithRetry(
-    using client: any HarnessMonitorClientProtocol,
+  private func clearTaskBoardTriageOverrideWithRetry(
+    access: TaskBoardClientAccess,
     id: String,
     actor: String,
     remainingRetries: Int
   ) async throws -> TaskBoardTriageOverrideMutationResponse {
+    try requireCurrentTaskBoardClientAccess(access)
+    let client = access.client
     var snapshot = try await client.taskBoardItemPositionSnapshot(id: id)
+    try requireCurrentTaskBoardClientAccess(access)
     let initialItemRevision = snapshot.itemRevision
     var retries = remainingRetries
     while true {
@@ -185,12 +176,15 @@ extension HarnessMonitorStore {
         actor: actor
       )
       do {
+        try requireCurrentTaskBoardClientAccess(access)
         return try await client.clearTaskBoardItemTriageOverride(id: id, request: request)
       } catch {
+        try requireCurrentTaskBoardClientAccess(access)
         guard retries > 0, error.isTriageOverrideConcurrentModification else {
           throw error
         }
         let refreshed = try await client.taskBoardItemPositionSnapshot(id: id)
+        try requireCurrentTaskBoardClientAccess(access)
         guard refreshed.itemRevision == initialItemRevision else {
           throw error
         }

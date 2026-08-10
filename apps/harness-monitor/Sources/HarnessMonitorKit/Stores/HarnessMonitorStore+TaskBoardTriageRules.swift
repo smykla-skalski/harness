@@ -2,72 +2,32 @@ import Foundation
 
 extension HarnessMonitorStore {
   public func taskBoardTriageRulesDraft() async -> TaskBoardTriageRulesDraftResponse? {
-    guard connectionState == .online, let client = availableTaskBoardClient else { return nil }
-    do {
-      let measuredResponse = try await Self.measureOperation {
-        try await client.taskBoardTriageRulesDraft()
-      }
-      recordRequestSuccess()
-      return measuredResponse.value
-    } catch is CancellationError {
-      return nil
-    } catch {
-      presentFailureFeedback(error.localizedDescription)
-      return nil
+    await readTaskBoard { client in
+      try await client.taskBoardTriageRulesDraft()
     }
   }
 
   public func previewTaskBoardTriageRules(
     request: TaskBoardPreviewTriageRulesRequest
   ) async -> TriageRuleSetPreviewResult? {
-    guard connectionState == .online, let client = availableTaskBoardClient else { return nil }
-    do {
-      let measuredResponse = try await Self.measureOperation {
-        try await client.previewTaskBoardTriageRules(request: request)
-      }
-      recordRequestSuccess()
-      return measuredResponse.value
-    } catch is CancellationError {
-      return nil
-    } catch {
-      presentFailureFeedback(error.localizedDescription)
-      return nil
+    await readTaskBoard { client in
+      try await client.previewTaskBoardTriageRules(request: request)
     }
   }
 
   public func taskBoardTriageRulesRevisions(limit: UInt32? = nil) async
     -> TaskBoardTriageRulesRevisionsResponse?
   {
-    guard connectionState == .online, let client = availableTaskBoardClient else { return nil }
-    do {
-      let measuredResponse = try await Self.measureOperation {
-        try await client.taskBoardTriageRulesRevisions(limit: limit)
-      }
-      recordRequestSuccess()
-      return measuredResponse.value
-    } catch is CancellationError {
-      return nil
-    } catch {
-      presentFailureFeedback(error.localizedDescription)
-      return nil
+    await readTaskBoard { client in
+      try await client.taskBoardTriageRulesRevisions(limit: limit)
     }
   }
 
   public func taskBoardTriageRulesAudit(limit: UInt32? = nil) async
     -> TaskBoardTriageRulesAuditResponse?
   {
-    guard connectionState == .online, let client = availableTaskBoardClient else { return nil }
-    do {
-      let measuredResponse = try await Self.measureOperation {
-        try await client.taskBoardTriageRulesAudit(limit: limit)
-      }
-      recordRequestSuccess()
-      return measuredResponse.value
-    } catch is CancellationError {
-      return nil
-    } catch {
-      presentFailureFeedback(error.localizedDescription)
-      return nil
+    await readTaskBoard { client in
+      try await client.taskBoardTriageRulesAudit(limit: limit)
     }
   }
 

@@ -18,10 +18,13 @@ extension HarnessMonitorStore {
     else {
       return false
     }
-    let databaseAccessGeneration =
-      hasSeenReady
-      ? await invalidateTaskBoardDatabaseAccess(using: client)
-      : taskBoardRuntimeState.connection.databaseAccessGeneration
+    guard
+      let databaseAccessGeneration = await reserveTaskBoardDatabaseAccessForReady(
+        using: client,
+        hasSeenReady: hasSeenReady,
+        connectionFence: connectionFence
+      )
+    else { return false }
     let accessFence = TaskBoardAccessFence(
       containment: containmentFence,
       connection: connectionFence,
@@ -48,6 +51,26 @@ extension HarnessMonitorStore {
     }
     await recoverGlobalPushOnlyState(using: client, connectionFence: connectionFence)
     return isCurrentTaskBoardAccessFence(accessFence)
+  }
+
+  private func reserveTaskBoardDatabaseAccessForReady(
+    using client: any HarnessMonitorClientProtocol,
+    hasSeenReady: Bool,
+    connectionFence: ConnectionAttemptFence?
+  ) async -> UInt64? {
+    guard hasSeenReady else {
+      return taskBoardRuntimeState.connection.databaseAccessGeneration
+    }
+    do {
+      return try await invalidateTaskBoardDatabaseAccess(using: client)
+    } catch is CancellationError {
+      return nil
+    } catch {
+      guard isCurrentConnectionAttemptFenceIfProvided(connectionFence) else { return nil }
+      markConnectionOffline(error.localizedDescription)
+      scheduleReconnectAfterConnectionFailure()
+      return nil
+    }
   }
 
   func recoverGlobalPushOnlyState(

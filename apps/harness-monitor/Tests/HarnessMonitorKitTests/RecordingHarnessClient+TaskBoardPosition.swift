@@ -6,7 +6,8 @@ extension RecordingHarnessClient {
   func taskBoardItemsSnapshot(status: TaskBoardStatus?) async throws
     -> TaskBoardListItemsSnapshot
   {
-    lock.withLock {
+    await taskBoardItemsReadGate.suspendIfConfigured()
+    return lock.withLock {
       let canonicalStatus = status?.canonicalPersistedStatus
       let items = taskBoardItemsStorage.filter { item in
         item.deletedAt == nil
@@ -25,7 +26,8 @@ extension RecordingHarnessClient {
   }
 
   func taskBoardItemPositionSnapshot(id: String) async throws -> TaskBoardItemPositionSnapshot {
-    try lock.withLock {
+    await taskBoardItemsReadGate.suspendIfConfigured()
+    return try lock.withLock {
       guard
         let item = taskBoardItemsStorage.first(where: { $0.id == id }),
         item.deletedAt == nil

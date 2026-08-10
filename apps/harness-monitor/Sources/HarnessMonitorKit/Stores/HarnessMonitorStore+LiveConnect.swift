@@ -24,7 +24,7 @@ extension HarnessMonitorStore {
       )
     } catch {
       guard isCurrentConnectionAttemptFence(connectionFence) else {
-        await settleAbandonedConnectionAttempt(using: client)
+        await settleAbandonedConnectionAttempt(using: client, connectionFence: connectionFence)
         return
       }
       guard await discardFailedConnectionUnlessReplaced() else {
@@ -34,7 +34,7 @@ extension HarnessMonitorStore {
     }
 
     guard isCurrentConnectionAttemptFence(connectionFence) else {
-      await settleAbandonedConnectionAttempt(using: client)
+      await settleAbandonedConnectionAttempt(using: client, connectionFence: connectionFence)
       return
     }
     withUISyncBatch {

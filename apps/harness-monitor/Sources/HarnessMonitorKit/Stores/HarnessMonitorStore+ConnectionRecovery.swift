@@ -123,20 +123,22 @@ extension HarnessMonitorStore {
     await disconnectedClient.shutdown()
   }
 
-  func discardConnectionCandidateIfOwned(
-    _ candidate: any HarnessMonitorClientProtocol
-  ) async {
-    guard self.client === candidate else { return }
-    await discardActiveConnection()
-  }
-
   func settleAbandonedConnectionAttempt(
-    using candidate: any HarnessMonitorClientProtocol
+    using candidate: any HarnessMonitorClientProtocol,
+    connectionFence: ConnectionAttemptFence
   ) async {
-    await discardConnectionCandidateIfOwned(candidate)
+    guard !isCurrentConnectionAttemptFence(connectionFence) else { return }
     if shouldAbandonConnectionAttempt {
-      connectionState = .idle
+      if self.client === candidate {
+        await discardActiveConnection()
+      }
+      if connection.legacyContainmentHealthy {
+        connectionState = .idle
+      }
+      return
     }
+    guard self.client !== candidate else { return }
+    await candidate.shutdown()
   }
 
   func discardFailedConnectionUnlessReplaced() async -> Bool {

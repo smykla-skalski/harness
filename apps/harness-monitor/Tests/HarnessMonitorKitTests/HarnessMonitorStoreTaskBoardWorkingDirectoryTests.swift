@@ -222,7 +222,7 @@ struct HarnessMonitorStoreTaskBoardWorkingDirectoryTests {
   func repeatedReadyBlocksWorkingCopyMutations() async throws {
     let client = RecordingHarnessClient()
     let store = await makeBootstrappedStore(client: client)
-    _ = await store.invalidateTaskBoardDatabaseAccess(using: client)
+    _ = try await store.invalidateTaskBoardDatabaseAccess(using: client)
 
     #expect(await store.obtainRepositoryWorkingCopy(repository: "blocked/repo") == nil)
     #expect(await store.deleteRepositoryWorkingCopy(repoKeySegment: "blocked") == false)

@@ -21,6 +21,14 @@ struct TaskBoardClientAccess: Sendable {
   }
 }
 
+private struct TaskBoardSourceSyncQuiescenceError: LocalizedError {
+  let errorDescription: String?
+
+  init(_ description: String) {
+    errorDescription = description
+  }
+}
+
 extension HarnessMonitorStore {
   var availableTaskBoardClient: (any HarnessMonitorClientProtocol)? {
     guard taskBoardRuntimeState.connection.databaseAccessSuspended == false else {
@@ -176,18 +184,42 @@ extension HarnessMonitorStore {
   @discardableResult
   func invalidateTaskBoardDatabaseAccess(
     using client: any HarnessMonitorClientProtocol
-  ) async -> UInt64 {
+  ) async throws -> UInt64 {
     taskBoardRuntimeState.connection.databaseAccessGeneration &+= 1
     taskBoardRuntimeState.connection.databaseAccessSuspended = true
     taskBoardDatabaseInstanceID = nil
     lastTaskBoardCredentialSync = nil
     cancelTaskBoardDashboardSnapshotRefresh()
     scheduleUISync([.contentDashboard])
-    if taskBoardSyncPhase != .idle {
-      setTaskBoardSyncPhase(.stopping)
-      _ = try? await client.cancelTaskBoardSync()
-    }
+    try await quiesceTaskBoardSourceSync(using: client)
     return taskBoardRuntimeState.connection.databaseAccessGeneration
+  }
+
+  private func quiesceTaskBoardSourceSync(
+    using client: any HarnessMonitorClientProtocol
+  ) async throws {
+    let restoreIdlePhase = taskBoardSyncPhase == .idle
+    let deadline = ContinuousClock.now.advanced(by: .seconds(30))
+    while true {
+      try Task.checkCancellation()
+      let status = try await client.taskBoardSyncStatus()
+      guard status.active else {
+        if restoreIdlePhase {
+          setTaskBoardSyncPhase(.idle)
+        }
+        return
+      }
+      setTaskBoardSyncPhase(.stopping)
+      if !status.cancellationRequested {
+        _ = try await client.cancelTaskBoardSync()
+      }
+      guard ContinuousClock.now <= deadline else {
+        throw TaskBoardSourceSyncQuiescenceError(
+          "Task source refresh did not stop before database recovery"
+        )
+      }
+      try await Task.sleep(for: .milliseconds(250))
+    }
   }
 
   func isCurrentTaskBoardDatabaseAccessGeneration(_ generation: UInt64) -> Bool {

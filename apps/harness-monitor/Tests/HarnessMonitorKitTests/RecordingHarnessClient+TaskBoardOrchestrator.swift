@@ -178,7 +178,17 @@ extension RecordingHarnessClient {
 
   func cancelTaskBoardSync() async throws -> TaskBoardSyncCancelResponse {
     record(.cancelTaskBoardSync)
-    return lock.withLock { taskBoardSyncCancelResponse }
+    return lock.withLock {
+      let response = taskBoardSyncCancelResponse
+      if response.cancelled {
+        taskBoardSyncStatusResponse = TaskBoardSyncStatusResponse(
+          active: false,
+          cancellationRequested: true,
+          cancelled: true
+        )
+      }
+      return response
+    }
   }
 
   func taskBoardSyncStatus() async throws -> TaskBoardSyncStatusResponse {
@@ -291,6 +301,7 @@ extension RecordingHarnessClient {
 
   func taskBoardOrchestratorStatus() async throws -> TaskBoardOrchestratorStatus {
     recordReadCall(.taskBoardOrchestratorStatus)
+    await taskBoardItemsReadGate.suspendIfConfigured()
     let heldItemIDs = lock.withLock { heldTaskBoardDispatchItemIDs }
     return sampleTaskBoardOrchestratorStatus(
       heldDispatches: TaskBoardHeldDispatchSummary(

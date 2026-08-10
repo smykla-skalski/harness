@@ -5,6 +5,29 @@ import Testing
 @MainActor
 @Suite("Harness Monitor task-board triage reads")
 struct HarnessMonitorStoreTaskBoardTriageTests {
+  @Test("Repeated ready revokes a triage mutation after its snapshot")
+  func repeatedReadyRevokesTriageMutationAfterSnapshot() async throws {
+    let client = RecordingHarnessClient()
+    let task = Self.item(id: "task-1")
+    client.taskBoardItemsStorage = [task]
+    let store = Self.onlineStore(client: client, items: [task])
+    await client.blockNextTaskBoardItemsRead()
+    let mutation = Task { @MainActor in
+      await store.setTaskBoardItemTriageOverride(
+        id: task.id,
+        verdict: .todo,
+        reason: nil
+      )
+    }
+
+    await client.waitUntilTaskBoardItemsReadIsBlocked()
+    _ = try await store.invalidateTaskBoardDatabaseAccess(using: client)
+    await client.releaseTaskBoardItemsRead()
+
+    #expect(await mutation.value == false)
+    #expect(client.taskBoardTriageOverrideSetRequests.isEmpty)
+  }
+
   @Test("Fetches the current decision when online")
   func fetchesCurrentDecisionWhenOnline() async throws {
     let client = RecordingHarnessClient()
@@ -28,6 +51,7 @@ struct HarnessMonitorStoreTaskBoardTriageTests {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController(client: client))
     store.client = client
     store.connectionState = .online
+    store.adoptDatabaseBackedTaskBoard(client.taskBoardCapabilitiesValue)
 
     let response = await store.taskBoardItemTriageCurrent(id: "task-1")
 

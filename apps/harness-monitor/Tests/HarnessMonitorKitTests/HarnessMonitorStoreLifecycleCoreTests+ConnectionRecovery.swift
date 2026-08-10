@@ -4,6 +4,30 @@ import Testing
 
 @MainActor
 extension HarnessMonitorStoreLifecycleCoreTests {
+  @Test("A stale connection attempt closes only its distinct candidate")
+  func staleConnectionAttemptClosesOnlyDistinctCandidate() async throws {
+    let activeClient = RecordingHarnessClient()
+    let staleClient = RecordingHarnessClient()
+    let store = await makeBootstrappedStore(client: activeClient)
+    let staleFence = try store.currentConnectionAttemptFence()
+    store.invalidateConnectionAttempts()
+
+    await store.settleAbandonedConnectionAttempt(
+      using: staleClient,
+      connectionFence: staleFence
+    )
+    await store.settleAbandonedConnectionAttempt(
+      using: activeClient,
+      connectionFence: staleFence
+    )
+
+    #expect(staleClient.shutdownCallCount() == 1)
+    #expect(activeClient.shutdownCallCount() == 0)
+    #expect(store.client === activeClient)
+    #expect(store.connectionState == .online)
+    await store.prepareForTermination()
+  }
+
   @Test("External bootstrap keeps retrying after consecutive transient failures")
   func externalBootstrapKeepsRetryingAfterConsecutiveFailures() async {
     let failedClient = RecordingHarnessClient()

@@ -146,11 +146,13 @@ extension HarnessMonitorStore {
     // only trustworthy answer. Claiming without checking is what surfaced as
     // the "is not held" conflict.
     guard await taskBoardDeliveryIsHeld(itemID: itemID, access: access) else {
-      presentUnheldTaskBoardDeliveryFeedback(
-        itemID: itemID,
-        didReserveItem: didReserveItem,
-        reserveFailure: reserveFailure
-      )
+      if (try? requireCurrentTaskBoardClientAccess(access)) != nil {
+        presentUnheldTaskBoardDeliveryFeedback(
+          itemID: itemID,
+          didReserveItem: didReserveItem,
+          reserveFailure: reserveFailure
+        )
+      }
       return nil
     }
     return await claimHeldTaskBoardDelivery(
@@ -174,6 +176,8 @@ extension HarnessMonitorStore {
       try requireCurrentTaskBoardClientAccess(access)
       recordRequestSuccess()
       return measuredStatus.value.heldDispatches.items.contains { $0.boardItemId == itemID }
+    } catch is CancellationError {
+      return false
     } catch {
       return true
     }
@@ -212,6 +216,7 @@ extension HarnessMonitorStore {
   ) async -> TaskBoardDispatchDelivery? {
     let client = access.client
     do {
+      try requireCurrentTaskBoardClientAccess(access)
       let measuredDelivery = try await Self.measureOperation {
         try await client.deliverTaskBoardDispatch(
           request: TaskBoardDispatchDeliverRequest(itemId: itemID, dryRun: dryRun)
@@ -236,18 +241,8 @@ extension HarnessMonitorStore {
   }
 
   public func policyApprovalGrants() async -> [PolicyApprovalGrant]? {
-    guard let client = availableTaskBoardClient else {
-      return nil
-    }
-    do {
-      let measuredGrants = try await Self.measureOperation {
-        try await client.policyApprovalGrants()
-      }
-      recordRequestSuccess()
-      return measuredGrants.value
-    } catch {
-      presentFailureFeedback(error.localizedDescription)
-      return nil
+    await readTaskBoard { client in
+      try await client.policyApprovalGrants()
     }
   }
 

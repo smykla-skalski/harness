@@ -248,6 +248,53 @@ extension HarnessMonitorStoreTaskBoardSettingsTests {
     await store.prepareForTermination()
   }
 
+  @Test("Repeated ready also stops a daemon-started source refresh")
+  func repeatedReadyStopsDaemonStartedSourceRefresh() async throws {
+    let client = RecordingHarnessClient()
+    client.taskBoardSyncStatusResponse = TaskBoardSyncStatusResponse(
+      active: true,
+      cancellationRequested: false
+    )
+    let store = connectedTaskBoardStore(client: client)
+    store.adoptDatabaseBackedTaskBoard(client.taskBoardCapabilitiesValue)
+    var hasSeenReady = true
+
+    #expect(
+      await store.processGlobalStreamEvent(
+        DaemonPushEvent(recordedAt: "2026-08-10T00:00:00Z", sessionId: nil, kind: .ready),
+        using: client,
+        hasSeenReady: &hasSeenReady
+      )
+    )
+
+    #expect(client.recordedCalls().contains(.cancelTaskBoardSync))
+    #expect(client.recordedCalls().filter { $0 == .taskBoardSyncStatus }.count >= 2)
+    #expect(store.taskBoardDatabaseInstanceID == client.taskBoardCapabilitiesValue.instanceID)
+    await store.prepareForTermination()
+  }
+
+  @Test("Repeated ready revokes an in-flight Task Board read")
+  func repeatedReadyRevokesInflightTaskBoardRead() async throws {
+    let client = RecordingHarnessClient()
+    let store = connectedTaskBoardStore(client: client)
+    store.adoptDatabaseBackedTaskBoard(client.taskBoardCapabilitiesValue)
+    let gate = RecordingTaskBoardItemsReadGate()
+    await gate.blockNextRead()
+    let read = Task { @MainActor in
+      await store.readTaskBoard { _ in
+        await gate.suspendIfConfigured()
+        return "stale"
+      }
+    }
+
+    await gate.waitUntilBlocked()
+    _ = try await store.invalidateTaskBoardDatabaseAccess(using: client)
+    await gate.release()
+
+    #expect(await read.value == nil)
+    await store.prepareForTermination()
+  }
+
   @Test("Connected Task Board clients bypass launch-agent cleanup")
   func connectedTaskBoardClientsBypassLaunchAgentCleanup() async throws {
     let client = RecordingHarnessClient()
@@ -309,6 +356,7 @@ extension HarnessMonitorStoreTaskBoardSettingsTests {
       taskBoardConnectionHistoryStore: TaskBoardConnectionHistoryStore(defaults: nil)
     )
     store.client = client
+    store.connectionState = .online
     return store
   }
 }
