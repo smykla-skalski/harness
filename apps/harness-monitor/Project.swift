@@ -992,8 +992,7 @@ private let kitTestsSources: SourceFilesList = SourceFilesList(
     .glob(
       "Tests/HarnessMonitorKitTests/**/*.swift",
       excluding: [
-        "Tests/HarnessMonitorKitTests/Features/**",
-        "Tests/HarnessMonitorKitTests/PolicyCanvas*.swift",
+        "Tests/HarnessMonitorKitTests/Features/**"
       ])
   ] + FeatureFlags.kitTestsAdditionalSourceGlobs())
 
