@@ -1,8 +1,7 @@
-use std::collections::BTreeMap;
 use std::convert::identity;
 use std::future::Future;
 use std::path::Path;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex};
 use std::thread;
 
 use tokio::runtime::{Builder, Handle, RuntimeFlavor};
@@ -19,7 +18,7 @@ use crate::workspace::utc_now;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::LIVE_REFRESH_INTERVAL;
-use super::manager::{ActiveAgentTui, AgentTuiManagerHandle, LiveRefreshWake};
+use super::manager::{AgentTuiManagerHandle, LiveRefreshWake};
 use super::model::session_disconnect_reason;
 use super::support::{agent_id_for_tui, lock_db};
 use crate::daemon::db::prelude::*;
@@ -27,7 +26,7 @@ use crate::daemon::db::task_board::prelude::{
     TaskBoardRuntimeTerminalReport, WorkItemProgressQueries,
 };
 use crate::daemon::db_handle::{AsyncDaemonDbHandle, DaemonDbOwnedHandle};
-use harness_daemon_managed_agents::{AgentTuiSnapshot, AgentTuiStatus, lock};
+use harness_daemon_managed_agents::{AgentTuiSnapshot, AgentTuiStatus};
 
 const LIVE_REFRESH_RETRY_LIMIT: std::time::Duration = std::time::Duration::from_secs(30);
 
@@ -38,12 +37,6 @@ impl AgentTuiManagerHandle {
 
     pub(super) fn async_db(&self) -> Option<Arc<AsyncDaemonDbHandle>> {
         self.state.async_db.get().cloned()
-    }
-
-    pub(super) fn active(
-        &self,
-    ) -> Result<MutexGuard<'_, BTreeMap<String, ActiveAgentTui>>, CliError> {
-        lock(&self.state.active, "terminal agent active process map")
     }
 
     pub(super) fn run_with_async_db<T, F, Fut>(&self, task: F) -> Option<Result<T, CliError>>
@@ -80,34 +73,6 @@ impl AgentTuiManagerHandle {
             },
             Err(_) => runtime.block_on(future),
         })
-    }
-
-    pub(crate) fn active_process(
-        &self,
-        tui_id: &str,
-    ) -> Result<Arc<super::AgentTuiProcess>, CliError> {
-        self.active_tui(tui_id)?.process.ok_or_else(|| {
-            CliErrorKind::session_not_active(format!("terminal agent '{tui_id}' is not active"))
-                .into()
-        })
-    }
-
-    pub(crate) fn active_tui(&self, tui_id: &str) -> Result<ActiveAgentTui, CliError> {
-        self.active()?.get(tui_id).cloned().ok_or_else(|| {
-            CliErrorKind::session_not_active(format!("terminal agent '{tui_id}' is not active"))
-                .into()
-        })
-    }
-
-    pub(crate) fn remove_active(
-        &self,
-        tui_id: &str,
-    ) -> Result<Option<Arc<super::AgentTuiProcess>>, CliError> {
-        let removed = self.active()?.remove(tui_id);
-        if let Some(active) = &removed {
-            active.stop();
-        }
-        Ok(removed.and_then(|active| active.process))
     }
 
     pub(super) fn load_snapshot(&self, tui_id: &str) -> Result<AgentTuiSnapshot, CliError> {
@@ -307,7 +272,7 @@ impl AgentTuiManagerHandle {
         });
     }
 
-    fn run_live_refresh_loop(&self, tui_id: &str, refresh_wake: &LiveRefreshWake) {
+    fn run_live_refresh_loop(&self, tui_id: &str, refresh_wake: &Arc<LiveRefreshWake>) {
         let mut delay = LIVE_REFRESH_INTERVAL;
         let mut failure_count = 0_u32;
         loop {
@@ -331,7 +296,7 @@ impl AgentTuiManagerHandle {
             }
         }
 
-        let _ = self.remove_active(tui_id);
+        let _ = self.remove_active_for_refresh(tui_id, refresh_wake);
     }
 
     pub(super) fn live_refresh_retry_delay(current: std::time::Duration) -> std::time::Duration {

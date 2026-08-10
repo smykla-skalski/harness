@@ -150,6 +150,28 @@ fn live_refresh_stop_before_wait_returns_immediately() {
 }
 
 #[test]
+fn retired_live_refresh_keeps_replacement_with_same_tui_id() {
+    let db_slot = Arc::new(OnceLock::new());
+    let (sender, _receiver) = broadcast::channel(4);
+    let manager = AgentTuiManagerHandle::new(sender, db_slot, true);
+    let retired = ActiveAgentTui::new(None);
+    let replacement = ActiveAgentTui::new(None);
+    let retired_wake = Arc::clone(&retired.refresh_wake);
+    let replacement_wake = Arc::clone(&replacement.refresh_wake);
+    manager
+        .active()
+        .expect("active map")
+        .insert("reused-tui".into(), replacement);
+
+    manager
+        .remove_active_for_refresh("reused-tui", &retired_wake)
+        .expect("retire old refresh owner");
+
+    let current = manager.active_tui("reused-tui").expect("replacement remains");
+    assert!(Arc::ptr_eq(&current.refresh_wake, &replacement_wake));
+}
+
+#[test]
 fn live_refresh_step_skips_persist_when_db_updated_concurrently() {
     let tmp = tempfile::tempdir().expect("tempdir");
     let project_dir = tmp.path().join("project");

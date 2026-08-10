@@ -13,6 +13,8 @@ mod kill_switch_port;
 #[cfg(feature = "daemon-runtime")]
 mod manager;
 #[cfg(feature = "daemon-runtime")]
+mod manager_active;
+#[cfg(feature = "daemon-runtime")]
 mod manager_control;
 #[cfg(feature = "daemon-runtime")]
 mod manager_lifecycle;
