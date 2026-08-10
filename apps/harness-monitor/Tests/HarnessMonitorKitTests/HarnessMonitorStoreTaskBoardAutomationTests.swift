@@ -46,12 +46,34 @@ struct HarnessMonitorStoreTaskBoardAutomationTests {
     store.mergeTaskBoardAutomationSnapshot(snapshot(revision: 100))
     store.globalTaskBoardSyncSummary = TaskBoardSyncSummary(total: 100, providers: [])
     store.globalTaskBoardEvaluationSummary = TaskBoardEvaluationSummary(total: 100, evaluated: 100)
+    store.globalTaskBoardItemsSnapshotAvailable = true
+    store.globalTaskBoardOrchestratorStatus = status(automation: snapshot(revision: 100))
+    store.globalTaskBoardProjects = []
+    store.globalTaskBoardMachines = []
+    store.globalPolicyCanvasWorkspace = PolicyCanvasWorkspace(
+      schemaVersion: 1,
+      activeCanvasId: "database-a",
+      canvases: [],
+      spawnKillSwitch: true
+    )
+    store.globalPolicyPipeline = client.samplePolicyPipeline(
+      canvasId: "database-a",
+      title: "Database A"
+    )
 
     _ = try await store.invalidateTaskBoardDatabaseAccess(using: client)
 
+    #expect(store.globalTaskBoardItems.isEmpty)
+    #expect(!store.globalTaskBoardItemsSnapshotAvailable)
+    #expect(store.globalTaskBoardOrchestratorStatus == nil)
     #expect(store.globalTaskBoardAutomationSnapshot == nil)
     #expect(store.globalTaskBoardSyncSummary == nil)
     #expect(store.globalTaskBoardEvaluationSummary == nil)
+    #expect(store.globalTaskBoardProjects == nil)
+    #expect(store.globalTaskBoardMachines == nil)
+    #expect(store.globalPolicyCanvasWorkspace == nil)
+    #expect(store.globalPolicyPipeline == nil)
+    #expect(store.taskBoardPolicyRuntimeRecoveryPending)
     store.mergeTaskBoardAutomationSnapshot(snapshot(revision: 1))
     #expect(store.globalTaskBoardAutomationSnapshot?.revision == 1)
   }

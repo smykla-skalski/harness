@@ -158,6 +158,43 @@ final class PolicyRegistryTests: XCTestCase {
     await store.stopSupervisor()
   }
 
+  @MainActor
+  func test_settingsRefreshRetriesAcrossTaskBoardGenerationChange() async throws {
+    let container = try HarnessMonitorModelContainer.preview()
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(),
+      modelContainer: container
+    )
+    await store.startSupervisor()
+    let stack = try XCTUnwrap(store.supervisorStack)
+    let repository = try XCTUnwrap(store.supervisorPolicyConfigRepository)
+    let gate = SupervisorPolicyOverrideRefreshGate()
+    store.supervisorBindings.policyOverrideRefreshGate = {
+      await gate.waitOnFirstRefresh()
+    }
+    try await repository.save(
+      PolicyConfigRowSnapshot(
+        ruleID: "unassigned-task",
+        enabled: false,
+        defaultBehaviorRaw: RuleDefaultBehavior.cautious.rawValue,
+        parametersJSON: "{}"
+      )
+    )
+    let refresh = Task {
+      await store.refreshSupervisorPolicyOverrides()
+    }
+    await gate.waitUntilBlocked()
+    store.taskBoardRuntimeState.connection.databaseAccessGeneration = 1
+    await stack.registry.advanceOverrideSourceGeneration(to: 1)
+
+    await gate.releaseRefresh()
+    await refresh.value
+
+    let isEnabled = await stack.registry.isEnabled(ruleID: "unassigned-task")
+    XCTAssertFalse(isEnabled)
+    await store.stopSupervisor()
+  }
+
   func test_isEnabledDefaultsToTrueWhenNoOverride() async {
     let registry = PolicyRegistry()
     await registry.register(StubRule(id: "stub"))
@@ -173,6 +210,37 @@ final class PolicyRegistryTests: XCTestCase {
     let observers = await registry.observerList
     let tags = observers.compactMap { ($0 as? StubObserver)?.tag }
     XCTAssertEqual(tags, ["first", "second"])
+  }
+}
+
+private actor SupervisorPolicyOverrideRefreshGate {
+  private var callCount = 0
+  private var releaseContinuation: CheckedContinuation<Void, Never>?
+  private var arrivalContinuations: [CheckedContinuation<Void, Never>] = []
+
+  func waitOnFirstRefresh() async {
+    callCount += 1
+    guard callCount == 1 else { return }
+    let arrivals = arrivalContinuations
+    arrivalContinuations.removeAll()
+    for arrival in arrivals {
+      arrival.resume()
+    }
+    await withCheckedContinuation { continuation in
+      releaseContinuation = continuation
+    }
+  }
+
+  func waitUntilBlocked() async {
+    guard callCount == 0 else { return }
+    await withCheckedContinuation { continuation in
+      arrivalContinuations.append(continuation)
+    }
+  }
+
+  func releaseRefresh() {
+    releaseContinuation?.resume()
+    releaseContinuation = nil
   }
 }
 

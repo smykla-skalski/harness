@@ -30,6 +30,11 @@ private struct TaskBoardSourceSyncQuiescenceError: LocalizedError {
 }
 
 extension HarnessMonitorStore {
+  public internal(set) var taskBoardPolicyRuntimeRecoveryPending: Bool {
+    get { contentUI.dashboard.taskBoardPolicyRuntimeRecoveryPending }
+    set { contentUI.dashboard.taskBoardPolicyRuntimeRecoveryPending = newValue }
+  }
+
   var availableTaskBoardClient: (any HarnessMonitorClientProtocol)? {
     guard taskBoardRuntimeState.connection.databaseAccessSuspended == false else {
       return nil
@@ -217,11 +222,23 @@ extension HarnessMonitorStore {
   }
 
   private func resetTaskBoardDatabaseScopedRecoveryState() {
-    globalTaskBoardAutomationSnapshot = nil
-    globalTaskBoardSyncSummary = nil
-    globalTaskBoardDispatchSummary = nil
-    globalTaskBoardEvaluationSummary = nil
-    globalTaskBoardItemAuditSummary = nil
+    withUISyncBatch {
+      globalTaskBoardItems = []
+      globalTaskBoardItemsSnapshotAvailable = false
+      globalTaskBoardOrchestratorStatus = nil
+      globalTaskBoardAutomationSnapshot = nil
+      globalTaskBoardSyncSummary = nil
+      globalTaskBoardDispatchSummary = nil
+      globalTaskBoardEvaluationSummary = nil
+      globalTaskBoardItemAuditSummary = nil
+      globalTaskBoardProjects = nil
+      globalTaskBoardMachines = nil
+      globalPolicyCanvasWorkspace = nil
+      globalPolicyPipeline = nil
+      globalPolicySimulation = nil
+      globalPolicyAudit = nil
+      taskBoardPolicyRuntimeRecoveryPending = true
+    }
     cacheWriteSync.taskBoardEvaluationBaselineRunID = nil
     if !taskBoardRuntimeState.positionMutation.pendingTokens.isEmpty {
       taskBoardRuntimeState.positionMutation.pendingTokens.removeAll()

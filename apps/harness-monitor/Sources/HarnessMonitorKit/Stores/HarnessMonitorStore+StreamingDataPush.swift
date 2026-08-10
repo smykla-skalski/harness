@@ -89,7 +89,7 @@ extension HarnessMonitorStore {
     guard isCurrentConnectionAttemptFenceIfProvided(connectionFence) else { return }
     scheduleGitHubTaskBoardRefresh(
       using: client,
-      includePolicyPipeline: globalPolicyCanvasWorkspace != nil
+      includePolicyPipeline: true
     )
   }
 }

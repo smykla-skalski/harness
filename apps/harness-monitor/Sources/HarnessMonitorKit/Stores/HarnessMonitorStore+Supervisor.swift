@@ -254,11 +254,20 @@ extension HarnessMonitorStore {
   }
 
   public func refreshSupervisorPolicyOverrides() async {
-    _ = await applyEffectivePolicyCanvasSupervisorOverrides(
-      for: globalPolicyCanvasWorkspace,
-      activeDocument: globalPolicyPipeline,
-      taskBoardSourceGeneration: taskBoardRuntimeState.connection.databaseAccessGeneration
-    )
+    while !Task.isCancelled {
+      let generation = taskBoardRuntimeState.connection.databaseAccessGeneration
+      if let gate = supervisorBindings.policyOverrideRefreshGate {
+        await gate()
+      }
+      let applied = await applyEffectivePolicyCanvasSupervisorOverrides(
+        for: globalPolicyCanvasWorkspace,
+        activeDocument: globalPolicyPipeline,
+        taskBoardSourceGeneration: generation
+      )
+      if applied || generation == taskBoardRuntimeState.connection.databaseAccessGeneration {
+        return
+      }
+    }
   }
 
   public func requestSupervisorCheckNow() async {

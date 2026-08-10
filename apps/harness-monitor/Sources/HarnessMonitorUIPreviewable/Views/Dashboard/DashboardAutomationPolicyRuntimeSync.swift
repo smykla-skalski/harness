@@ -6,12 +6,13 @@ enum DashboardAutomationPolicyRuntimeSynchronizer {
   static func synchronizeEnforcedCanvasAutomationPolicies(
     policyCenter: AutomationPolicyCenter,
     workspace: PolicyCanvasWorkspace?,
-    activeDocument: PolicyPipelineDocument?
+    activeDocument: PolicyPipelineDocument?,
+    isRecovering: Bool = false
   ) {
-    policyCenter.setKillSwitchEngaged(workspace?.spawnKillSwitch ?? false)
+    policyCenter.setKillSwitchEngaged(isRecovering || workspace?.spawnKillSwitch == true)
     let compilation = PolicyCanvasAutomationPolicyCompiler.compileEnforcedCanvases(
-      workspace: workspace,
-      activeDocument: activeDocument
+      workspace: isRecovering ? nil : workspace,
+      activeDocument: isRecovering ? nil : activeDocument
     )
     let compiledPolicies = compilation.policies.map(AutomationPolicy.init)
     guard policyCenter.document.canvasPolicies != compiledPolicies else {

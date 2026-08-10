@@ -9,104 +9,52 @@ extension HarnessMonitorStore {
   nonisolated static func loadPolicyPipelineSnapshot(
     using client: any HarnessMonitorClientProtocol,
     canvasId: String? = nil
-  ) async -> MeasuredOperation<PolicyPipelineDocument?> {
+  ) async -> TaskBoardSnapshotLoad<PolicyPipelineDocument> {
     do {
       let measuredPipeline = try await measureOperation {
         try await client.policyPipeline(canvasId: canvasId)
       }
-      return MeasuredOperation(value: measuredPipeline.value, latencyMs: measuredPipeline.latencyMs)
+      return TaskBoardSnapshotLoad(measured: measuredPipeline)
     } catch {
       let description = RefreshSnapshotErrorFormatting.describeUnderlying(error)
       HarnessMonitorLogger.store.debug(
         "policy pipeline unavailable during refresh: \(description, privacy: .public)"
       )
-      return MeasuredOperation(value: nil, latencyMs: 0)
+      return TaskBoardSnapshotLoad(measured: nil)
     }
   }
 
   nonisolated static func loadPolicyCanvasWorkspace(
     using client: any HarnessMonitorClientProtocol
-  ) async -> MeasuredOperation<PolicyCanvasWorkspace?> {
+  ) async -> TaskBoardSnapshotLoad<PolicyCanvasWorkspace> {
     do {
       let measuredWorkspace = try await measureOperation {
         try await client.policyCanvasWorkspace()
       }
-      return MeasuredOperation(
-        value: measuredWorkspace.value, latencyMs: measuredWorkspace.latencyMs)
+      return TaskBoardSnapshotLoad(measured: measuredWorkspace)
     } catch {
       let description = RefreshSnapshotErrorFormatting.describeUnderlying(error)
       HarnessMonitorLogger.store.debug(
         "policy workspace unavailable during refresh: \(description, privacy: .public)"
       )
-      return MeasuredOperation(value: nil, latencyMs: 0)
+      return TaskBoardSnapshotLoad(measured: nil)
     }
   }
 
   public func refreshPolicyPipeline() async {
     guard let access = availableTaskBoardClientAccess else { return }
     let client = access.client
-    let measuredWorkspace = await Self.loadPolicyCanvasWorkspace(using: client)
+    let workspaceLoad = await Self.loadPolicyCanvasWorkspace(using: client)
     guard taskBoardAccessIsCurrent(access) else { return }
-    if let workspace = measuredWorkspace.value {
-      await syncPolicyCanvasWorkspace(
-        workspace,
-        using: client,
-        forceReloadActiveCanvas: true,
-        taskBoardAccess: access
-      )
-      return
-    }
-    async let pipeline = Self.loadPolicyPipelineSnapshot(using: client)
-    async let audit = loadPolicyAudit(using: client)
-    let measuredPipeline = await pipeline
-    let measuredAudit = await audit
-    guard taskBoardAccessIsCurrent(access) else { return }
-
-    var fallbackWorkspace = globalPolicyCanvasWorkspace
-    if var workspace = fallbackWorkspace, let document = measuredPipeline.value {
-      updatePolicyCanvasSummary(
-        &workspace,
-        canvasId: workspace.activeCanvasId,
-        document: document
-      )
-      if let latestSimulation = measuredAudit?.latestSimulation,
-        let activeIndex = workspace.canvases.firstIndex(where: {
-          $0.canvasId == workspace.activeCanvasId
-        })
-      {
-        var activeSummary = workspace.canvases[activeIndex]
-        activeSummary.latestSimulationTraceId = latestSimulation.traceId
-        activeSummary.latestSimulationSucceeded = latestSimulation.succeeded
-        activeSummary.latestSimulationAt = latestSimulation.simulatedAt
-        workspace.canvases[activeIndex] = activeSummary
-      }
-      fallbackWorkspace = workspace
-    }
-
-    guard
-      await applyEffectivePolicyCanvasSupervisorOverrides(
-        for: fallbackWorkspace,
-        activeDocument: measuredPipeline.value,
-        taskBoardSourceGeneration: access.databaseAccessGeneration
-      ),
-      taskBoardAccessIsCurrent(access)
-    else { return }
-    if let document = measuredPipeline.value,
-      let canvasId = fallbackWorkspace?.activeCanvasId
-    {
-      guard
-        await cachePolicyDocument(
-          document,
-          canvasId: canvasId,
-          access: access
-        )
-      else { return }
-    }
-    withUISyncBatch {
-      globalPolicyCanvasWorkspace = fallbackWorkspace
-      globalPolicyPipeline = measuredPipeline.value
-      globalPolicySimulation = measuredAudit?.latestSimulation
-      globalPolicyAudit = measuredAudit
+    guard let measuredWorkspace = workspaceLoad.measured else { return }
+    let synchronized = await syncPolicyCanvasWorkspace(
+      measuredWorkspace.value,
+      using: client,
+      forceReloadActiveCanvas: true,
+      taskBoardAccess: access
+    )
+    if synchronized, taskBoardAccessIsCurrent(access) {
+      taskBoardPolicyRuntimeRecoveryPending = false
     }
   }
 
@@ -121,7 +69,7 @@ extension HarnessMonitorStore {
   public func loadTaskBoardPolicyWorkspaceSnapshot() async -> TaskBoardPolicyWorkspaceSnapshot? {
     guard globalPolicyCanvasWorkspace == nil else { return nil }
     guard let access = availableTaskBoardClientAccess else { return nil }
-    let workspace = await Self.loadPolicyCanvasWorkspace(using: access.client).value
+    let workspace = await Self.loadPolicyCanvasWorkspace(using: access.client).measured?.value
     guard taskBoardAccessIsCurrent(access), let workspace else { return nil }
     return TaskBoardPolicyWorkspaceSnapshot(workspace: workspace, access: access)
   }
@@ -153,7 +101,7 @@ extension HarnessMonitorStore {
     let existingCanvasId = globalPolicyCanvasWorkspace?.activeCanvasId
     let loadedWorkspace =
       existingCanvasId == nil
-      ? await Self.loadPolicyCanvasWorkspace(using: client).value
+      ? await Self.loadPolicyCanvasWorkspace(using: client).measured?.value
       : nil
     guard taskBoardAccessIsCurrent(access) else { return nil }
     if let loadedWorkspace {
