@@ -345,7 +345,7 @@ extension HarnessMonitorStoreTaskBoardSettingsTests {
     )
   }
 
-  private func connectedTaskBoardStore(client: RecordingHarnessClient) -> HarnessMonitorStore {
+  func connectedTaskBoardStore(client: RecordingHarnessClient) -> HarnessMonitorStore {
     let store = HarnessMonitorStore(
       daemonController: RecordingDaemonController(client: client),
       voiceCapture: NativeVoiceCaptureService(),

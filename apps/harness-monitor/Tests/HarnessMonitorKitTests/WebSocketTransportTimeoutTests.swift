@@ -72,6 +72,50 @@ struct WebSocketTransportTimeoutTests {
     #expect(health.version == "v-test")
   }
 
+  @Test("recovery RPC uses its shorter deadline")
+  func recoveryRPCUsesShorterDeadline() async throws {
+    let waiter = HangingSenderWaiter()
+    let transport = WebSocketTransport(
+      connection: HarnessMonitorConnection(endpoint: Self.testEndpoint, token: "test"),
+      session: .shared,
+      rpcSender: { _, _, _ in
+        try await waiter.waitForever()
+      }
+    )
+    await transport.installTestRPCTimeout(.seconds(5))
+
+    let started = ContinuousClock.now
+    await #expect(throws: WebSocketTransportError.requestTimedOut) {
+      _ = try await transport.taskBoardSyncStatus(recoveryTimeout: .milliseconds(100))
+    }
+    #expect(started.duration(to: ContinuousClock.now) < .seconds(1))
+    waiter.release()
+  }
+
+  @Test("cancelling a recovery RPC returns promptly")
+  func cancellingRecoveryRPCReturnsPromptly() async throws {
+    let waiter = HangingSenderWaiter()
+    let transport = WebSocketTransport(
+      connection: HarnessMonitorConnection(endpoint: Self.testEndpoint, token: "test"),
+      session: .shared,
+      rpcSender: { _, _, _ in
+        try await waiter.waitForever()
+      }
+    )
+    let request = Task {
+      try await transport.taskBoardSyncStatus(recoveryTimeout: .seconds(5))
+    }
+    try await Task.sleep(for: .milliseconds(50))
+
+    let started = ContinuousClock.now
+    request.cancel()
+    await #expect(throws: CancellationError.self) {
+      _ = try await request.value
+    }
+    #expect(started.duration(to: ContinuousClock.now) < .seconds(1))
+    waiter.release()
+  }
+
   @Test("requestTimedOut surfaces a human-readable description")
   func requestTimedOutHasUserFacingDescription() {
     let error = WebSocketTransportError.requestTimedOut

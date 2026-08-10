@@ -35,11 +35,15 @@ extension HarnessMonitorStore {
   }
 
   func finishTaskBoardDashboardRefreshDeferral(
-    using client: any HarnessMonitorClientProtocol
+    using client: any HarnessMonitorClientProtocol,
+    access: TaskBoardClientAccess? = nil
   ) async {
     guard cacheWriteSync.taskBoardRefreshDeferralDepth > 0 else { return }
     cacheWriteSync.taskBoardRefreshDeferralDepth -= 1
     guard cacheWriteSync.taskBoardRefreshDeferralDepth == 0 else { return }
+    if let access {
+      guard (try? requireCurrentTaskBoardClientAccess(access)) != nil else { return }
+    }
 
     let requestGeneration = scheduleTaskBoardDashboardSnapshotRefresh(
       using: client,

@@ -62,7 +62,10 @@ extension HarnessMonitorStore {
       return taskBoardRuntimeState.connection.databaseAccessGeneration
     }
     do {
-      return try await invalidateTaskBoardDatabaseAccess(using: client)
+      return try await invalidateTaskBoardDatabaseAccess(
+        using: client,
+        connectionFence: connectionFence
+      )
     } catch is CancellationError {
       return nil
     } catch {

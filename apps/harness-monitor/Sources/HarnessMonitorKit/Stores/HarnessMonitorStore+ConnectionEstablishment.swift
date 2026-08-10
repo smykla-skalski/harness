@@ -9,7 +9,6 @@ extension HarnessMonitorStore {
     guard let prepared = try await prepareConnectionCandidate(using: client) else {
       return
     }
-    self.client = client
 
     if maintainsLiveDaemonObservation {
       try await connectLive(using: client, connectionFence: prepared.fence)
@@ -27,14 +26,21 @@ extension HarnessMonitorStore {
         await settleAbandonedConnectionAttempt(using: client, connectionFence: prepared.fence)
         return
       }
-      guard await discardFailedConnectionUnlessReplaced() else {
-        return
+      if self.client === client {
+        guard await discardFailedConnectionUnlessReplaced() else {
+          return
+        }
+      } else {
+        await client.shutdown()
       }
       throw error
     }
 
     guard isCurrentConnectionAttemptFence(prepared.fence) else {
       await settleAbandonedConnectionAttempt(using: client, connectionFence: prepared.fence)
+      return
+    }
+    guard await adoptConnectionCandidate(client, connectionFence: prepared.fence) else {
       return
     }
     withUISyncBatch {

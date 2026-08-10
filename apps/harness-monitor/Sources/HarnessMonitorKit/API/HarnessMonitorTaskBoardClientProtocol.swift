@@ -61,7 +61,9 @@ public protocol HarnessMonitorTaskBoardClientProtocol: Sendable {
   ) async throws -> TaskBoardPlanningResponse
   func syncTaskBoard(request: TaskBoardSyncRequest) async throws -> TaskBoardSyncSummary
   func cancelTaskBoardSync() async throws -> TaskBoardSyncCancelResponse
+  func cancelTaskBoardSync(recoveryTimeout: Duration) async throws -> TaskBoardSyncCancelResponse
   func taskBoardSyncStatus() async throws -> TaskBoardSyncStatusResponse
+  func taskBoardSyncStatus(recoveryTimeout: Duration) async throws -> TaskBoardSyncStatusResponse
   func dispatchTaskBoard(request: TaskBoardDispatchRequest) async throws -> TaskBoardDispatchSummary
   func pickTaskBoardDispatch(
     request: TaskBoardDispatchPickRequest

@@ -17,6 +17,9 @@ extension HarnessMonitorStore {
     } catch is CancellationError {
       return nil
     } catch {
+      guard (try? requireCurrentTaskBoardClientAccess(access)) != nil else {
+        return nil
+      }
       presentFailureFeedback(error.localizedDescription)
       return nil
     }

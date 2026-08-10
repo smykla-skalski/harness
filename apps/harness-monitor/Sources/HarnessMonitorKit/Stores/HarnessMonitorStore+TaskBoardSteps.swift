@@ -110,7 +110,7 @@ extension HarnessMonitorStore {
       isAlreadyHeld: isAlreadyHeld,
       access: access
     )
-    await finishTaskBoardDashboardRefreshDeferral(using: client)
+    await finishTaskBoardDashboardRefreshDeferral(using: client, access: access)
     return delivery
   }
 
@@ -362,12 +362,22 @@ extension HarnessMonitorStore {
       }
       try requireCurrentTaskBoardClientAccess(access)
       recordRequestSuccess()
-      await syncPolicyCanvasWorkspace(measuredWorkspace.value, using: client)
+      guard
+        await syncPolicyCanvasWorkspace(
+          measuredWorkspace.value,
+          using: client,
+          taskBoardAccess: access
+        )
+      else { return false }
+      try requireCurrentTaskBoardClientAccess(access)
       presentSuccessFeedback(actionName)
       return true
     } catch is CancellationError {
       return false
     } catch {
+      guard (try? requireCurrentTaskBoardClientAccess(access)) != nil else {
+        return false
+      }
       presentFailureFeedback(error.localizedDescription)
       return false
     }

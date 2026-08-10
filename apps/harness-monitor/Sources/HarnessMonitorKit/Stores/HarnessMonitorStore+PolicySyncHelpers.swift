@@ -1,38 +1,56 @@
 import Foundation
 
 extension HarnessMonitorStore {
+  @discardableResult
   func applyEffectivePolicyCanvasSupervisorOverrides(
     for workspace: PolicyCanvasWorkspace?,
-    activeDocument: PolicyPipelineDocument? = nil
-  ) async {
+    activeDocument: PolicyPipelineDocument? = nil,
+    taskBoardSourceGeneration: UInt64? = nil
+  ) async -> Bool {
     guard let registry = supervisorStack?.registry else {
-      return
+      return true
     }
+    let overrides = await effectivePolicyCanvasSupervisorOverrides(
+      for: workspace,
+      activeDocument: activeDocument
+    )
+    if let taskBoardSourceGeneration {
+      return await registry.applyOverrides(
+        overrides,
+        sourceGeneration: taskBoardSourceGeneration
+      )
+    }
+    await registry.applyOverrides(overrides)
+    return true
+  }
+
+  private func effectivePolicyCanvasSupervisorOverrides(
+    for workspace: PolicyCanvasWorkspace?,
+    activeDocument: PolicyPipelineDocument?
+  ) async -> [PolicyConfigOverride] {
     guard let workspace else {
-      if let activeDocument, activeDocument.mode == .enforced {
-        await registry.applyOverrides(activeDocument.supervisorPolicyOverrides())
-        return
+      guard let activeDocument, activeDocument.mode == .enforced else {
+        return await loadPolicyOverrides()
       }
-      await registry.applyOverrides(await loadPolicyOverrides())
-      return
+      return activeDocument.supervisorPolicyOverrides()
     }
     let liveDocuments = workspace.canvases.compactMap { canvas in
       canvas.liveDocument ?? (canvas.mode == .enforced ? canvas.document : nil)
     }
     guard !liveDocuments.isEmpty else {
-      await registry.applyOverrides(await loadPolicyOverrides())
-      return
+      return await loadPolicyOverrides()
     }
-    await registry.applyOverrides(
-      liveDocuments.flatMap { $0.supervisorPolicyOverrides() }
-    )
+    return liveDocuments.flatMap { $0.supervisorPolicyOverrides() }
   }
 
+  @discardableResult
   func syncPolicyCanvasWorkspace(
     _ workspace: PolicyCanvasWorkspace,
     using client: any HarnessMonitorClientProtocol,
-    forceReloadActiveCanvas: Bool = false
-  ) async {
+    forceReloadActiveCanvas: Bool = false,
+    taskBoardAccess: TaskBoardClientAccess? = nil
+  ) async -> Bool {
+    guard taskBoardAccessIsCurrent(taskBoardAccess) else { return false }
     let previousActiveCanvasId = globalPolicyCanvasWorkspace?.activeCanvasId
     let shouldReloadActiveCanvas =
       forceReloadActiveCanvas
@@ -53,6 +71,7 @@ extension HarnessMonitorStore {
       )
       let measuredPipeline = await pipeline
       let measuredAudit = await audit
+      guard taskBoardAccessIsCurrent(taskBoardAccess) else { return false }
       activeDocument = measuredPipeline.value
       activeAudit = measuredAudit
     }
@@ -62,6 +81,15 @@ extension HarnessMonitorStore {
       using: client,
       activeDocument: activeDocument
     )
+    guard taskBoardAccessIsCurrent(taskBoardAccess) else { return false }
+    guard
+      await applyEffectivePolicyCanvasSupervisorOverrides(
+        for: syncedWorkspace,
+        activeDocument: activeDocument,
+        taskBoardSourceGeneration: taskBoardAccess?.databaseAccessGeneration
+      )
+    else { return false }
+    guard taskBoardAccessIsCurrent(taskBoardAccess) else { return false }
     withUISyncBatch {
       globalPolicyCanvasWorkspace = syncedWorkspace
       if shouldReloadActiveCanvas {
@@ -71,13 +99,19 @@ extension HarnessMonitorStore {
       }
     }
     let activeCanvasId = syncedWorkspace.activeCanvasId
-    if shouldReloadActiveCanvas, let doc = activeDocument, !activeCanvasId.isEmpty {
+    if taskBoardAccess == nil,
+      shouldReloadActiveCanvas,
+      let doc = activeDocument,
+      !activeCanvasId.isEmpty
+    {
       _ = await cacheService?.cachePolicyDocument(canvasId: activeCanvasId, document: doc)
     }
-    await applyEffectivePolicyCanvasSupervisorOverrides(
-      for: syncedWorkspace,
-      activeDocument: activeDocument
-    )
+    return taskBoardAccessIsCurrent(taskBoardAccess)
+  }
+
+  private func taskBoardAccessIsCurrent(_ access: TaskBoardClientAccess?) -> Bool {
+    guard let access else { return true }
+    return (try? requireCurrentTaskBoardClientAccess(access)) != nil
   }
 
   func hydrateEffectivePolicyCanvasWorkspace(

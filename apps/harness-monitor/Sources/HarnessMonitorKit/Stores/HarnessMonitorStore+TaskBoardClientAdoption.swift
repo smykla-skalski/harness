@@ -158,7 +158,9 @@ extension HarnessMonitorStore {
         message: "Task Board credential synchronization did not complete"
       )
     }
-    self.client = candidate
+    guard await adoptConnectionCandidate(candidate, connectionFence: connectionFence) else {
+      throw CancellationError()
+    }
     return TaskBoardClientAccess(
       client: candidate,
       instanceID: capabilities.instanceID,
@@ -183,43 +185,79 @@ extension HarnessMonitorStore {
 
   @discardableResult
   func invalidateTaskBoardDatabaseAccess(
-    using client: any HarnessMonitorClientProtocol
+    using client: any HarnessMonitorClientProtocol,
+    connectionFence: ConnectionAttemptFence? = nil
   ) async throws -> UInt64 {
     taskBoardRuntimeState.connection.databaseAccessGeneration &+= 1
+    await supervisorStack?.registry.advanceOverrideSourceGeneration(
+      to: taskBoardRuntimeState.connection.databaseAccessGeneration
+    )
     taskBoardRuntimeState.connection.databaseAccessSuspended = true
     taskBoardDatabaseInstanceID = nil
     lastTaskBoardCredentialSync = nil
     cancelTaskBoardDashboardSnapshotRefresh()
     scheduleUISync([.contentDashboard])
-    try await quiesceTaskBoardSourceSync(using: client)
+    try await quiesceTaskBoardSourceSync(using: client, connectionFence: connectionFence)
     return taskBoardRuntimeState.connection.databaseAccessGeneration
   }
 
   private func quiesceTaskBoardSourceSync(
-    using client: any HarnessMonitorClientProtocol
+    using client: any HarnessMonitorClientProtocol,
+    connectionFence: ConnectionAttemptFence?
   ) async throws {
     let restoreIdlePhase = taskBoardSyncPhase == .idle
+    defer {
+      if restoreIdlePhase {
+        setTaskBoardSyncPhase(.idle)
+      }
+    }
     let deadline = ContinuousClock.now.advanced(by: .seconds(30))
     while true {
-      try Task.checkCancellation()
-      let status = try await client.taskBoardSyncStatus()
-      guard status.active else {
-        if restoreIdlePhase {
-          setTaskBoardSyncPhase(.idle)
-        }
-        return
-      }
+      let statusTimeout = try taskBoardSourceSyncRecoveryTimeout(
+        deadline: deadline,
+        connectionFence: connectionFence
+      )
+      let status = try await client.taskBoardSyncStatus(recoveryTimeout: statusTimeout)
+      _ = try taskBoardSourceSyncRecoveryTimeout(
+        deadline: deadline,
+        connectionFence: connectionFence
+      )
+      guard status.active else { return }
       setTaskBoardSyncPhase(.stopping)
       if !status.cancellationRequested {
-        _ = try await client.cancelTaskBoardSync()
-      }
-      guard ContinuousClock.now <= deadline else {
-        throw TaskBoardSourceSyncQuiescenceError(
-          "Task source refresh did not stop before database recovery"
+        let cancelTimeout = try taskBoardSourceSyncRecoveryTimeout(
+          deadline: deadline,
+          connectionFence: connectionFence
+        )
+        _ = try await client.cancelTaskBoardSync(recoveryTimeout: cancelTimeout)
+        _ = try taskBoardSourceSyncRecoveryTimeout(
+          deadline: deadline,
+          connectionFence: connectionFence
         )
       }
-      try await Task.sleep(for: .milliseconds(250))
+      let sleepBudget = try taskBoardSourceSyncRecoveryTimeout(
+        deadline: deadline,
+        connectionFence: connectionFence
+      )
+      try await Task.sleep(for: min(.milliseconds(250), sleepBudget))
     }
+  }
+
+  private func taskBoardSourceSyncRecoveryTimeout(
+    deadline: ContinuousClock.Instant,
+    connectionFence: ConnectionAttemptFence?
+  ) throws -> Duration {
+    try Task.checkCancellation()
+    guard isCurrentConnectionAttemptFenceIfProvided(connectionFence) else {
+      throw CancellationError()
+    }
+    let remaining = ContinuousClock.now.duration(to: deadline)
+    guard remaining > .zero else {
+      throw TaskBoardSourceSyncQuiescenceError(
+        "Task source refresh did not stop before database recovery"
+      )
+    }
+    return min(remaining, .seconds(5))
   }
 
   func isCurrentTaskBoardDatabaseAccessGeneration(_ generation: UInt64) -> Bool {

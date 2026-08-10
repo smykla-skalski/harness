@@ -128,17 +128,32 @@ extension HarnessMonitorStore {
     connectionFence: ConnectionAttemptFence
   ) async {
     guard !isCurrentConnectionAttemptFence(connectionFence) else { return }
-    if shouldAbandonConnectionAttempt {
-      if self.client === candidate {
-        await discardActiveConnection()
-      }
-      if connection.legacyContainmentHealthy {
-        connectionState = .idle
-      }
+    guard self.client === candidate else {
+      await candidate.shutdown()
       return
     }
-    guard self.client !== candidate else { return }
-    await candidate.shutdown()
+    guard shouldAbandonConnectionAttempt else { return }
+    await discardActiveConnection()
+  }
+
+  func adoptConnectionCandidate(
+    _ candidate: any HarnessMonitorClientProtocol,
+    connectionFence: ConnectionAttemptFence
+  ) async -> Bool {
+    guard isCurrentConnectionAttemptFence(connectionFence) else {
+      await candidate.shutdown()
+      return false
+    }
+    let replacedClient = self.client
+    if replacedClient !== candidate {
+      await replacedClient?.shutdown()
+      guard isCurrentConnectionAttemptFence(connectionFence) else {
+        await candidate.shutdown()
+        return false
+      }
+    }
+    self.client = candidate
+    return true
   }
 
   func discardFailedConnectionUnlessReplaced() async -> Bool {

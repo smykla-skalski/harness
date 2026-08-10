@@ -66,8 +66,20 @@ extension HarnessMonitorTaskBoardClientProtocol {
     throw HarnessMonitorAPIError.server(code: 501, message: "Task board unavailable")
   }
 
+  public func cancelTaskBoardSync(
+    recoveryTimeout _: Duration
+  ) async throws -> TaskBoardSyncCancelResponse {
+    try await cancelTaskBoardSync()
+  }
+
   public func taskBoardSyncStatus() async throws -> TaskBoardSyncStatusResponse {
     throw HarnessMonitorAPIError.server(code: 501, message: "Task board unavailable")
+  }
+
+  public func taskBoardSyncStatus(
+    recoveryTimeout _: Duration
+  ) async throws -> TaskBoardSyncStatusResponse {
+    try await taskBoardSyncStatus()
   }
 
   public func syncTaskBoard(status: TaskBoardStatus? = nil) async throws -> TaskBoardSyncSummary {

@@ -108,6 +108,27 @@ final class PolicyRegistryTests: XCTestCase {
     XCTAssertEqual(behavior, .cautious)
   }
 
+  func test_staleTaskBoardOverrideGenerationCannotReplaceCurrentPolicy() async {
+    let registry = PolicyRegistry()
+    await registry.advanceOverrideSourceGeneration(to: 2)
+
+    let applied = await registry.applyOverrides(
+      [
+        PolicyConfigOverride(
+          ruleID: "stub",
+          enabled: true,
+          defaultBehavior: .aggressive,
+          parameters: [:]
+        )
+      ],
+      sourceGeneration: 1
+    )
+
+    XCTAssertFalse(applied)
+    let overrides = await registry.currentOverrides()
+    XCTAssertTrue(overrides.isEmpty)
+  }
+
   func test_isEnabledDefaultsToTrueWhenNoOverride() async {
     let registry = PolicyRegistry()
     await registry.register(StubRule(id: "stub"))

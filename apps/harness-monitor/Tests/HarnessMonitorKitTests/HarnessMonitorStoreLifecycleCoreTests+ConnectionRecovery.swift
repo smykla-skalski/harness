@@ -4,6 +4,26 @@ import Testing
 
 @MainActor
 extension HarnessMonitorStoreLifecycleCoreTests {
+  @Test("A connection is not published before its initial refresh commits")
+  func connectionIsNotPublishedBeforeInitialRefreshCommits() async {
+    let client = RecordingHarnessClient()
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    await client.blockNextTaskBoardItemsRead()
+    let connection = Task { @MainActor in
+      try? await store.connect(using: client)
+    }
+
+    await client.waitUntilTaskBoardItemsReadIsBlocked()
+    #expect(store.client == nil)
+    store.invalidateConnectionAttempts()
+    await client.releaseTaskBoardItemsRead()
+    await connection.value
+
+    #expect(store.client == nil)
+    #expect(client.shutdownCallCount() == 1)
+    await store.prepareForTermination()
+  }
+
   @Test("A stale connection attempt closes only its distinct candidate")
   func staleConnectionAttemptClosesOnlyDistinctCandidate() async throws {
     let activeClient = RecordingHarnessClient()
