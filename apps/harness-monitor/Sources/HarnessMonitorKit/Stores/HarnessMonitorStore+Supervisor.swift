@@ -257,7 +257,10 @@ extension HarnessMonitorStore {
     guard let registry = supervisorStack?.registry else {
       return
     }
-    await registry.applyOverrides(await loadPolicyOverrides())
+    _ = await registry.applyOverrides(
+      await loadPolicyOverrides(),
+      sourceGeneration: 0
+    )
   }
 
   public func requestSupervisorCheckNow() async {

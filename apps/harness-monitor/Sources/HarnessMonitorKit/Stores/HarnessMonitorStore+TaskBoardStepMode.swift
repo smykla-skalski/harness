@@ -28,9 +28,7 @@ extension HarnessMonitorStore {
       return true
     }
     guard (try? requireCurrentTaskBoardClientAccess(access)) != nil else {
-      finishTaskBoardStepModeMutation(
-        settings: taskBoardRuntimeState.stepModeMutation.lastAuthoritativeSettings
-      )
+      finishTaskBoardStepModeMutation(settings: nil)
       return false
     }
     if let settings = taskBoardRuntimeState.stepModeMutation.lastAuthoritativeSettings,
@@ -54,7 +52,9 @@ extension HarnessMonitorStore {
       return true
     } catch is CancellationError {
       finishTaskBoardStepModeMutation(
-        settings: taskBoardRuntimeState.stepModeMutation.lastAuthoritativeSettings
+        settings: taskBoardAccessIsCurrent(access)
+          ? taskBoardRuntimeState.stepModeMutation.lastAuthoritativeSettings
+          : nil
       )
       return false
     } catch {
@@ -62,9 +62,7 @@ extension HarnessMonitorStore {
         return true
       }
       guard taskBoardAccessIsCurrent(access) else {
-        finishTaskBoardStepModeMutation(
-          settings: taskBoardRuntimeState.stepModeMutation.lastAuthoritativeSettings
-        )
+        finishTaskBoardStepModeMutation(settings: nil)
         return false
       }
       finishTaskBoardStepModeFailure(error, generation: generation)

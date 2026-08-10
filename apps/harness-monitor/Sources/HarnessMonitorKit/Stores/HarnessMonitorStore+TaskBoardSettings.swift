@@ -240,11 +240,11 @@ extension HarnessMonitorStore {
     guard (try? requireCurrentTaskBoardClientAccess(access)) != nil else { return }
     let client = access.client
     async let verifyOutcome = verifyTaskBoardSigning(client: client, repository: nil)
-    async let refresh: Void = refreshTaskBoardDashboardSnapshot(using: client, access: access)
+    async let refresh = refreshTaskBoardDashboardSnapshot(using: client, access: access)
 
     let resolvedVerifyOutcome = await verifyOutcome
     guard (try? requireCurrentTaskBoardClientAccess(access)) != nil else {
-      await refresh
+      _ = await refresh
       return
     }
     switch resolvedVerifyOutcome {
@@ -257,7 +257,7 @@ extension HarnessMonitorStore {
         "Saved task board settings, but signing dry-run failed: \(message)"
       )
     }
-    await refresh
+    _ = await refresh
   }
 
   private func verifyTaskBoardSigning(

@@ -8,6 +8,14 @@ private struct TaskBoardSourceRefreshError: LocalizedError {
   }
 }
 
+private struct TaskBoardSourceRefreshPresentation {
+  let successMessage: String?
+  let failureMessagePrefix: String?
+  let activityKey: String?
+  let activityTitle: String?
+  let feedbackPosition: ActionFeedback.Position
+}
+
 extension HarnessMonitorStore {
   @discardableResult
   public func syncTaskBoard(request: TaskBoardSyncRequest) async -> Bool {
@@ -55,7 +63,13 @@ extension HarnessMonitorStore {
     activityTitle: String? = nil,
     feedbackPosition: ActionFeedback.Position = .topTrailing
   ) async -> Bool {
-    let client = access.client
+    let presentation = TaskBoardSourceRefreshPresentation(
+      successMessage: successMessage,
+      failureMessagePrefix: failureMessagePrefix,
+      activityKey: activityKey,
+      activityTitle: activityTitle,
+      feedbackPosition: feedbackPosition
+    )
     updateTaskBoardRefreshActivity(
       key: activityKey,
       title: activityTitle,
@@ -64,74 +78,121 @@ extension HarnessMonitorStore {
     )
     defer { dismissTaskBoardRefreshActivity(key: activityKey) }
     do {
-      let measuredSummary = try await Self.measureOperation {
-        try await client.syncTaskBoard(request: request)
-      }
-      try requireCurrentTaskBoardClientAccess(access)
-      recordRequestSuccess()
-      globalTaskBoardSyncSummary = measuredSummary.value
-      updateTaskBoardRefreshActivity(
-        key: activityKey,
-        title: activityTitle,
-        message: "Board ready · refreshing task sources",
-        position: feedbackPosition
+      return try await performTaskBoardSourceSync(
+        access: access,
+        request: request,
+        presentation: presentation
       )
-      await refreshTaskBoardDashboardSnapshot(using: client, access: access)
-      try requireCurrentTaskBoardClientAccess(access)
-      let completion = try await waitForTaskBoardSourceRefresh(access: access)
-      if taskBoardSyncPhase == .stopping || completion.cancelled {
-        finishStoppedTaskBoardSync(using: client, position: feedbackPosition)
-        return false
-      }
-      if let error = completion.error {
-        throw TaskBoardSourceRefreshError(error)
-      }
-      if let summary = completion.summary {
-        globalTaskBoardSyncSummary = summary
-      }
-      updateTaskBoardRefreshActivity(
-        key: activityKey,
-        title: activityTitle,
-        message: "Loading refreshed tasks",
-        position: feedbackPosition
-      )
-      await refreshTaskBoardDashboardSnapshot(using: client, access: access)
-      try requireCurrentTaskBoardClientAccess(access)
-      if let successMessage {
-        presentSuccessFeedback(successMessage, position: feedbackPosition)
-      }
-      return true
     } catch is CancellationError {
-      if taskBoardSyncPhase == .stopping,
-        (try? requireCurrentTaskBoardClientAccess(access)) != nil
-      {
-        finishStoppedTaskBoardSync(using: client, position: feedbackPosition)
-      }
-      return false
-    } catch {
-      guard (try? requireCurrentTaskBoardClientAccess(access)) != nil else {
-        return false
-      }
-      if taskBoardSyncPhase == .stopping {
-        finishStoppedTaskBoardSync(using: client, position: feedbackPosition)
-        return false
-      }
-      updateTaskBoardRefreshActivity(
-        key: activityKey,
-        title: activityTitle,
-        message: "Reloading current tasks",
-        position: feedbackPosition
+      return handleTaskBoardSourceSyncCancellation(
+        access: access,
+        feedbackPosition: feedbackPosition
       )
-      await refreshTaskBoardDashboardSnapshot(using: client, access: access)
-      let failureDescription =
-        if let failureMessagePrefix {
-          "\(failureMessagePrefix): \(error.localizedDescription)"
-        } else {
-          error.localizedDescription
-        }
-      presentFailureFeedback(failureDescription, position: feedbackPosition)
+    } catch {
+      return await handleTaskBoardSourceSyncFailure(
+        error,
+        access: access,
+        presentation: presentation
+      )
+    }
+  }
+
+  private func performTaskBoardSourceSync(
+    access: TaskBoardClientAccess,
+    request: TaskBoardSyncRequest,
+    presentation: TaskBoardSourceRefreshPresentation
+  ) async throws -> Bool {
+    let client = access.client
+    let measuredSummary = try await Self.measureOperation {
+      try await client.syncTaskBoard(request: request)
+    }
+    try requireCurrentTaskBoardClientAccess(access)
+    recordRequestSuccess()
+    globalTaskBoardSyncSummary = measuredSummary.value
+    updateTaskBoardRefreshActivity(
+      key: presentation.activityKey,
+      title: presentation.activityTitle,
+      message: "Board ready · refreshing task sources",
+      position: presentation.feedbackPosition
+    )
+    guard await refreshTaskBoardDashboardSnapshot(using: client, access: access) else {
       return false
     }
+    try requireCurrentTaskBoardClientAccess(access)
+    let completion = try await waitForTaskBoardSourceRefresh(access: access)
+    if taskBoardSyncPhase == .stopping || completion.cancelled {
+      finishStoppedTaskBoardSync(using: client, position: presentation.feedbackPosition)
+      return false
+    }
+    if let error = completion.error {
+      throw TaskBoardSourceRefreshError(error)
+    }
+    if let summary = completion.summary {
+      globalTaskBoardSyncSummary = summary
+    }
+    updateTaskBoardRefreshActivity(
+      key: presentation.activityKey,
+      title: presentation.activityTitle,
+      message: "Loading refreshed tasks",
+      position: presentation.feedbackPosition
+    )
+    guard await refreshTaskBoardDashboardSnapshot(using: client, access: access) else {
+      return false
+    }
+    try requireCurrentTaskBoardClientAccess(access)
+    if let successMessage = presentation.successMessage {
+      presentSuccessFeedback(successMessage, position: presentation.feedbackPosition)
+    }
+    return true
+  }
+
+  private func handleTaskBoardSourceSyncCancellation(
+    access: TaskBoardClientAccess,
+    feedbackPosition: ActionFeedback.Position
+  ) -> Bool {
+    if taskBoardSyncPhase == .stopping,
+      (try? requireCurrentTaskBoardClientAccess(access)) != nil
+    {
+      finishStoppedTaskBoardSync(using: access.client, position: feedbackPosition)
+    }
+    return false
+  }
+
+  private func handleTaskBoardSourceSyncFailure(
+    _ error: any Error,
+    access: TaskBoardClientAccess,
+    presentation: TaskBoardSourceRefreshPresentation
+  ) async -> Bool {
+    guard (try? requireCurrentTaskBoardClientAccess(access)) != nil else {
+      return false
+    }
+    if taskBoardSyncPhase == .stopping {
+      finishStoppedTaskBoardSync(
+        using: access.client,
+        position: presentation.feedbackPosition
+      )
+      return false
+    }
+    updateTaskBoardRefreshActivity(
+      key: presentation.activityKey,
+      title: presentation.activityTitle,
+      message: "Reloading current tasks",
+      position: presentation.feedbackPosition
+    )
+    guard
+      await refreshTaskBoardDashboardSnapshot(
+        using: access.client,
+        access: access
+      )
+    else { return false }
+    let failureDescription =
+      if let failureMessagePrefix = presentation.failureMessagePrefix {
+        "\(failureMessagePrefix): \(error.localizedDescription)"
+      } else {
+        error.localizedDescription
+      }
+    presentFailureFeedback(failureDescription, position: presentation.feedbackPosition)
+    return false
   }
 
   private func waitForTaskBoardSourceRefresh(

@@ -95,16 +95,20 @@ extension HarnessMonitorStore {
       try requireCurrentTaskBoardClientAccess(access)
       recordRequestSuccess()
       if result.activated {
+        guard await refreshTaskBoardDashboardSnapshot(using: client, access: access) else {
+          return nil
+        }
         presentSuccessFeedback(rules == nil ? "Deactivate triage rules" : "Activate triage rules")
-        await refreshTaskBoardDashboardSnapshot(using: client, access: access)
       }
       return result
     } catch is CancellationError {
       return nil
     } catch {
       guard taskBoardAccessIsCurrent(access) else { return nil }
+      guard await refreshTaskBoardDashboardSnapshot(using: client, access: access) else {
+        return nil
+      }
       presentFailureFeedback(error.localizedDescription)
-      await refreshTaskBoardDashboardSnapshot(using: client, access: access)
       return nil
     }
   }

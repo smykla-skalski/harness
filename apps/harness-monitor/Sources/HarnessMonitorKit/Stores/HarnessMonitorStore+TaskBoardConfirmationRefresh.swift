@@ -13,6 +13,10 @@ extension HarnessMonitorStore {
   ) {
     guard !preservedItemIDs.isEmpty || preservedStatus else { return }
     guard initialTaskBoardConfirmationGracePeriod > .zero else { return }
+    guard
+      let access = availableTaskBoardClientAccess,
+      access.client === client
+    else { return }
     cancelInitialTaskBoardConfirmationRefresh()
     let deadline = ContinuousClock.now.advanced(by: initialTaskBoardConfirmationGracePeriod)
     initialTaskBoardConfirmationTask = Task(priority: .utility) { @MainActor [weak self] in
@@ -20,6 +24,7 @@ extension HarnessMonitorStore {
       defer { self.initialTaskBoardConfirmationTask = nil }
       await self.runInitialTaskBoardConfirmationRefresh(
         using: client,
+        access: access,
         preservedItemIDs: preservedItemIDs,
         preservedStatus: preservedStatus,
         deadline: deadline
@@ -29,24 +34,34 @@ extension HarnessMonitorStore {
 
   private func runInitialTaskBoardConfirmationRefresh(
     using client: any HarnessMonitorClientProtocol,
+    access: TaskBoardClientAccess,
     preservedItemIDs: Set<String>,
     preservedStatus: Bool,
     deadline: ContinuousClock.Instant
   ) async {
+    var retryInterval = taskBoardConfirmationRetryInterval
     while !Task.isCancelled {
+      guard taskBoardAccessIsCurrent(access) else { return }
       do {
-        try await Task.sleep(for: taskBoardConfirmationRetryInterval)
+        try await Task.sleep(for: retryInterval)
       } catch {
         return
       }
-      guard connectionState == .online || connectionState == .connecting else { return }
+      guard
+        connectionState == .online || connectionState == .connecting,
+        taskBoardAccessIsCurrent(access)
+      else { return }
       let stepModeConfirmationRevision =
         taskBoardRuntimeState.stepModeMutation.confirmationRevision
       let positionMutationGeneration = taskBoardRuntimeState.positionMutation.generation
       let snapshot = await Self.loadTaskBoardRefreshSnapshot(
         using: client,
-        stepModeConfirmationRevision: stepModeConfirmationRevision
+        stepModeConfirmationRevision: stepModeConfirmationRevision,
+        includeItems: !preservedItemIDs.isEmpty,
+        includeOrchestratorStatus: preservedStatus,
+        includeProjects: false
       )
+      guard taskBoardAccessIsCurrent(access) else { return }
       let reachedDeadline = ContinuousClock.now >= deadline
       let tick = evaluateTaskBoardConfirmationTick(
         snapshot: snapshot,
@@ -55,8 +70,12 @@ extension HarnessMonitorStore {
         reachedDeadline: reachedDeadline,
         positionMutationGeneration: positionMutationGeneration
       )
-      if tick.shouldKeepWaiting && !reachedDeadline { continue }
+      if tick.shouldKeepWaiting && !reachedDeadline {
+        retryInterval = min(retryInterval * 2, .seconds(1))
+        continue
+      }
       guard tick.shouldApply else { return }
+      guard taskBoardAccessIsCurrent(access) else { return }
       commitTaskBoardConfirmationTick(tick)
       return
     }

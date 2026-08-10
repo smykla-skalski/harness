@@ -97,6 +97,31 @@ extension HarnessMonitorStoreTaskBoardStatusUpdateTests {
     await store.prepareForTermination()
   }
 
+  @Test("A revoked optimistic move cannot restore the previous database item")
+  func revokedOptimisticMoveCannotRestorePreviousDatabaseItem() async throws {
+    let client = RecordingHarnessClient()
+    client.configureTaskBoardItems([taskBoardItem(id: "board-1", status: .todo)])
+    client.configureMutationDelay(.milliseconds(200))
+    let store = await makeBootstrappedStore(client: client)
+    let mutation = Task { @MainActor in
+      await store.updateTaskBoardItemStatuses([
+        TaskBoardItemStatusUpdate(id: "board-1", status: .inProgress)
+      ])
+    }
+    #expect(
+      await waitUntil {
+        store.globalTaskBoardItems.first?.status == .inProgress
+      }
+    )
+
+    _ = try await store.invalidateTaskBoardDatabaseAccess(using: client)
+    store.globalTaskBoardItems = [taskBoardItem(id: "board-1", status: .blocked)]
+
+    #expect(await mutation.value == false)
+    #expect(store.globalTaskBoardItems.first?.status == .blocked)
+    await store.prepareForTermination()
+  }
+
   @Test("Optimistic move preserves the item's kind")
   func optimisticMovePreservesKind() async {
     let client = RecordingHarnessClient()

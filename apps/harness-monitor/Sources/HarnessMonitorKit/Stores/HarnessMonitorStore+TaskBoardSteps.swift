@@ -63,7 +63,9 @@ extension HarnessMonitorStore {
         mergeTaskBoardItem(delivery.applied.item)
       }
       if refreshDashboard && !dryRun {
-        await refreshTaskBoardDashboardSnapshot(using: client, access: access)
+        guard await refreshTaskBoardDashboardSnapshot(using: client, access: access) else {
+          return nil
+        }
       }
       presentSuccessFeedback(dryRun ? "Previewed task-board delivery" : "Delivered task-board item")
       return delivery
@@ -72,7 +74,9 @@ extension HarnessMonitorStore {
     } catch {
       guard taskBoardAccessIsCurrent(access) else { return nil }
       if refreshDashboard && !dryRun {
-        await refreshTaskBoardDashboardSnapshot(using: client, access: access)
+        guard await refreshTaskBoardDashboardSnapshot(using: client, access: access) else {
+          return nil
+        }
       }
       presentFailureFeedback(error.localizedDescription)
       return nil

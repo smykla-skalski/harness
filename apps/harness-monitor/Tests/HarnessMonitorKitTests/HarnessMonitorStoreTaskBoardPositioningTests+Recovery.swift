@@ -22,9 +22,11 @@ extension HarnessMonitorStoreTaskBoardPositioningTests {
 
     await client.waitUntilTaskBoardItemsReadIsBlocked()
     _ = try await store.invalidateTaskBoardDatabaseAccess(using: client)
+    store.globalTaskBoardItems = [taskBoardItem(id: item.id, status: .blocked)]
     await client.releaseTaskBoardItemsRead()
 
     #expect(await mutation.value == false)
+    #expect(store.globalTaskBoardItems.first?.status == .blocked)
     #expect(
       !client.recordedCalls().contains {
         if case .setTaskBoardItemPosition = $0 { return true }

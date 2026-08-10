@@ -91,6 +91,17 @@ extension HarnessMonitorStore {
       ),
       taskBoardAccessIsCurrent(access)
     else { return }
+    if let document = measuredPipeline.value,
+      let canvasId = fallbackWorkspace?.activeCanvasId
+    {
+      guard
+        await cachePolicyDocument(
+          document,
+          canvasId: canvasId,
+          access: access
+        )
+      else { return }
+    }
     withUISyncBatch {
       globalPolicyCanvasWorkspace = fallbackWorkspace
       globalPolicyPipeline = measuredPipeline.value
@@ -204,17 +215,13 @@ extension HarnessMonitorStore {
     }
     let activeCanvasId = globalPolicyCanvasWorkspace?.activeCanvasId
     if let activeCanvasId, !activeCanvasId.isEmpty {
-      _ = await cacheService?.cachePolicyDocument(
-        canvasId: activeCanvasId,
-        document: response.document
-      )
-      guard taskBoardAccessIsCurrent(access) else {
-        await cacheService?.removePolicyDocument(
+      guard
+        await cachePolicyDocument(
+          response.document,
           canvasId: activeCanvasId,
-          matching: response.document
+          access: access
         )
-        return nil
-      }
+      else { return nil }
     }
     recordRequestSuccess()
     globalPolicyPipeline = response.document
@@ -238,14 +245,15 @@ extension HarnessMonitorStore {
         )
       )
       try requireCurrentTaskBoardClientAccess(access)
-      recordRequestSuccess()
-      globalPolicySimulation = simulation
-      refreshActivePolicyCanvasSummary(latestSimulation: simulation)
-      globalPolicyAudit = await loadPolicyAudit(
+      let audit = await loadPolicyAudit(
         using: client,
         canvasId: globalPolicyCanvasWorkspace?.activeCanvasId
       )
       try requireCurrentTaskBoardClientAccess(access)
+      recordRequestSuccess()
+      globalPolicySimulation = simulation
+      globalPolicyAudit = audit
+      refreshActivePolicyCanvasSummary(latestSimulation: simulation)
       if simulation.validation.isValid {
         presentSuccessFeedback("Simulated policy")
       } else {

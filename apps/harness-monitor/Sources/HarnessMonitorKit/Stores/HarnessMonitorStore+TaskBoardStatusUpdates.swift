@@ -95,7 +95,7 @@ extension HarnessMonitorStore {
         )
         reconciledItems.append(item)
       } catch is CancellationError {
-        restoreTaskBoardItems(priorItemsByID.values)
+        restoreTaskBoardItemsIfCurrent(priorItemsByID.values, access: access)
         return false
       } catch {
         firstFailure = firstFailure ?? error
@@ -106,7 +106,6 @@ extension HarnessMonitorStore {
     }
 
     guard (try? requireCurrentTaskBoardClientAccess(access)) != nil else {
-      restoreTaskBoardItems(priorItemsByID.values)
       return false
     }
     withUISyncBatch {
@@ -114,8 +113,9 @@ extension HarnessMonitorStore {
         mergeTaskBoardItem(item)
       }
     }
-    await refreshTaskBoardDashboardSnapshot(using: client, access: access)
-    guard taskBoardAccessIsCurrent(access) else { return false }
+    guard await refreshTaskBoardDashboardSnapshot(using: client, access: access) else {
+      return false
+    }
     if let firstFailure {
       presentFailureFeedback(firstFailure.localizedDescription)
       return false
@@ -147,6 +147,14 @@ extension HarnessMonitorStore {
         mergeTaskBoardItem(item)
       }
     }
+  }
+
+  private func restoreTaskBoardItemsIfCurrent<S: Sequence>(
+    _ items: S,
+    access: TaskBoardClientAccess
+  ) where S.Element == TaskBoardItem {
+    guard taskBoardAccessIsCurrent(access) else { return }
+    restoreTaskBoardItems(items)
   }
 
   private func priorTaskBoardItems(for ids: [String]) -> [String: TaskBoardItem] {

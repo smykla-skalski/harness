@@ -200,16 +200,19 @@ extension HarnessMonitorStore {
     connectionFence: ConnectionAttemptFence? = nil
   ) async throws -> UInt64 {
     taskBoardRuntimeState.connection.databaseAccessGeneration &+= 1
-    await supervisorStack?.registry.advanceOverrideSourceGeneration(
-      to: taskBoardRuntimeState.connection.databaseAccessGeneration
-    )
+    let databaseAccessGeneration =
+      taskBoardRuntimeState.connection.databaseAccessGeneration
     taskBoardRuntimeState.connection.databaseAccessSuspended = true
     taskBoardDatabaseInstanceID = nil
     lastTaskBoardCredentialSync = nil
     cancelTaskBoardDashboardSnapshotRefresh()
+    cancelInitialTaskBoardConfirmationRefresh()
     scheduleUISync([.contentDashboard])
+    await supervisorStack?.registry.advanceOverrideSourceGeneration(
+      to: databaseAccessGeneration
+    )
     try await quiesceTaskBoardSourceSync(using: client, connectionFence: connectionFence)
-    return taskBoardRuntimeState.connection.databaseAccessGeneration
+    return databaseAccessGeneration
   }
 
   private func quiesceTaskBoardSourceSync(

@@ -3,16 +3,17 @@ import Foundation
 extension HarnessMonitorStore {
   private static let taskBoardRefreshCoalescingDelay: Duration = .milliseconds(50)
 
+  @discardableResult
   func refreshTaskBoardDashboardSnapshot(
     using client: any HarnessMonitorClientProtocol,
     fallbackStatus: TaskBoardOrchestratorStatus? = nil,
     access providedAccess: TaskBoardClientAccess? = nil
-  ) async {
+  ) async -> Bool {
     guard
       let access = providedAccess ?? availableTaskBoardClientAccess,
       access.client === client,
       taskBoardAccessIsCurrent(access)
-    else { return }
+    else { return false }
     cancelInitialTaskBoardConfirmationRefresh()
     let requestGeneration = scheduleTaskBoardDashboardSnapshotRefresh(
       using: client,
@@ -21,6 +22,7 @@ extension HarnessMonitorStore {
       access: access
     )
     await waitForTaskBoardDashboardSnapshotRefresh(requestGeneration)
+    return taskBoardAccessIsCurrent(access)
   }
 
   func scheduleGitHubTaskBoardRefresh(

@@ -82,7 +82,8 @@ extension HarnessMonitorStore {
     } catch {
       guard
         isCurrentConnectionAttemptFence(connectionFence),
-        self.client === client
+        self.client === client,
+        taskBoardAccessIsCurrent(taskBoardAccess)
       else { return }
       guard await discardFailedConnectionUnlessReplaced() else { return }
       guard !shouldAbandonConnectionAttempt else {

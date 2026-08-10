@@ -62,7 +62,9 @@ extension HarnessMonitorStore {
       return false
     }
     guard let access = availableTaskBoardClientAccess else {
-      rollbackOptimisticTaskBoardPosition(resolvedMutation)
+      if !taskBoardRuntimeState.connection.databaseAccessSuspended {
+        rollbackOptimisticTaskBoardPosition(resolvedMutation)
+      }
       finishTaskBoardPositionMutation(resolvedMutation)
       return false
     }
@@ -93,18 +95,24 @@ extension HarnessMonitorStore {
         response.snapshot.item,
         mutation: resolvedMutation
       )
-      await refreshTaskBoardDashboardSnapshot(using: client, access: access)
-      return true
+      return await refreshTaskBoardDashboardSnapshot(using: client, access: access)
     } catch is CancellationError {
-      rollbackOptimisticTaskBoardPosition(resolvedMutation)
+      if taskBoardAccessIsCurrent(access) {
+        rollbackOptimisticTaskBoardPosition(resolvedMutation)
+      }
       finishTaskBoardPositionMutation(resolvedMutation)
       return false
     } catch {
+      guard taskBoardAccessIsCurrent(access) else {
+        finishTaskBoardPositionMutation(resolvedMutation)
+        return false
+      }
       rollbackOptimisticTaskBoardPosition(resolvedMutation)
       finishTaskBoardPositionMutation(resolvedMutation)
-      guard taskBoardAccessIsCurrent(access) else { return false }
+      guard await refreshTaskBoardDashboardSnapshot(using: client, access: access) else {
+        return false
+      }
       presentFailureFeedback(error.localizedDescription)
-      await refreshTaskBoardDashboardSnapshot(using: client, access: access)
       return false
     }
   }
@@ -244,14 +252,15 @@ extension HarnessMonitorStore {
       try requireCurrentTaskBoardClientAccess(access)
       recordRequestSuccess()
       mergeTaskBoardItem(response.snapshot.item)
-      await refreshTaskBoardDashboardSnapshot(using: client, access: access)
-      return true
+      return await refreshTaskBoardDashboardSnapshot(using: client, access: access)
     } catch is CancellationError {
       return false
     } catch {
       guard taskBoardAccessIsCurrent(access) else { return false }
+      guard await refreshTaskBoardDashboardSnapshot(using: client, access: access) else {
+        return false
+      }
       presentFailureFeedback(error.localizedDescription)
-      await refreshTaskBoardDashboardSnapshot(using: client, access: access)
       return false
     }
   }

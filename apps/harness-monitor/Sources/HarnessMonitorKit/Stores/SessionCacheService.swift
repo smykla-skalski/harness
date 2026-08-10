@@ -17,6 +17,7 @@ public actor SessionCacheService {
   let databaseURL: URL?
   let beforeSave: () async throws -> Void
   let saveChanges: (ModelContext) throws -> Void
+  var policyDocumentWriteIDsByCanvasID: [String: UUID] = [:]
 
   public init(
     modelContainer: ModelContainer,

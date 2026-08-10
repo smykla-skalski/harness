@@ -7,11 +7,28 @@ extension SessionCacheService {
     let document: PolicyPipelineDocument
   }
 
+  struct PolicyDocumentCacheWriteToken: Sendable {
+    let canvasId: String
+    let writeID: UUID
+    let writtenData: Data
+    let previousWriteID: UUID?
+    let previousCachedAt: Date?
+    let previousData: Data?
+  }
+
+  struct PolicyDocumentCacheWriteResult: Sendable {
+    let didPersist: Bool
+    let token: PolicyDocumentCacheWriteToken?
+  }
+
   func cachePolicyDocument(
     canvasId: String,
     document: PolicyPipelineDocument
-  ) async -> WriteResult {
+  ) async -> PolicyDocumentCacheWriteResult {
     let context = makeContext()
+    let writeID = UUID()
+    let previousWriteID = policyDocumentWriteIDsByCanvasID[canvasId]
+    let token: PolicyDocumentCacheWriteToken
     do {
       let data = try Codecs.encoder.encode(document)
       var descriptor = FetchDescriptor<CachedPolicyDocument>(
@@ -19,19 +36,55 @@ extension SessionCacheService {
       )
       descriptor.fetchLimit = 1
       if let existing = try context.fetch(descriptor).first {
+        let cachedAt = nextPolicyDocumentCacheDate(after: existing.cachedAt)
+        token = PolicyDocumentCacheWriteToken(
+          canvasId: canvasId,
+          writeID: writeID,
+          writtenData: data,
+          previousWriteID: previousWriteID,
+          previousCachedAt: existing.cachedAt,
+          previousData: existing.documentData
+        )
         existing.documentData = data
-        existing.cachedAt = .now
+        existing.cachedAt = cachedAt
       } else {
-        context.insert(CachedPolicyDocument(canvasId: canvasId, documentData: data))
+        let cachedAt = Date.now
+        token = PolicyDocumentCacheWriteToken(
+          canvasId: canvasId,
+          writeID: writeID,
+          writtenData: data,
+          previousWriteID: previousWriteID,
+          previousCachedAt: nil,
+          previousData: nil
+        )
+        context.insert(
+          CachedPolicyDocument(
+            canvasId: canvasId,
+            cachedAt: cachedAt,
+            documentData: data
+          )
+        )
       }
     } catch {
       HarnessMonitorLogger.store.warning(
         "cache policy document failed: \(error.localizedDescription, privacy: .public)"
       )
-      return WriteResult(didPersist: false, metadataUpdate: .none)
+      return PolicyDocumentCacheWriteResult(didPersist: false, token: nil)
     }
     let didPersist = await persist(context, operation: "cache policy document")
-    return WriteResult(didPersist: didPersist, metadataUpdate: .none)
+    if didPersist {
+      policyDocumentWriteIDsByCanvasID[canvasId] = writeID
+    }
+    return PolicyDocumentCacheWriteResult(
+      didPersist: didPersist,
+      token: didPersist ? token : nil
+    )
+  }
+
+  private func nextPolicyDocumentCacheDate(after cachedAt: Date) -> Date {
+    let now = Date.now
+    guard now <= cachedAt else { return now }
+    return cachedAt.addingTimeInterval(0.001)
   }
 
   func loadPolicyDocument(
@@ -48,28 +101,42 @@ extension SessionCacheService {
     return try? cached.decodedDocument()
   }
 
-  func removePolicyDocument(
-    canvasId: String,
-    matching document: PolicyPipelineDocument
-  ) async {
+  @discardableResult
+  func rollbackPolicyDocumentCacheWrite(
+    _ token: PolicyDocumentCacheWriteToken
+  ) async -> Bool {
+    guard policyDocumentWriteIDsByCanvasID[token.canvasId] == token.writeID else {
+      return false
+    }
     let context = makeContext()
+    let canvasId = token.canvasId
     do {
-      let data = try Codecs.encoder.encode(document)
       var descriptor = FetchDescriptor<CachedPolicyDocument>(
         predicate: #Predicate { $0.canvasId == canvasId }
       )
       descriptor.fetchLimit = 1
       guard let cached = try context.fetch(descriptor).first,
-        cached.documentData == data
-      else { return }
-      context.delete(cached)
+        cached.documentData == token.writtenData
+      else { return false }
+      if let previousCachedAt = token.previousCachedAt,
+        let previousData = token.previousData
+      {
+        cached.cachedAt = previousCachedAt
+        cached.documentData = previousData
+      } else {
+        context.delete(cached)
+      }
     } catch {
       HarnessMonitorLogger.store.warning(
-        "remove stale policy document failed: \(error.localizedDescription, privacy: .public)"
+        "rollback stale policy document failed: \(error.localizedDescription, privacy: .public)"
       )
-      return
+      return false
     }
-    _ = await persist(context, operation: "remove stale policy document")
+    if await persist(context, operation: "rollback stale policy document") {
+      policyDocumentWriteIDsByCanvasID[canvasId] = token.previousWriteID
+      return true
+    }
+    return false
   }
 
   func loadMostRecentPolicyDocument() -> PolicyPipelineDocument? {

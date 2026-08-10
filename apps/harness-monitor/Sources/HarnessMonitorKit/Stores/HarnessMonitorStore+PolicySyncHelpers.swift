@@ -86,6 +86,15 @@ extension HarnessMonitorStore {
       )
     else { return false }
     guard taskBoardAccessIsCurrent(taskBoardAccess) else { return false }
+    if shouldReloadActiveCanvas, let activeDocument {
+      guard
+        await cachePolicyDocument(
+          activeDocument,
+          canvasId: syncedWorkspace.activeCanvasId,
+          access: taskBoardAccess
+        )
+      else { return false }
+    }
     withUISyncBatch {
       globalPolicyCanvasWorkspace = syncedWorkspace
       if shouldReloadActiveCanvas {
@@ -95,6 +104,26 @@ extension HarnessMonitorStore {
       }
     }
     return taskBoardAccessIsCurrent(taskBoardAccess)
+  }
+
+  func cachePolicyDocument(
+    _ document: PolicyPipelineDocument,
+    canvasId: String,
+    access: TaskBoardClientAccess
+  ) async -> Bool {
+    guard taskBoardAccessIsCurrent(access) else { return false }
+    guard let cacheService else { return true }
+    let write = await cacheService.cachePolicyDocument(
+      canvasId: canvasId,
+      document: document
+    )
+    guard taskBoardAccessIsCurrent(access) else {
+      if let token = write.token {
+        await cacheService.rollbackPolicyDocumentCacheWrite(token)
+      }
+      return false
+    }
+    return true
   }
 
   func hydrateEffectivePolicyCanvasWorkspace(
