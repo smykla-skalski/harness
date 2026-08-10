@@ -46,6 +46,16 @@ extension HarnessMonitorPaths {
   static func configuredDataHomeRoot(
     using environment: HarnessMonitorEnvironment
   ) -> URL? {
+    if DaemonOwnership(environment: environment) == .managed,
+      let bundledDataHome = embeddedBundleValue(
+        for: "HarnessMonitorManagedDaemonDataHome",
+        using: environment
+      ),
+      (bundledDataHome as NSString).isAbsolutePath
+    {
+      return URL(fileURLWithPath: bundledDataHome, isDirectory: true)
+    }
+
     let daemonDataHomeValue = environment.values[
       HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey]?
       .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -59,25 +69,66 @@ extension HarnessMonitorPaths {
       return URL(fileURLWithPath: xdgDataHomeValue, isDirectory: true)
     }
 
+    if explicitlyConfiguredRuntimeLane(using: environment) != nil {
+      return nil
+    }
+
+    if let bundledDataHome = embeddedBundleValue(
+      for: "HarnessMonitorManagedDaemonDataHome",
+      using: environment
+    ),
+      (bundledDataHome as NSString).isAbsolutePath
+    {
+      return URL(fileURLWithPath: bundledDataHome, isDirectory: true)
+    }
+
     return nil
   }
 
   static func resolvedRuntimeLane(
     using environment: HarnessMonitorEnvironment
   ) -> String? {
-    if let explicitLane = sanitizeRuntimeLane(
-      environment.values[HarnessMonitorRuntimeLane.environmentKey]
-    ) {
+    if DaemonOwnership(environment: environment) == .managed,
+      let embeddedLane = sanitizeRuntimeLane(
+        embeddedBundleValue(
+          for: "HarnessMonitorManagedDaemonRuntimeLane",
+          using: environment
+        )
+      )
+    {
+      return embeddedLane
+    }
+
+    if let explicitLane = explicitlyConfiguredRuntimeLane(using: environment) {
       return explicitLane
     }
 
-    if let inferredFromDataHome = inferRuntimeLane(
-      fromPath: environment.values[HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey]
+    if let embeddedLane = sanitizeRuntimeLane(
+      embeddedBundleValue(
+        for: "HarnessMonitorManagedDaemonRuntimeLane",
+        using: environment
+      )
     ) {
-      return inferredFromDataHome
+      return embeddedLane
+    }
+
+    if let embeddedDataHome = embeddedBundleValue(
+      for: "HarnessMonitorManagedDaemonDataHome",
+      using: environment
+    ) {
+      return inferRuntimeLane(fromPath: embeddedDataHome)
     }
 
     return nil
+  }
+
+  static func explicitlyConfiguredRuntimeLane(
+    using environment: HarnessMonitorEnvironment
+  ) -> String? {
+    sanitizeRuntimeLane(environment.values[HarnessMonitorRuntimeLane.environmentKey])
+      ?? inferRuntimeLane(
+        fromPath: environment.values[HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey]
+      )
   }
 
   static func runtimeLaneBaseRoot(
@@ -147,10 +198,30 @@ extension HarnessMonitorPaths {
   static func resolvedCodexBridgePortString(
     using environment: HarnessMonitorEnvironment
   ) -> String? {
+    if DaemonOwnership(environment: environment) == .managed,
+      let embeddedPort = embeddedBundleValue(
+        for: "HarnessMonitorManagedDaemonCodexWSPort",
+        using: environment
+      )
+    {
+      return embeddedPort
+    }
+
     if let explicitPort = normalizedNonEmpty(
       environment.values[HarnessMonitorRuntimeLane.codexWSPortEnvironmentKey]
     ) {
       return explicitPort
+    }
+
+    if let lane = explicitlyConfiguredRuntimeLane(using: environment) {
+      return String(derivedCodexBridgePort(for: lane))
+    }
+
+    if let embeddedPort = embeddedBundleValue(
+      for: "HarnessMonitorManagedDaemonCodexWSPort",
+      using: environment
+    ) {
+      return embeddedPort
     }
 
     guard let lane = resolvedRuntimeLane(using: environment) else {

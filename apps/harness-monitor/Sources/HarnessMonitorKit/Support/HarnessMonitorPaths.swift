@@ -138,23 +138,39 @@ public enum HarnessMonitorPaths {
   /// `error: 22 (EINVAL)` and `Service status: 3 (.notFound)` whenever the
   /// two diverge, which manifests as a managed-daemon bootstrap that loops
   /// on `Bootstrapping daemon client for managed daemon mode` without ever
-  /// spawning a daemon process. Lane identity therefore flows through the
-  /// `HARNESS_MONITOR_RUNTIME_LANE` env entry in the plist, not the label.
-  ///
-  /// For sandboxed SMAppService launch agents, the service name must be an
-  /// immediate child of the app group. Keep this as
-  /// `<app-group>.<single-component>` so backgroundtaskmanagementd can resolve
-  /// the helper's full path instead of rejecting registration with a
-  /// `job-creation` sandbox denial.
+  /// spawning a daemon process. Sandboxed SMAppService launch agents must
+  /// also be immediate children of the app group, so the lane suffix is
+  /// joined with `-`, not another `.`, and the result remains
+  /// `<app-group>.<single-component>`.
   public static func launchAgentLabel(
     using environment: HarnessMonitorEnvironment = .current
   ) -> String {
+    if DaemonOwnership(environment: environment) == .managed,
+      let embeddedLabel = embeddedBundleValue(
+        for: "HarnessMonitorManagedLaunchAgentLabel",
+        using: environment
+      )
+    {
+      return embeddedLabel
+    }
     if let explicitLabel = normalizedNonEmpty(
       environment.values[HarnessMonitorRuntimeLane.launchAgentLabelEnvKey]
     ) {
       return explicitLabel
     }
-    return managedLaunchAgentLabelBase()
+    if let lane = explicitlyConfiguredRuntimeLane(using: environment) {
+      return "\(managedLaunchAgentLabelBase())-\(lane)"
+    }
+    if let embeddedLabel = embeddedBundleValue(
+      for: "HarnessMonitorManagedLaunchAgentLabel",
+      using: environment
+    ) {
+      return embeddedLabel
+    }
+    guard let lane = resolvedRuntimeLane(using: environment) else {
+      return managedLaunchAgentLabelBase()
+    }
+    return "\(managedLaunchAgentLabelBase())-\(lane)"
   }
 
   static func managedLaunchAgentLabelBase() -> String {
@@ -323,20 +339,6 @@ public enum HarnessMonitorPaths {
   ) -> URL {
     Self.daemonRoot(ownership: ownership, using: environment)
       .appendingPathComponent("auth-token")
-  }
-
-  public static func managedLaunchAgentBundleStampURL(
-    using environment: HarnessMonitorEnvironment = .current
-  ) -> URL {
-    Self.daemonRoot(ownership: .managed, using: environment)
-      .appendingPathComponent("managed-launch-agent-bundle-stamp.json")
-  }
-
-  public static func managedLaunchAgentLockURL(
-    using environment: HarnessMonitorEnvironment = .current
-  ) -> URL {
-    Self.daemonRoot(ownership: .managed, using: environment)
-      .appendingPathComponent("managed-launch-agent.lock")
   }
 
   /// The daemon's singleton lock. It is held for the whole daemon process

@@ -293,6 +293,7 @@ public final class HarnessMonitorStore {
   var sessionPushFallbackTask: Task<Void, Never>?
   @ObservationIgnored var appInactivitySuspendTask: Task<Void, Never>?
   @ObservationIgnored var initialTaskBoardConfirmationTask: Task<Void, Never>?
+  @ObservationIgnored var initialTaskBoardConfirmationGeneration: UInt64 = 0
   @ObservationIgnored var selectedSessionRefreshFallbackTask: Task<Void, Never>?
   var sessionSnapshotHydrationTask: Task<Void, Never>?
   @ObservationIgnored var sessionLoadTask: Task<Void, Never>?
@@ -338,6 +339,8 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var managedLaunchAgentRefreshAttempts = 0
   var managedDaemonRecoveryExhausted = false
   @ObservationIgnored var hasRefreshedManagedLaunchAgentOnLaunch = false
+  @ObservationIgnored let legacyManagedLaunchAgentContainment =
+    LegacyManagedLaunchAgentContainment()
   @ObservationIgnored var pendingAgentTuiActionRefresh: (tuiID: String, token: UInt64)?
   var pendingExtensions: SessionExtensionsPayload?
   var isNavigatingHistory = false
@@ -387,6 +390,7 @@ public final class HarnessMonitorStore {
       reviewFilePatchStore
     )
     self.modelContext = modelContainer?.mainContext
+    cacheWriteSync.repositoryLabelUsagePersistenceWorker = Self.makeLabelUsageWorker(modelContainer)
     self.userDataService = Self.makeUserDataService(modelContainer: modelContainer)
     self.supervisorPolicyConfigRepository = modelContainer.map(
       SupervisorPolicyConfigRepository.init)

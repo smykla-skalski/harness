@@ -9,6 +9,10 @@ use crate::daemon::db::prelude::*;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
 use crate::task_board::{DispatchAppliedTask, TaskBoardWorkItemState};
 
+#[path = "admission_recovery/sql.rs"]
+mod sql;
+use sql::{ADMISSION_RECOVERY_FOR_WORKER_SQL, ADMISSION_RECOVERY_SQL};
+
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct TaskBoardAdmissionWorkerRecovery {
     pub(crate) managed_worker_id: String,
@@ -63,40 +67,83 @@ pub(super) async fn task_board_admission_worker_recoveries(
     recoveries_from_rows(rows)
 }
 
+pub(super) async fn prepare_task_board_admission_worker_recoveries(
+    db: &AsyncDaemonDb,
+) -> Result<Vec<TaskBoardAdmissionWorkerRecovery>, CliError> {
+    prepare_recoveries(db)
+        .await
+        .map(|prepared| prepared.recoveries)
+}
+
 pub(super) async fn migrate_legacy_task_board_admission_worker_owners(
     db: &AsyncDaemonDb,
 ) -> Result<usize, CliError> {
-    let recoveries = task_board_admission_worker_recoveries(db).await?;
-    let mut migrated = 0;
-    for recovery in recoveries {
+    prepare_recoveries(db)
+        .await
+        .map(|prepared| prepared.migrated)
+}
+
+struct PreparedRecoveries {
+    recoveries: Vec<TaskBoardAdmissionWorkerRecovery>,
+    migrated: usize,
+}
+
+async fn prepare_recoveries(db: &AsyncDaemonDb) -> Result<PreparedRecoveries, CliError> {
+    let mut prepared = Vec::new();
+    let mut legacy = Vec::new();
+    for recovery in task_board_admission_worker_recoveries(db).await? {
         if recovery.dispatch.workspace_id.is_none()
             && recovery.session_id.is_some()
             && recovery.dispatch.read_only_workflow.is_none()
             && recovery.dispatch.write_workflow.is_none()
-            && migrate_one_legacy_worker_owner(db, &recovery).await?
         {
-            migrated += 1;
+            legacy.push(recovery);
+        } else {
+            prepared.push(recovery);
         }
     }
-    Ok(migrated)
+    let migrated = migrate_legacy_worker_owners(db, legacy, &mut prepared).await?;
+    prepared.sort_by(|left, right| left.managed_worker_id.cmp(&right.managed_worker_id));
+    Ok(PreparedRecoveries {
+        recoveries: prepared,
+        migrated,
+    })
 }
 
-async fn migrate_one_legacy_worker_owner(
+async fn migrate_legacy_worker_owners(
     db: &AsyncDaemonDb,
-    expected: &TaskBoardAdmissionWorkerRecovery,
-) -> Result<bool, CliError> {
+    legacy: Vec<TaskBoardAdmissionWorkerRecovery>,
+    prepared: &mut Vec<TaskBoardAdmissionWorkerRecovery>,
+) -> Result<usize, CliError> {
+    if legacy.is_empty() {
+        return Ok(0);
+    }
     let mut transaction = db
         .begin_immediate_transaction("legacy task board worker owner migration")
         .await?;
-    let Some(current) =
-        load_worker_recovery_in_tx(&mut transaction, &expected.managed_worker_id).await?
-    else {
-        transaction.commit().await.map_err(|error| {
-            db_error(format!(
-                "commit empty legacy worker owner migration: {error}"
-            ))
-        })?;
-        return Ok(false);
+    let mut migrated = 0;
+    for expected in legacy {
+        if let Some((recovery, changed)) =
+            migrate_one_legacy_worker_owner_in_tx(&mut transaction, &expected).await?
+        {
+            migrated += usize::from(changed);
+            prepared.push(recovery);
+        }
+    }
+    transaction.commit().await.map_err(|error| {
+        db_error(format!(
+            "commit legacy task board worker owner migrations: {error}"
+        ))
+    })?;
+    Ok(migrated)
+}
+
+async fn migrate_one_legacy_worker_owner_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    expected: &TaskBoardAdmissionWorkerRecovery,
+) -> Result<Option<(TaskBoardAdmissionWorkerRecovery, bool)>, CliError> {
+    let Some(mut current) = load_worker_recovery_in_tx(transaction, expected).await? else {
+        return Ok(None);
     };
     if current != *expected {
         return Err(db_error(format!(
@@ -105,7 +152,7 @@ async fn migrate_one_legacy_worker_owner(
         )));
     }
     let Some(workspace_id) = selected_workspace_for_session_in_tx(
-        &mut transaction,
+        transaction,
         expected
             .session_id
             .as_deref()
@@ -113,19 +160,10 @@ async fn migrate_one_legacy_worker_owner(
     )
     .await?
     else {
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit unmigrated legacy worker owner: {error}")))?;
-        return Ok(false);
+        return Ok(Some((current, false)));
     };
-    persist_migrated_worker_owner_in_tx(&mut transaction, current, &workspace_id).await?;
-    transaction.commit().await.map_err(|error| {
-        db_error(format!(
-            "commit legacy task board worker owner migration: {error}"
-        ))
-    })?;
-    Ok(true)
+    persist_migrated_worker_owner_in_tx(transaction, &mut current, &workspace_id).await?;
+    Ok(Some((current, true)))
 }
 
 async fn selected_workspace_for_session_in_tx(
@@ -152,15 +190,14 @@ async fn selected_workspace_for_session_in_tx(
 
 async fn persist_migrated_worker_owner_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
-    recovery: TaskBoardAdmissionWorkerRecovery,
+    recovery: &mut TaskBoardAdmissionWorkerRecovery,
     workspace_id: &str,
 ) -> Result<(), CliError> {
     let now = utc_now();
-    migrate_current_item_owner_in_tx(transaction, &recovery, workspace_id, &now).await?;
-    let mut dispatch = recovery.dispatch;
-    dispatch.workspace_id = Some(workspace_id.to_string());
-    dispatch.item.workspace_id = Some(workspace_id.to_string());
-    let payload_json = serde_json::to_string(&dispatch)
+    migrate_current_item_owner_in_tx(transaction, recovery, workspace_id, &now).await?;
+    recovery.dispatch.workspace_id = Some(workspace_id.to_string());
+    recovery.dispatch.item.workspace_id = Some(workspace_id.to_string());
+    let payload_json = serde_json::to_string(&recovery.dispatch)
         .map_err(|error| db_error(format!("serialize migrated worker dispatch: {error}")))?;
     let updated = query(
         "UPDATE task_board_dispatch_intents
@@ -270,96 +307,6 @@ pub(super) async fn reconcile_missing_task_board_admission_worker(
     }))
 }
 
-const ADMISSION_RECOVERY_SQL: &str =
-    "SELECT DISTINCT ledger.managed_worker_id, intent.intent_id, intent.item_id,
-        intent.session_id, intent.workspace_id, intent.working_copy_id,
-        intent.work_item_id, intent.workflow_execution_id,
-        intent.payload_json, intent.status AS intent_status
-     FROM task_board_dispatch_admission_ledger AS ledger
-     JOIN task_board_dispatch_intents AS intent ON intent.intent_id = ledger.intent_id
-     WHERE ledger.kind = 'concurrency'
-       AND ledger.managed_worker_id IS NOT NULL
-       AND NOT (intent.status = 'starting' AND intent.compensation_pending = 1)
-       AND (
-           ledger.state = 'committed'
-           OR (ledger.state = 'released' AND EXISTS (
-               SELECT 1 FROM task_board_work_item_progress AS progress
-               WHERE progress.item_id = intent.item_id
-                 AND progress.work_item_id = intent.work_item_id
-                 AND progress.attempt_id = ledger.managed_worker_id
-                 AND progress.completed_at IS NULL
-                 AND progress.state IN ('pending', 'running')
-                 AND (
-                     (
-                         NOT EXISTS (
-                             SELECT 1 FROM codex_runs AS run
-                             WHERE run.run_id = ledger.managed_worker_id
-                         )
-                         AND NOT EXISTS (
-                             SELECT 1 FROM agent_tuis AS tui
-                             WHERE tui.tui_id = ledger.managed_worker_id
-                         )
-                     )
-                     OR EXISTS (
-                         SELECT 1 FROM codex_runs AS run
-                         WHERE run.run_id = ledger.managed_worker_id
-                           AND run.status IN ('completed', 'failed', 'cancelled')
-                     )
-                     OR EXISTS (
-                         SELECT 1 FROM agent_tuis AS tui
-                         WHERE tui.tui_id = ledger.managed_worker_id
-                           AND tui.status IN ('exited', 'failed', 'stopped')
-                     )
-                 )
-           ))
-       )
-     ORDER BY ledger.managed_worker_id, intent.intent_id";
-
-const ADMISSION_RECOVERY_FOR_WORKER_SQL: &str =
-    "SELECT DISTINCT ledger.managed_worker_id, intent.intent_id, intent.item_id,
-        intent.session_id, intent.workspace_id, intent.working_copy_id,
-        intent.work_item_id, intent.workflow_execution_id,
-        intent.payload_json, intent.status AS intent_status
-     FROM task_board_dispatch_admission_ledger AS ledger
-     JOIN task_board_dispatch_intents AS intent ON intent.intent_id = ledger.intent_id
-     WHERE ledger.kind = 'concurrency'
-       AND ledger.managed_worker_id = ?1
-       AND NOT (intent.status = 'starting' AND intent.compensation_pending = 1)
-       AND (
-           ledger.state = 'committed'
-           OR (ledger.state = 'released' AND EXISTS (
-               SELECT 1 FROM task_board_work_item_progress AS progress
-               WHERE progress.item_id = intent.item_id
-                 AND progress.work_item_id = intent.work_item_id
-                 AND progress.attempt_id = ledger.managed_worker_id
-                 AND progress.completed_at IS NULL
-                 AND progress.state IN ('pending', 'running')
-                 AND (
-                     (
-                         NOT EXISTS (
-                             SELECT 1 FROM codex_runs AS run
-                             WHERE run.run_id = ledger.managed_worker_id
-                         )
-                         AND NOT EXISTS (
-                             SELECT 1 FROM agent_tuis AS tui
-                             WHERE tui.tui_id = ledger.managed_worker_id
-                         )
-                     )
-                     OR EXISTS (
-                         SELECT 1 FROM codex_runs AS run
-                         WHERE run.run_id = ledger.managed_worker_id
-                           AND run.status IN ('completed', 'failed', 'cancelled')
-                     )
-                     OR EXISTS (
-                         SELECT 1 FROM agent_tuis AS tui
-                         WHERE tui.tui_id = ledger.managed_worker_id
-                           AND tui.status IN ('exited', 'failed', 'stopped')
-                     )
-                 )
-           ))
-       )
-     ORDER BY ledger.managed_worker_id, intent.intent_id";
-
 fn recoveries_from_rows(
     rows: Vec<AdmissionRecoveryRow>,
 ) -> Result<Vec<TaskBoardAdmissionWorkerRecovery>, CliError> {
@@ -421,10 +368,11 @@ fn recovery_from_row(
 
 async fn load_worker_recovery_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
-    managed_worker_id: &str,
+    expected: &TaskBoardAdmissionWorkerRecovery,
 ) -> Result<Option<TaskBoardAdmissionWorkerRecovery>, CliError> {
     let rows = query_as::<_, AdmissionRecoveryRow>(ADMISSION_RECOVERY_FOR_WORKER_SQL)
-        .bind(managed_worker_id)
+        .bind(&expected.intent_id)
+        .bind(&expected.managed_worker_id)
         .fetch_all(transaction.as_mut())
         .await
         .map_err(|error| db_error(format!("reload task board admission worker: {error}")))?;
@@ -433,7 +381,8 @@ async fn load_worker_recovery_in_tx(
         0 => Ok(None),
         1 => Ok(recoveries.pop()),
         _ => Err(db_error(format!(
-            "managed worker '{managed_worker_id}' resolved to multiple recovery records"
+            "managed worker '{}' resolved to multiple recovery records",
+            expected.managed_worker_id
         ))),
     }
 }
@@ -444,9 +393,7 @@ async fn screen_missing_worker_recovery_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     expected: &TaskBoardAdmissionWorkerRecovery,
 ) -> Result<bool, CliError> {
-    let Some(current) =
-        load_worker_recovery_in_tx(transaction, &expected.managed_worker_id).await?
-    else {
+    let Some(current) = load_worker_recovery_in_tx(transaction, expected).await? else {
         return Ok(false);
     };
     if current != *expected {
@@ -481,3 +428,7 @@ async fn managed_worker_exists_in_tx(
         ))
     })
 }
+
+#[cfg(test)]
+#[path = "admission_recovery/query_plan_tests.rs"]
+mod query_plan_tests;

@@ -22,7 +22,7 @@ struct HarnessMonitorStoreTaskBoardSettingsTests {
       #expect(store.taskBoardDatabaseInstanceID == nil)
     }
 
-    await store.connect(using: client)
+    try? await store.connect(using: client)
 
     #expect(store.client == nil)
     #expect(client.readCallCount(.taskBoardItems(nil)) == 0)
@@ -110,10 +110,10 @@ struct HarnessMonitorStoreTaskBoardSettingsTests {
   @Test("Token sync failure runs after runtime success but leaves keychain unchanged")
   func tokenSyncFailureRunsAfterRuntimeSuccessButLeavesKeychainUnchanged() async {
     let client = RecordingHarnessClient()
+    let store = await makeBootstrappedStore(client: client)
     client.configureTaskBoardGitHubTokensSyncError(
       HarnessMonitorAPIError.server(code: 503, message: "Token sync unavailable.")
     )
-    let store = await makeBootstrappedStore(client: client)
     let baselineCallCount = client.recordedCalls().count
     let snapshot = makeSettingsSnapshot()
 
@@ -375,7 +375,7 @@ struct HarnessMonitorStoreTaskBoardSettingsTests {
     #expect(reloaded.isEmpty)
   }
 
-  private func makeSettingsSnapshot(stepMode: Bool = false) -> TaskBoardGitSettingsSnapshot {
+  func makeSettingsSnapshot(stepMode: Bool = false) -> TaskBoardGitSettingsSnapshot {
     TaskBoardGitSettingsSnapshot(
       orchestratorSettings: TaskBoardOrchestratorSettings(
         stepMode: stepMode,

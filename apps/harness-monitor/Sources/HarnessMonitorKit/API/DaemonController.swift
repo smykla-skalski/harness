@@ -13,6 +13,10 @@ public struct DaemonController: DaemonControlling {
   let transportPreference: TransportPreference
   let autoTransportWebSocketGracePeriod: Duration
   let launchAgentManager: any DaemonLaunchAgentManaging
+  let legacyLaunchAgentManagerFactory: @Sendable (String) -> any DaemonLaunchAgentManaging
+  let legacyLaunchAgentCleanupDefaults: SendableUserDefaults
+  let legacyMonitorProcessIsRunning: @Sendable () async -> Bool
+  let legacyMonitorProcessScanCache: LegacyMonitorProcessScanCache
   let ownership: DaemonOwnership
   let remoteConnectionSource: any RemoteDaemonConnectionSourcing
   let endpointProbe: @Sendable (URL) async -> Bool
@@ -24,14 +28,20 @@ public struct DaemonController: DaemonControlling {
   let managedLaunchAgentCurrentBundleStamp: @Sendable () throws -> ManagedLaunchAgentBundleStamp?
   let managedLaunchAgentDeferredRefreshState: ManagedLaunchAgentDeferredRefreshState
   let processLiveness: ProcessLivenessProbe
+  let processSignal: ProcessSignal
+  let managedDaemonProcessIdentityValidator: ManagedProcessValidator
   let bootSessionUUID: BootSessionUUIDProbe
   let externalManifestLocator: ExternalDaemonManifestLocator
 
   public init(
     environment: HarnessMonitorEnvironment = .current,
     transportPreference: TransportPreference = .webSocket,
-    launchAgentManager: any DaemonLaunchAgentManaging =
-      ServiceManagementDaemonLaunchAgentManager(),
+    launchAgentManager: (any DaemonLaunchAgentManaging)? = nil,
+    legacyLaunchAgentManagerFactory:
+      (@Sendable (String) -> any DaemonLaunchAgentManaging)? = nil,
+    legacyLaunchAgentCleanupDefaults: UserDefaults = .standard,
+    legacyMonitorProcessIsRunning:
+      (@Sendable () async -> Bool)? = nil,
     ownership: DaemonOwnership = .managed,
     remoteConnectionSource: (any RemoteDaemonConnectionSourcing)? = nil,
     autoTransportWebSocketGracePeriod: Duration = .seconds(2),
@@ -72,13 +82,41 @@ public struct DaemonController: DaemonControlling {
         try Self.currentManagedLaunchAgentBundleStamp()
       },
     processLiveness: @escaping ProcessLivenessProbe = Self.defaultProcessLiveness,
+    processSignal: @escaping ProcessSignal = { kill($0, $1) },
+    managedDaemonProcessIdentityValidator:
+      @escaping ManagedProcessValidator =
+      Self.defaultManagedProcessValidator,
     bootSessionUUID: @escaping BootSessionUUIDProbe = Self.defaultBootSessionUUID,
     externalManifestDefaults: UserDefaults = .standard
   ) {
+    let launchAgentManagerWasInjected = launchAgentManager != nil
     self.environment = environment
     self.transportPreference = transportPreference
     self.autoTransportWebSocketGracePeriod = autoTransportWebSocketGracePeriod
-    self.launchAgentManager = launchAgentManager
+    self.launchAgentManager =
+      launchAgentManager
+      ?? ServiceManagementDaemonLaunchAgentManager(
+        plistName: HarnessMonitorPaths.launchAgentPlistName(using: environment)
+      )
+    self.legacyLaunchAgentManagerFactory =
+      legacyLaunchAgentManagerFactory
+      ?? { plistName in
+        if launchAgentManagerWasInjected {
+          return InactiveDaemonLaunchAgentManager()
+        }
+        return ServiceManagementDaemonLaunchAgentManager(plistName: plistName)
+      }
+    self.legacyLaunchAgentCleanupDefaults = SendableUserDefaults(
+      legacyLaunchAgentCleanupDefaults
+    )
+    let legacyMonitorProcessScanCache = LegacyMonitorProcessScanCache()
+    self.legacyMonitorProcessScanCache = legacyMonitorProcessScanCache
+    self.legacyMonitorProcessIsRunning =
+      legacyMonitorProcessIsRunning ?? {
+        await legacyMonitorProcessScanCache.value {
+          await Self.defaultLegacyMonitorProcessIsRunning()
+        }
+      }
     self.ownership = ownership
     self.remoteConnectionSource =
       remoteConnectionSource ?? DisabledRemoteDaemonConnectionSource()
@@ -93,6 +131,8 @@ public struct DaemonController: DaemonControlling {
     self.managedLaunchAgentCurrentBundleStamp = managedLaunchAgentCurrentBundleStamp
     self.managedLaunchAgentDeferredRefreshState = ManagedLaunchAgentDeferredRefreshState()
     self.processLiveness = processLiveness
+    self.processSignal = processSignal
+    self.managedDaemonProcessIdentityValidator = managedDaemonProcessIdentityValidator
     self.bootSessionUUID = bootSessionUUID
     self.externalManifestLocator = ExternalDaemonManifestLocator(
       environment: environment,
@@ -217,13 +257,14 @@ public struct DaemonController: DaemonControlling {
 
   public func registerLaunchAgent() async throws -> DaemonLaunchAgentRegistrationState {
     try requireLocalDaemonControl("Register Launch Agent")
-    try launchAgentManager.register()
-    let state = launchAgentManager.registrationState()
-    if state == .enabled {
-      try persistCurrentManagedLaunchAgentBundleStamp()
-      try persistCurrentManagedLaunchAgentOwner()
+    return try await withRequiredManagedLaunchAgentLock {
+      let state = try await registerCurrentLaunchAgentAndRequireLegacyCleanup()
+      if state == .enabled {
+        try persistCurrentManagedLaunchAgentBundleStamp()
+        try persistCurrentManagedLaunchAgentOwner()
+      }
+      return state
     }
-    return state
   }
 
   public func launchAgentRegistrationState() async -> DaemonLaunchAgentRegistrationState {
@@ -260,9 +301,12 @@ public struct DaemonController: DaemonControlling {
       return try await requestDaemonStop(using: client)
     }
     if launchAgentManager.registrationState() == .enabled {
-      try launchAgentManager.unregister()
-      clearManagedLaunchAgentBundleStamp()
-      clearManagedLaunchAgentOwner()
+      try await withRequiredManagedLaunchAgentLock {
+        try launchAgentManager.unregister()
+        clearManagedLaunchAgentBundleStamp()
+        clearManagedLaunchAgentOwner()
+        await awaitManagedLaunchAgentBTMSettleAfterUnregister()
+      }
       return "stopped"
     }
 
@@ -319,10 +363,12 @@ public struct DaemonController: DaemonControlling {
     case .notRegistered, .notFound:
       return "launch agent not installed"
     case .enabled, .requiresApproval:
-      try launchAgentManager.unregister()
-      clearManagedLaunchAgentBundleStamp()
-      clearManagedLaunchAgentOwner()
-      await awaitManagedLaunchAgentBTMSettleAfterUnregister()
+      try await withRequiredManagedLaunchAgentLock {
+        try launchAgentManager.unregister()
+        clearManagedLaunchAgentBundleStamp()
+        clearManagedLaunchAgentOwner()
+        await awaitManagedLaunchAgentBTMSettleAfterUnregister()
+      }
       return "launch agent removed"
     }
   }
@@ -346,7 +392,7 @@ public struct DaemonController: DaemonControlling {
   {
     let helperURL = Bundle.main.bundleURL
       .appendingPathComponent("Contents", isDirectory: true)
-      .appendingPathComponent("Helpers", isDirectory: true)
+      .appendingPathComponent("Resources", isDirectory: true)
       .appendingPathComponent("harness-daemon")
     guard FileManager.default.fileExists(atPath: helperURL.path) else {
       return nil
@@ -359,20 +405,4 @@ public struct DaemonController: DaemonControlling {
     )
   }
 
-  func managedDaemonVersionMismatch(for manifest: DaemonManifest) -> DaemonControlError? {
-    guard ownership == .managed else {
-      return nil
-    }
-
-    guard
-      let expectedVersion = expectedManagedDaemonVersion()?
-        .trimmingCharacters(in: .whitespacesAndNewlines),
-      !expectedVersion.isEmpty,
-      manifest.version != expectedVersion
-    else {
-      return nil
-    }
-
-    return .managedDaemonVersionMismatch(expected: expectedVersion, actual: manifest.version)
-  }
 }

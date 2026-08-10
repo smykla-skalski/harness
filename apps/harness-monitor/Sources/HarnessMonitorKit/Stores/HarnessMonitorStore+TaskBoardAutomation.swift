@@ -5,54 +5,24 @@ extension HarnessMonitorStore {
     before: String? = nil,
     limit: UInt32 = 50
   ) async -> TaskBoardAutomationHistoryResponse? {
-    guard connectionState == .online, let client else { return nil }
-    do {
-      let measuredResponse = try await Self.measureOperation {
-        try await client.taskBoardAutomationRuns(
-          request: TaskBoardAutomationHistoryRequest(limit: limit, before: before)
-        )
-      }
-      recordRequestSuccess()
-      return measuredResponse.value
-    } catch is CancellationError {
-      return nil
-    } catch {
-      presentFailureFeedback(error.localizedDescription)
-      return nil
+    await readTaskBoard { client in
+      try await client.taskBoardAutomationRuns(
+        request: TaskBoardAutomationHistoryRequest(limit: limit, before: before)
+      )
     }
   }
 
   public func taskBoardAutomationRunDetail(
     runID: String
   ) async -> TaskBoardAutomationRunDetail? {
-    guard connectionState == .online, let client else { return nil }
-    do {
-      let measuredDetail = try await Self.measureOperation {
-        try await client.taskBoardAutomationRunDetail(runID: runID)
-      }
-      recordRequestSuccess()
-      return measuredDetail.value
-    } catch is CancellationError {
-      return nil
-    } catch {
-      presentFailureFeedback(error.localizedDescription)
-      return nil
+    await readTaskBoard { client in
+      try await client.taskBoardAutomationRunDetail(runID: runID)
     }
   }
 
   public func taskBoardAutomationMetrics() async -> TaskBoardAutomationMetrics? {
-    guard connectionState == .online, let client else { return nil }
-    do {
-      let measuredMetrics = try await Self.measureOperation {
-        try await client.taskBoardAutomationMetrics()
-      }
-      recordRequestSuccess()
-      return measuredMetrics.value
-    } catch is CancellationError {
-      return nil
-    } catch {
-      presentFailureFeedback(error.localizedDescription)
-      return nil
+    await readTaskBoard { client in
+      try await client.taskBoardAutomationMetrics()
     }
   }
 
@@ -60,7 +30,10 @@ extension HarnessMonitorStore {
   public func forceCancelTaskBoardAutomation(
     request: TaskBoardAutomationForceCancelRequest
   ) async -> Bool {
-    guard connectionState == .online, let client else { return false }
+    guard connectionState == .online, let access = availableTaskBoardClientAccess else {
+      return false
+    }
+    let client = access.client
     guard isCurrentForceCancelTarget(request.target) else {
       presentFailureFeedback("Cancellation target changed. Refresh and try again.")
       return false
@@ -77,14 +50,20 @@ extension HarnessMonitorStore {
       let measuredResponse = try await Self.measureOperation {
         try await client.forceCancelTaskBoardAutomation(request: request)
       }
+      try requireCurrentTaskBoardClientAccess(access)
       recordRequestSuccess()
-      await refreshTaskBoardDashboardSnapshot(using: client)
+      guard await refreshTaskBoardDashboardSnapshot(using: client, access: access) else {
+        return false
+      }
       presentSuccessFeedback(Self.forceCancelSuccessMessage(measuredResponse.value.disposition))
       return true
     } catch is CancellationError {
       return false
     } catch {
-      await refreshTaskBoardDashboardSnapshot(using: client)
+      guard taskBoardAccessIsCurrent(access) else { return false }
+      guard await refreshTaskBoardDashboardSnapshot(using: client, access: access) else {
+        return false
+      }
       presentFailureFeedback(error.localizedDescription)
       return false
     }

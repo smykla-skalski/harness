@@ -6,7 +6,10 @@ extension HarnessMonitorStore {
     daemonCommand: String
   ) -> ExternalDaemonRecoveryFeedback {
     guard let daemonError = error as? DaemonControlError else {
-      return .generic(daemonCommand: daemonCommand)
+      return .generic(
+        daemonCommand: daemonCommand,
+        message: error.localizedDescription
+      )
     }
 
     switch daemonError {

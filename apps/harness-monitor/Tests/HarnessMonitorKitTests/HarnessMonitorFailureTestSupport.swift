@@ -317,6 +317,12 @@ final class InMemoryTaskBoardKeychainBundle {
 
 @MainActor
 extension HarnessMonitorStore {
+  func installConnectedTestClient(_ client: RecordingHarnessClient) {
+    _ = try? beginConnectionAttempt()
+    self.client = client
+    adoptDatabaseBackedTaskBoard(client.taskBoardCapabilitiesValue)
+  }
+
   var currentSuccessFeedbackMessage: String? {
     toast.activeFeedback.first { $0.severity == .success }?.message
   }

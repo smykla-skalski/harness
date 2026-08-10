@@ -36,6 +36,48 @@ struct HarnessMonitorStoreTaskBoardAutomationTests {
     #expect(store.globalTaskBoardAutomationSnapshot?.observedAt == "2026-07-19T12:02:00Z")
   }
 
+  @Test("Database handoff resets database-scoped automation state")
+  func databaseHandoffResetsDatabaseScopedAutomationState() async throws {
+    let client = RecordingHarnessClient()
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController(client: client))
+    store.client = client
+    store.connectionState = .online
+    store.adoptDatabaseBackedTaskBoard(client.taskBoardCapabilitiesValue)
+    store.mergeTaskBoardAutomationSnapshot(snapshot(revision: 100))
+    store.globalTaskBoardSyncSummary = TaskBoardSyncSummary(total: 100, providers: [])
+    store.globalTaskBoardEvaluationSummary = TaskBoardEvaluationSummary(total: 100, evaluated: 100)
+    store.globalTaskBoardItemsSnapshotAvailable = true
+    store.globalTaskBoardOrchestratorStatus = status(automation: snapshot(revision: 100))
+    store.globalTaskBoardProjects = []
+    store.globalTaskBoardMachines = []
+    store.globalPolicyCanvasWorkspace = PolicyCanvasWorkspace(
+      schemaVersion: 1,
+      activeCanvasId: "database-a",
+      canvases: [],
+      spawnKillSwitch: true
+    )
+    store.globalPolicyPipeline = client.samplePolicyPipeline(
+      canvasId: "database-a",
+      title: "Database A"
+    )
+
+    _ = try await store.invalidateTaskBoardDatabaseAccess(using: client)
+
+    #expect(store.globalTaskBoardItems.isEmpty)
+    #expect(!store.globalTaskBoardItemsSnapshotAvailable)
+    #expect(store.globalTaskBoardOrchestratorStatus == nil)
+    #expect(store.globalTaskBoardAutomationSnapshot == nil)
+    #expect(store.globalTaskBoardSyncSummary == nil)
+    #expect(store.globalTaskBoardEvaluationSummary == nil)
+    #expect(store.globalTaskBoardProjects == nil)
+    #expect(store.globalTaskBoardMachines == nil)
+    #expect(store.globalPolicyCanvasWorkspace == nil)
+    #expect(store.globalPolicyPipeline == nil)
+    #expect(store.taskBoardPolicyRuntimeRecoveryPending)
+    store.mergeTaskBoardAutomationSnapshot(snapshot(revision: 1))
+    #expect(store.globalTaskBoardAutomationSnapshot?.revision == 1)
+  }
+
   @Test("Force cancel sends the exact target and refreshes automation status")
   func forceCancelSendsExactTargetAndRefreshes() async {
     let client = RecordingHarnessClient()

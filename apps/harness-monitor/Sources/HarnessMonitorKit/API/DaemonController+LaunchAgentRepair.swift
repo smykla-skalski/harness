@@ -14,6 +14,20 @@ extension DaemonController {
     try? await managedLaunchAgentBTMSettleSleep(managedLaunchAgentBTMSettleDelay)
   }
 
+  func awaitManagedLaunchAgentBTMSettleAfterCancelledUnregister() async {
+    guard
+      ownership == .managed,
+      managedLaunchAgentBTMSettleDelay > .zero
+    else {
+      return
+    }
+    let delay = managedLaunchAgentBTMSettleDelay
+    let sleep = managedLaunchAgentBTMSettleSleep
+    await Task.detached(priority: .userInitiated) {
+      try? await sleep(delay)
+    }.value
+  }
+
   /// Tear down and re-register the bundled SMAppService launch agent at app
   /// launch ONLY when the helper bundle on disk no longer matches the stamp
   /// we persisted on the last successful register — that's the signal an
@@ -37,32 +51,53 @@ extension DaemonController {
     guard ownership == .managed else {
       return false
     }
-    let preState = launchAgentManager.registrationState()
-    guard preState == .enabled || preState == .requiresApproval else {
-      // Nothing currently registered — the regular bootstrap path will
-      // call `registerLaunchAgent()` itself and that fresh register
-      // writes a clean BTM record. No tear-down needed here.
-      return false
-    }
-
-    // Stamp gate: only tear down when the bundled helper actually
-    // changed since the last successful register. Without this, every
-    // launch unregisters a healthy daemon and bounces any sibling WS.
-    guard let currentStamp = try? managedLaunchAgentCurrentBundleStamp() else {
-      return false
-    }
     let stampURL = HarnessMonitorPaths.managedLaunchAgentBundleStampURL(
       using: environment
     )
-    if let persistedStamp = loadManagedLaunchAgentBundleStamp(from: stampURL),
-      persistedStamp == currentStamp
-    {
+    guard launchRefreshStampCandidate(at: stampURL) != nil else {
       return false
     }
 
-    // Sibling-lane gate: defer to the owner instance if another live
-    // Monitor process registered this lane. Mirrors the gate in
-    // `managedLaunchAgentRefreshNeededForBundledHelperChange`.
+    return try await withRequiredManagedLaunchAgentLock {
+      try await refreshManagedLaunchAgentForLaunchLocked(stampURL: stampURL)
+    }
+  }
+
+  private func launchRefreshStampCandidate(
+    at stampURL: URL
+  ) -> ManagedLaunchAgentBundleStamp? {
+    let state = launchAgentManager.registrationState()
+    guard state == .enabled || state == .requiresApproval else {
+      return nil
+    }
+    guard let currentStamp = try? managedLaunchAgentCurrentBundleStamp() else {
+      return nil
+    }
+    guard loadManagedLaunchAgentBundleStamp(from: stampURL) != currentStamp else {
+      return nil
+    }
+    return currentStamp
+  }
+
+  private func refreshManagedLaunchAgentForLaunchLocked(
+    stampURL: URL
+  ) async throws -> Bool {
+    guard let lockedStamp = launchRefreshStampCandidate(at: stampURL) else {
+      return false
+    }
+    guard deferRefreshToLiveSibling() == false else {
+      return false
+    }
+
+    try launchAgentManager.unregister()
+    clearManagedLaunchAgentBundleStamp(at: stampURL)
+    clearManagedLaunchAgentOwner()
+    await awaitManagedLaunchAgentBTMSettleAfterUnregister()
+    let state = try await registerCurrentLaunchAgentAndRequireLegacyCleanup()
+    return try finishLaunchAgentRefresh(lockedStamp, stampURL: stampURL, state: state)
+  }
+
+  private func deferRefreshToLiveSibling() -> Bool {
     switch currentManagedLaunchAgentOwnership() {
     case .ownedByLiveSibling(let owner):
       HarnessMonitorLogger.lifecycle.notice(
@@ -72,23 +107,23 @@ extension DaemonController {
         when the sibling refreshes.
         """
       )
-      return false
+      return true
     case .staleOwnership:
       clearManagedLaunchAgentOwner()
+      return false
     case .unowned, .ownedBySelf:
-      break
+      return false
     }
+  }
 
-    try launchAgentManager.unregister()
-    clearManagedLaunchAgentBundleStamp(at: stampURL)
-    clearManagedLaunchAgentOwner()
-    await awaitManagedLaunchAgentBTMSettleAfterUnregister()
-
-    try launchAgentManager.register()
-    let postState = launchAgentManager.registrationState()
-    switch postState {
+  private func finishLaunchAgentRefresh(
+    _ stamp: ManagedLaunchAgentBundleStamp,
+    stampURL: URL,
+    state: DaemonLaunchAgentRegistrationState
+  ) throws -> Bool {
+    switch state {
     case .enabled:
-      try persistManagedLaunchAgentBundleStamp(currentStamp, to: stampURL)
+      try persistManagedLaunchAgentBundleStamp(stamp, to: stampURL)
       try persistCurrentManagedLaunchAgentOwner()
       HarnessMonitorLogger.lifecycle.notice(
         "Refreshed managed launch agent on launch after helper bundle stamp change"
@@ -113,35 +148,36 @@ extension DaemonController {
   /// In `.managed` mode the unregister is followed by a fresh register so
   /// the helper is reachable again on the next launchd spawn cycle.
   public func repairLaunchAgentRegistration() async throws -> String {
-    let preState = launchAgentManager.registrationState()
-    switch preState {
-    case .enabled, .requiresApproval:
-      try launchAgentManager.unregister()
-      clearManagedLaunchAgentBundleStamp()
-      clearManagedLaunchAgentOwner()
-      await awaitManagedLaunchAgentBTMSettleAfterUnregister()
-    case .notRegistered, .notFound:
-      break
-    }
+    try await withRequiredManagedLaunchAgentLock {
+      let preState = launchAgentManager.registrationState()
+      switch preState {
+      case .enabled, .requiresApproval:
+        try launchAgentManager.unregister()
+        clearManagedLaunchAgentBundleStamp()
+        clearManagedLaunchAgentOwner()
+        await awaitManagedLaunchAgentBTMSettleAfterUnregister()
+      case .notRegistered, .notFound:
+        break
+      }
 
-    guard ownership == .managed else {
-      return preState == .notRegistered || preState == .notFound
-        ? "launch agent not registered"
-        : "launch agent unregistered"
-    }
+      guard ownership == .managed else {
+        return preState == .notRegistered || preState == .notFound
+          ? "launch agent not registered"
+          : "launch agent unregistered"
+      }
 
-    try launchAgentManager.register()
-    let postState = launchAgentManager.registrationState()
-    if postState == .enabled {
-      try persistCurrentManagedLaunchAgentBundleStamp()
-      try persistCurrentManagedLaunchAgentOwner()
-      return "launch agent re-registered"
+      let postState = try await registerCurrentLaunchAgentAndRequireLegacyCleanup()
+      if postState == .enabled {
+        try persistCurrentManagedLaunchAgentBundleStamp()
+        try persistCurrentManagedLaunchAgentOwner()
+        return "launch agent re-registered"
+      }
+      if postState == .requiresApproval {
+        return "launch agent re-registered; approval required in System Settings"
+      }
+      throw DaemonControlError.commandFailed(
+        "launch agent re-registration did not complete"
+      )
     }
-    if postState == .requiresApproval {
-      return "launch agent re-registered; approval required in System Settings"
-    }
-    throw DaemonControlError.commandFailed(
-      "launch agent re-registration did not complete"
-    )
   }
 }

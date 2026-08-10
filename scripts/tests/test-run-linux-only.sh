@@ -87,6 +87,7 @@ workflow_path = pathlib.Path(sys.argv[2])
 repo_root = mise_path.parent
 expected_tasks = {
     "test:unit",
+    "test:unit:systemd",
     "test:integration",
     "test:workers",
     "test:slow",
@@ -112,6 +113,8 @@ task_name = None
 # wrapper, and reported the coverage it could no longer see as missing.
 script_run_pattern = re.compile(r'run\s*=\s*"([^"]+)"')
 script_path_pattern = re.compile(r'\./scripts/[\w.-]+\.sh')
+only_group_pattern = re.compile(r'HARNESS_ONLY_UNIT_GROUP\s*=\s*"([^"]+)"')
+task_only_group = None
 
 
 def scan_line(line, task_name, source):
@@ -142,11 +145,17 @@ for line in mise_path.read_text().splitlines():
     task_header = re.fullmatch(r'\[tasks\."([^"]+)"\]', line)
     if task_header:
         task_name = task_header.group(1)
+        task_only_group = None
         continue
+    only_group = only_group_pattern.search(line)
+    if only_group:
+        task_only_group = only_group.group(1)
     script_match = script_run_pattern.search(line)
     delegated = script_path_pattern.findall(script_match.group(1)) if script_match else []
     if delegated:
         for candidate in delegated:
+            if candidate.endswith("run-unit-tests.sh") and task_only_group not in (None, "systemd"):
+                continue
             script_path = repo_root / candidate
             if not script_path.is_file():
                 raise SystemExit(f"{task_name} delegates to a missing script: {script_path}")

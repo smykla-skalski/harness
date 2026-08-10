@@ -53,9 +53,13 @@ extension HarnessMonitorStore {
     )
   }
 
-  func recoverGitHubDataPushState(using client: any HarnessMonitorClientProtocol) async {
+  func recoverGitHubDataPushState(
+    using client: any HarnessMonitorClientProtocol,
+    connectionFence: ConnectionAttemptFence? = nil
+  ) async {
     do {
       let githubStatus = try await client.githubStatus()
+      guard isCurrentConnectionAttemptFenceIfProvided(connectionFence) else { return }
       if let revision = githubStatus.dataRevision,
         contentUI.dashboard.githubDataRevision != revision
       {
@@ -70,6 +74,7 @@ extension HarnessMonitorStore {
     }
     do {
       let capabilities = try await client.taskBoardCapabilities()
+      guard isCurrentConnectionAttemptFenceIfProvided(connectionFence) else { return }
       if capabilities.storage == "database",
         contentUI.dashboard.taskBoardRevision != capabilities.revision
       {
@@ -81,9 +86,10 @@ extension HarnessMonitorStore {
         "websocket reconnect Task Board revision refresh failed: \(err, privacy: .public)"
       )
     }
+    guard isCurrentConnectionAttemptFenceIfProvided(connectionFence) else { return }
     scheduleGitHubTaskBoardRefresh(
       using: client,
-      includePolicyPipeline: globalPolicyCanvasWorkspace != nil
+      includePolicyPipeline: true
     )
   }
 }

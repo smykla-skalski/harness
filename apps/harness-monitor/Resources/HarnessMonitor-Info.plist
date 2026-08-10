@@ -10,6 +10,14 @@
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIconName</key>
 	<string>AppIcon</string>
+	<key>HarnessMonitorManagedLaunchAgentLabel</key>
+	<string>$(HARNESS_MONITOR_DAEMON_LAUNCH_AGENT_LABEL)</string>
+	<key>HarnessMonitorManagedDaemonDataHome</key>
+	<string>$(HARNESS_MONITOR_BUNDLED_DAEMON_DATA_HOME)</string>
+	<key>HarnessMonitorManagedDaemonRuntimeLane</key>
+	<string>$(HARNESS_MONITOR_RUNTIME_LANE)</string>
+	<key>HarnessMonitorManagedDaemonCodexWSPort</key>
+	<string>$(HARNESS_CODEX_WS_PORT)</string>
 	<key>CFBundleIdentifier</key>
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleInfoDictionaryVersion</key>

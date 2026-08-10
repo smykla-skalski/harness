@@ -28,6 +28,9 @@ extension RecordingHarnessClient {
 
   func diagnostics() async throws -> DaemonDiagnosticsReport {
     recordReadCall(.diagnostics)
+    if let diagnosticsHandler {
+      return try await diagnosticsHandler()
+    }
     if let error = dequeueDiagnosticsError() {
       throw error
     }
@@ -80,7 +83,15 @@ extension RecordingHarnessClient {
   }
 
   func stopDaemon() async throws -> DaemonControlResponse {
-    DaemonControlResponse(status: "stopping")
+    let (delay, error) = lock.withLock {
+      stopDaemonRequestCount += 1
+      return (stopDaemonDelay, stopDaemonError)
+    }
+    try await sleepIfNeeded(delay)
+    if let error {
+      throw error
+    }
+    return DaemonControlResponse(status: "stopping")
   }
 
   func projects() async throws -> [ProjectSummary] {
@@ -312,7 +323,10 @@ extension RecordingHarnessClient {
   }
 
   func logLevel() async throws -> LogLevelResponse {
-    LogLevelResponse(
+    if let logLevelHandler {
+      return try await logLevelHandler()
+    }
+    return LogLevelResponse(
       level: HarnessMonitorLogger.defaultDaemonLogLevel,
       filter: HarnessMonitorLogger.defaultDaemonFilter
     )

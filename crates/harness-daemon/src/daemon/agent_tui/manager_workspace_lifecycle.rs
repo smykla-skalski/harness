@@ -95,10 +95,7 @@ impl AgentTuiManagerHandle {
         transcript_path: &Path,
     ) -> Result<AgentTuiSnapshot, CliError> {
         let bridge = BridgeClient::for_capability(BridgeCapability::AgentTui)?;
-        // The bridge only spawns the PTY and reports what it made; ownership is
-        // the daemon's to record, so the workspace is stamped on the way in to
-        // persistence rather than sent across the bridge protocol.
-        let mut snapshot = bridge.agent_tui_start(&AgentTuiStartSpec {
+        let snapshot = bridge.agent_tui_start(&AgentTuiStartSpec {
             session_id: owner.workspace_id.to_string(),
             workspace_id: Some(owner.workspace_id.to_string()),
             agent_id: String::new(),
@@ -115,10 +112,22 @@ impl AgentTuiManagerHandle {
                 .map(ToString::to_string),
             effort: request.effort.clone(),
         })?;
-        snapshot.workspace_id = Some(owner.workspace_id.to_string());
+        let snapshot = normalize_started_workspace_snapshot(snapshot, owner.workspace_id);
         self.register_started_snapshot(&snapshot, ActiveAgentTui::new(None))?;
         Ok(snapshot)
     }
+}
+
+pub(super) fn normalize_started_workspace_snapshot(
+    mut snapshot: AgentTuiSnapshot,
+    workspace_id: &str,
+) -> AgentTuiSnapshot {
+    // A bridge can survive a daemon upgrade and still return its old
+    // Session-shaped owner until the host app restarts.
+    snapshot.session_id = workspace_id.to_string();
+    snapshot.workspace_id = Some(workspace_id.to_string());
+    snapshot.agent_id.clear();
+    snapshot
 }
 
 /// A reclaimed identity has to belong to the workspace reclaiming it. Returning

@@ -18,11 +18,26 @@ public protocol DaemonControlling: Sendable {
   func awaitManifestWarmUp(
     timeout: Duration
   ) async throws -> any HarnessMonitorClientProtocol
+  func awaitManifestWarmUpAfterLegacyCleanup(
+    timeout: Duration
+  ) async throws -> any HarnessMonitorClientProtocol
   func performDeferredManagedLaunchAgentRefreshIfNeeded() async -> Bool
+  func requireLegacyManagedLaunchAgentCleanup() async throws
+  func invalidateLegacyMonitorProcessScan()
 }
 
 extension DaemonControlling {
+  public func awaitManifestWarmUpAfterLegacyCleanup(
+    timeout: Duration
+  ) async throws -> any HarnessMonitorClientProtocol {
+    try await awaitManifestWarmUp(timeout: timeout)
+  }
+
   public func refreshManagedLaunchAgentForLaunch() async throws -> Bool {
     false
   }
+
+  public func requireLegacyManagedLaunchAgentCleanup() async throws {}
+
+  public func invalidateLegacyMonitorProcessScan() {}
 }

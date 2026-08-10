@@ -3,17 +3,26 @@ import Foundation
 extension HarnessMonitorStore {
   private static let taskBoardRefreshCoalescingDelay: Duration = .milliseconds(50)
 
+  @discardableResult
   func refreshTaskBoardDashboardSnapshot(
     using client: any HarnessMonitorClientProtocol,
-    fallbackStatus: TaskBoardOrchestratorStatus? = nil
-  ) async {
+    fallbackStatus: TaskBoardOrchestratorStatus? = nil,
+    access providedAccess: TaskBoardClientAccess? = nil
+  ) async -> Bool {
+    guard
+      let access = providedAccess ?? availableTaskBoardClientAccess,
+      access.client === client,
+      taskBoardAccessIsCurrent(access)
+    else { return false }
     cancelInitialTaskBoardConfirmationRefresh()
     let requestGeneration = scheduleTaskBoardDashboardSnapshotRefresh(
       using: client,
       fallbackStatus: fallbackStatus,
-      immediate: true
+      immediate: true,
+      access: access
     )
     await waitForTaskBoardDashboardSnapshotRefresh(requestGeneration)
+    return taskBoardAccessIsCurrent(access)
   }
 
   func scheduleGitHubTaskBoardRefresh(
@@ -22,11 +31,16 @@ extension HarnessMonitorStore {
     includeOrchestratorStatus: Bool = true,
     includePolicyPipeline: Bool = false
   ) {
+    guard
+      let access = availableTaskBoardClientAccess,
+      access.client === client
+    else { return }
     _ = scheduleTaskBoardDashboardSnapshotRefresh(
       using: client,
       includeItems: includeItems,
       includeOrchestratorStatus: includeOrchestratorStatus,
-      includePolicyPipeline: includePolicyPipeline
+      includePolicyPipeline: includePolicyPipeline,
+      access: access
     )
   }
 
@@ -35,15 +49,22 @@ extension HarnessMonitorStore {
   }
 
   func finishTaskBoardDashboardRefreshDeferral(
-    using client: any HarnessMonitorClientProtocol
+    using client: any HarnessMonitorClientProtocol,
+    access: TaskBoardClientAccess? = nil
   ) async {
     guard cacheWriteSync.taskBoardRefreshDeferralDepth > 0 else { return }
     cacheWriteSync.taskBoardRefreshDeferralDepth -= 1
     guard cacheWriteSync.taskBoardRefreshDeferralDepth == 0 else { return }
+    guard
+      let access = access ?? availableTaskBoardClientAccess,
+      access.client === client,
+      taskBoardAccessIsCurrent(access)
+    else { return }
 
     let requestGeneration = scheduleTaskBoardDashboardSnapshotRefresh(
       using: client,
-      immediate: true
+      immediate: true,
+      access: access
     )
     await waitForTaskBoardDashboardSnapshotRefresh(requestGeneration)
   }
@@ -54,7 +75,8 @@ extension HarnessMonitorStore {
     includeOrchestratorStatus: Bool = true,
     includePolicyPipeline: Bool = false,
     fallbackStatus: TaskBoardOrchestratorStatus? = nil,
-    immediate: Bool = false
+    immediate: Bool = false,
+    access: TaskBoardClientAccess
   ) -> UInt64 {
     if immediate {
       cacheWriteSync.taskBoardRefreshRequiresImmediate = true
@@ -70,7 +92,7 @@ extension HarnessMonitorStore {
     if let fallbackStatus {
       cacheWriteSync.pendingTaskBoardFallbackStatus = fallbackStatus
     }
-    startTaskBoardDashboardSnapshotRefreshIfNeeded(using: client)
+    startTaskBoardDashboardSnapshotRefreshIfNeeded(using: client, access: access)
     return requestGeneration
   }
 
@@ -119,7 +141,8 @@ extension HarnessMonitorStore {
   }
 
   private func startTaskBoardDashboardSnapshotRefreshIfNeeded(
-    using client: any HarnessMonitorClientProtocol
+    using client: any HarnessMonitorClientProtocol,
+    access: TaskBoardClientAccess
   ) {
     guard cacheWriteSync.taskBoardRefreshTask == nil,
       cacheWriteSync.taskBoardRefreshDeferralDepth == 0
@@ -136,12 +159,9 @@ extension HarnessMonitorStore {
       guard let self, self.cacheWriteSync.taskBoardRefreshGeneration == generation else {
         return
       }
+      guard self.taskBoardAccessIsCurrent(access) else { return }
 
-      if self.cacheWriteSync.pendingTaskBoardItemsRefresh,
-        !self.cacheWriteSync.taskBoardRefreshRequiresImmediate
-      {
-        guard await self.waitForTaskBoardRefreshPacing(generation: generation) else { return }
-      }
+      guard await self.taskBoardRefreshPacingAllowsStart(generation: generation) else { return }
 
       let includeItems = self.cacheWriteSync.pendingTaskBoardItemsRefresh
       let includeOrchestratorStatus =
@@ -167,7 +187,10 @@ extension HarnessMonitorStore {
         includeItems: includeItems,
         includeOrchestratorStatus: includeOrchestratorStatus
       )
-      guard self.cacheWriteSync.taskBoardRefreshGeneration == generation else { return }
+      guard
+        self.cacheWriteSync.taskBoardRefreshGeneration == generation,
+        self.taskBoardAccessIsCurrent(access)
+      else { return }
 
       if includeItems {
         self.cacheWriteSync.lastTaskBoardItemsRefreshAt = Date()
@@ -182,7 +205,10 @@ extension HarnessMonitorStore {
       if includePolicyPipeline {
         await self.refreshPolicyPipeline()
       }
-      guard self.cacheWriteSync.taskBoardRefreshGeneration == generation else { return }
+      guard
+        self.cacheWriteSync.taskBoardRefreshGeneration == generation,
+        self.taskBoardAccessIsCurrent(access)
+      else { return }
       self.cacheWriteSync.taskBoardRefreshCompletedGeneration =
         completedRequestGeneration
       self.resumeCompletedTaskBoardDashboardSnapshotRefreshWaiters()
@@ -192,9 +218,15 @@ extension HarnessMonitorStore {
         || self.cacheWriteSync.pendingTaskBoardOrchestratorRefresh
         || self.cacheWriteSync.pendingTaskBoardPolicyPipelineRefresh
       {
-        self.startTaskBoardDashboardSnapshotRefreshIfNeeded(using: client)
+        self.startTaskBoardDashboardSnapshotRefreshIfNeeded(using: client, access: access)
       }
     }
+  }
+
+  private func taskBoardRefreshPacingAllowsStart(generation: UInt64) async -> Bool {
+    guard cacheWriteSync.pendingTaskBoardItemsRefresh else { return true }
+    guard !cacheWriteSync.taskBoardRefreshRequiresImmediate else { return true }
+    return await waitForTaskBoardRefreshPacing(generation: generation)
   }
 
   private func waitForTaskBoardRefreshPacing(generation: UInt64) async -> Bool {

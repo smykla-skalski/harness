@@ -7,6 +7,7 @@ public actor PolicyRegistry {
   private var rules: [any PolicyRule] = []
   private var observers: [any PolicyObserver] = []
   private var overrides: [String: PolicyConfigOverride] = [:]
+  private var minimumOverrideSourceGeneration: UInt64 = 0
 
   public init() {}
 
@@ -23,9 +24,24 @@ public actor PolicyRegistry {
   }
 
   public func applyOverrides(_ overrides: [PolicyConfigOverride]) {
-    self.overrides = overrides.reduce(into: [:]) { merged, override in
-      merged[override.ruleID] = override
-    }
+    replaceOverrides(with: overrides)
+  }
+
+  public func advanceOverrideSourceGeneration(to generation: UInt64) {
+    guard generation > minimumOverrideSourceGeneration else { return }
+    minimumOverrideSourceGeneration = generation
+    overrides.removeAll()
+  }
+
+  @discardableResult
+  public func applyOverrides(
+    _ overrides: [PolicyConfigOverride],
+    sourceGeneration: UInt64
+  ) -> Bool {
+    guard sourceGeneration >= minimumOverrideSourceGeneration else { return false }
+    minimumOverrideSourceGeneration = sourceGeneration
+    replaceOverrides(with: overrides)
+    return true
   }
 
   public func clearOverrides() {
@@ -34,6 +50,12 @@ public actor PolicyRegistry {
 
   public func currentOverrides() -> [PolicyConfigOverride] {
     Array(overrides.values)
+  }
+
+  private func replaceOverrides(with overrides: [PolicyConfigOverride]) {
+    self.overrides = overrides.reduce(into: [:]) { merged, override in
+      merged[override.ruleID] = override
+    }
   }
 }
 

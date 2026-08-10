@@ -351,11 +351,11 @@ struct DashboardTaskBoardRouteView: View {
     else { return }
     HarnessMonitorAsyncWorkQueue.shared.submit(
       .init(title: "Loading task-board policy workspace") {
-        let workspace = await store.loadTaskBoardPolicyWorkspaceSnapshot()
+        let snapshot = await store.loadTaskBoardPolicyWorkspaceSnapshot()
         await MainActor.run {
           state.finishLoad(generation: generation) {
-            if let workspace {
-              store.adoptTaskBoardPolicyWorkspaceSnapshot(workspace)
+            if let snapshot {
+              store.adoptTaskBoardPolicyWorkspaceSnapshot(snapshot)
             }
           }
         }

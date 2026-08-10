@@ -354,24 +354,31 @@ struct HarnessMonitorPathsTests {
   func launchAgentPlistPathIsBundleRelative() {
     #expect(
       HarnessMonitorPaths.launchAgentPlistName
-        == "Q498EB36N4.io.harnessmonitor.daemon.plist"
+        == "Q498EB36N4.io.harnessmonitor.agent.plist"
     )
     #expect(
       HarnessMonitorPaths.launchAgentBundleRelativePath
-        == "Contents/Library/LaunchAgents/Q498EB36N4.io.harnessmonitor.daemon.plist"
+        == "Contents/Library/LaunchAgents/Q498EB36N4.io.harnessmonitor.agent.plist"
     )
   }
 
-  @Test("Launch agent label is the bundled app-group child service")
-  func launchAgentLabelIsBundledAppGroupChildService() {
+  @Test("Launch agent label is isolated by runtime lane")
+  func launchAgentLabelIsIsolatedByRuntimeLane() {
     let environment = HarnessMonitorEnvironment(
-      values: [HarnessMonitorAppGroup.environmentKey: "TEAMID.com.example.group"],
+      values: [
+        HarnessMonitorAppGroup.environmentKey: "TEAMID.com.example.group",
+        HarnessMonitorRuntimeLane.environmentKey: "Lane A",
+      ],
       homeDirectory: URL(fileURLWithPath: "/Users/example", isDirectory: true)
     )
 
     #expect(
       HarnessMonitorPaths.launchAgentLabel(using: environment)
-        == "Q498EB36N4.io.harnessmonitor.daemon"
+        == "Q498EB36N4.io.harnessmonitor.agent-lane-a"
+    )
+    #expect(
+      HarnessMonitorPaths.launchAgentPlistName(using: environment)
+        == "Q498EB36N4.io.harnessmonitor.agent-lane-a.plist"
     )
   }
 }

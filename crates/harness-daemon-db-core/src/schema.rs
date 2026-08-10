@@ -28,6 +28,9 @@ use migration_steps::{
     migrate_v41_to_v42, migrate_v42_to_v43,
 };
 
+#[path = "schema_recent_migrations.rs"]
+mod recent_migrations;
+
 static SCHEMA_MIGRATION_LOCK: Mutex<()> = Mutex::new(());
 
 /// Session/timeline repair callbacks the migration chain needs.
@@ -178,17 +181,7 @@ impl DaemonDb {
         self.apply_pending_migrations_v54(version_number)?;
         self.apply_pending_migrations_v55(version_number)?;
         self.apply_pending_migrations_v56(version_number)?;
-        self.apply_pending_migrations_v57(version_number)?;
-        self.apply_pending_migrations_v58(version_number)?;
-        self.apply_pending_migrations_v59(version_number)?;
-        self.apply_pending_migrations_v60(version_number)?;
-        self.apply_pending_migrations_v61(version_number)?;
-        self.apply_pending_migrations_v62(version_number)?;
-        self.apply_pending_migrations_v63(version_number)?;
-        self.apply_pending_migrations_v64(version_number)?;
-        self.apply_pending_migrations_v65(version_number)?;
-        self.apply_pending_migrations_v66(version_number)?;
-        self.apply_pending_migrations_v67_to_v69(version_number)
+        self.apply_pending_migrations_v57_to_v71(version_number)
     }
 
     #[expect(
@@ -398,89 +391,6 @@ impl DaemonDb {
     fn apply_pending_migrations_v56(&self, version_number: u8) -> Result<(), CliError> {
         if version_number <= 55 {
             harness_db_schema::schema_v56::run(&self.conn)?;
-        }
-        Ok(())
-    }
-
-    fn apply_pending_migrations_v57(&self, version_number: u8) -> Result<(), CliError> {
-        if version_number <= 56 {
-            harness_db_schema::schema_v57::run(&self.conn)?;
-        }
-        Ok(())
-    }
-
-    fn apply_pending_migrations_v58(&self, version_number: u8) -> Result<(), CliError> {
-        if version_number <= 57 {
-            harness_db_schema::schema_v58::run(&self.conn)?;
-        }
-        Ok(())
-    }
-
-    fn apply_pending_migrations_v59(&self, version_number: u8) -> Result<(), CliError> {
-        if version_number <= 58 {
-            harness_db_schema::schema_v59::run(&self.conn)?;
-        }
-        Ok(())
-    }
-
-    fn apply_pending_migrations_v60(&self, version_number: u8) -> Result<(), CliError> {
-        if version_number <= 59 {
-            harness_db_schema::schema_v60::run(&self.conn)?;
-        }
-        Ok(())
-    }
-
-    fn apply_pending_migrations_v61(&self, version_number: u8) -> Result<(), CliError> {
-        if version_number <= 60 {
-            harness_db_schema::schema_v61::run(&self.conn)?;
-        }
-        Ok(())
-    }
-
-    fn apply_pending_migrations_v62(&self, version_number: u8) -> Result<(), CliError> {
-        if version_number <= 61 {
-            harness_db_schema::schema_v62::run(&self.conn)?;
-        }
-        Ok(())
-    }
-
-    fn apply_pending_migrations_v63(&self, version_number: u8) -> Result<(), CliError> {
-        if version_number <= 62 {
-            harness_db_schema::schema_v63::run(&self.conn)?;
-        }
-        Ok(())
-    }
-
-    fn apply_pending_migrations_v64(&self, version_number: u8) -> Result<(), CliError> {
-        if version_number <= 63 {
-            harness_db_schema::schema_v64::run(&self.conn)?;
-        }
-        Ok(())
-    }
-
-    fn apply_pending_migrations_v65(&self, version_number: u8) -> Result<(), CliError> {
-        if version_number <= 64 {
-            harness_db_schema::schema_v65::run(&self.conn)?;
-        }
-        Ok(())
-    }
-
-    fn apply_pending_migrations_v66(&self, version_number: u8) -> Result<(), CliError> {
-        if version_number <= 65 {
-            harness_db_schema::schema_v66::run(&self.conn)?;
-        }
-        Ok(())
-    }
-
-    fn apply_pending_migrations_v67_to_v69(&self, version_number: u8) -> Result<(), CliError> {
-        if version_number <= 66 {
-            harness_db_schema::schema_v67::run(&self.conn)?;
-        }
-        if version_number <= 67 {
-            harness_db_schema::schema_v68::run(&self.conn)?;
-        }
-        if version_number <= 68 {
-            harness_db_schema::schema_v69::run(&self.conn)?;
         }
         Ok(())
     }

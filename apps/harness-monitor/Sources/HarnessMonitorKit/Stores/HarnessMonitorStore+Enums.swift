@@ -96,7 +96,7 @@ extension HarnessMonitorStore {
     case excluded
   }
 
-  public enum HostBridgeCapabilityMutationResult: Equatable {
+  public enum HostBridgeCapabilityMutationResult: Equatable, Sendable {
     case success
     case requiresForce(String)
     case failed

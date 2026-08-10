@@ -4,7 +4,10 @@ import Foundation
 
 extension RecordingHarnessClient {
   func taskBoardCapabilities() async throws -> TaskBoardCapabilities {
-    lock.withLock { taskBoardCapabilitiesValue }
+    if let taskBoardCapabilitiesHandler {
+      return try await taskBoardCapabilitiesHandler()
+    }
+    return lock.withLock { taskBoardCapabilitiesValue }
   }
 
   func taskBoardItems(status: TaskBoardStatus?) async throws -> [TaskBoardItem] {
@@ -175,7 +178,17 @@ extension RecordingHarnessClient {
 
   func cancelTaskBoardSync() async throws -> TaskBoardSyncCancelResponse {
     record(.cancelTaskBoardSync)
-    return lock.withLock { taskBoardSyncCancelResponse }
+    return lock.withLock {
+      let response = taskBoardSyncCancelResponse
+      if response.cancelled {
+        taskBoardSyncStatusResponse = TaskBoardSyncStatusResponse(
+          active: false,
+          cancellationRequested: true,
+          cancelled: true
+        )
+      }
+      return response
+    }
   }
 
   func taskBoardSyncStatus() async throws -> TaskBoardSyncStatusResponse {
@@ -288,6 +301,7 @@ extension RecordingHarnessClient {
 
   func taskBoardOrchestratorStatus() async throws -> TaskBoardOrchestratorStatus {
     recordReadCall(.taskBoardOrchestratorStatus)
+    await taskBoardItemsReadGate.suspendIfConfigured()
     let heldItemIDs = lock.withLock { heldTaskBoardDispatchItemIDs }
     return sampleTaskBoardOrchestratorStatus(
       heldDispatches: TaskBoardHeldDispatchSummary(

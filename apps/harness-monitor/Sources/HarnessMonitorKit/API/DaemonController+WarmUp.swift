@@ -4,7 +4,13 @@ extension DaemonController {
   public func awaitManifestWarmUp(
     timeout: Duration
   ) async throws -> any HarnessMonitorClientProtocol {
-    LegacyManagedLaunchAgentCleanup.runOnce()
+    try await requireLegacyManagedLaunchAgentCleanup()
+    return try await awaitManifestWarmUpAfterLegacyCleanup(timeout: timeout)
+  }
+
+  public func awaitManifestWarmUpAfterLegacyCleanup(
+    timeout: Duration
+  ) async throws -> any HarnessMonitorClientProtocol {
     var state = WarmUpLoopState(ownerSnapshot: currentOwnerSnapshot())
     state.pendingBundleStampRefresh =
       try managedLaunchAgentRefreshNeededForBundledHelperChange(state: &state)
@@ -52,9 +58,16 @@ extension DaemonController {
     var signaledManagedRecoveryManifestSignature: String?
     var lastLoggedManifestSignature: String?
     var lastLoggedRetryErrorDescription: String?
+    var runtimeLaneManifestCache: RuntimeLaneManifestCache?
     /// Captured ownership for the warm-up entry; recaptured at every
     /// site that mutates ownership. See `OwnerSnapshot`.
     var ownerSnapshot: OwnerSnapshot
+  }
+
+  struct RuntimeLaneManifestCache {
+    let lanesRoot: URL
+    let modificationDate: Date?
+    let manifestURLs: [URL]
   }
 
   struct WarmUpIterationOutcome {

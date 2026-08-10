@@ -1,6 +1,6 @@
 import Foundation
 
-public protocol HarnessMonitorClientProtocol: HarnessMonitorTaskBoardClientProtocol,
+public protocol HarnessMonitorClientProtocol: AnyObject, HarnessMonitorTaskBoardClientProtocol,
   HarnessMonitorReviewsClientProtocol, HarnessMonitorAcpSessionClientProtocol, Sendable
 {
   func health() async throws -> HealthResponse
@@ -330,7 +330,7 @@ extension HarnessMonitorClientProtocol {
       sessionID: sessionID,
       scope: resolvedScope
     ) { entries, batchIndex, batchCount in
-      let response = timelineWindowResponse(
+      let response = self.timelineWindowResponse(
         from: entries,
         request: request
       )

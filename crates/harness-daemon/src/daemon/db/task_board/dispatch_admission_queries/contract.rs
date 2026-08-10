@@ -25,6 +25,10 @@ pub(crate) trait DispatchAdmissionQueries: Send + Sync {
         &self,
     ) -> Result<Vec<TaskBoardAdmissionWorkerRecovery>, CliError>;
 
+    async fn prepare_task_board_admission_worker_recoveries(
+        &self,
+    ) -> Result<Vec<TaskBoardAdmissionWorkerRecovery>, CliError>;
+
     async fn migrate_legacy_task_board_admission_worker_owners(&self) -> Result<usize, CliError>;
 
     async fn reconcile_missing_task_board_admission_worker(

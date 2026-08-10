@@ -7,7 +7,7 @@
 		<string>io.harnessmonitor.app</string>
 	</array>
 	<key>BundleProgram</key>
-	<string>Contents/Helpers/harness-daemon</string>
+	<string>Contents/Resources/harness-daemon</string>
 	<key>EnvironmentVariables</key>
 	<dict>
 		<key>HARNESS_APP_GROUP_ID</key>

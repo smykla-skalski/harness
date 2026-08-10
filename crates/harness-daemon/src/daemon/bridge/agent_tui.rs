@@ -65,6 +65,7 @@ impl BridgeServer {
         let input_worker = AgentTuiInputWorker::spawn(Arc::clone(&process), Arc::clone(&stop_flag));
         let context = BridgeSnapshotContext {
             session_id: spec.session_id.clone(),
+            workspace_id: spec.workspace_id.clone(),
             agent_id: spec.agent_id.clone(),
             tui_id: spec.tui_id.clone(),
             profile: spec.profile.clone(),
@@ -299,6 +300,7 @@ mod tests {
             stop_flag,
             context: BridgeSnapshotContext {
                 session_id: "sess".into(),
+                workspace_id: None,
                 agent_id: String::new(),
                 tui_id: tui_id.into(),
                 profile,

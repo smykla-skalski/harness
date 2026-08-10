@@ -207,4 +207,27 @@ extension SessionCacheService {
     return WriteResult(didPersist: didPersist, metadataUpdate: .none)
   }
 
+  func clearTaskBoardSnapshot() async -> WriteResult {
+    let context = makeContext()
+    let snapshotID = CachedTaskBoardSnapshot.globalSnapshotID
+    do {
+      var descriptor = FetchDescriptor<CachedTaskBoardSnapshot>(
+        predicate: #Predicate { $0.snapshotID == snapshotID }
+      )
+      descriptor.fetchLimit = 1
+      guard let existing = try context.fetch(descriptor).first else {
+        return WriteResult(didPersist: true, metadataUpdate: .none)
+      }
+      context.delete(existing)
+    } catch {
+      HarnessMonitorLogger.store.warning(
+        "clear task board snapshot failed: \(error.localizedDescription, privacy: .public)"
+      )
+      return WriteResult(didPersist: false, metadataUpdate: .none)
+    }
+
+    let didPersist = await persist(context, operation: "clear task board snapshot")
+    return WriteResult(didPersist: didPersist, metadataUpdate: .none)
+  }
+
 }

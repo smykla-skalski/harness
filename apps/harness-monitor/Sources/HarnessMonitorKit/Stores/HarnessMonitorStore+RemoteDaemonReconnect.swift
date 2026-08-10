@@ -21,7 +21,10 @@ extension HarnessMonitorStore {
     set { connection.remoteDaemonReconnectGeneration = newValue }
   }
 
-  func scheduleRemoteDaemonReconnect(after error: (any Error)? = nil) {
+  func scheduleRemoteDaemonReconnect(
+    after error: (any Error)? = nil,
+    immediately: Bool = false
+  ) {
     guard shouldRetryRemoteDaemonConnection(after: error) else {
       stopRemoteDaemonReconnect()
       return
@@ -34,6 +37,11 @@ extension HarnessMonitorStore {
     let generation = remoteDaemonReconnectGeneration
     remoteDaemonReconnectTask = Task { @MainActor [weak self] in
       var attempt = 0
+      if immediately {
+        guard await self?.retryRemoteDaemonConnection(generation: generation) == true else {
+          return
+        }
+      }
       while true {
         // The store is taken for each step and let go again before the wait.
         // This loop only ends once the store says so, so a reference held

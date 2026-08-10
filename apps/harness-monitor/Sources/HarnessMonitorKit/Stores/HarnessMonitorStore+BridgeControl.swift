@@ -237,6 +237,8 @@ extension HarnessMonitorStore {
           announceFeedback: true
         )
         return .success
+      } catch is CancellationError {
+        return .failed
       } catch {
         presentFailureFeedback(error.localizedDescription)
         return .failed
@@ -247,6 +249,7 @@ extension HarnessMonitorStore {
   private func restartManagedDaemonForHostBridgeReconfigure() async throws
     -> any HarnessMonitorClientProtocol
   {
+    stopConnectionRecovery()
     stopAllStreams()
     let staleClient = client
     client = nil
@@ -254,8 +257,12 @@ extension HarnessMonitorStore {
       await staleClient.shutdown()
     }
 
-    _ = try await daemonController.stopDaemon()
-    let registrationState = try await daemonController.registerLaunchAgent()
+    try await requireLegacyManagedLaunchAgentCleanupOrThrow()
+    _ = try await withControllerLegacyCleanupFailureTracking {
+      try await daemonController.repairLaunchAgentRegistration()
+    }
+    try await requireLegacyManagedLaunchAgentCleanupOrThrow()
+    let registrationState = await daemonController.launchAgentRegistrationState()
     switch registrationState {
     case .enabled:
       break
@@ -267,16 +274,24 @@ extension HarnessMonitorStore {
       throw DaemonControlError.commandFailed("Launch agent registration did not complete")
     }
 
-    let refreshedClient = try await daemonController.awaitManifestWarmUp(
-      timeout: bootstrapWarmUpTimeout
-    )
-    await connect(using: refreshedClient)
-    guard connectionState == .online else {
-      throw DaemonControlError.commandFailed(
-        "The harness daemon did not become healthy before the timeout"
+    let refreshedClient = try await withLegacyContainmentClient {
+      try await daemonController.awaitManifestWarmUpAfterLegacyCleanup(
+        timeout: bootstrapWarmUpTimeout
       )
     }
-    return refreshedClient
+    do {
+      try await connect(using: refreshedClient)
+    } catch is CancellationError {
+      throw CancellationError()
+    } catch {
+      guard await recoverManagedBootstrapFailure(from: error) else {
+        throw error
+      }
+    }
+    guard connectionState == .online, let activeClient = client else {
+      throw CancellationError()
+    }
+    return activeClient
   }
 
   private func hostBridgeActionLabel(for capability: String, enabled: Bool) -> String {

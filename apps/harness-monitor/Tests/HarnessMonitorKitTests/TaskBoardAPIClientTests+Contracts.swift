@@ -65,6 +65,20 @@ extension TaskBoardAPIClientTests {
     #expect(calls.first?.params == .object([:]))
   }
 
+  @Test("HTTP task-board recovery requests honor their deadline")
+  func httpTaskBoardRecoveryRequestsHonorTheirDeadline() async throws {
+    TaskBoardURLProtocol.reset()
+    let client = try makeClient()
+
+    _ = try await client.cancelTaskBoardSync(recoveryTimeout: .milliseconds(250))
+    _ = try await client.taskBoardSyncStatus(recoveryTimeout: .milliseconds(400))
+
+    let records = TaskBoardURLProtocol.records
+    #expect(records.count == 2)
+    #expect(abs(records[0].timeoutInterval - 0.25) < 0.001)
+    #expect(abs(records[1].timeoutInterval - 0.4) < 0.001)
+  }
+
   @Test("Task-board sync status has matching HTTP and WebSocket contracts")
   func taskBoardSyncStatusContractsMatch() async throws {
     TaskBoardURLProtocol.reset()

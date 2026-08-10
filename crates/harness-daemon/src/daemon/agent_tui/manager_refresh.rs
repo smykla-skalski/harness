@@ -1,9 +1,7 @@
-use std::collections::BTreeMap;
 use std::convert::identity;
 use std::future::Future;
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex};
 use std::thread;
 
 use tokio::runtime::{Builder, Handle, RuntimeFlavor};
@@ -20,7 +18,7 @@ use crate::workspace::utc_now;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::LIVE_REFRESH_INTERVAL;
-use super::manager::{ActiveAgentTui, AgentTuiManagerHandle};
+use super::manager::{AgentTuiManagerHandle, LiveRefreshWake};
 use super::model::session_disconnect_reason;
 use super::support::{agent_id_for_tui, lock_db};
 use crate::daemon::db::prelude::*;
@@ -28,7 +26,9 @@ use crate::daemon::db::task_board::prelude::{
     TaskBoardRuntimeTerminalReport, WorkItemProgressQueries,
 };
 use crate::daemon::db_handle::{AsyncDaemonDbHandle, DaemonDbOwnedHandle};
-use harness_daemon_managed_agents::{AgentTuiSnapshot, AgentTuiStatus, lock};
+use harness_daemon_managed_agents::{AgentTuiSnapshot, AgentTuiStatus};
+
+const LIVE_REFRESH_RETRY_LIMIT: std::time::Duration = std::time::Duration::from_secs(30);
 
 impl AgentTuiManagerHandle {
     pub(super) fn db(&self) -> Result<Arc<Mutex<DaemonDbOwnedHandle>>, CliError> {
@@ -37,12 +37,6 @@ impl AgentTuiManagerHandle {
 
     pub(super) fn async_db(&self) -> Option<Arc<AsyncDaemonDbHandle>> {
         self.state.async_db.get().cloned()
-    }
-
-    pub(super) fn active(
-        &self,
-    ) -> Result<MutexGuard<'_, BTreeMap<String, ActiveAgentTui>>, CliError> {
-        lock(&self.state.active, "terminal agent active process map")
     }
 
     pub(super) fn run_with_async_db<T, F, Fut>(&self, task: F) -> Option<Result<T, CliError>>
@@ -81,34 +75,6 @@ impl AgentTuiManagerHandle {
         })
     }
 
-    pub(crate) fn active_process(
-        &self,
-        tui_id: &str,
-    ) -> Result<Arc<super::AgentTuiProcess>, CliError> {
-        self.active_tui(tui_id)?.process.ok_or_else(|| {
-            CliErrorKind::session_not_active(format!("terminal agent '{tui_id}' is not active"))
-                .into()
-        })
-    }
-
-    pub(crate) fn active_tui(&self, tui_id: &str) -> Result<ActiveAgentTui, CliError> {
-        self.active()?.get(tui_id).cloned().ok_or_else(|| {
-            CliErrorKind::session_not_active(format!("terminal agent '{tui_id}' is not active"))
-                .into()
-        })
-    }
-
-    pub(crate) fn remove_active(
-        &self,
-        tui_id: &str,
-    ) -> Result<Option<Arc<super::AgentTuiProcess>>, CliError> {
-        let removed = self.active()?.remove(tui_id);
-        if let Some(active) = &removed {
-            active.stop();
-        }
-        Ok(removed.and_then(|active| active.process))
-    }
-
     pub(super) fn load_snapshot(&self, tui_id: &str) -> Result<AgentTuiSnapshot, CliError> {
         let tui_id_owned = tui_id.to_string();
         if let Some(result) = self.run_with_async_db(|async_db| async move {
@@ -143,11 +109,49 @@ impl AgentTuiManagerHandle {
         snapshot: AgentTuiSnapshot,
     ) -> Result<AgentTuiSnapshot, CliError> {
         if self.state.sandboxed && snapshot.status == AgentTuiStatus::Running {
-            let snapshot = BridgeClient::for_capability(BridgeCapability::AgentTui)?
-                .agent_tui_get(&snapshot.tui_id)?;
-            return Ok(self.normalize_snapshot(snapshot));
+            let refreshed = BridgeClient::for_capability(BridgeCapability::AgentTui)?
+                .agent_tui_get(&snapshot.tui_id);
+            return match refreshed {
+                Ok(refreshed) => Ok(self.normalize_bridge_snapshot(&snapshot, refreshed)),
+                Err(error) if error.code() == "KSRCLI090" => {
+                    Ok(Self::orphaned_inactive_snapshot(snapshot))
+                }
+                Err(error) => Err(error),
+            };
         }
         self.refresh_local_snapshot(snapshot)
+    }
+
+    pub(super) fn normalize_bridge_snapshot(
+        &self,
+        previous: &AgentTuiSnapshot,
+        refreshed: AgentTuiSnapshot,
+    ) -> AgentTuiSnapshot {
+        self.normalize_bridge_snapshot_owner(previous.workspace_id.as_deref(), refreshed)
+    }
+
+    pub(super) fn bridge_snapshot_workspace_id(
+        &self,
+        tui_id: &str,
+    ) -> Result<Option<String>, CliError> {
+        if let Some(active) = self.active()?.get(tui_id) {
+            return Ok(active.workspace_id.clone());
+        }
+        Ok(self.load_snapshot(tui_id)?.workspace_id)
+    }
+
+    pub(super) fn normalize_bridge_snapshot_owner(
+        &self,
+        workspace_id: Option<&str>,
+        mut refreshed: AgentTuiSnapshot,
+    ) -> AgentTuiSnapshot {
+        if let Some(workspace_id) = workspace_id {
+            refreshed.session_id.clear();
+            refreshed.session_id.push_str(workspace_id);
+            refreshed.workspace_id = Some(workspace_id.to_string());
+            refreshed.agent_id.clear();
+        }
+        self.normalize_snapshot(refreshed)
     }
 
     pub(super) fn refresh_local_snapshot(
@@ -230,7 +234,7 @@ impl AgentTuiManagerHandle {
     }
 
     pub(crate) fn normalize_snapshot(&self, mut snapshot: AgentTuiSnapshot) -> AgentTuiSnapshot {
-        if snapshot.agent_id.is_empty() {
+        if snapshot.workspace_id.is_none() && snapshot.agent_id.is_empty() {
             self.try_resolve_agent_id(&mut snapshot);
         }
         snapshot
@@ -261,33 +265,42 @@ impl AgentTuiManagerHandle {
             || previous.agent_id != refreshed.agent_id
     }
 
-    pub(crate) fn spawn_live_refresh(&self, tui_id: String, stop_flag: Arc<AtomicBool>) {
+    pub(crate) fn spawn_live_refresh(&self, tui_id: String, refresh_wake: Arc<LiveRefreshWake>) {
         let manager = self.clone();
         let _ = thread::spawn(move || {
-            manager.run_live_refresh_loop(&tui_id, &stop_flag);
+            manager.run_live_refresh_loop(&tui_id, &refresh_wake);
         });
     }
 
-    fn run_live_refresh_loop(&self, tui_id: &str, stop_flag: &AtomicBool) {
-        while Self::wait_for_live_refresh_tick(stop_flag) && self.handle_live_refresh_step(tui_id) {
+    fn run_live_refresh_loop(&self, tui_id: &str, refresh_wake: &Arc<LiveRefreshWake>) {
+        let mut delay = LIVE_REFRESH_INTERVAL;
+        let mut failure_count = 0_u32;
+        loop {
+            if !refresh_wake.wait(delay) {
+                break;
+            }
+            match self.live_refresh_step(tui_id) {
+                Ok(true) => {
+                    delay = LIVE_REFRESH_INTERVAL;
+                    failure_count = 0;
+                }
+                Ok(false) => break,
+                Err(error) => {
+                    failure_count = failure_count.saturating_add(1);
+                    Self::log_live_refresh_failure(tui_id, &error, failure_count);
+                    if !self.state.sandboxed {
+                        break;
+                    }
+                    delay = Self::live_refresh_retry_delay(delay);
+                }
+            }
         }
 
-        let _ = self.remove_active(tui_id);
+        let _ = self.remove_active_for_refresh(tui_id, refresh_wake);
     }
 
-    fn wait_for_live_refresh_tick(stop_flag: &AtomicBool) -> bool {
-        if stop_flag.load(Ordering::Relaxed) {
-            return false;
-        }
-        thread::sleep(LIVE_REFRESH_INTERVAL);
-        !stop_flag.load(Ordering::Relaxed)
-    }
-
-    fn handle_live_refresh_step(&self, tui_id: &str) -> bool {
-        self.live_refresh_step(tui_id).unwrap_or_else(|error| {
-            Self::warn_live_refresh_failure(tui_id, &error);
-            false
-        })
+    pub(super) fn live_refresh_retry_delay(current: std::time::Duration) -> std::time::Duration {
+        (current * 2).min(LIVE_REFRESH_RETRY_LIMIT)
     }
 
     fn live_refresh_step(&self, tui_id: &str) -> Result<bool, CliError> {
@@ -332,8 +345,12 @@ impl AgentTuiManagerHandle {
         clippy::cognitive_complexity,
         reason = "tracing macro expansion in a leaf logging helper"
     )]
-    fn warn_live_refresh_failure(tui_id: &str, error: &CliError) {
-        tracing::warn!(tui_id = %tui_id, %error, "terminal agent live refresh failed");
+    pub(super) fn log_live_refresh_failure(tui_id: &str, error: &CliError, failure_count: u32) {
+        if failure_count == 1 {
+            tracing::warn!(tui_id = %tui_id, %error, "terminal agent live refresh failed");
+        } else {
+            tracing::debug!(tui_id = %tui_id, %error, failure_count, "terminal agent live refresh still unavailable");
+        }
     }
 
     pub(super) fn save_and_broadcast(

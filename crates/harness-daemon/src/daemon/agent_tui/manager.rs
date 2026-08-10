@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Condvar, Mutex, OnceLock, PoisonError};
 use std::time::Duration;
 
 use tokio::runtime::Handle;
@@ -14,7 +14,9 @@ use harness_daemon_managed_agents::{AgentTuiInputWorker, AgentTuiProcess};
 pub(crate) struct ActiveAgentTui {
     pub(crate) process: Option<Arc<AgentTuiProcess>>,
     pub(crate) stop_flag: Arc<AtomicBool>,
+    pub(crate) refresh_wake: Arc<LiveRefreshWake>,
     pub(crate) input_worker: Option<AgentTuiInputWorker>,
+    pub(crate) workspace_id: Option<String>,
 }
 
 impl ActiveAgentTui {
@@ -26,11 +28,37 @@ impl ActiveAgentTui {
             }),
             process,
             stop_flag,
+            refresh_wake: Arc::new(LiveRefreshWake::default()),
+            workspace_id: None,
         }
     }
 
     pub(crate) fn stop(&self) {
         self.stop_flag.store(true, Ordering::Relaxed);
+        self.refresh_wake.stop();
+    }
+}
+
+#[derive(Default)]
+pub(crate) struct LiveRefreshWake {
+    stopped: Mutex<bool>,
+    changed: Condvar,
+}
+
+impl LiveRefreshWake {
+    pub(crate) fn wait(&self, delay: Duration) -> bool {
+        let stopped = self.stopped.lock().unwrap_or_else(PoisonError::into_inner);
+        let (stopped, timeout) = self
+            .changed
+            .wait_timeout_while(stopped, delay, |stopped| !*stopped)
+            .unwrap_or_else(PoisonError::into_inner);
+        timeout.timed_out() && !*stopped
+    }
+
+    pub(crate) fn stop(&self) {
+        let mut stopped = self.stopped.lock().unwrap_or_else(PoisonError::into_inner);
+        *stopped = true;
+        self.changed.notify_all();
     }
 }
 

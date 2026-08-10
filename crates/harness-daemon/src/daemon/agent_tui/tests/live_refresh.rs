@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 use tokio::sync::broadcast;
 
 use crate::daemon::agent_tui::{
-    AgentTuiManagerHandle, AgentTuiSize, AgentTuiSnapshot, AgentTuiStatus,
+    ActiveAgentTui, AgentTuiManagerHandle, AgentTuiSize, AgentTuiSnapshot, AgentTuiStatus,
 };
 use crate::daemon::db::DaemonDb;
 use crate::session::service as session_service;
@@ -105,6 +105,70 @@ fn manager_publishes_terminal_output_without_manual_refresh() {
         assert_eq!(updated_snapshot.tui_id, snapshot.tui_id);
         assert!(updated_snapshot.screen.text.contains("agent-ready"));
     });
+}
+
+#[test]
+fn sandboxed_live_refresh_retry_backs_off_to_thirty_seconds() {
+    let mut delay = std::time::Duration::from_millis(100);
+    for _ in 0..16 {
+        delay = AgentTuiManagerHandle::live_refresh_retry_delay(delay);
+    }
+    assert_eq!(delay, std::time::Duration::from_secs(30));
+    assert_eq!(
+        AgentTuiManagerHandle::live_refresh_retry_delay(delay),
+        std::time::Duration::from_secs(30)
+    );
+}
+
+#[test]
+fn live_refresh_backoff_stops_without_waiting_for_the_full_delay() {
+    let active = ActiveAgentTui::new(None);
+    let active_for_thread = active.clone();
+    let stopper = std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        active_for_thread.stop();
+    });
+    let started = std::time::Instant::now();
+
+    let should_refresh = active.refresh_wake.wait(std::time::Duration::from_secs(30));
+
+    stopper.join().expect("stopper thread");
+    assert!(!should_refresh);
+    assert!(started.elapsed() < std::time::Duration::from_millis(250));
+}
+
+#[test]
+fn live_refresh_stop_before_wait_returns_immediately() {
+    let active = ActiveAgentTui::new(None);
+    active.stop();
+    let started = std::time::Instant::now();
+
+    let should_refresh = active.refresh_wake.wait(std::time::Duration::from_secs(30));
+
+    assert!(!should_refresh);
+    assert!(started.elapsed() < std::time::Duration::from_millis(25));
+}
+
+#[test]
+fn retired_live_refresh_keeps_replacement_with_same_tui_id() {
+    let db_slot = Arc::new(OnceLock::new());
+    let (sender, _receiver) = broadcast::channel(4);
+    let manager = AgentTuiManagerHandle::new(sender, db_slot, true);
+    let retired = ActiveAgentTui::new(None);
+    let replacement = ActiveAgentTui::new(None);
+    let retired_wake = Arc::clone(&retired.refresh_wake);
+    let replacement_wake = Arc::clone(&replacement.refresh_wake);
+    manager
+        .active()
+        .expect("active map")
+        .insert("reused-tui".into(), replacement);
+
+    manager
+        .remove_active_for_refresh("reused-tui", &retired_wake)
+        .expect("retire old refresh owner");
+
+    let current = manager.active_tui("reused-tui").expect("replacement remains");
+    assert!(Arc::ptr_eq(&current.refresh_wake, &replacement_wake));
 }
 
 #[test]

@@ -9,7 +9,7 @@
 	<key>CFBundleExecutable</key>
 	<string>harness-daemon</string>
 	<key>CFBundleIdentifier</key>
-	<string>Q498EB36N4.io.harnessmonitor.daemon</string>
+	<string>Q498EB36N4.io.harnessmonitor.agent</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>

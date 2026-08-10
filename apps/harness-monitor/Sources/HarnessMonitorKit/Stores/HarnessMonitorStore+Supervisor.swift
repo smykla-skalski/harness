@@ -249,15 +249,31 @@ extension HarnessMonitorStore {
       return
     }
     Task {
-      await self.applySupervisorQuietHoursWindow(window, service: service)
+      await service.setQuietHoursWindow(window)
     }
   }
 
   public func refreshSupervisorPolicyOverrides() async {
-    guard let registry = supervisorStack?.registry else {
-      return
+    await withSerializedTaskBoardPolicyPublication(cancellationResult: ()) {
+      await refreshSupervisorPolicyOverridesSerialized()
     }
-    await registry.applyOverrides(await loadPolicyOverrides())
+  }
+
+  private func refreshSupervisorPolicyOverridesSerialized() async {
+    while !Task.isCancelled {
+      let generation = taskBoardRuntimeState.connection.databaseAccessGeneration
+      if let gate = supervisorBindings.policyOverrideRefreshGate {
+        await gate()
+      }
+      let applied = await applyEffectivePolicyCanvasSupervisorOverrides(
+        for: globalPolicyCanvasWorkspace,
+        activeDocument: globalPolicyPipeline,
+        taskBoardSourceGeneration: generation
+      )
+      if applied || generation == taskBoardRuntimeState.connection.databaseAccessGeneration {
+        return
+      }
+    }
   }
 
   public func requestSupervisorCheckNow() async {
@@ -329,22 +345,6 @@ extension HarnessMonitorStore {
     }
   }
 
-  public func runSupervisorTickForTesting() async {
-    await runSupervisorTickNow()
-  }
-
-  public func supervisorScheduledTickCountsForTesting() -> (requests: Int, drains: Int) {
-    let trigger = supervisorTickTrigger
-    return (trigger.requestCount, trigger.drainCount)
-  }
-
-  public func insertDecisionForTesting(_ draft: DecisionDraft) async throws {
-    guard let stack = supervisorStack else {
-      return
-    }
-    try await stack.decisionStore.insert(draft)
-  }
-
   func applySupervisorLiveTick(_ snapshot: DecisionLiveTickSnapshot) {
     guard supervisorLiveTick != snapshot else {
       return
@@ -355,41 +355,6 @@ extension HarnessMonitorStore {
 
   func resetSupervisorLiveTick() {
     applySupervisorLiveTick(.placeholder)
-  }
-
-  public func isSupervisorBackgroundActivityScheduledForTesting() -> Bool {
-    supervisorStack?.lifecycle.isBackgroundActivityScheduled ?? false
-  }
-
-  public func isSupervisorAuditRetentionScheduledForTesting() -> Bool {
-    supervisorStack?.auditRetention?.isBackgroundActivityScheduled ?? false
-  }
-
-  public func forceSupervisorBackgroundActivityTickForTesting() async {
-    await supervisorStack?.lifecycle.forceTick()
-  }
-
-  public func isSupervisorAutoActionSuppressedForTesting(at date: Date) async -> Bool {
-    guard let service = supervisorStack?.service else {
-      return false
-    }
-    return await service.isAutoActionSuppressed(at: date)
-  }
-
-  public func applySupervisorQuietHoursWindowForTesting(
-    _ window: SupervisorQuietHoursWindow?
-  ) async {
-    guard let service = supervisorStack?.service else {
-      return
-    }
-    await applySupervisorQuietHoursWindow(window, service: service)
-  }
-
-  private func applySupervisorQuietHoursWindow(
-    _ window: SupervisorQuietHoursWindow?,
-    service: SupervisorService
-  ) async {
-    await service.setQuietHoursWindow(window)
   }
 
   private func enqueueNotificationResolution(

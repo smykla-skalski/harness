@@ -49,10 +49,14 @@ extension HarnessMonitorStore {
   public func prepareForTermination() async {
     connection.isPreparingForTermination = true
     toast.dismissAll()
+    resolveSecretMigrationConsent(nil)
     cancelPendingAppInactivitySuspend()
     stopRemoteDaemonReconnect()
+    stopConnectionRecovery()
     stopAllStreams()
     stopManifestWatcher()
+    connection.legacyContainmentReconnectTask?.cancel()
+    connection.legacyContainmentReconnectTask = nil
     cancelChromeDataAvailabilityGateTask()
     #if HARNESS_FEATURE_OTEL
       stopResourceMetricsSampling()
@@ -69,6 +73,12 @@ extension HarnessMonitorStore {
     // connection has been torn down so the next launch picks up a
     // freshly-bundled daemon helper without bouncing the daemon while
     // the user was still working.
-    _ = await daemonController.performDeferredManagedLaunchAgentRefreshIfNeeded()
+    if connection.legacyContainmentHealthy {
+      let refreshed = await daemonController.performDeferredManagedLaunchAgentRefreshIfNeeded()
+      if refreshed {
+        _ = await requireLegacyManagedLaunchAgentCleanup()
+      }
+    }
+    legacyManagedLaunchAgentContainment.cancel()
   }
 }

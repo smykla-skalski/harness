@@ -125,7 +125,7 @@ struct HarnessMonitorStoreSecretMigrationTests {
     // The replacement daemon holds nothing, so every secret is an on-by-default
     // carry-over. The sheet still appears on the real switch path (connect()
     // runs the capability check twice); applying it carries everything over.
-    async let connected: Void = store.connect(using: replacementClient)
+    async let connected: Void? = try? await store.connect(using: replacementClient)
     #expect(await waitUntil { store.presentedSheet != nil })
     store.resolveSecretMigrationConsent([
       .githubGlobalToken: true,
@@ -285,7 +285,7 @@ struct HarnessMonitorStoreSecretMigrationTests {
       instanceID: "daemon-B"
     )
 
-    async let connected: Void = store.connect(using: replacementClient)
+    async let connected: Void? = try? await store.connect(using: replacementClient)
     #expect(await waitUntil { store.presentedSheet != nil })
     // Replace = carry the previous daemon's value over.
     store.resolveSecretMigrationConsent([.githubGlobalToken: true])
@@ -323,7 +323,7 @@ struct HarnessMonitorStoreSecretMigrationTests {
       instanceID: "daemon-B"
     )
 
-    async let connected: Void = store.connect(using: replacementClient)
+    async let connected: Void? = try? await store.connect(using: replacementClient)
     #expect(await waitUntil { store.presentedSheet != nil })
     store.resolveSecretMigrationConsent(nil)
     await connected

@@ -68,6 +68,8 @@ public enum ManagedLaunchAgentRefreshDecision: Equatable, Sendable {
 }
 
 public typealias ProcessLivenessProbe = @Sendable (Int32) -> ProcessLiveness
+public typealias ProcessSignal = @Sendable (Int32, Int32) -> Int32
+public typealias ManagedProcessValidator = @Sendable (Int32) -> Bool
 
 /// Returns the current boot's session UUID (`kern.bootsessionuuid`)
 /// or `nil` if the syscall fails. The UUID changes on every boot,
@@ -98,7 +100,7 @@ extension HarnessMonitorPaths {
   public static func managedLaunchAgentOwnerURL(
     using environment: HarnessMonitorEnvironment = .current
   ) -> URL {
-    Self.daemonRoot(using: environment)
+    Self.managedLaunchAgentControlRoot(using: environment)
       .appendingPathComponent("managed-launch-agent-owner.json")
   }
 }

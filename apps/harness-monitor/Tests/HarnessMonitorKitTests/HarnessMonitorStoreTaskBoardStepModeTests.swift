@@ -120,6 +120,27 @@ struct HarnessMonitorStoreTaskBoardStepModeTests {
     #expect(!store.isDaemonActionInFlight)
   }
 
+  @Test("A revoked Step Mode mutation cannot restore the previous database settings")
+  func revokedStepModeMutationCannotRestorePreviousDatabaseSettings() async throws {
+    let client = RecordingHarnessClient()
+    let store = await makeBootstrappedStore(client: client)
+    await client.blockNextTaskBoardOrchestratorSettingsMutations()
+    let mutation = Task { @MainActor in
+      await store.setTaskBoardStepMode(enabled: true)
+    }
+    await client.waitForBlockedTaskBoardOrchestratorSettingsMutations()
+
+    _ = try await store.invalidateTaskBoardDatabaseAccess(using: client)
+    let replacementStatus = client.sampleTaskBoardOrchestratorStatus(stepMode: true)
+    store.globalTaskBoardOrchestratorStatus = replacementStatus
+    await client.releaseNextTaskBoardOrchestratorSettingsMutation()
+
+    #expect(await mutation.value == false)
+    #expect(store.globalTaskBoardOrchestratorStatus == replacementStatus)
+    #expect(!store.isDaemonActionInFlight)
+    await store.prepareForTermination()
+  }
+
   @Test("Rapid enable disable enable coalesces stale intermediate intent")
   func rapidEnableDisableEnableCoalescesStaleIntermediateIntent() async throws {
     let client = RecordingHarnessClient()

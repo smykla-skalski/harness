@@ -5,6 +5,7 @@ extension HarnessMonitorStore {
     globalStreamTask?.cancel()
     globalStreamTask = nil
     cancelTaskBoardDashboardSnapshotRefresh()
+    resetTaskBoardPolicyRecoveryRetry()
     cacheWriteSync.taskBoardRefreshDeferralDepth = 0
   }
 
@@ -29,6 +30,7 @@ extension HarnessMonitorStore {
   }
 
   func stopAllStreams(resetSubscriptions: Bool = true) {
+    invalidateConnectionAttempts()
     stopGlobalStream()
     stopSessionStream(resetSubscriptions: resetSubscriptions)
     stopConnectionProbe()

@@ -149,6 +149,23 @@ extension HarnessMonitorStore {
     return await cacheService.loadTaskBoardSnapshot()
   }
 
+  func clearCachedTaskBoardSnapshot() async -> Bool {
+    cancelPendingTaskBoardSnapshotCacheWriteTask()
+    guard let cacheService, persistenceError == nil else { return true }
+    let result = await cacheService.clearTaskBoardSnapshot()
+    await applyPersistedCacheWriteResult(result)
+    return result.didPersist
+  }
+
+  func clearCachedPolicyDocuments(sourceGeneration: UInt64) async -> Bool {
+    guard let cacheService, persistenceError == nil else { return true }
+    let result = await cacheService.clearPolicyDocuments(
+      sourceGeneration: sourceGeneration
+    )
+    await applyPersistedCacheWriteResult(result)
+    return result.didPersist
+  }
+
   func loadCachedPolicyDocument() async -> SessionCacheService.CachedPolicyDocumentSnapshot? {
     guard let cacheService, persistenceError == nil else { return nil }
     return await cacheService.loadMostRecentPolicyDocumentSnapshot()

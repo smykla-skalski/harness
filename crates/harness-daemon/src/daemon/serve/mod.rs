@@ -202,15 +202,23 @@ async fn run_startup_recovery(app_state: &DaemonHttpState) -> Result<(), CliErro
 async fn recover_task_board_workers_after_restart(
     app_state: &DaemonHttpState,
 ) -> Result<(), CliError> {
+    let db = app_state.async_db.get().cloned().ok_or_else(|| {
+        CliErrorKind::workflow_io(
+            "task board worker startup recovery requires the async daemon database",
+        )
+    })?;
+    let recoveries = db.prepare_task_board_admission_worker_recoveries().await?;
     Box::pin(
         app_state
             .codex_controller
-            .reconcile_task_board_admission_workers_after_restart(),
+            .reconcile_task_board_admission_workers(db.as_ref(), &recoveries),
     )
     .await?;
     Box::pin(
-        crate::daemon::task_board_managed_agents::reconcile_interactive_workers_after_restart(
+        crate::daemon::task_board_managed_agents::restart_recovery::reconcile_interactive_workers(
             app_state,
+            db.as_ref(),
+            &recoveries,
         ),
     )
     .await

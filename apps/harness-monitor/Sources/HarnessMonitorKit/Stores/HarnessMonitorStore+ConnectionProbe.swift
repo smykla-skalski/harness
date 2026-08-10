@@ -1,7 +1,10 @@
 import Foundation
 
 extension HarnessMonitorStore {
-  func startConnectionProbe(using client: any HarnessMonitorClientProtocol) {
+  func startConnectionProbe(
+    using client: any HarnessMonitorClientProtocol,
+    connectionFence: ConnectionAttemptFence? = nil
+  ) {
     stopConnectionProbe()
     guard maintainsLiveDaemonObservation else {
       return
@@ -23,7 +26,8 @@ extension HarnessMonitorStore {
         guard
           await self?.runConnectionProbePass(
             using: client,
-            consecutiveFailures: &consecutiveFailures
+            consecutiveFailures: &consecutiveFailures,
+            connectionFence: connectionFence
           ) == true
         else {
           return
@@ -35,8 +39,12 @@ extension HarnessMonitorStore {
   /// One probe tick. Returns false when the loop should stop.
   private func runConnectionProbePass(
     using client: any HarnessMonitorClientProtocol,
-    consecutiveFailures: inout Int
+    consecutiveFailures: inout Int,
+    connectionFence: ConnectionAttemptFence?
   ) async -> Bool {
+    guard isCurrentConnectionAttemptFenceIfProvided(connectionFence) else {
+      return false
+    }
     // Skip the probe while a reconnect cycle is in flight. The stream
     // reconnect loop already logged "reconnecting <scope> attempt N";
     // firing another RPC into the dead socket here just produces a
@@ -53,6 +61,7 @@ extension HarnessMonitorStore {
 
     do {
       if let transportLatencyMs = try await client.transportLatencyMs() {
+        guard isCurrentConnectionAttemptFenceIfProvided(connectionFence) else { return false }
         consecutiveFailures = 0
         recordRequestSuccess(
           latencyMs: transportLatencyMs,
@@ -65,6 +74,7 @@ extension HarnessMonitorStore {
       let sample = try await Self.measureOperation {
         try await client.health()
       }
+      guard isCurrentConnectionAttemptFenceIfProvided(connectionFence) else { return false }
       consecutiveFailures = 0
       recordRequestSuccess(
         latencyMs: sample.latencyMs,
@@ -74,7 +84,7 @@ extension HarnessMonitorStore {
       await refreshLocalBridgeStateIfNeeded()
       return true
     } catch {
-      if Task.isCancelled {
+      if Task.isCancelled || !isCurrentConnectionAttemptFenceIfProvided(connectionFence) {
         return false
       }
       consecutiveFailures += 1

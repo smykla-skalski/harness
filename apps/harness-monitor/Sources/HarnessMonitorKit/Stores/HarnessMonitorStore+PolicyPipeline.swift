@@ -1,116 +1,98 @@
 import Foundation
 
+public struct TaskBoardPolicyWorkspaceSnapshot: Sendable {
+  public let workspace: PolicyCanvasWorkspace
+  let access: TaskBoardClientAccess
+}
+
 extension HarnessMonitorStore {
   nonisolated static func loadPolicyPipelineSnapshot(
     using client: any HarnessMonitorClientProtocol,
     canvasId: String? = nil
-  ) async -> MeasuredOperation<PolicyPipelineDocument?> {
+  ) async -> TaskBoardSnapshotLoad<PolicyPipelineDocument> {
     do {
       let measuredPipeline = try await measureOperation {
         try await client.policyPipeline(canvasId: canvasId)
       }
-      return MeasuredOperation(value: measuredPipeline.value, latencyMs: measuredPipeline.latencyMs)
+      return TaskBoardSnapshotLoad(measured: measuredPipeline)
     } catch {
       let description = RefreshSnapshotErrorFormatting.describeUnderlying(error)
       HarnessMonitorLogger.store.debug(
         "policy pipeline unavailable during refresh: \(description, privacy: .public)"
       )
-      return MeasuredOperation(value: nil, latencyMs: 0)
+      return TaskBoardSnapshotLoad(measured: nil)
     }
   }
 
   nonisolated static func loadPolicyCanvasWorkspace(
     using client: any HarnessMonitorClientProtocol
-  ) async -> MeasuredOperation<PolicyCanvasWorkspace?> {
+  ) async -> TaskBoardSnapshotLoad<PolicyCanvasWorkspace> {
     do {
       let measuredWorkspace = try await measureOperation {
         try await client.policyCanvasWorkspace()
       }
-      return MeasuredOperation(
-        value: measuredWorkspace.value, latencyMs: measuredWorkspace.latencyMs)
+      return TaskBoardSnapshotLoad(measured: measuredWorkspace)
     } catch {
       let description = RefreshSnapshotErrorFormatting.describeUnderlying(error)
       HarnessMonitorLogger.store.debug(
         "policy workspace unavailable during refresh: \(description, privacy: .public)"
       )
-      return MeasuredOperation(value: nil, latencyMs: 0)
+      return TaskBoardSnapshotLoad(measured: nil)
     }
   }
 
-  public func refreshPolicyPipeline() async {
-    guard let client else {
-      return
+  @discardableResult
+  public func refreshPolicyPipeline() async -> Bool {
+    await withSerializedTaskBoardPolicyPublication(cancellationResult: false) {
+      await refreshPolicyPipelineSerialized()
     }
-    let measuredWorkspace = await Self.loadPolicyCanvasWorkspace(using: client)
-    if let workspace = measuredWorkspace.value {
-      await syncPolicyCanvasWorkspace(
-        workspace,
-        using: client,
-        forceReloadActiveCanvas: true
-      )
-      return
-    }
-    async let pipeline = Self.loadPolicyPipelineSnapshot(using: client)
-    async let audit = loadPolicyAudit(using: client)
-    let measuredPipeline = await pipeline
-    let measuredAudit = await audit
+  }
 
-    var fallbackWorkspace = globalPolicyCanvasWorkspace
-    if var workspace = fallbackWorkspace, let document = measuredPipeline.value {
-      updatePolicyCanvasSummary(
-        &workspace,
-        canvasId: workspace.activeCanvasId,
-        document: document
-      )
-      if let latestSimulation = measuredAudit?.latestSimulation,
-        let activeIndex = workspace.canvases.firstIndex(where: {
-          $0.canvasId == workspace.activeCanvasId
-        })
-      {
-        var activeSummary = workspace.canvases[activeIndex]
-        activeSummary.latestSimulationTraceId = latestSimulation.traceId
-        activeSummary.latestSimulationSucceeded = latestSimulation.succeeded
-        activeSummary.latestSimulationAt = latestSimulation.simulatedAt
-        workspace.canvases[activeIndex] = activeSummary
-      }
-      fallbackWorkspace = workspace
+  private func refreshPolicyPipelineSerialized() async -> Bool {
+    guard let access = availableTaskBoardClientAccess else { return false }
+    let client = access.client
+    let workspaceLoad = await Self.loadPolicyCanvasWorkspace(using: client)
+    guard taskBoardAccessIsCurrent(access) else { return false }
+    guard let measuredWorkspace = workspaceLoad.measured else {
+      return handleTaskBoardPolicyRecoveryFailure(access: access)
     }
-
-    withUISyncBatch {
-      globalPolicyCanvasWorkspace = fallbackWorkspace
-      globalPolicyPipeline = measuredPipeline.value
-      globalPolicySimulation = measuredAudit?.latestSimulation
-      globalPolicyAudit = measuredAudit
-    }
-    await applyEffectivePolicyCanvasSupervisorOverrides(
-      for: fallbackWorkspace,
-      activeDocument: measuredPipeline.value
+    let synchronized = await syncPolicyCanvasWorkspace(
+      measuredWorkspace.value,
+      using: client,
+      forceReloadActiveCanvas: true,
+      taskBoardAccess: access
     )
+    guard synchronized, taskBoardAccessIsCurrent(access) else {
+      return handleTaskBoardPolicyRecoveryFailure(access: access)
+    }
+    await completeTaskBoardPolicyRecovery()
+    return true
   }
 
   public func ensurePolicyCanvasWorkspaceLoadedForRuntimePolicies() async {
-    guard globalPolicyCanvasWorkspace == nil else {
+    guard globalPolicyCanvasWorkspace == nil || taskBoardPolicyRuntimeRecoveryPending else {
       return
     }
     await bootstrapIfNeeded()
     await refreshPolicyPipeline()
   }
 
-  public func loadTaskBoardPolicyWorkspaceSnapshot() async -> PolicyCanvasWorkspace? {
-    if let globalPolicyCanvasWorkspace {
-      return globalPolicyCanvasWorkspace
-    }
-    guard let client else {
-      return nil
-    }
-    return await Self.loadPolicyCanvasWorkspace(using: client).value
+  public func loadTaskBoardPolicyWorkspaceSnapshot() async -> TaskBoardPolicyWorkspaceSnapshot? {
+    guard globalPolicyCanvasWorkspace == nil else { return nil }
+    guard let access = availableTaskBoardClientAccess else { return nil }
+    let workspace = await Self.loadPolicyCanvasWorkspace(using: access.client).measured?.value
+    guard taskBoardAccessIsCurrent(access), let workspace else { return nil }
+    return TaskBoardPolicyWorkspaceSnapshot(workspace: workspace, access: access)
   }
 
-  public func adoptTaskBoardPolicyWorkspaceSnapshot(_ workspace: PolicyCanvasWorkspace) {
-    guard globalPolicyCanvasWorkspace == nil else {
+  public func adoptTaskBoardPolicyWorkspaceSnapshot(_ snapshot: TaskBoardPolicyWorkspaceSnapshot) {
+    guard
+      globalPolicyCanvasWorkspace == nil,
+      taskBoardAccessIsCurrent(snapshot.access)
+    else {
       return
     }
-    globalPolicyCanvasWorkspace = workspace
+    globalPolicyCanvasWorkspace = snapshot.workspace
   }
 
   /// Persist a draft to the daemon and return the daemon's saved document on
@@ -125,14 +107,22 @@ extension HarnessMonitorStore {
   public func savePolicyPipelineDraft(
     document: PolicyPipelineDocument
   ) async -> PolicyPipelineDocument? {
-    guard let client else {
-      return nil
+    await withSerializedTaskBoardPolicyPublication(cancellationResult: nil) {
+      await savePolicyPipelineDraftSerialized(document: document)
     }
+  }
+
+  private func savePolicyPipelineDraftSerialized(
+    document: PolicyPipelineDocument
+  ) async -> PolicyPipelineDocument? {
+    guard let access = availableTaskBoardClientAccess else { return nil }
+    let client = access.client
     let existingCanvasId = globalPolicyCanvasWorkspace?.activeCanvasId
     let loadedWorkspace =
       existingCanvasId == nil
-      ? await Self.loadPolicyCanvasWorkspace(using: client).value
+      ? await Self.loadPolicyCanvasWorkspace(using: client).measured?.value
       : nil
+    guard taskBoardAccessIsCurrent(access) else { return nil }
     if let loadedWorkspace {
       globalPolicyCanvasWorkspace = loadedWorkspace
     }
@@ -148,8 +138,12 @@ extension HarnessMonitorStore {
         canvasId: canvasId,
         document: document
       )
-      return await adoptPolicyPipelineSaveResponse(response)
+      try requireCurrentTaskBoardClientAccess(access)
+      return await adoptPolicyPipelineSaveResponse(response, access: access)
+    } catch is CancellationError {
+      return nil
     } catch {
+      guard taskBoardAccessIsCurrent(access) else { return nil }
       presentFailureFeedback(error.localizedDescription)
       return nil
     }
@@ -167,16 +161,19 @@ extension HarnessMonitorStore {
     )
   }
   @discardableResult
-  public func adoptPolicyPipelineSaveResponse(
-    _ response: PolicyPipelineSaveDraftResponse
+  func adoptPolicyPipelineSaveResponse(
+    _ response: PolicyPipelineSaveDraftResponse,
+    access: TaskBoardClientAccess
   ) async -> PolicyPipelineDocument? {
-    recordRequestSuccess()
-    globalPolicyPipeline = response.document
-    refreshActivePolicyCanvasSummary(document: response.document)
-    await applyEffectivePolicyCanvasSupervisorOverrides(
-      for: globalPolicyCanvasWorkspace,
-      activeDocument: response.document
-    )
+    guard taskBoardAccessIsCurrent(access) else { return nil }
+    guard
+      await applyEffectivePolicyCanvasSupervisorOverrides(
+        for: globalPolicyCanvasWorkspace,
+        activeDocument: response.document,
+        taskBoardSourceGeneration: access.databaseAccessGeneration
+      ),
+      taskBoardAccessIsCurrent(access)
+    else { return nil }
     guard response.validation.isValid else {
       presentFailureFeedback(
         response.validation.issues.first?.message ?? "Policy draft is invalid"
@@ -185,20 +182,33 @@ extension HarnessMonitorStore {
     }
     let activeCanvasId = globalPolicyCanvasWorkspace?.activeCanvasId
     if let activeCanvasId, !activeCanvasId.isEmpty {
-      _ = await cacheService?.cachePolicyDocument(
-        canvasId: activeCanvasId,
-        document: response.document
-      )
+      guard
+        await cachePolicyDocument(
+          response.document,
+          canvasId: activeCanvasId,
+          access: access
+        )
+      else { return nil }
     }
+    recordRequestSuccess()
+    globalPolicyPipeline = response.document
+    refreshActivePolicyCanvasSummary(document: response.document)
     return response.document
   }
   @discardableResult
   public func simulatePolicyPipeline(
     document: PolicyPipelineDocument? = nil
   ) async -> Bool {
-    guard let client else {
-      return false
+    await withSerializedTaskBoardPolicyPublication(cancellationResult: false) {
+      await simulatePolicyPipelineSerialized(document: document)
     }
+  }
+
+  private func simulatePolicyPipelineSerialized(
+    document: PolicyPipelineDocument?
+  ) async -> Bool {
+    guard let access = availableTaskBoardClientAccess else { return false }
+    let client = access.client
     beginDaemonAction()
     defer { endDaemonAction() }
 
@@ -209,13 +219,16 @@ extension HarnessMonitorStore {
           document: document
         )
       )
-      recordRequestSuccess()
-      globalPolicySimulation = simulation
-      refreshActivePolicyCanvasSummary(latestSimulation: simulation)
-      globalPolicyAudit = await loadPolicyAudit(
+      try requireCurrentTaskBoardClientAccess(access)
+      let audit = await loadPolicyAudit(
         using: client,
         canvasId: globalPolicyCanvasWorkspace?.activeCanvasId
       )
+      try requireCurrentTaskBoardClientAccess(access)
+      recordRequestSuccess()
+      globalPolicySimulation = simulation
+      globalPolicyAudit = audit
+      refreshActivePolicyCanvasSummary(latestSimulation: simulation)
       if simulation.validation.isValid {
         presentSuccessFeedback("Simulated policy")
       } else {
@@ -224,7 +237,10 @@ extension HarnessMonitorStore {
         )
       }
       return simulation.succeeded
+    } catch is CancellationError {
+      return false
     } catch {
+      guard taskBoardAccessIsCurrent(access) else { return false }
       presentFailureFeedback(error.localizedDescription)
       return false
     }
@@ -245,159 +261,6 @@ extension HarnessMonitorStore {
         "policy audit unavailable during refresh: \(description, privacy: .public)"
       )
       return nil
-    }
-  }
-  @discardableResult
-  public func createPolicyCanvas(title: String? = nil) async -> Bool {
-    guard let client else {
-      return false
-    }
-    beginDaemonAction()
-    defer { endDaemonAction() }
-
-    do {
-      let workspace = try await client.createPolicyCanvas(
-        request: PolicyCanvasCreateRequest(title: title)
-      )
-      recordRequestSuccess()
-      await syncPolicyCanvasWorkspace(
-        workspace,
-        using: client,
-        forceReloadActiveCanvas: true
-      )
-      presentSuccessFeedback("Created policy canvas")
-      return true
-    } catch {
-      presentFailureFeedback(error.localizedDescription)
-      return false
-    }
-  }
-  @discardableResult
-  public func duplicatePolicyCanvas(
-    canvasId: String,
-    title: String? = nil
-  ) async -> Bool {
-    guard let client else {
-      return false
-    }
-    beginDaemonAction()
-    defer { endDaemonAction() }
-
-    do {
-      let workspace = try await client.duplicatePolicyCanvas(
-        request: PolicyCanvasDuplicateRequest(canvasId: canvasId, title: title)
-      )
-      recordRequestSuccess()
-      await syncPolicyCanvasWorkspace(
-        workspace,
-        using: client,
-        forceReloadActiveCanvas: true
-      )
-      presentSuccessFeedback("Duplicated policy canvas")
-      return true
-    } catch {
-      presentFailureFeedback(error.localizedDescription)
-      return false
-    }
-  }
-  @discardableResult
-  public func renamePolicyCanvas(
-    canvasId: String,
-    title: String
-  ) async -> Bool {
-    guard let client else {
-      return false
-    }
-    beginDaemonAction()
-    defer { endDaemonAction() }
-
-    do {
-      let workspace = try await client.renamePolicyCanvas(
-        request: PolicyCanvasRenameRequest(canvasId: canvasId, title: title)
-      )
-      recordRequestSuccess()
-      await syncPolicyCanvasWorkspace(workspace, using: client)
-      presentSuccessFeedback("Renamed policy canvas")
-      return true
-    } catch {
-      presentFailureFeedback(error.localizedDescription)
-      return false
-    }
-  }
-  @discardableResult
-  public func activatePolicyCanvas(canvasId: String) async -> Bool {
-    guard let client else {
-      return false
-    }
-    beginDaemonAction()
-    defer { endDaemonAction() }
-
-    do {
-      let workspace = try await client.activatePolicyCanvas(
-        request: PolicyCanvasActivateRequest(canvasId: canvasId)
-      )
-      recordRequestSuccess()
-      await syncPolicyCanvasWorkspace(
-        workspace,
-        using: client,
-        forceReloadActiveCanvas: true
-      )
-      return true
-    } catch {
-      presentFailureFeedback(error.localizedDescription)
-      await refreshPolicyPipeline()
-      return false
-    }
-  }
-  @discardableResult
-  public func deletePolicyCanvas(canvasId: String) async -> Bool {
-    guard let client else {
-      return false
-    }
-    beginDaemonAction()
-    defer { endDaemonAction() }
-
-    do {
-      let workspace = try await client.deletePolicyCanvas(
-        request: PolicyCanvasDeleteRequest(canvasId: canvasId)
-      )
-      recordRequestSuccess()
-      await syncPolicyCanvasWorkspace(
-        workspace,
-        using: client,
-        forceReloadActiveCanvas: true
-      )
-      presentSuccessFeedback("Deleted policy canvas")
-      return true
-    } catch {
-      presentFailureFeedback(error.localizedDescription)
-      await refreshPolicyPipeline()
-      return false
-    }
-  }
-  @discardableResult
-  public func setPolicyCanvasGlobalEnforcement(enabled: Bool) async -> Bool {
-    guard let client else {
-      return false
-    }
-    beginDaemonAction()
-    defer { endDaemonAction() }
-
-    do {
-      let workspace = try await client.setPolicyCanvasGlobalEnforcement(
-        request: PolicyCanvasSetGlobalEnforcementRequest(enabled: enabled)
-      )
-      recordRequestSuccess()
-      await syncPolicyCanvasWorkspace(
-        workspace,
-        using: client,
-        forceReloadActiveCanvas: true
-      )
-      return true
-    } catch {
-      presentFailureFeedback(error.localizedDescription)
-      await refreshPolicyPipeline()
-      return false
     }
   }
 }

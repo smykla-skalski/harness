@@ -13,12 +13,9 @@ extension DaemonController {
     case contended
   }
 
-  /// Try-acquire `flock(LOCK_EX|LOCK_NB)` on a daemon-root sentinel
-  /// file, holding it across the supplied closure. The lock
-  /// serializes the marker-read / decide / IPC / marker-write
-  /// transaction across sibling Monitor processes that resolve to
-  /// the same daemon root (e.g. two processes with no
-  /// `HARNESS_MONITOR_RUNTIME_LANE`).
+  /// Try-acquire `flock(LOCK_EX|LOCK_NB)` on the service-identity sentinel,
+  /// holding it across the supplied closure. Every Monitor process for one
+  /// runtime lane controls the same SMAppService identity.
   ///
   /// Lock semantics:
   /// - `flock(2)` is per open-file-description on Darwin, so two
@@ -44,6 +41,34 @@ extension DaemonController {
     perform: () async throws -> Value
   ) async throws -> LaunchAgentLockOutcome<Value> where Value: Sendable {
     let url = HarnessMonitorPaths.managedLaunchAgentLockURL(using: environment)
+    return try await withLaunchAgentLock(
+      at: url,
+      totalTimeout: totalTimeout,
+      retryInterval: retryInterval,
+      perform: perform
+    )
+  }
+
+  func withLegacyManagedLaunchAgentLock<Value>(
+    totalTimeout: Duration = .milliseconds(250),
+    retryInterval: Duration = .milliseconds(25),
+    perform: () async throws -> Value
+  ) async throws -> LaunchAgentLockOutcome<Value> where Value: Sendable {
+    let url = HarnessMonitorPaths.legacyManagedLaunchAgentLockURL(using: environment)
+    return try await withLaunchAgentLock(
+      at: url,
+      totalTimeout: totalTimeout,
+      retryInterval: retryInterval,
+      perform: perform
+    )
+  }
+
+  private func withLaunchAgentLock<Value>(
+    at url: URL,
+    totalTimeout: Duration,
+    retryInterval: Duration,
+    perform: () async throws -> Value
+  ) async throws -> LaunchAgentLockOutcome<Value> where Value: Sendable {
     try FileManager.default.createDirectory(
       at: url.deletingLastPathComponent(),
       withIntermediateDirectories: true
@@ -60,8 +85,10 @@ extension DaemonController {
 
     let deadline = ContinuousClock.now + totalTimeout
     while true {
+      try Task.checkCancellation()
       if bsdFlock(fd, LOCK_EX | LOCK_NB) == 0 {
         defer { _ = bsdFlock(fd, LOCK_UN) }
+        try Task.checkCancellation()
         return .acquired(try await perform())
       }
       let err = errno
@@ -73,8 +100,23 @@ extension DaemonController {
       if ContinuousClock.now >= deadline {
         return .contended
       }
-      try? await Task.sleep(for: retryInterval)
+      try await Task.sleep(for: retryInterval)
     }
+  }
+
+  func withRequiredManagedLaunchAgentLock<Value>(
+    perform: () async throws -> Value
+  ) async throws -> Value where Value: Sendable {
+    let outcome = try await withManagedLaunchAgentLock(
+      totalTimeout: .seconds(2),
+      perform: perform
+    )
+    guard case .acquired(let value) = outcome else {
+      throw DaemonControlError.commandFailed(
+        "Managed launch-agent lifecycle is busy in another Harness Monitor process"
+      )
+    }
+    return value
   }
 }
 
@@ -93,7 +135,12 @@ extension DaemonController {
   /// can lose a race with a daemon acquiring it at the same instant, which is
   /// the same tradeoff the daemon-side probe already accepts.
   func daemonSingletonLockIsHeld() -> Bool {
-    let url = HarnessMonitorPaths.daemonSingletonLockURL(using: environment)
+    daemonSingletonLockIsHeld(
+      at: HarnessMonitorPaths.daemonSingletonLockURL(using: environment)
+    )
+  }
+
+  func daemonSingletonLockIsHeld(at url: URL) -> Bool {
     let fd = Darwin.open(url.path, O_RDWR | O_CLOEXEC)
     guard fd >= 0 else {
       return false

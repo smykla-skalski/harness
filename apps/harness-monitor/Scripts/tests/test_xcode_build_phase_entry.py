@@ -53,12 +53,13 @@ class XcodeBuildPhaseEntryTests(unittest.TestCase):
 
         required_inputs = (
             '"$(PROJECT_DIR)/Scripts/lib/daemon-input-state.py"',
+            '"$(PROJECT_DIR)/Resources/LaunchAgents/Q498EB36N4.io.harnessmonitor.agent.plist"',
             '"$(PROJECT_DIR)/Resources/LaunchAgents/Q498EB36N4.io.harnessmonitor.daemon.plist"',
             '"$(PROJECT_DIR)/Resources/LaunchAgents/io.harnessmonitor.daemon.managed.plist"',
             '"$(PROJECT_DIR)/Resources/LaunchAgents/io.harnessmonitor.daemon.plist"',
             '"$(PROJECT_DIR)/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist"',
             '"$(PROJECT_DIR)/HarnessMonitorDaemon.entitlements"',
-            '"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/harness-daemon.cstemp"',
+            '"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/harness-daemon.cstemp"',
             'inputPaths: variant.inputPaths + ["$(TARGET_BUILD_DIR)/$(FULL_PRODUCT_NAME)"]',
         )
 

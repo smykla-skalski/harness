@@ -1,6 +1,12 @@
+struct ConnectionAttemptFence: Sendable {
+  let generation: UInt64
+  let containment: LegacyContainmentFence
+}
+
 extension HarnessMonitorStore {
   var shouldAbandonConnectionAttempt: Bool {
-    Task.isCancelled || isAppLifecycleSuspended || connection.isPreparingForTermination
+    Task.isCancelled || !connection.legacyContainmentHealthy
+      || isAppLifecycleSuspended || connection.isPreparingForTermination
   }
 
   var hasLiveConnectionActivity: Bool {
@@ -23,10 +29,55 @@ extension HarnessMonitorStore {
     set { connection.connectionRecoveryGeneration = newValue }
   }
 
+  var connectionRecoveryRetryDelays: [Duration] {
+    get { connection.recoveryRetryDelays }
+    set { connection.recoveryRetryDelays = newValue }
+  }
+
+  func beginConnectionAttempt() throws -> ConnectionAttemptFence {
+    let containment = try currentLegacyContainmentFence()
+    invalidateConnectionAttempts()
+    return ConnectionAttemptFence(
+      generation: connection.connectionAttemptGeneration,
+      containment: containment
+    )
+  }
+
+  func invalidateConnectionAttempts() {
+    connection.connectionAttemptGeneration &+= 1
+    cancelSecretMigrationConsentIfPending()
+    cancelTaskBoardDashboardSnapshotRefresh()
+  }
+
+  func currentConnectionAttemptFence() throws -> ConnectionAttemptFence {
+    ConnectionAttemptFence(
+      generation: connection.connectionAttemptGeneration,
+      containment: try currentLegacyContainmentFence()
+    )
+  }
+
+  func isCurrentConnectionAttemptFence(_ fence: ConnectionAttemptFence) -> Bool {
+    fence.generation == connection.connectionAttemptGeneration
+      && isCurrentLegacyContainmentFence(fence.containment)
+  }
+
+  func isCurrentConnectionAttemptFenceIfProvided(
+    _ fence: ConnectionAttemptFence?
+  ) -> Bool {
+    guard let fence else { return !shouldAbandonConnectionAttempt }
+    return isCurrentConnectionAttemptFence(fence)
+  }
+
   func scheduleReconnectAfterConnectionFailure() {
+    if connectionState == .online {
+      markConnectionOffline("Daemon connection interrupted")
+    }
+    if usesRemoteDaemon {
+      scheduleRemoteDaemonReconnect(immediately: true)
+      return
+    }
     guard
       connectionRecoveryTask == nil,
-      !isBootstrapping,
       !isReconnecting,
       !isAppLifecycleSuspended,
       !connection.isPreparingForTermination
@@ -39,10 +90,7 @@ extension HarnessMonitorStore {
     connectionRecoveryTask = Task { @MainActor [weak self] in
       guard let self else { return }
       defer { self.finishConnectionRecovery(generation: generation) }
-      guard self.shouldRunConnectionRecovery(generation: generation) else {
-        return
-      }
-      await self.reconnect()
+      await self.runConnectionRecovery(generation: generation)
     }
   }
 
@@ -63,7 +111,9 @@ extension HarnessMonitorStore {
       self.client = nil
       taskBoardDatabaseInstanceID = nil
     }
-    connectionState = .idle
+    if connection.legacyContainmentHealthy {
+      connectionState = .idle
+    }
   }
 
   func discardActiveConnection() async {
@@ -71,6 +121,57 @@ extension HarnessMonitorStore {
       return
     }
     await disconnectedClient.shutdown()
+  }
+
+  func settleAbandonedConnectionAttempt(
+    using candidate: any HarnessMonitorClientProtocol,
+    connectionFence: ConnectionAttemptFence
+  ) async {
+    guard !isCurrentConnectionAttemptFence(connectionFence) else { return }
+    guard self.client === candidate else {
+      await candidate.shutdown()
+      return
+    }
+    guard shouldAbandonConnectionAttempt else { return }
+    await discardActiveConnection()
+  }
+
+  func adoptConnectionCandidate(
+    _ candidate: any HarnessMonitorClientProtocol,
+    connectionFence: ConnectionAttemptFence,
+    onAdopt: () -> Bool = { true }
+  ) async -> Bool {
+    guard isCurrentConnectionAttemptFence(connectionFence) else {
+      await candidate.shutdown()
+      return false
+    }
+    let replacedClient = self.client
+    if replacedClient !== candidate {
+      await replacedClient?.shutdown()
+      guard isCurrentConnectionAttemptFence(connectionFence) else {
+        await candidate.shutdown()
+        return false
+      }
+    }
+    self.client = candidate
+    guard onAdopt() else {
+      self.client = nil
+      await candidate.shutdown()
+      return false
+    }
+    return true
+  }
+
+  func discardFailedConnectionUnlessReplaced() async -> Bool {
+    guard let disconnectedClient = disconnectActiveConnection() else {
+      return false
+    }
+    guard let postDisconnectFence = try? currentConnectionAttemptFence() else {
+      await disconnectedClient.shutdown()
+      return false
+    }
+    await disconnectedClient.shutdown()
+    return isCurrentConnectionAttemptFence(postDisconnectFence)
   }
 
   func applyConnectionFailure(_ error: any Error) async {
@@ -86,13 +187,34 @@ extension HarnessMonitorStore {
     }
   }
 
-  private func shouldRunConnectionRecovery(generation: UInt64) -> Bool {
+  private func shouldContinueConnectionRecovery(generation: UInt64) -> Bool {
     !Task.isCancelled
       && generation == connectionRecoveryGeneration
-      && !isBootstrapping
-      && !isReconnecting
+      && connectionState != .online
       && !isAppLifecycleSuspended
       && !connection.isPreparingForTermination
+  }
+
+  private func runConnectionRecovery(generation: UInt64) async {
+    guard !connectionRecoveryRetryDelays.isEmpty else { return }
+    var attempt = 0
+    while true {
+      let delayIndex = min(attempt, connectionRecoveryRetryDelays.count - 1)
+      do {
+        try await Task.sleep(for: connectionRecoveryRetryDelays[delayIndex])
+      } catch {
+        return
+      }
+      guard shouldContinueConnectionRecovery(generation: generation) else {
+        return
+      }
+      guard !isBootstrapping, !isReconnecting else { continue }
+      await reconnect()
+      guard connectionState != .online else {
+        return
+      }
+      attempt += 1
+    }
   }
 
   private func finishConnectionRecovery(generation: UInt64) {

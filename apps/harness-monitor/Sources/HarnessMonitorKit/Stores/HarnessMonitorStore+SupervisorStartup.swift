@@ -48,6 +48,7 @@ extension HarnessMonitorStore {
       clock: supervisorClock,
       interval: SupervisorSettingsDefaults.defaultIntervalSeconds
     )
+    await service.setPolicyRecoverySuppressed(taskBoardPolicyRuntimeRecoveryPending)
     await service.setQuietHoursWindow(SupervisorSettingsDefaults.quietHoursWindow())
 
     let lifecycle = SupervisorLifecycle(
@@ -117,7 +118,10 @@ extension HarnessMonitorStore {
   private func makeSupervisorRegistry() async -> PolicyRegistry {
     let registry = PolicyRegistry()
     await registry.registerDefaults()
-    await registry.applyOverrides(await loadPolicyOverrides())
+    _ = await registry.applyOverrides(
+      await loadPolicyOverrides(),
+      sourceGeneration: 0
+    )
     return registry
   }
 

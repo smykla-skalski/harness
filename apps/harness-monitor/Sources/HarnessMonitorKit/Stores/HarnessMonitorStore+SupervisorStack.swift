@@ -53,4 +53,5 @@ final class SupervisorBindings {
   weak var notificationController: HarnessMonitorUserNotificationController?
   var pendingDecisionsBadgeSync: (@MainActor (Int) -> Void)?
   var pendingDecisionsStatusSync: (@MainActor (Int, DecisionSeverity?) -> Void)?
+  var policyOverrideRefreshGate: (@MainActor () async -> Void)?
 }

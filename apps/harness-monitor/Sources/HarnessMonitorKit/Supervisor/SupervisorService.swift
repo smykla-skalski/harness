@@ -20,6 +20,7 @@ public actor SupervisorService {
   var running = false, tickInProgress = false
   var tickWaiters: [CheckedContinuation<Void, Never>] = []
   var autoActionSuppressionDepth = 0
+  var policyRecoverySuppressed = false
   var quietHoursWindow: SupervisorQuietHoursWindow?
 
   var ruleFailureWindow: [[String: Bool]] = []
@@ -65,6 +66,10 @@ public actor SupervisorService {
     quietHoursWindow = window
   }
 
+  public func setPolicyRecoverySuppressed(_ suppressed: Bool) {
+    policyRecoverySuppressed = suppressed
+  }
+
   public func awaitCurrentTick() async {
     guard tickInProgress else { return }
     await withCheckedContinuation { continuation in
@@ -74,7 +79,9 @@ public actor SupervisorService {
 
   public func quarantinedRuleIDs() -> Set<String> { quarantined }
 
-  public func isAutoActionSuppressed(at date: Date) -> Bool { suppressionActive(at: date) }
+  public func isAutoActionSuppressed(at date: Date) async -> Bool {
+    suppressionActive(at: date)
+  }
 
   public func liveTickSnapshot() -> DecisionLiveTickSnapshot {
     DecisionLiveTickSnapshot(

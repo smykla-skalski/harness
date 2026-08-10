@@ -45,6 +45,7 @@ pub(super) struct BridgeAgentTuiMetadata {
 #[derive(Debug, Clone)]
 pub(super) struct BridgeSnapshotContext {
     pub(super) session_id: String,
+    pub(super) workspace_id: Option<String>,
     pub(super) agent_id: String,
     pub(super) tui_id: String,
     pub(super) profile: AgentTuiLaunchProfile,
@@ -55,7 +56,7 @@ pub(super) struct BridgeSnapshotContext {
 impl BridgeSnapshotContext {
     pub(super) fn borrowed(&self) -> AgentTuiSnapshotContext<'_> {
         AgentTuiSnapshotContext {
-            workspace_id: None,
+            workspace_id: self.workspace_id.as_deref(),
             session_id: &self.session_id,
             agent_id: &self.agent_id,
             tui_id: &self.tui_id,

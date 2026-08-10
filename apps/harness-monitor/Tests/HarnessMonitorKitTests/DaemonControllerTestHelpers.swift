@@ -4,6 +4,28 @@ import Testing
 
 @testable import HarnessMonitorKit
 
+final class TempHarnessMonitorEnvironmentFixture: @unchecked Sendable {
+  let rootURL: URL
+  let environment: HarnessMonitorEnvironment
+
+  init() {
+    let rootURL = FileManager.default.temporaryDirectory
+      .appendingPathComponent("harness-monitor-environment-\(UUID().uuidString)", isDirectory: true)
+    self.rootURL = rootURL
+    self.environment = HarnessMonitorEnvironment(
+      values: [
+        HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey:
+          rootURL.appendingPathComponent("data-home", isDirectory: true).path
+      ],
+      homeDirectory: rootURL
+    )
+  }
+
+  deinit {
+    try? FileManager.default.removeItem(at: rootURL)
+  }
+}
+
 func withTempDaemonFixture(
   pid: UInt32,
   version: String = "19.4.1",
@@ -49,14 +71,16 @@ func withTempDaemonFixture(
   try manifestData.write(to: daemonRoot.appendingPathComponent("manifest.json"))
 
   var environmentValues: [String: String] = [
-    HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey: daemonHome.path
+    HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey: daemonHome.path,
+    HarnessMonitorRuntimeLane.launchAgentLabelEnvKey:
+      "\(HarnessMonitorRuntimeLane.launchAgentBaseLabel)-test-\(UUID().uuidString.lowercased())",
   ]
   if ownership == .external {
     environmentValues[DaemonOwnership.environmentKey] = "1"
   }
   let environment = HarnessMonitorEnvironment(
     values: environmentValues,
-    homeDirectory: URL(fileURLWithPath: "/Users/example", isDirectory: true)
+    homeDirectory: root
   )
   try await perform(environment)
 }

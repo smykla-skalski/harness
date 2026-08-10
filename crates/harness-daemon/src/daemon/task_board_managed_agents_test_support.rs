@@ -27,6 +27,10 @@ use crate::task_board::{
 use crate::workspace::utc_now;
 
 pub(super) fn test_http_state() -> DaemonHttpState {
+    test_http_state_with_sandboxed(false)
+}
+
+pub(super) fn test_http_state_with_sandboxed(sandboxed: bool) -> DaemonHttpState {
     let (sender, _) = broadcast::channel(8);
     let db_slot = Arc::new(OnceLock::new());
     let async_db = Arc::new(OnceLock::new());
@@ -72,7 +76,7 @@ pub(super) fn test_http_state() -> DaemonHttpState {
             sender.clone(),
             db_slot.clone(),
             async_db.clone(),
-            false,
+            sandboxed,
         ),
         acp_agent_manager: AcpAgentManagerHandle::new_with_async_db(
             sender.clone(),
@@ -83,7 +87,7 @@ pub(super) fn test_http_state() -> DaemonHttpState {
             sender.clone(),
             db_slot,
             async_db,
-            false,
+            sandboxed,
         ),
         managed_agent_mutation_locks: ManagedAgentMutationLocks::default(),
         recovery_snapshot: Arc::default(),
@@ -164,7 +168,7 @@ pub(super) async fn seed_session(
     })
     .to_string();
     sqlx::query(
-        "INSERT INTO projects (
+        "INSERT OR IGNORE INTO projects (
              project_id, name, checkout_id, checkout_name, context_root,
              is_worktree, discovered_at, updated_at
          ) VALUES ('project-1', 'harness', 'checkout-1', 'main',

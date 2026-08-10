@@ -21,4 +21,18 @@ extension SessionWindowFlowTests {
 
     #expect(center.isKillSwitchEngaged)
   }
+
+  @Test("App runtime service fails closed during database recovery")
+  @MainActor
+  func appRuntimeServiceFailsClosedDuringDatabaseRecovery() {
+    let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .taskBoardBoardOnly)
+    let center = AutomationPolicyCenter()
+    let service = AutomationPolicyRuntimeService(policyCenter: center)
+    store.taskBoardPolicyRuntimeRecoveryPending = true
+
+    service.start(store: store)
+
+    #expect(center.isKillSwitchEngaged)
+    #expect(center.document.canvasPolicies.isEmpty)
+  }
 }

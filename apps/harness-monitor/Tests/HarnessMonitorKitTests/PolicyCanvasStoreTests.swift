@@ -14,11 +14,13 @@ final class PolicyCanvasStoreTests: XCTestCase {
     let expectedWorkspace = try await client.policyCanvasWorkspace()
 
     let store = await makeBootstrappedStore(client: client)
+    store.taskBoardPolicyRuntimeRecoveryPending = true
     await store.refreshPolicyPipeline()
 
     XCTAssertEqual(store.contentUI.dashboard.policyCanvasWorkspace, expectedWorkspace)
     XCTAssertEqual(
       store.contentUI.dashboard.policyPipeline?.nodes.first?.title, "Release Policies")
+    XCTAssertFalse(store.taskBoardPolicyRuntimeRecoveryPending)
     XCTAssertGreaterThanOrEqual(client.readCallCount(.policyCanvasWorkspace), 2)
   }
 

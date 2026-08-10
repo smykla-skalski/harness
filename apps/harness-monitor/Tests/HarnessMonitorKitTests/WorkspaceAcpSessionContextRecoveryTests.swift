@@ -81,7 +81,7 @@ struct WorkspaceAcpSessionContextRecoveryTests {
           expectedAcpStartCall(),
         ]
     )
-    #expect(await daemon.recordedOperations() == ["warm-up", "stop", "register", "warm-up"])
+    #expect(await daemon.recordedOperations() == ["warm-up", "repair", "warm-up"])
     #expect(store.hostBridgeCapabilityState(for: "acp") == .ready)
     #expect(store.currentFailureFeedbackMessage == nil)
   }

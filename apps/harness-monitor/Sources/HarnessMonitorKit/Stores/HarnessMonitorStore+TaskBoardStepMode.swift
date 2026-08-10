@@ -4,11 +4,12 @@ extension HarnessMonitorStore {
   @discardableResult
   public func setTaskBoardStepMode(enabled: Bool) async -> Bool {
     guard
-      let client,
+      let access = availableTaskBoardClientAccess,
       let currentStatus = globalTaskBoardOrchestratorStatus
     else {
       return false
     }
+    let client = access.client
     guard
       !isTaskBoardBusy || taskBoardRuntimeState.stepModeMutation.desiredValue != nil
         || taskBoardRuntimeState.orchestratorSettingsMutation.isLocked
@@ -26,6 +27,10 @@ extension HarnessMonitorStore {
     guard generation == taskBoardRuntimeState.stepModeMutation.latestGeneration else {
       return true
     }
+    guard (try? requireCurrentTaskBoardClientAccess(access)) != nil else {
+      finishTaskBoardStepModeMutation(settings: nil)
+      return false
+    }
     if let settings = taskBoardRuntimeState.stepModeMutation.lastAuthoritativeSettings,
       settings.stepMode == enabled
     {
@@ -37,6 +42,7 @@ extension HarnessMonitorStore {
       let settings = try await client.updateTaskBoardOrchestratorSettings(
         request: TaskBoardOrchestratorSettingsUpdateRequest(stepMode: enabled)
       )
+      try requireCurrentTaskBoardClientAccess(access)
       taskBoardRuntimeState.stepModeMutation.lastAuthoritativeSettings = settings
       confirmTaskBoardOrchestratorSettings(settings)
       guard generation == taskBoardRuntimeState.stepModeMutation.latestGeneration else {
@@ -44,9 +50,20 @@ extension HarnessMonitorStore {
       }
       finishTaskBoardStepModeSuccess(settings: settings, generation: generation)
       return true
+    } catch is CancellationError {
+      finishTaskBoardStepModeMutation(
+        settings: taskBoardAccessIsCurrent(access)
+          ? taskBoardRuntimeState.stepModeMutation.lastAuthoritativeSettings
+          : nil
+      )
+      return false
     } catch {
       guard generation == taskBoardRuntimeState.stepModeMutation.latestGeneration else {
         return true
+      }
+      guard taskBoardAccessIsCurrent(access) else {
+        finishTaskBoardStepModeMutation(settings: nil)
+        return false
       }
       finishTaskBoardStepModeFailure(error, generation: generation)
       return false

@@ -18,7 +18,7 @@ extension HarnessMonitorStore {
       replayQueuedReconnectAfterBootstrapIfNeeded()
     }
 
-    pruneRepositoryLabelUsageCache()
+    scheduleRepositoryLabelUsageCachePrune()
     scheduleReviewFilesVacuumIfNeeded()
 
     if usesRemoteDaemon {
@@ -26,6 +26,7 @@ extension HarnessMonitorStore {
       return
     }
     ensureLocalManifestURL()
+    guard await requireLegacyManagedLaunchAgentCleanup() else { return }
     switch daemonOwnership {
     case .external:
       await bootstrapExternalDaemon()
@@ -34,10 +35,11 @@ extension HarnessMonitorStore {
     }
   }
 
-  private func pruneRepositoryLabelUsageCache() {
-    guard let modelContext else { return }
-    let cache = RepositoryLabelUsageCache(context: modelContext)
-    cache.pruneStale()
+  private func scheduleRepositoryLabelUsageCachePrune() {
+    guard let worker = cacheWriteSync.repositoryLabelUsagePersistenceWorker else { return }
+    Task.detached(priority: .background) {
+      await worker.pruneStale()
+    }
   }
 
   /// Vacuum old dependency-files rows when the per-file cache exceeds the
@@ -52,14 +54,14 @@ extension HarnessMonitorStore {
     let container = modelContext.container
     let cutoff = Date.now.addingTimeInterval(-Self.reviewFilesVacuumMaxAge)
     Task.detached(priority: .background) {
-      await Self.runReviewFilesVacuum(container: container, cutoff: cutoff)
+      Self.runReviewFilesVacuum(container: container, cutoff: cutoff)
     }
   }
 
-  private static func runReviewFilesVacuum(
+  nonisolated private static func runReviewFilesVacuum(
     container: ModelContainer,
     cutoff: Date
-  ) async {
+  ) {
     let context = ModelContext(container)
     let cache = ReviewFilesCache(context: context)
     let pruned = cache.pruneStale(cutoff: cutoff)
@@ -241,7 +243,7 @@ extension HarnessMonitorStore {
     let registrationState: DaemonLaunchAgentRegistrationState
     do {
       registrationState = try await withBootstrapTelemetryPhase(.managedLaunchAgentReady) {
-        try await ensureManagedLaunchAgentReady()
+        try await ensureManagedLaunchAgentReady(legacyCleanupAlreadyRequired: true)
       }
     } catch {
       await applyLaunchAgentOfflineState(reason: error.localizedDescription)
@@ -267,8 +269,8 @@ extension HarnessMonitorStore {
       let client = try await withBootstrapTelemetryPhase(.managedDaemonWarmUp) {
         try await awaitManagedDaemonWarmUpWithRecovery()
       }
-      await withBootstrapTelemetryPhase(.managedInitialConnect) {
-        await connect(using: client)
+      try await withBootstrapTelemetryPhase(.managedInitialConnect) {
+        try await connect(using: client)
       }
     } catch {
       let recovered = await recoverManagedBootstrapFailure(from: error)
@@ -294,47 +296,69 @@ extension HarnessMonitorStore {
       // last persisted snapshot immediately while we wait for the manifest.
       restorePersistedSessionStateWhileConnectingInBackground()
       let client = try await withBootstrapTelemetryPhase(.externalDaemonWarmUp) {
-        try await daemonController.awaitManifestWarmUp(timeout: bootstrapWarmUpTimeout)
+        try await withLegacyContainmentClient {
+          try await daemonController.awaitManifestWarmUpAfterLegacyCleanup(
+            timeout: bootstrapWarmUpTimeout
+          )
+        }
       }
-      await withBootstrapTelemetryPhase(.externalInitialConnect) {
-        await connect(using: client)
-      }
-    } catch {
-      let recovery = externalDaemonRecoveryFeedback(
-        for: error,
-        daemonCommand: daemonCommand
-      )
-      markConnectionOffline(recovery.offlineMessage)
-      toast.presentWarning(
-        recovery.message,
-        title: recovery.title,
-        details: recovery.details,
-        primaryAction: recovery.primaryAction,
-        rollupDuplicates: true
-      )
-      await restorePersistedSessionState()
-      startManifestWatcher()
-    }
-  }
-
-  func bootstrapRemoteDaemon() async {
-    restorePersistedSessionStateWhileConnectingInBackground()
-    do {
-      let client = try await withBootstrapTelemetryPhase(.remoteDaemonConnect) {
-        try await daemonController.bootstrapClient()
-      }
-      await withBootstrapTelemetryPhase(.remoteInitialConnect) {
-        await connect(using: client)
+      try await withBootstrapTelemetryPhase(.externalInitialConnect) {
+        try await connect(using: client)
       }
     } catch {
       guard !shouldAbandonConnectionAttempt, !(error is CancellationError) else {
         connectionState = .idle
         return
       }
-      handleRemoteDaemonConnectionFailure(error)
+      do {
+        try await retryLocalDaemonConnection()
+        return
+      } catch {
+        guard !shouldAbandonConnectionAttempt, !(error is CancellationError) else {
+          connectionState = .idle
+          return
+        }
+        let recovery = externalDaemonRecoveryFeedback(
+          for: error,
+          daemonCommand: daemonCommand
+        )
+        markConnectionOffline(recovery.offlineMessage)
+        toast.presentWarning(
+          recovery.message,
+          title: recovery.title,
+          details: recovery.details,
+          primaryAction: recovery.primaryAction,
+          rollupDuplicates: true
+        )
+      }
+      await restorePersistedSessionState()
+      startManifestWatcher()
+      scheduleReconnectAfterConnectionFailure()
+    }
+  }
+
+  func bootstrapRemoteDaemon() async {
+    restorePersistedSessionStateWhileConnectingInBackground()
+    do {
+      try await requireLegacyManagedLaunchAgentCleanupOrThrow()
+      let client = try await withBootstrapTelemetryPhase(.remoteDaemonConnect) {
+        try await withLegacyContainmentClient {
+          try await daemonController.bootstrapClient()
+        }
+      }
+      try await withBootstrapTelemetryPhase(.remoteInitialConnect) {
+        try await connect(using: client)
+      }
+    } catch {
+      guard !shouldAbandonConnectionAttempt, !(error is CancellationError) else {
+        connectionState = .idle
+        return
+      }
+      let underlyingError = Self.underlyingRefreshSnapshotError(error)
+      handleRemoteDaemonConnectionFailure(underlyingError)
       markConnectionOffline(error.localizedDescription)
       await restorePersistedSessionState()
-      scheduleRemoteDaemonReconnect(after: error)
+      scheduleRemoteDaemonReconnect(after: underlyingError)
     }
   }
 

@@ -2,6 +2,9 @@ import Foundation
 
 extension HarnessMonitorStore {
   public func clientForMobileRelay() async throws -> any HarnessMonitorClientProtocol {
+    guard shouldAbandonConnectionAttempt == false else {
+      throw DaemonControlError.commandFailed(LegacyManagedLaunchAgentCleanup.failureMessage)
+    }
     if let client {
       return client
     }
@@ -19,7 +22,10 @@ extension HarnessMonitorStore {
       }
     }
 
-    let client = try await makeMobileRelayBackgroundClient()
+    try await requireLegacyManagedLaunchAgentCleanupOrThrow()
+    let client = try await withLegacyContainmentClient {
+      try await makeMobileRelayBackgroundClient()
+    }
     mobileRelayBackgroundClient = client
     return client
   }
@@ -30,7 +36,9 @@ extension HarnessMonitorStore {
     }
     switch daemonOwnership {
     case .managed:
-      let registrationState = try await ensureManagedLaunchAgentReady()
+      let registrationState = try await ensureManagedLaunchAgentReady(
+        legacyCleanupAlreadyRequired: true
+      )
       guard registrationState == .enabled else {
         throw DaemonControlError.commandFailed(
           "Mobile relay needs the managed daemon launch agent to be enabled."
@@ -38,7 +46,9 @@ extension HarnessMonitorStore {
       }
       return try await awaitManagedDaemonWarmUpWithRecovery()
     case .external:
-      return try await daemonController.awaitManifestWarmUp(timeout: bootstrapWarmUpTimeout)
+      return try await daemonController.awaitManifestWarmUpAfterLegacyCleanup(
+        timeout: bootstrapWarmUpTimeout
+      )
     }
   }
 

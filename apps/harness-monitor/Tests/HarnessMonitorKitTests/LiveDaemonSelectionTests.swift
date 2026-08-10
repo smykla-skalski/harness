@@ -29,4 +29,45 @@ final class LiveDaemonSelectionTests: XCTestCase {
   func testReturnsNilWhenNoLiveCandidates() {
     XCTAssertNil(HarnessMonitorPaths.chooseLiveDaemon(base: nil, lanes: []))
   }
+
+  func testEnumeratesBaseLaneAndLegacyManagedManifests() throws {
+    let home = FileManager.default.temporaryDirectory
+      .appendingPathComponent("live-managed-manifests-\(UUID().uuidString)", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: home) }
+    let environment = HarnessMonitorEnvironment(
+      values: [HarnessMonitorAppGroup.environmentKey: HarnessMonitorAppGroup.identifier],
+      homeDirectory: home
+    )
+    let container =
+      home
+      .appendingPathComponent("Library/Group Containers", isDirectory: true)
+      .appendingPathComponent(HarnessMonitorAppGroup.identifier, isDirectory: true)
+    let base = container.appendingPathComponent("harness/daemon/managed/manifest.json")
+    let lane =
+      container
+      .appendingPathComponent("runtime-lanes/lane-a", isDirectory: true)
+      .appendingPathComponent("harness/daemon/managed/manifest.json")
+    let legacy =
+      container
+      .appendingPathComponent("runtime-lanes/lane-b", isDirectory: true)
+      .appendingPathComponent("harness/daemon/manifest.json")
+    for manifest in [base, lane, legacy] {
+      try FileManager.default.createDirectory(
+        at: manifest.deletingLastPathComponent(),
+        withIntermediateDirectories: true
+      )
+      let ownership = manifest == legacy ? "" : ",\"ownership\":\"managed\""
+      try Data("{\"pid\":42\(ownership)}".utf8).write(to: manifest)
+    }
+
+    let manifests = HarnessMonitorPaths.liveManagedDaemonManifestURLs(
+      using: environment,
+      pidIsLive: { $0 == 42 }
+    )
+
+    XCTAssertEqual(
+      Set(manifests.map(\.standardizedFileURL)),
+      Set([base, lane, legacy].map(\.standardizedFileURL))
+    )
+  }
 }

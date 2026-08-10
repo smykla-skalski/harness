@@ -61,11 +61,14 @@ extension HarnessMonitorStore {
     else {
       return false
     }
-    guard let client else {
-      rollbackOptimisticTaskBoardPosition(resolvedMutation)
+    guard let access = availableTaskBoardClientAccess else {
+      if !taskBoardRuntimeState.connection.databaseAccessSuspended {
+        rollbackOptimisticTaskBoardPosition(resolvedMutation)
+      }
       finishTaskBoardPositionMutation(resolvedMutation)
       return false
     }
+    let client = access.client
     beginDaemonAction()
     beginTaskBoardAction()
     defer {
@@ -73,9 +76,9 @@ extension HarnessMonitorStore {
       endTaskBoardAction()
     }
     do {
-      let response = try await Self.measureOperation {
-        try await Self.setTaskBoardItemPositionWithRetry(
-          using: client,
+      let response = try await Self.measureOperation { [self] in
+        try await setTaskBoardItemPositionWithRetry(
+          access: access,
           id: id,
           PositionPlacement(
             sourceStatus: sourceStatus,
@@ -86,18 +89,30 @@ extension HarnessMonitorStore {
           remainingRetries: Self.taskBoardPositionConflictRetryLimit
         )
       }.value
+      try requireCurrentTaskBoardClientAccess(access)
       recordRequestSuccess()
       completeSuccessfulTaskBoardPosition(
         response.snapshot.item,
         mutation: resolvedMutation
       )
-      await refreshTaskBoardDashboardSnapshot(using: client)
-      return true
+      return await refreshTaskBoardDashboardSnapshot(using: client, access: access)
+    } catch is CancellationError {
+      if taskBoardAccessIsCurrent(access) {
+        rollbackOptimisticTaskBoardPosition(resolvedMutation)
+      }
+      finishTaskBoardPositionMutation(resolvedMutation)
+      return false
     } catch {
+      guard taskBoardAccessIsCurrent(access) else {
+        finishTaskBoardPositionMutation(resolvedMutation)
+        return false
+      }
       rollbackOptimisticTaskBoardPosition(resolvedMutation)
       finishTaskBoardPositionMutation(resolvedMutation)
+      guard await refreshTaskBoardDashboardSnapshot(using: client, access: access) else {
+        return false
+      }
       presentFailureFeedback(error.localizedDescription)
-      await refreshTaskBoardDashboardSnapshot(using: client)
       return false
     }
   }
@@ -217,7 +232,8 @@ extension HarnessMonitorStore {
     id: String,
     actor: String = "Harness Monitor"
   ) async -> Bool {
-    guard let client else { return false }
+    guard let access = availableTaskBoardClientAccess else { return false }
+    let client = access.client
     beginDaemonAction()
     beginTaskBoardAction()
     defer {
@@ -225,21 +241,26 @@ extension HarnessMonitorStore {
       endTaskBoardAction()
     }
     do {
-      let response = try await Self.measureOperation {
-        try await Self.resetTaskBoardItemPositionWithRetry(
-          using: client,
+      let response = try await Self.measureOperation { [self] in
+        try await resetTaskBoardItemPositionWithRetry(
+          access: access,
           id: id,
           actor: actor,
           remainingRetries: Self.taskBoardPositionConflictRetryLimit
         )
       }.value
+      try requireCurrentTaskBoardClientAccess(access)
       recordRequestSuccess()
       mergeTaskBoardItem(response.snapshot.item)
-      await refreshTaskBoardDashboardSnapshot(using: client)
-      return true
+      return await refreshTaskBoardDashboardSnapshot(using: client, access: access)
+    } catch is CancellationError {
+      return false
     } catch {
+      guard taskBoardAccessIsCurrent(access) else { return false }
+      guard await refreshTaskBoardDashboardSnapshot(using: client, access: access) else {
+        return false
+      }
       presentFailureFeedback(error.localizedDescription)
-      await refreshTaskBoardDashboardSnapshot(using: client)
       return false
     }
   }
@@ -253,16 +274,19 @@ extension HarnessMonitorStore {
     let actor: String
   }
 
-  nonisolated fileprivate static func setTaskBoardItemPositionWithRetry(
-    using client: any HarnessMonitorClientProtocol,
+  fileprivate func setTaskBoardItemPositionWithRetry(
+    access: TaskBoardClientAccess,
     id: String,
     _ target: PositionPlacement,
     remainingRetries: Int
   ) async throws -> TaskBoardItemPositionMutationResponse {
+    try requireCurrentTaskBoardClientAccess(access)
+    let client = access.client
     let sourceStatus = target.sourceStatus.canonicalPersistedStatus
     let destinationStatus = target.destinationStatus.canonicalPersistedStatus
     let snapshot = try await client.taskBoardItemsSnapshot(status: nil)
-    let request = try taskBoardPositionRequest(
+    try requireCurrentTaskBoardClientAccess(access)
+    let request = try Self.taskBoardPositionRequest(
       snapshot: snapshot,
       id: id,
       target: PositionPlacement(
@@ -273,13 +297,15 @@ extension HarnessMonitorStore {
       )
     )
     do {
+      try requireCurrentTaskBoardClientAccess(access)
       return try await client.setTaskBoardItemPosition(id: id, request: request)
     } catch {
+      try requireCurrentTaskBoardClientAccess(access)
       guard remainingRetries > 0, error.isPositionConcurrentModification else {
         throw error
       }
       return try await setTaskBoardItemPositionWithRetry(
-        using: client,
+        access: access,
         id: id,
         PositionPlacement(
           sourceStatus: sourceStatus,
@@ -332,14 +358,17 @@ extension HarnessMonitorStore {
     )
   }
 
-  nonisolated static func resetTaskBoardItemPositionWithRetry(
-    using client: any HarnessMonitorClientProtocol,
+  func resetTaskBoardItemPositionWithRetry(
+    access: TaskBoardClientAccess,
     id: String,
     actor: String,
     remainingRetries: Int,
     initialItemRevision: Int64? = nil
   ) async throws -> TaskBoardItemPositionMutationResponse {
+    try requireCurrentTaskBoardClientAccess(access)
+    let client = access.client
     let snapshot = try await client.taskBoardItemPositionSnapshot(id: id)
+    try requireCurrentTaskBoardClientAccess(access)
     guard
       snapshot.item.deletedAt == nil,
       snapshot.item.laneOrigin?.isManual == true,
@@ -353,13 +382,15 @@ extension HarnessMonitorStore {
       actor: actor
     )
     do {
+      try requireCurrentTaskBoardClientAccess(access)
       return try await client.resetTaskBoardItemPosition(id: id, request: request)
     } catch {
+      try requireCurrentTaskBoardClientAccess(access)
       guard remainingRetries > 0, error.isPositionConcurrentModification else {
         throw error
       }
       return try await resetTaskBoardItemPositionWithRetry(
-        using: client,
+        access: access,
         id: id,
         actor: actor,
         remainingRetries: remainingRetries - 1,

@@ -4,7 +4,9 @@ use crate::daemon::protocol::ManagedAgentSnapshot;
 use crate::daemon::task_board_managed_agents::{
     join_worker_to_workspace, recover_same_applied_worker,
 };
-use harness_kernel::errors::{CliError, CliErrorKind};
+use harness_kernel::errors::CliError;
+#[cfg(test)]
+use harness_kernel::errors::CliErrorKind;
 
 use super::handle::CodexControllerHandle;
 use crate::daemon::db::task_board::prelude::*;
@@ -13,6 +15,7 @@ use crate::daemon::db_handle::AsyncDaemonDbHandle;
 const MISSING_RUN_RECOVERY_REASON: &str = "Managed worker was missing after daemon restart";
 
 impl CodexControllerHandle {
+    #[cfg(test)]
     pub(crate) async fn reconcile_task_board_admission_workers_after_restart(
         &self,
     ) -> Result<(), CliError> {
@@ -21,10 +24,18 @@ impl CodexControllerHandle {
                 "task board admission recovery requires the async daemon database".to_string(),
             ))
         })?;
-        db.migrate_legacy_task_board_admission_worker_owners()
-            .await?;
-        for recovery in db.task_board_admission_worker_recoveries().await? {
-            Box::pin(self.reconcile_one_admission_worker(db.as_ref(), &recovery)).await?;
+        let recoveries = db.prepare_task_board_admission_worker_recoveries().await?;
+        self.reconcile_task_board_admission_workers(db.as_ref(), &recoveries)
+            .await
+    }
+
+    pub(crate) async fn reconcile_task_board_admission_workers(
+        &self,
+        db: &AsyncDaemonDbHandle,
+        recoveries: &[TaskBoardAdmissionWorkerRecovery],
+    ) -> Result<(), CliError> {
+        for recovery in recoveries {
+            Box::pin(self.reconcile_one_admission_worker(db, recovery)).await?;
         }
         Ok(())
     }
@@ -40,8 +51,10 @@ impl CodexControllerHandle {
         if self.state.active_runs.contains(&recovery.managed_worker_id) {
             return Ok(());
         }
-        if db.codex_run(&recovery.managed_worker_id).await?.is_some() {
-            return self.reconcile_existing_admission_run(db, recovery).await;
+        if let Some(run) = db.codex_run(&recovery.managed_worker_id).await? {
+            return self
+                .reconcile_existing_admission_run(db, recovery, run)
+                .await;
         }
         Box::pin(self.reconcile_missing_admission_run(db, recovery)).await
     }
@@ -50,21 +63,22 @@ impl CodexControllerHandle {
         &self,
         db: &AsyncDaemonDbHandle,
         recovery: &TaskBoardAdmissionWorkerRecovery,
+        run: crate::daemon::protocol::CodexRunSnapshot,
     ) -> Result<(), CliError> {
-        let run = db
-            .codex_run(&recovery.managed_worker_id)
-            .await?
-            .ok_or_else(|| missing_recovered_run_error(recovery))?;
-        recover_same_applied_worker(
+        let run = recover_same_applied_worker(
             ManagedAgentSnapshot::Codex(run),
             &recovery.dispatch,
             &recovery.managed_worker_id,
         )?;
+        let ManagedAgentSnapshot::Codex(mut run) = run else {
+            unreachable!("Codex recovery returned a non-Codex runtime")
+        };
         join_worker_to_workspace(db, &recovery.dispatch, &recovery.managed_worker_id).await?;
-        let run = db
-            .codex_run(&recovery.managed_worker_id)
-            .await?
-            .ok_or_else(|| missing_recovered_run_error(recovery))?;
+        if let Some(workspace_id) = recovery.dispatch.workspace_id.as_ref() {
+            run.session_id.clone_from(workspace_id);
+            run.session_agent_id = None;
+            db.save_codex_run(&run).await?;
+        }
         if !run.status.is_active() {
             db.release_task_board_admission_for_managed_worker(&run.run_id)
                 .await?;
@@ -85,8 +99,9 @@ impl CodexControllerHandle {
             .reconcile_missing_task_board_admission_worker(recovery, MISSING_RUN_RECOVERY_REASON)
             .await?
         else {
-            if db.codex_run(&recovery.managed_worker_id).await?.is_some() {
-                self.reconcile_existing_admission_run(db, recovery).await?;
+            if let Some(run) = db.codex_run(&recovery.managed_worker_id).await? {
+                self.reconcile_existing_admission_run(db, recovery, run)
+                    .await?;
             }
             return Ok(());
         };
@@ -99,12 +114,4 @@ impl CodexControllerHandle {
         );
         Ok(())
     }
-}
-
-fn missing_recovered_run_error(recovery: &TaskBoardAdmissionWorkerRecovery) -> CliError {
-    CliErrorKind::workflow_io(format!(
-        "Codex run '{}' disappeared while binding its workspace owner",
-        recovery.managed_worker_id
-    ))
-    .into()
 }

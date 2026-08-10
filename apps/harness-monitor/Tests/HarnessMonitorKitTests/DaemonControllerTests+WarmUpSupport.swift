@@ -72,9 +72,11 @@ func writeManagedLaunchAgentBundleStampFixture(
   _ stamp: ManagedLaunchAgentBundleStampFixture,
   environment: HarnessMonitorEnvironment
 ) throws {
-  let daemonRoot = HarnessMonitorPaths.daemonRoot(using: environment)
-  try FileManager.default.createDirectory(at: daemonRoot, withIntermediateDirectories: true)
-  let url = daemonRoot.appendingPathComponent("managed-launch-agent-bundle-stamp.json")
+  let url = HarnessMonitorPaths.managedLaunchAgentBundleStampURL(using: environment)
+  try FileManager.default.createDirectory(
+    at: url.deletingLastPathComponent(),
+    withIntermediateDirectories: true
+  )
   let encoder = JSONEncoder()
   encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
   let data = try encoder.encode(stamp)

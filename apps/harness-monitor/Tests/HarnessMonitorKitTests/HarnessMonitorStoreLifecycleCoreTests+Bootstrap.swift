@@ -90,7 +90,7 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     await store.bootstrap()
 
     #expect(store.connectionState == .online)
-    #expect(await daemon.recordedOperations() == ["warm-up", "remove", "register", "warm-up"])
+    #expect(await daemon.recordedOperations() == ["warm-up", "repair", "warm-up"])
   }
 
   @Test("Bootstrap recovers when the daemon becomes healthy after warm-up gives up")
@@ -103,7 +103,7 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     #expect(store.connectionState == .online)
     #expect(
       await daemon.recordedOperations()
-        == ["warm-up", "remove", "register", "warm-up", "bootstrap"]
+        == ["warm-up", "repair", "warm-up", "bootstrap"]
     )
   }
 
@@ -184,6 +184,7 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     let store = HarnessMonitorStore(
       daemonController: RecordingDaemonController(client: client)
     )
+    store.installConnectedTestClient(client)
     let clock = ContinuousClock()
     let startedAt = clock.now
 
@@ -227,10 +228,9 @@ extension HarnessMonitorStoreLifecycleCoreTests {
   )
   func bootstrapGoesOfflineWhenSnapshotEndpointsFailPersistently() async {
     let client = RecordingHarnessClient()
-    let persistentErrors: [any Error] = (0..<20).map { _ in
-      HarnessMonitorAPIError.server(code: 503, message: "daemon snapshot warming up")
+    client.diagnosticsHandler = {
+      throw HarnessMonitorAPIError.server(code: 503, message: "daemon snapshot warming up")
     }
-    client.configureDiagnosticsErrors(persistentErrors)
     let store = HarnessMonitorStore(
       daemonController: RecordingDaemonController(client: client)
     )

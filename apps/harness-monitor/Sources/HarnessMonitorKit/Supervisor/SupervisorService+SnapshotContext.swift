@@ -82,6 +82,9 @@ extension SupervisorService {
     if autoActionSuppressionDepth > 0 {
       return true
     }
+    if policyRecoverySuppressed {
+      return true
+    }
     return quietHoursWindow?.contains(now) == true
   }
 

@@ -13,8 +13,24 @@ extension DaemonController {
     from manifest: DaemonManifest,
     emitTrace: Bool = true
   ) throws -> HarnessMonitorConnection {
+    try daemonConnection(
+      from: manifest,
+      trustedDaemonRoot: externalManifestLocator.daemonRoot,
+      emitTrace: emitTrace
+    )
+  }
+
+  func daemonConnection(
+    from manifest: DaemonManifest,
+    trustedDaemonRoot: URL,
+    emitTrace: Bool = true
+  ) throws -> HarnessMonitorConnection {
     let endpoint = try endpointURL(from: manifest.endpoint)
-    let token = try loadToken(path: manifest.tokenPath, emitTrace: emitTrace)
+    let token = try loadToken(
+      path: manifest.tokenPath,
+      trustedDaemonRoot: trustedDaemonRoot,
+      emitTrace: emitTrace
+    )
     return HarnessMonitorConnection(endpoint: endpoint, token: token)
   }
 
@@ -38,7 +54,19 @@ extension DaemonController {
   }
 
   func loadToken(path: String, emitTrace: Bool = true) throws -> String {
-    let tokenURL = try validatedTokenURL(from: path)
+    try loadToken(
+      path: path,
+      trustedDaemonRoot: externalManifestLocator.daemonRoot,
+      emitTrace: emitTrace
+    )
+  }
+
+  func loadToken(
+    path: String,
+    trustedDaemonRoot: URL,
+    emitTrace: Bool = true
+  ) throws -> String {
+    let tokenURL = try validatedTokenURL(from: path, trustedDaemonRoot: trustedDaemonRoot)
     let token = try String(contentsOf: tokenURL, encoding: .utf8)
       .trimmingCharacters(in: .whitespacesAndNewlines)
     if emitTrace {
@@ -61,8 +89,11 @@ extension DaemonController {
     return url
   }
 
-  private func recoverManifestEndpointIfNeeded(_ manifest: DaemonManifest) -> DaemonManifest {
-    guard let event = latestDaemonListeningEvent(),
+  private func recoverManifestEndpointIfNeeded(
+    _ manifest: DaemonManifest,
+    daemonRoot: URL
+  ) -> DaemonManifest {
+    guard let event = latestDaemonListeningEvent(in: daemonRoot),
       shouldRecoverManifestEndpoint(manifest, with: event)
     else {
       return manifest
@@ -103,9 +134,8 @@ extension DaemonController {
     return event.recordedAt > manifestTimestamp
   }
 
-  private func latestDaemonListeningEvent() -> DaemonListeningEvent? {
-    let eventsURL = externalManifestLocator.daemonRoot
-      .appendingPathComponent("events.jsonl")
+  private func latestDaemonListeningEvent(in daemonRoot: URL) -> DaemonListeningEvent? {
+    let eventsURL = daemonRoot.appendingPathComponent("events.jsonl")
     guard let handle = try? FileHandle(forReadingFrom: eventsURL) else {
       return nil
     }
@@ -163,6 +193,13 @@ extension DaemonController {
   }
 
   func validatedTokenURL(from path: String) throws -> URL {
+    try validatedTokenURL(from: path, trustedDaemonRoot: externalManifestLocator.daemonRoot)
+  }
+
+  func validatedTokenURL(
+    from path: String,
+    trustedDaemonRoot: URL
+  ) throws -> URL {
     guard (path as NSString).isAbsolutePath else {
       throw DaemonControlError.invalidManifest("token path must be absolute")
     }
@@ -173,7 +210,7 @@ extension DaemonController {
       throw DaemonControlError.invalidManifest("token path must not include symlinks")
     }
 
-    let daemonRoot = externalManifestLocator.daemonRoot
+    let daemonRoot = trustedDaemonRoot
       .standardizedFileURL
       .resolvingSymlinksInPath()
     guard Self.isWithinDirectory(resolvedTokenURL, root: daemonRoot) else {
@@ -233,7 +270,7 @@ extension DaemonController {
         installed: true,
         loaded: true,
         label: label,
-        path: HarnessMonitorPaths.launchAgentBundleRelativePath,
+        path: HarnessMonitorPaths.launchAgentBundleRelativePath(using: environment),
         serviceTarget: label,
         state: "enabled"
       )
@@ -242,7 +279,7 @@ extension DaemonController {
         installed: true,
         loaded: false,
         label: label,
-        path: HarnessMonitorPaths.launchAgentBundleRelativePath,
+        path: HarnessMonitorPaths.launchAgentBundleRelativePath(using: environment),
         serviceTarget: label,
         statusError: "Approval required in System Settings > General > Login Items"
       )
@@ -251,7 +288,7 @@ extension DaemonController {
         installed: false,
         loaded: false,
         label: label,
-        path: HarnessMonitorPaths.launchAgentBundleRelativePath,
+        path: HarnessMonitorPaths.launchAgentBundleRelativePath(using: environment),
         serviceTarget: label
       )
     case .notFound:
@@ -259,7 +296,7 @@ extension DaemonController {
         installed: false,
         loaded: false,
         label: label,
-        path: HarnessMonitorPaths.launchAgentBundleRelativePath,
+        path: HarnessMonitorPaths.launchAgentBundleRelativePath(using: environment),
         serviceTarget: label,
         statusError: "Bundled daemon launch agent plist was not found"
       )
@@ -268,7 +305,9 @@ extension DaemonController {
 
   func loadManifest(
     at manifestURL: URL,
-    emitTrace: Bool
+    emitTrace: Bool,
+    activate: Bool = true,
+    recoverEndpoint: Bool = true
   ) throws -> DaemonManifest {
     guard FileManager.default.fileExists(atPath: manifestURL.path) else {
       throw DaemonControlError.manifestMissing
@@ -280,8 +319,16 @@ extension DaemonController {
 
     let wire = try PolicyWireCoding.decoder.decode(DaemonManifestWire.self, from: data)
     let manifest = DaemonManifest(wire: wire)
-    externalManifestLocator.activate(manifestURL)
-    let resolvedManifest = recoverManifestEndpointIfNeeded(manifest)
+    if activate {
+      externalManifestLocator.activate(manifestURL)
+    }
+    let resolvedManifest =
+      recoverEndpoint
+      ? recoverManifestEndpointIfNeeded(
+        manifest,
+        daemonRoot: manifestURL.deletingLastPathComponent()
+      )
+      : manifest
     if emitTrace {
       let manifestFilePath = manifestURL.path
       let pid = resolvedManifest.pid
@@ -299,7 +346,8 @@ extension DaemonController {
     case .manifestMissing, .manifestUnreadable, .invalidManifest:
       return true
     case .daemonDidNotStart, .daemonOffline, .harnessBinaryNotFound, .externalDaemonOffline,
-      .externalDaemonManifestStale, .managedDaemonVersionMismatch, .commandFailed:
+      .externalDaemonManifestStale, .managedDaemonVersionMismatch,
+      .legacyManagedLaunchAgentCleanupFailed, .commandFailed:
       return false
     }
   }

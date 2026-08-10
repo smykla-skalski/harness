@@ -133,7 +133,7 @@ struct HarnessMonitorStoreTaskBoardRefreshCoalescingTests {
     #expect(store.taskBoardRuntimeState.positionMutation.pendingTokens.isEmpty)
 
     await client.releaseTaskBoardItemsRead()
-    await refresh.value
+    _ = await refresh.value
 
     #expect(store.globalTaskBoardItems.map(\.id) == ["anchor", "moving"])
     #expect(store.globalTaskBoardItems.last?.status == .planning)

@@ -22,10 +22,12 @@ struct AnyEncodable: Encodable {
 extension HarnessMonitorAPIClient {
   func get<Response: Decodable>(
     _ path: String,
-    decoder: JSONDecoder? = nil
+    decoder: JSONDecoder? = nil,
+    timeout: Duration? = nil
   ) async throws -> Response {
     var request = try makeRequest(path: path)
     request.httpMethod = "GET"
+    applyRequestTimeout(timeout, to: &request)
     return try await send(request, decoder: decoder)
   }
 
@@ -42,13 +44,20 @@ extension HarnessMonitorAPIClient {
   func post<RequestBody: Encodable, Response: Decodable>(
     _ path: String,
     body: RequestBody,
-    decoder: JSONDecoder? = nil
+    decoder: JSONDecoder? = nil,
+    timeout: Duration? = nil
   ) async throws -> Response {
     var request = try makeRequest(path: path)
     request.httpMethod = "POST"
     request.httpBody = try encoder.encode(AnyEncodable(body))
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    applyRequestTimeout(timeout, to: &request)
     return try await send(request, decoder: decoder)
+  }
+
+  private func applyRequestTimeout(_ timeout: Duration?, to request: inout URLRequest) {
+    guard let timeout else { return }
+    request.timeoutInterval = max(harnessMonitorDurationMilliseconds(timeout) / 1_000, 0.001)
   }
 
   // SessionDetail is the aggregate every session-mutation endpoint returns. These decode the

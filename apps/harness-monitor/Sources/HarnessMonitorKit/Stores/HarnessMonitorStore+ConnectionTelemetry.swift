@@ -166,6 +166,7 @@ extension HarnessMonitorStore {
   public var isTaskBoardBusy: Bool {
     taskBoardRuntimeState.actionCount > 0
       || !taskBoardRuntimeState.positionMutation.pendingTokens.isEmpty
+      || taskBoardRuntimeState.connection.databaseAccessSuspended
   }
 
   public var taskBoardSyncPhase: TaskBoardSyncPhase {

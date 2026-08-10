@@ -22,9 +22,10 @@ extension HarnessMonitorStore {
     status: TaskBoardStatus? = nil,
     itemID: String? = nil
   ) async -> TaskBoardEvaluationSummary? {
-    guard let client else {
+    guard let access = availableTaskBoardClientAccess else {
       return nil
     }
+    let client = access.client
     beginDaemonAction()
     defer { endDaemonAction() }
 
@@ -34,10 +35,14 @@ extension HarnessMonitorStore {
           request: TaskBoardEvaluateRequest(status: status, itemId: itemID, dryRun: true)
         )
       }
+      try requireCurrentTaskBoardClientAccess(access)
       recordRequestSuccess()
       presentSuccessFeedback("Previewed task board evaluate")
       return measuredSummary.value
+    } catch is CancellationError {
+      return nil
     } catch {
+      guard taskBoardAccessIsCurrent(access) else { return nil }
       presentFailureFeedback(error.localizedDescription)
       return nil
     }

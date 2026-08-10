@@ -64,7 +64,8 @@ extension DaemonController {
       return WarmUpIterationOutcome(liveClient: client, stop: true, progressed: true)
     }
     if let alternateOutcome = try await bootstrapReachableAlternateExternalManifestIfNeeded(
-      currentManifestURL: currentManifestURL
+      currentManifestURL: currentManifestURL,
+      state: &state
     ) {
       state.sawUnreachableManifest = false
       return alternateOutcome
@@ -78,7 +79,8 @@ extension DaemonController {
   }
 
   func bootstrapReachableAlternateExternalManifestIfNeeded(
-    currentManifestURL: URL
+    currentManifestURL: URL,
+    state: inout WarmUpLoopState
   ) async throws -> WarmUpIterationOutcome? {
     guard ownership == .external else {
       return nil
@@ -90,7 +92,10 @@ extension DaemonController {
       HarnessMonitorPaths.manifestURL(using: environment).standardizedFileURL,
       to: &candidateManifestURLs
     )
-    appendRuntimeLaneExternalManifestCandidateURLs(to: &candidateManifestURLs)
+    appendRuntimeLaneExternalManifestCandidateURLs(
+      to: &candidateManifestURLs,
+      state: &state
+    )
 
     for candidateManifestURL in candidateManifestURLs
     where candidateManifestURL != currentManifestURL {
@@ -126,7 +131,10 @@ extension DaemonController {
     manifestURLs.append(manifestURL)
   }
 
-  func appendRuntimeLaneExternalManifestCandidateURLs(to manifestURLs: inout [URL]) {
+  func appendRuntimeLaneExternalManifestCandidateURLs(
+    to manifestURLs: inout [URL],
+    state: inout WarmUpLoopState
+  ) {
     let appGroupIdentifier =
       HarnessMonitorPaths.normalizedAppGroupIdentifier(using: environment)
       ?? HarnessMonitorAppGroup.identifier
@@ -142,27 +150,41 @@ extension DaemonController {
     let lanesRoot = containerRoot.appendingPathComponent(
       HarnessMonitorRuntimeLane.dataHomeLanesDirectoryName,
       isDirectory: true
-    )
+    ).standardizedFileURL
+    let modificationDate = try? lanesRoot.resourceValues(
+      forKeys: [.contentModificationDateKey]
+    ).contentModificationDate
+    if let cache = state.runtimeLaneManifestCache,
+      cache.lanesRoot == lanesRoot,
+      cache.modificationDate == modificationDate
+    {
+      for manifestURL in cache.manifestURLs {
+        appendExternalManifestCandidateURL(manifestURL, to: &manifestURLs)
+      }
+      return
+    }
+
     let laneEntries =
       (try? FileManager.default.contentsOfDirectory(
         at: lanesRoot,
-        includingPropertiesForKeys: [.isDirectoryKey],
+        includingPropertiesForKeys: nil,
         options: [.skipsHiddenFiles]
       )) ?? []
 
-    for laneEntry in laneEntries {
-      let values = try? laneEntry.resourceValues(forKeys: [.isDirectoryKey])
-      guard values?.isDirectory == true else {
-        continue
-      }
-
-      let manifestURL =
-        laneEntry
+    let runtimeLaneManifestURLs = laneEntries.map { laneEntry in
+      laneEntry
         .appendingPathComponent("harness", isDirectory: true)
         .appendingPathComponent("daemon", isDirectory: true)
         .appendingPathComponent(ownership.rawValue, isDirectory: true)
         .appendingPathComponent("manifest.json")
         .standardizedFileURL
+    }
+    state.runtimeLaneManifestCache = RuntimeLaneManifestCache(
+      lanesRoot: lanesRoot,
+      modificationDate: modificationDate,
+      manifestURLs: runtimeLaneManifestURLs
+    )
+    for manifestURL in runtimeLaneManifestURLs {
       appendExternalManifestCandidateURL(manifestURL, to: &manifestURLs)
     }
   }

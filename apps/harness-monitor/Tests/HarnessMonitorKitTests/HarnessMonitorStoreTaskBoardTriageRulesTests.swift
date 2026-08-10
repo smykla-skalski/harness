@@ -158,6 +158,7 @@ struct HarnessMonitorStoreTaskBoardTriageRulesTests {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController(client: client))
     store.client = client
     store.connectionState = .online
+    store.adoptDatabaseBackedTaskBoard(client.taskBoardCapabilitiesValue)
     return store
   }
 

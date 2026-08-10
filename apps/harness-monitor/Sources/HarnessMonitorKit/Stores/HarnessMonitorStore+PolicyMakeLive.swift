@@ -9,9 +9,14 @@ extension HarnessMonitorStore {
   /// no client or any daemon/transport failure (the toast surfaces the reason).
   @discardableResult
   public func makeLivePolicyPipeline(revision: UInt64) async -> Bool {
-    guard let client else {
-      return false
+    await withSerializedTaskBoardPolicyPublication(cancellationResult: false) {
+      await makeLivePolicyPipelineSerialized(revision: revision)
     }
+  }
+
+  private func makeLivePolicyPipelineSerialized(revision: UInt64) async -> Bool {
+    guard let access = availableTaskBoardClientAccess else { return false }
+    let client = access.client
     beginDaemonAction()
     defer { endDaemonAction() }
 
@@ -22,19 +27,26 @@ extension HarnessMonitorStore {
           revision: revision
         )
       )
+      try requireCurrentTaskBoardClientAccess(access)
       recordRequestSuccess()
-      globalPolicyPipeline = response.document
       // The response workspace already reflects the Enforced canvas mode and the
       // enabled global flag; force-reload the active canvas so the audit + the
       // supervisor overrides re-derive from the now-live document in one pass.
-      await syncPolicyCanvasWorkspace(
-        response.workspace,
-        using: client,
-        forceReloadActiveCanvas: true
-      )
+      guard
+        await syncPolicyCanvasWorkspace(
+          response.workspace,
+          using: client,
+          forceReloadActiveCanvas: true,
+          taskBoardAccess: access
+        )
+      else { return false }
+      try requireCurrentTaskBoardClientAccess(access)
       presentSuccessFeedback("Policy is live")
       return true
+    } catch is CancellationError {
+      return false
     } catch {
+      guard taskBoardAccessIsCurrent(access) else { return false }
       presentFailureFeedback(error.localizedDescription)
       return false
     }
@@ -48,16 +60,19 @@ extension HarnessMonitorStore {
   public func goLiveDiffPolicyPipeline(
     canvasId: String? = nil
   ) async -> PolicyPipelineGoLiveDiff? {
-    guard let client else {
-      return nil
-    }
+    guard let access = availableTaskBoardClientAccess else { return nil }
     do {
-      return try await client.goLiveDiffPolicyPipeline(
+      let result = try await access.client.goLiveDiffPolicyPipeline(
         request: PolicyPipelineGoLiveDiffRequest(
           canvasId: canvasId ?? globalPolicyCanvasWorkspace?.activeCanvasId
         )
       )
+      try requireCurrentTaskBoardClientAccess(access)
+      return result
+    } catch is CancellationError {
+      return nil
     } catch {
+      guard taskBoardAccessIsCurrent(access) else { return nil }
       presentFailureFeedback(error.localizedDescription)
       return nil
     }

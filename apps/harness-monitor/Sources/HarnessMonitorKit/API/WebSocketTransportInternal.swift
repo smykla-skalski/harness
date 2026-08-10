@@ -93,14 +93,16 @@ extension WebSocketTransport {
   func rpc(
     method: WebSocketRPCMethod,
     params: JSONValue? = nil,
-    onSemanticBatch: ResponseBatchHandler? = nil
+    onSemanticBatch: ResponseBatchHandler? = nil,
+    timeout: Duration? = nil
   ) async throws -> JSONValue {
     if let rpcSender {
       return try await rpcViaInjectedSender(
         rpcSender,
         method: method,
         params: params,
-        onSemanticBatch: onSemanticBatch
+        onSemanticBatch: onSemanticBatch,
+        timeout: timeout ?? rpcTimeout
       )
     }
     guard !isShutDown, let webSocketTask else {
@@ -110,7 +112,8 @@ extension WebSocketTransport {
       method: method,
       params: params,
       onSemanticBatch: onSemanticBatch,
-      webSocketTask: webSocketTask
+      webSocketTask: webSocketTask,
+      timeout: timeout ?? rpcTimeout
     )
   }
 
@@ -118,9 +121,9 @@ extension WebSocketTransport {
     _ rpcSender: @escaping RPCSender,
     method: WebSocketRPCMethod,
     params: JSONValue?,
-    onSemanticBatch: ResponseBatchHandler?
+    onSemanticBatch: ResponseBatchHandler?,
+    timeout: Duration
   ) async throws -> JSONValue {
-    let timeout = rpcTimeout
     let outcome = AsyncStream<RPCSenderOutcome>.makeStream(
       bufferingPolicy: .bufferingNewest(1)
     )
@@ -147,6 +150,7 @@ extension WebSocketTransport {
     }
     var iterator = outcome.stream.makeAsyncIterator()
     guard let first = await iterator.next() else {
+      try Task.checkCancellation()
       throw WebSocketTransportError.requestTimedOut
     }
     switch first {
@@ -159,7 +163,8 @@ extension WebSocketTransport {
     method: WebSocketRPCMethod,
     params: JSONValue?,
     onSemanticBatch: ResponseBatchHandler?,
-    webSocketTask task: URLSessionWebSocketTask
+    webSocketTask task: URLSessionWebSocketTask,
+    timeout: Duration
   ) async throws -> JSONValue {
     #if HARNESS_FEATURE_OTEL
       let span = HarnessMonitorTelemetry.shared.startSpan(
@@ -203,7 +208,8 @@ extension WebSocketTransport {
     let timeoutTask = makeRPCTimeoutTask(
       id: id,
       method: method,
-      store: store
+      store: store,
+      timeout: timeout
     )
     defer { timeoutTask.cancel() }
     do {
@@ -237,9 +243,9 @@ extension WebSocketTransport {
   private func makeRPCTimeoutTask(
     id: String,
     method: WebSocketRPCMethod,
-    store: PendingRequestStore
+    store: PendingRequestStore,
+    timeout: Duration
   ) -> Task<Void, Never> {
-    let timeout = rpcTimeout
     return Task { [weak self] in
       do {
         try await Task.sleep(for: timeout)
@@ -268,22 +274,33 @@ extension WebSocketTransport {
     task: URLSessionWebSocketTask,
     store: PendingRequestStore
   ) async throws -> JSONValue {
-    try await withCheckedThrowingContinuation { continuation in
-      store.register(id: id, continuation: continuation)
-      task.send(.string(text)) { error in
-        if let error {
-          let errorDescription = error.localizedDescription
-          HarnessMonitorLogger.websocket.warning(
-            """
-            WebSocket send failed for \(method.rawValue, privacy: .public): \
-            \(errorDescription, privacy: .public)
-            """
-          )
-          Task { await self.clearResponseBatchHandler(for: id) }
-          Task { await self.clearPendingRPCMethod(for: id) }
-          store.fail(id: id, error: error)
+    try await withTaskCancellationHandler {
+      try Task.checkCancellation()
+      return try await withCheckedThrowingContinuation { continuation in
+        store.register(id: id, continuation: continuation)
+        if Task.isCancelled {
+          store.fail(id: id, error: CancellationError())
+          return
+        }
+        task.send(.string(text)) { error in
+          if let error {
+            let errorDescription = error.localizedDescription
+            HarnessMonitorLogger.websocket.warning(
+              """
+              WebSocket send failed for \(method.rawValue, privacy: .public): \
+              \(errorDescription, privacy: .public)
+              """
+            )
+            Task { await self.clearResponseBatchHandler(for: id) }
+            Task { await self.clearPendingRPCMethod(for: id) }
+            store.fail(id: id, error: error)
+          }
         }
       }
+    } onCancel: {
+      store.fail(id: id, error: CancellationError())
+      Task { await self.clearResponseBatchHandler(for: id) }
+      Task { await self.clearPendingRPCMethod(for: id) }
     }
   }
 

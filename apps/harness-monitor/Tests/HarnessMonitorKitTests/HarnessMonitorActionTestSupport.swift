@@ -31,6 +31,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var transportLatencyError: (any Error)?
   var diagnosticsDelay: Duration?
   var diagnosticsReportOverride: DaemonDiagnosticsReport?
+  var diagnosticsHandler: (@Sendable () async throws -> DaemonDiagnosticsReport)?
   var projectsDelay: Duration?
   var sessionsDelay: Duration?
   var queuedDiagnosticsErrors: [any Error] = []
@@ -52,6 +53,10 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
     revision: 0,
     instanceID: "recording-task-board"
   )
+  var taskBoardCapabilitiesHandler: (@Sendable () async throws -> TaskBoardCapabilities)?
+  var taskBoardGitRuntimeConfigHandler: (@Sendable () async throws -> TaskBoardGitRuntimeConfig)?
+  var logLevelHandler: (@Sendable () async throws -> LogLevelResponse)?
+  var shutdownHandler: (@Sendable () async -> Void)?
   let taskBoardItemsReadGate = RecordingTaskBoardItemsReadGate()
   var taskBoardItemsDelay: Duration?
   var queuedTaskBoardItemSnapshots: [[TaskBoardItem]] = []
@@ -101,11 +106,18 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var taskBoardGitHubTokensSyncError: (any Error)?
   var taskBoardGitIdentityDefaultsValue = TaskBoardGitIdentityDefaults()
   var taskBoardGitSigningVerifyValue: TaskBoardGitSigningVerifyResponse = .skipped
+  var taskBoardGitSigningVerifyHandler:
+    (@Sendable () async throws -> TaskBoardGitSigningVerifyResponse)?
   var taskBoardSecretHandoffStub = RecordingTaskBoardSecretHandoffStub()
   var policyValidationOverride: PolicyPipelineValidation?
   var policySimulationOverride: Bool?
   var policyCanvasWorkspaceError: (any Error)?
+  var policyCanvasWorkspaceHandler: (@Sendable () async throws -> PolicyCanvasWorkspace)?
   var policyCanvasWorkspaceStorage: PolicyCanvasWorkspace?
+  var policyCanvasSpawnKillSwitchRequests: [Bool] = []
+  var stopDaemonRequestCount = 0
+  var stopDaemonDelay: Duration?
+  var stopDaemonError: (any Error)?
   var policyPipelinesByCanvasID: [String: PolicyPipelineDocument] = [:]
   var policyAuditByCanvasID: [String: PolicyPipelineAuditSummary] = [:]
   var policyCanvasIDCounter = 1

@@ -191,6 +191,32 @@ struct HarnessMonitorStoreTaskBoardDashboardTests {
     )
   }
 
+  @Test("Repeated ready cannot turn a stale held check into delivery")
+  func repeatedReadyCannotClaimStaleHeldDelivery() async throws {
+    let client = RecordingHarnessClient()
+    client.configureTaskBoardItems([sampleTaskBoardItem()])
+    client.configureHeldTaskBoardDispatches(["board-1"])
+    let store = await makeBootstrappedStore(client: client)
+    client.clearRecordedCalls()
+    await client.blockNextTaskBoardItemsRead()
+    let delivery = Task { @MainActor in
+      await store.prepareAndDeliverTaskBoardDispatch(
+        request: TaskBoardDispatchRequest(itemId: "board-1", dryRun: false)
+      )
+    }
+
+    await client.waitUntilTaskBoardItemsReadIsBlocked()
+    let taskBoardItemsReadCount = client.readCallCount(.taskBoardItems(nil))
+    _ = try await store.invalidateTaskBoardDatabaseAccess(using: client)
+    await client.releaseTaskBoardItemsRead()
+
+    #expect(await delivery.value == nil)
+    #expect(
+      !client.recordedCalls().contains(.deliverTaskBoardDispatch(itemID: "board-1", dryRun: false))
+    )
+    #expect(client.readCallCount(.taskBoardItems(nil)) == taskBoardItemsReadCount)
+  }
+
   @Test("Step-mode prepare+deliver reports one outcome when the held claim fails")
   func stepModePrepareAndDeliverReportsSingleOutcomeWhenClaimFails() async {
     let client = RecordingHarnessClient()

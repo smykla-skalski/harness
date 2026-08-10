@@ -2,72 +2,32 @@ import Foundation
 
 extension HarnessMonitorStore {
   public func taskBoardTriageRulesDraft() async -> TaskBoardTriageRulesDraftResponse? {
-    guard connectionState == .online, let client else { return nil }
-    do {
-      let measuredResponse = try await Self.measureOperation {
-        try await client.taskBoardTriageRulesDraft()
-      }
-      recordRequestSuccess()
-      return measuredResponse.value
-    } catch is CancellationError {
-      return nil
-    } catch {
-      presentFailureFeedback(error.localizedDescription)
-      return nil
+    await readTaskBoard { client in
+      try await client.taskBoardTriageRulesDraft()
     }
   }
 
   public func previewTaskBoardTriageRules(
     request: TaskBoardPreviewTriageRulesRequest
   ) async -> TriageRuleSetPreviewResult? {
-    guard connectionState == .online, let client else { return nil }
-    do {
-      let measuredResponse = try await Self.measureOperation {
-        try await client.previewTaskBoardTriageRules(request: request)
-      }
-      recordRequestSuccess()
-      return measuredResponse.value
-    } catch is CancellationError {
-      return nil
-    } catch {
-      presentFailureFeedback(error.localizedDescription)
-      return nil
+    await readTaskBoard { client in
+      try await client.previewTaskBoardTriageRules(request: request)
     }
   }
 
   public func taskBoardTriageRulesRevisions(limit: UInt32? = nil) async
     -> TaskBoardTriageRulesRevisionsResponse?
   {
-    guard connectionState == .online, let client else { return nil }
-    do {
-      let measuredResponse = try await Self.measureOperation {
-        try await client.taskBoardTriageRulesRevisions(limit: limit)
-      }
-      recordRequestSuccess()
-      return measuredResponse.value
-    } catch is CancellationError {
-      return nil
-    } catch {
-      presentFailureFeedback(error.localizedDescription)
-      return nil
+    await readTaskBoard { client in
+      try await client.taskBoardTriageRulesRevisions(limit: limit)
     }
   }
 
   public func taskBoardTriageRulesAudit(limit: UInt32? = nil) async
     -> TaskBoardTriageRulesAuditResponse?
   {
-    guard connectionState == .online, let client else { return nil }
-    do {
-      let measuredResponse = try await Self.measureOperation {
-        try await client.taskBoardTriageRulesAudit(limit: limit)
-      }
-      recordRequestSuccess()
-      return measuredResponse.value
-    } catch is CancellationError {
-      return nil
-    } catch {
-      presentFailureFeedback(error.localizedDescription)
-      return nil
+    await readTaskBoard { client in
+      try await client.taskBoardTriageRulesAudit(limit: limit)
     }
   }
 
@@ -77,7 +37,8 @@ extension HarnessMonitorStore {
     expectedRevision: Int64?,
     actor: String = "Harness Monitor"
   ) async -> TriageRuleSetDraftSaveResult? {
-    guard let client else { return nil }
+    guard let access = availableTaskBoardClientAccess else { return nil }
+    let client = access.client
     beginDaemonAction()
     beginTaskBoardAction()
     defer {
@@ -93,12 +54,16 @@ extension HarnessMonitorStore {
       let result = try await Self.measureOperation {
         try await client.saveTaskBoardTriageRulesDraft(request: request)
       }.value
+      try requireCurrentTaskBoardClientAccess(access)
       recordRequestSuccess()
       if result.persisted {
         presentSuccessFeedback("Save triage rules draft")
       }
       return result
+    } catch is CancellationError {
+      return nil
     } catch {
+      guard taskBoardAccessIsCurrent(access) else { return nil }
       presentFailureFeedback(error.localizedDescription)
       return nil
     }
@@ -110,7 +75,8 @@ extension HarnessMonitorStore {
     expectedActiveRevision: Int64?,
     actor: String = "Harness Monitor"
   ) async -> TriageRuleSetActivationResult? {
-    guard let client else { return nil }
+    guard let access = availableTaskBoardClientAccess else { return nil }
+    let client = access.client
     beginDaemonAction()
     beginTaskBoardAction()
     defer {
@@ -126,15 +92,23 @@ extension HarnessMonitorStore {
       let result = try await Self.measureOperation {
         try await client.activateTaskBoardTriageRules(request: request)
       }.value
+      try requireCurrentTaskBoardClientAccess(access)
       recordRequestSuccess()
       if result.activated {
+        guard await refreshTaskBoardDashboardSnapshot(using: client, access: access) else {
+          return nil
+        }
         presentSuccessFeedback(rules == nil ? "Deactivate triage rules" : "Activate triage rules")
-        await refreshTaskBoardDashboardSnapshot(using: client)
       }
       return result
+    } catch is CancellationError {
+      return nil
     } catch {
+      guard taskBoardAccessIsCurrent(access) else { return nil }
+      guard await refreshTaskBoardDashboardSnapshot(using: client, access: access) else {
+        return nil
+      }
       presentFailureFeedback(error.localizedDescription)
-      await refreshTaskBoardDashboardSnapshot(using: client)
       return nil
     }
   }

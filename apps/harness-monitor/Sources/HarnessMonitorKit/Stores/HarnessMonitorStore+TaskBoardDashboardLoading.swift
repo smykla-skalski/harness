@@ -81,7 +81,8 @@ extension HarnessMonitorStore {
     using client: any HarnessMonitorClientProtocol,
     stepModeConfirmationRevision: UInt64,
     includeItems: Bool = true,
-    includeOrchestratorStatus: Bool = true
+    includeOrchestratorStatus: Bool = true,
+    includeProjects: Bool = true
   ) async -> TaskBoardRefreshSnapshot {
     async let items =
       if includeItems {
@@ -96,7 +97,7 @@ extension HarnessMonitorStore {
         TaskBoardSnapshotLoad<TaskBoardOrchestratorStatus?>(measured: nil)
       }
     async let projects =
-      if includeItems {
+      if includeItems && includeProjects {
         loadTaskBoardProjectsSnapshot(using: client)
       } else {
         TaskBoardSnapshotLoad<[TaskBoardProjectSummary]>(measured: nil)

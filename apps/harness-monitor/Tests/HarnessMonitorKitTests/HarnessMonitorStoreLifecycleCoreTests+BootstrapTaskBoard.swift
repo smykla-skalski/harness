@@ -46,6 +46,7 @@ extension HarnessMonitorStoreLifecycleCoreTests {
 
     #expect(store.globalTaskBoardItems.map(\.id) == ["board-cached-confirmation"])
     #expect(store.globalTaskBoardItems.first?.externalRefs.first?.externalId == "345")
+    #expect(taskBoardProjectCallCount(client) == 1)
   }
 
   @Test(
@@ -163,6 +164,8 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     }
 
     #expect(store.globalTaskBoardItems.isEmpty)
+    #expect(taskBoardProjectCallCount(client) == 1)
+    #expect(client.readCallCount(.taskBoardItems(nil)) <= 4)
   }
 
   func makeBootstrapTaskBoardItem(
@@ -196,6 +199,16 @@ extension HarnessMonitorStoreLifecycleCoreTests {
       updatedAt: "2026-05-19T10:05:00Z",
       deletedAt: nil
     )
+  }
+
+  func taskBoardProjectCallCount(_ client: RecordingHarnessClient) -> Int {
+    client.recordedCalls().count {
+      if case .taskBoardProjects(status: nil) = $0 {
+        true
+      } else {
+        false
+      }
+    }
   }
 }
 

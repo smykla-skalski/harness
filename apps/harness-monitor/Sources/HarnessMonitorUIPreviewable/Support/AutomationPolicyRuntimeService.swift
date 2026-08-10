@@ -28,7 +28,8 @@ public final class AutomationPolicyRuntimeService {
     let runtime = withObservationTracking {
       (
         store.globalPolicyCanvasWorkspace,
-        store.globalPolicyPipeline
+        store.globalPolicyPipeline,
+        store.taskBoardPolicyRuntimeRecoveryPending
       )
     } onChange: { [weak self] in
       Task { @MainActor [weak self] in
@@ -38,7 +39,8 @@ public final class AutomationPolicyRuntimeService {
     DashboardAutomationPolicyRuntimeSynchronizer.synchronizeEnforcedCanvasAutomationPolicies(
       policyCenter: policyCenter,
       workspace: runtime.0,
-      activeDocument: runtime.1
+      activeDocument: runtime.1,
+      isRecovering: runtime.2
     )
   }
 }

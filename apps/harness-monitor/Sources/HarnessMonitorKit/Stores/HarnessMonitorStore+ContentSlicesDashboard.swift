@@ -40,6 +40,7 @@ extension HarnessMonitorStore {
     public var policyPipeline: PolicyPipelineDocument?
     public var policySimulation: PolicyPipelineSimulationResult?
     public var policyAudit: PolicyPipelineAuditSummary?
+    public internal(set) var taskBoardPolicyRuntimeRecoveryPending = true
 
     public init() {}
 

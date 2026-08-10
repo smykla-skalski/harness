@@ -79,7 +79,13 @@ impl AgentTuiManagerHandle {
         }
 
         let previous = snapshot.clone();
-        let refreshed = if self.is_tui_active(&snapshot.tui_id)? {
+        let is_active = self.is_tui_active(&snapshot.tui_id)?;
+        let refreshed = if self.state.sandboxed && is_active {
+            // The background refresh owns bridge liveness. A request-coupled
+            // list must stay a local read: one unavailable bridge otherwise
+            // costs the caller five seconds for every cached terminal.
+            snapshot
+        } else if is_active {
             self.refresh_live_snapshot(snapshot)?
         } else {
             Self::orphaned_inactive_snapshot(snapshot)
@@ -99,18 +105,30 @@ impl AgentTuiManagerHandle {
         Ok(refreshed)
     }
 
-    /// Refresh a recovered Task Board TUI while preserving its durable
-    /// workspace owner even when an older bridge still reports a Session.
-    pub(crate) fn recover_for_workspace(
+    /// Restore a Task Board TUI from durable state before bridge availability
+    /// is guaranteed, preserving a workspace owner when the dispatch has one.
+    pub(crate) fn recover_after_restart(
         &self,
         tui_id: &str,
-        workspace_id: &str,
+        workspace_id: Option<&str>,
     ) -> Result<AgentTuiSnapshot, CliError> {
         let previous = self.load_snapshot(tui_id)?;
+        if self.state.sandboxed && previous.status == AgentTuiStatus::Running {
+            let mut recovered = previous;
+            if let Some(workspace_id) = workspace_id {
+                recovered.session_id = workspace_id.to_string();
+                recovered.workspace_id = Some(workspace_id.to_string());
+                recovered.agent_id.clear();
+            }
+            self.register_recovered_snapshot(&recovered)?;
+            return Ok(recovered);
+        }
         let mut refreshed = self.refresh_live_snapshot(previous.clone())?;
-        refreshed.session_id = workspace_id.to_string();
-        refreshed.workspace_id = Some(workspace_id.to_string());
-        refreshed.agent_id.clear();
+        if let Some(workspace_id) = workspace_id {
+            refreshed.session_id = workspace_id.to_string();
+            refreshed.workspace_id = Some(workspace_id.to_string());
+            refreshed.agent_id.clear();
+        }
         self.persist_refreshed_snapshot(&previous, &refreshed)?;
         Ok(refreshed)
     }
@@ -126,7 +144,9 @@ impl AgentTuiManagerHandle {
     ) -> Result<AgentTuiSnapshot, CliError> {
         request.validate().map_err(CliErrorKind::workflow_parse)?;
         if self.state.sandboxed {
-            let snapshot = self.normalize_snapshot(
+            let workspace_id = self.bridge_snapshot_workspace_id(tui_id)?;
+            let snapshot = self.normalize_bridge_snapshot_owner(
+                workspace_id.as_deref(),
                 BridgeClient::for_capability(BridgeCapability::AgentTui)?
                     .agent_tui_input(tui_id, request)?,
             );
@@ -203,7 +223,9 @@ impl AgentTuiManagerHandle {
         request: &AgentTuiResizeRequest,
     ) -> Result<AgentTuiSnapshot, CliError> {
         if self.state.sandboxed {
-            let snapshot = self.normalize_snapshot(
+            let workspace_id = self.bridge_snapshot_workspace_id(tui_id)?;
+            let snapshot = self.normalize_bridge_snapshot_owner(
+                workspace_id.as_deref(),
                 BridgeClient::for_capability(BridgeCapability::AgentTui)?
                     .agent_tui_resize(tui_id, request)?,
             );
@@ -230,7 +252,7 @@ impl AgentTuiManagerHandle {
                 .and_then(|bridge| bridge.agent_tui_stop(tui_id))
             {
                 Ok(stopped) => {
-                    let stopped = self.normalize_snapshot(stopped);
+                    let stopped = self.normalize_bridge_snapshot(&snapshot, stopped);
                     let _ = self.remove_active(tui_id)?;
                     self.save_and_broadcast("agent_tui_stopped", &stopped)?;
                     return Ok(stopped);

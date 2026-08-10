@@ -173,7 +173,18 @@ extension HarnessMonitorStoreHostBridgeTests {
       recoveredClient.recordedCalls().last
         == .reconfigureHostBridge(enable: ["codex"], disable: [], force: false)
     )
-    #expect(await daemon.recordedOperations() == ["warm-up", "stop", "register", "warm-up"])
+    let recordedOperations = await daemon.recordedOperations()
+    #expect(
+      recordedOperations
+        == [
+          "legacy-cleanup",
+          "warm-up",
+          "legacy-cleanup",
+          "repair",
+          "legacy-cleanup",
+          "warm-up",
+        ]
+    )
     #expect(store.hostBridgeCapabilityState(for: "codex") == .ready)
     #expect(store.currentSuccessFeedbackMessage == "Enabled Codex host bridge")
   }
@@ -245,7 +256,7 @@ extension HarnessMonitorStoreHostBridgeTests {
     #expect(failureMessage.contains("Restart `"))
     #expect(failureMessage.contains("harness-daemon dev"))
     #expect(failureMessage.contains("and try again"))
-    #expect(await daemon.recordedOperations() == ["warm-up"])
+    #expect(await daemon.recordedOperations() == ["legacy-cleanup", "warm-up"])
   }
 
   @Test("Host bridge enable clears stale excluded state when the bridge is no longer running")
