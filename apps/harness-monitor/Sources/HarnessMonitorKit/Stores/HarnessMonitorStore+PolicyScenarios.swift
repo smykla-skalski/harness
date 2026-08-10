@@ -53,7 +53,7 @@ extension HarnessMonitorStore {
     successMessage: String,
     perform: (any HarnessMonitorClientProtocol) async throws -> PolicyCanvasWorkspace
   ) async -> Bool {
-    await withSerializedTaskBoardPolicyPublication {
+    await withSerializedTaskBoardPolicyPublication(cancellationResult: false) {
       await mutatePolicyScenariosSerialized(
         successMessage: successMessage,
         perform: perform

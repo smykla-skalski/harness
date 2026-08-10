@@ -20,6 +20,7 @@ public actor SupervisorService {
   var running = false, tickInProgress = false
   var tickWaiters: [CheckedContinuation<Void, Never>] = []
   var autoActionSuppressionDepth = 0
+  var policyRecoverySuppressed = false
   var quietHoursWindow: SupervisorQuietHoursWindow?
 
   var ruleFailureWindow: [[String: Bool]] = []
@@ -65,6 +66,10 @@ public actor SupervisorService {
     quietHoursWindow = window
   }
 
+  public func setPolicyRecoverySuppressed(_ suppressed: Bool) {
+    policyRecoverySuppressed = suppressed
+  }
+
   public func awaitCurrentTick() async {
     guard tickInProgress else { return }
     await withCheckedContinuation { continuation in
@@ -75,8 +80,7 @@ public actor SupervisorService {
   public func quarantinedRuleIDs() -> Set<String> { quarantined }
 
   public func isAutoActionSuppressed(at date: Date) async -> Bool {
-    guard !suppressionActive(at: date) else { return true }
-    return await policyRecoverySuppressionActive()
+    suppressionActive(at: date)
   }
 
   public func liveTickSnapshot() -> DecisionLiveTickSnapshot {
@@ -300,7 +304,7 @@ public actor SupervisorService {
           actionKey: action.actionKey
         )
         let actionNow = clock.now()
-        if await shouldSuppress(action, behavior: behavior, at: actionNow) {
+        if shouldSuppress(action, behavior: behavior, at: actionNow) {
           HarnessMonitorLogger.supervisorTrace(
             "supervisor.action.suppressed key=\(action.actionKey)"
           )

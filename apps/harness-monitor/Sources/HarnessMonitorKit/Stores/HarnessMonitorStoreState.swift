@@ -17,7 +17,7 @@ struct CacheWriteSyncState {
   var taskBoardPolicyRecoveryTask: Task<Void, Never>?
   var taskBoardPolicyRecoveryGeneration: UInt64 = 0
   var taskBoardPolicyRecoveryAttempt = 0
-  var taskBoardPolicyRecoveryRetryDelayOverride: Duration?
+  var policyRecoveryRetryOverride: Duration?
   var pendingTaskBoardFallbackStatus: TaskBoardOrchestratorStatus?
   var taskBoardEvaluationBaselineRunID: String?
   var pendingCacheWriteTask: Task<Void, Never>?
@@ -43,7 +43,12 @@ struct TaskBoardRuntimeState {
 
 struct TaskBoardPolicyPublicationState {
   var isLocked = false
-  var waiters: [CheckedContinuation<Void, Never>] = []
+  var waiters: [TaskBoardPolicyPublicationWaiter] = []
+}
+
+struct TaskBoardPolicyPublicationWaiter {
+  let id: UUID
+  let continuation: CheckedContinuation<Bool, Never>
 }
 
 struct TaskBoardOrchestratorSettingsMutationState {

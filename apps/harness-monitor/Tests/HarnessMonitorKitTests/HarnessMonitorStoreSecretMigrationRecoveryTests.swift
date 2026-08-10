@@ -6,6 +6,57 @@ import Testing
 @MainActor
 @Suite("Harness Monitor secret migration recovery")
 struct HarnessMonitorStoreSecretMigrationRecoveryTests {
+  @Test("Initial database switch invalidates cached policy before adoption")
+  func initialDatabaseSwitchInvalidatesCachedPolicyBeforeAdoption() async throws {
+    let container = try HarnessMonitorModelContainer.preview()
+    let cache = SessionCacheService(modelContainer: container)
+    let previousClient = RecordingHarnessClient()
+    let staleDocument = previousClient.samplePolicyPipeline(
+      canvasId: "database-a-canvas",
+      title: "Database A policy"
+    )
+    #expect(
+      await cache.cachePolicyDocument(
+        canvasId: "database-a-canvas",
+        document: staleDocument
+      ).didPersist
+    )
+    let connectionHistory = TaskBoardConnectionHistoryStore(defaults: nil)
+    _ = connectionHistory.noteConnectedDatabaseInstance("daemon-A")
+    let replacementClient = RecordingHarnessClient()
+    replacementClient.taskBoardCapabilitiesValue = TaskBoardCapabilities(
+      storage: "database",
+      revision: 2,
+      instanceID: "daemon-B"
+    )
+    replacementClient.policyCanvasWorkspaceError = HarnessMonitorAPIError.server(
+      code: 503,
+      message: "policy unavailable"
+    )
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(client: replacementClient),
+      voiceCapture: NativeVoiceCaptureService(),
+      modelContainer: container,
+      cacheService: cache,
+      taskBoardSettingsWorker: TaskBoardSettingsWorker(
+        credentialPersistence: InMemoryTaskBoardCredentialBundle().persistence,
+        keyMaterialPersistence: InMemoryTaskBoardKeychainBundle().persistence
+      ),
+      taskBoardConnectionHistoryStore: connectionHistory
+    )
+    await store.restorePersistedPolicyPipelineState()
+    #expect(store.globalPolicyPipeline?.nodes.first?.title == "Database A policy")
+    #expect(store.taskBoardPolicyRuntimeRecoveryPending)
+
+    try await store.connect(using: replacementClient)
+
+    #expect(store.taskBoardDatabaseInstanceID == "daemon-B")
+    #expect(store.globalPolicyPipeline == nil)
+    #expect(store.taskBoardPolicyRuntimeRecoveryPending)
+    #expect(await cache.loadMostRecentPolicyDocumentSnapshot() == nil)
+    await store.prepareForTermination()
+  }
+
   @Test("Inactivity resolves pending consent before a replacement reconnects")
   func inactivityResolvesPendingConsentBeforeReconnect() async throws {
     let initialClient = RecordingHarnessClient()

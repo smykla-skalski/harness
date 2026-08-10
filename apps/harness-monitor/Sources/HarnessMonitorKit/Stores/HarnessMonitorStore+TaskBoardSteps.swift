@@ -355,7 +355,7 @@ extension HarnessMonitorStore {
       @escaping @Sendable (any HarnessMonitorClientProtocol) async throws
       -> PolicyCanvasWorkspace
   ) async -> Bool {
-    await withSerializedTaskBoardPolicyPublication {
+    await withSerializedTaskBoardPolicyPublication(cancellationResult: false) {
       await mutatePolicySpawnGateSerialized(
         actionName: actionName,
         mutation: mutation

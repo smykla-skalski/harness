@@ -118,7 +118,8 @@ extension HarnessMonitorStore {
     guard
       isCurrentTaskBoardClient(client, connectionFence: connectionFence),
       taskBoardRuntimeState.connection.databaseAccessSuspended == false,
-      isCurrentTaskBoardDatabaseAccessGeneration(databaseAccessGeneration)
+      isCurrentTaskBoardDatabaseAccessGeneration(databaseAccessGeneration),
+      !taskBoardDatabaseInstanceNeedsInvalidation(capabilities.instanceID)
     else {
       throw CancellationError()
     }
@@ -199,11 +200,20 @@ extension HarnessMonitorStore {
     return (try? requireCurrentTaskBoardClientAccess(access)) != nil
   }
 
+  func taskBoardDatabaseInstanceNeedsInvalidation(_ instanceID: String) -> Bool {
+    let knownInstanceID =
+      taskBoardDatabaseInstanceID
+      ?? taskBoardRuntimeState.connection.lastConnectedDatabaseInstanceID
+      ?? taskBoardConnectionHistoryStore.lastConnectedDatabaseInstance()
+    return knownInstanceID.map { $0 != instanceID } ?? false
+  }
+
   @discardableResult
   func invalidateTaskBoardDatabaseAccess(
     using client: any HarnessMonitorClientProtocol,
     connectionFence: ConnectionAttemptFence? = nil
   ) async throws -> UInt64 {
+    await supervisorStack?.service.setPolicyRecoverySuppressed(true)
     taskBoardRuntimeState.connection.databaseAccessGeneration &+= 1
     let databaseAccessGeneration =
       taskBoardRuntimeState.connection.databaseAccessGeneration
@@ -213,7 +223,14 @@ extension HarnessMonitorStore {
     resetTaskBoardDatabaseScopedRecoveryState()
     cancelTaskBoardDashboardSnapshotRefresh()
     cancelInitialTaskBoardConfirmationRefresh()
-    await clearCachedTaskBoardSnapshot()
+    guard
+      await clearCachedTaskBoardSnapshot(),
+      await clearCachedPolicyDocuments(sourceGeneration: databaseAccessGeneration)
+    else {
+      throw DaemonControlError.commandFailed(
+        "Unable to invalidate the previous Task Board cache"
+      )
+    }
     scheduleUISync([.contentDashboard])
     await supervisorStack?.registry.advanceOverrideSourceGeneration(
       to: databaseAccessGeneration

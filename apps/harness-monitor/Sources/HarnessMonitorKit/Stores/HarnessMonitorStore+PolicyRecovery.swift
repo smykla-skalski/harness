@@ -1,7 +1,7 @@
 import Foundation
 
 extension HarnessMonitorStore {
-  private static let taskBoardPolicyRecoveryMaximumRetrySeconds = 30
+  private static let policyRecoveryMaxRetrySeconds = 30
 
   func handleTaskBoardPolicyRecoveryFailure(access: TaskBoardClientAccess) -> Bool {
     guard taskBoardPolicyRuntimeRecoveryPending, taskBoardAccessIsCurrent(access) else {
@@ -11,7 +11,8 @@ extension HarnessMonitorStore {
     return false
   }
 
-  func completeTaskBoardPolicyRecovery() {
+  func completeTaskBoardPolicyRecovery() async {
+    await supervisorStack?.service.setPolicyRecoverySuppressed(false)
     taskBoardPolicyRuntimeRecoveryPending = false
     resetTaskBoardPolicyRecoveryRetry()
   }
@@ -30,7 +31,7 @@ extension HarnessMonitorStore {
     cacheWriteSync.taskBoardPolicyRecoveryGeneration &+= 1
     let generation = cacheWriteSync.taskBoardPolicyRecoveryGeneration
     let delay =
-      cacheWriteSync.taskBoardPolicyRecoveryRetryDelayOverride
+      cacheWriteSync.policyRecoveryRetryOverride
       ?? Self.taskBoardPolicyRecoveryRetryDelay(attempt: attempt)
     cacheWriteSync.taskBoardPolicyRecoveryTask = Task { @MainActor [weak self] in
       do {
@@ -39,17 +40,19 @@ extension HarnessMonitorStore {
         return
       }
       guard let self,
-        self.cacheWriteSync.taskBoardPolicyRecoveryGeneration == generation,
+        self.cacheWriteSync.taskBoardPolicyRecoveryGeneration == generation
+      else { return }
+      self.cacheWriteSync.taskBoardPolicyRecoveryTask = nil
+      guard
         self.taskBoardPolicyRuntimeRecoveryPending,
         self.taskBoardAccessIsCurrent(access)
       else { return }
-      self.cacheWriteSync.taskBoardPolicyRecoveryTask = nil
       await self.refreshPolicyPipeline()
     }
   }
 
   private static func taskBoardPolicyRecoveryRetryDelay(attempt: Int) -> Duration {
     let exponent = min(max(attempt, 0), 5)
-    return .seconds(min(taskBoardPolicyRecoveryMaximumRetrySeconds, 1 << exponent))
+    return .seconds(min(policyRecoveryMaxRetrySeconds, 1 << exponent))
   }
 }

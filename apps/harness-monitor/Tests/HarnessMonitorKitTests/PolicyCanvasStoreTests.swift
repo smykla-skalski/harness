@@ -52,64 +52,6 @@ final class PolicyCanvasStoreTests: XCTestCase {
       store.contentUI.dashboard.policyPipeline?.nodes.first?.title, "Release Policies")
   }
 
-  func testRecoveryRetriesAfterTransientWorkspaceFailure() async throws {
-    let client = RecordingHarnessClient()
-    let expectedWorkspace = try await client.policyCanvasWorkspace()
-    let store = await makeBootstrappedStore(client: client)
-    store.taskBoardPolicyRuntimeRecoveryPending = true
-    store.cacheWriteSync.taskBoardPolicyRecoveryRetryDelayOverride = .milliseconds(10)
-    store.globalPolicyCanvasWorkspace = expectedWorkspace
-    client.policyCanvasWorkspaceError = NSError(
-      domain: "PolicyCanvasStoreTests",
-      code: 2
-    )
-
-    let refreshed = await store.refreshPolicyPipeline()
-    XCTAssertFalse(refreshed)
-    XCTAssertTrue(store.taskBoardPolicyRuntimeRecoveryPending)
-
-    client.policyCanvasWorkspaceError = nil
-    let recovered = await HarnessMonitorKitTests.waitUntil(timeout: .seconds(2)) {
-      !store.taskBoardPolicyRuntimeRecoveryPending
-    }
-
-    XCTAssertTrue(recovered)
-    XCTAssertEqual(store.globalPolicyCanvasWorkspace, expectedWorkspace)
-  }
-
-  func testPolicyRefreshesPublishInRequestOrder() async throws {
-    let client = RecordingHarnessClient()
-    let oldDocument = client.samplePolicyPipeline(canvasId: "canvas-old", title: "Old")
-    let newDocument = client.samplePolicyPipeline(canvasId: "canvas-new", title: "New")
-    let oldWorkspace = makePolicyWorkspace(document: oldDocument, client: client)
-    let newWorkspace = makePolicyWorkspace(document: newDocument, client: client)
-    let sequence = PolicyWorkspaceReadSequence(first: oldWorkspace, second: newWorkspace)
-    let store = await makeBootstrappedStore(client: client)
-    client.policyCanvasWorkspaceHandler = { await sequence.next() }
-    client.policyPipelinesByCanvasID = [
-      "canvas-old": oldDocument,
-      "canvas-new": newDocument,
-    ]
-    client.policyAuditByCanvasID = [
-      "canvas-old": client.samplePolicyPipelineAudit(for: oldDocument),
-      "canvas-new": client.samplePolicyPipelineAudit(for: newDocument),
-    ]
-
-    let first = Task { @MainActor in await store.refreshPolicyPipeline() }
-    await sequence.waitUntilFirstReadStarts()
-    let second = Task { @MainActor in await store.refreshPolicyPipeline() }
-    let queued = await HarnessMonitorKitTests.waitUntil {
-      store.taskBoardRuntimeState.policyPublication.waiters.count == 1
-    }
-    XCTAssertTrue(queued)
-    await sequence.releaseFirstRead()
-
-    XCTAssertTrue(await first.value)
-    XCTAssertTrue(await second.value)
-    XCTAssertEqual(store.globalPolicyCanvasWorkspace?.activeCanvasId, "canvas-new")
-    XCTAssertEqual(store.globalPolicyPipeline?.nodes.first?.title, "New")
-  }
-
   func testCanvasMutationsReloadActiveSnapshotAndKeepGuards() async throws {
     let client = RecordingHarnessClient()
     let store = await makeBootstrappedStore(client: client)
@@ -376,61 +318,6 @@ final class PolicyCanvasStoreTests: XCTestCase {
     )
   }
 
-}
-
-private actor PolicyWorkspaceReadSequence {
-  private let first: PolicyCanvasWorkspace
-  private let second: PolicyCanvasWorkspace
-  private var count = 0
-  private var firstStarted = false
-  private var startWaiters: [CheckedContinuation<Void, Never>] = []
-  private var firstRelease: CheckedContinuation<Void, Never>?
-
-  init(first: PolicyCanvasWorkspace, second: PolicyCanvasWorkspace) {
-    self.first = first
-    self.second = second
-  }
-
-  func next() async -> PolicyCanvasWorkspace {
-    count += 1
-    guard count == 1 else { return second }
-    firstStarted = true
-    let waiters = startWaiters
-    startWaiters.removeAll()
-    waiters.forEach { $0.resume() }
-    await withCheckedContinuation { firstRelease = $0 }
-    return first
-  }
-
-  func waitUntilFirstReadStarts() async {
-    guard !firstStarted else { return }
-    await withCheckedContinuation { startWaiters.append($0) }
-  }
-
-  func releaseFirstRead() {
-    firstRelease?.resume()
-    firstRelease = nil
-  }
-}
-
-private func makePolicyWorkspace(
-  document: PolicyPipelineDocument,
-  client: RecordingHarnessClient
-) -> PolicyCanvasWorkspace {
-  let canvasId = document.policyTraceIds.first?.replacingOccurrences(of: "trace-", with: "")
-    ?? "canvas"
-  return PolicyCanvasWorkspace(
-    schemaVersion: 1,
-    activeCanvasId: canvasId,
-    canvases: [
-      client.policyCanvasSummary(
-        canvasId: canvasId,
-        title: document.nodes.first?.title ?? "Policy",
-        document: document,
-        latestSimulation: nil
-      )
-    ]
-  )
 }
 
 private struct PolicyCanvasWorkspaceState: Equatable {

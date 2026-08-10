@@ -5,6 +5,7 @@ extension HarnessMonitorStore {
     globalStreamTask?.cancel()
     globalStreamTask = nil
     cancelTaskBoardDashboardSnapshotRefresh()
+    resetTaskBoardPolicyRecoveryRetry()
     cacheWriteSync.taskBoardRefreshDeferralDepth = 0
   }
 

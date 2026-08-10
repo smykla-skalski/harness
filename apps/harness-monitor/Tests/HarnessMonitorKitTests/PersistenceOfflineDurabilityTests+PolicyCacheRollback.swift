@@ -122,6 +122,45 @@ extension PersistenceOfflineDurabilityTests {
     #expect(cached.revision == secondDocument.revision)
     #expect(cached.nodes.first?.title == "Second")
   }
+
+  @Test("Policy cache invalidation drains older writes")
+  func policyCacheInvalidationDrainsOlderWrites() async throws {
+    let client = RecordingHarnessClient()
+    let gate = PolicyCacheFirstSaveGate()
+    let cache = SessionCacheService(
+      modelContainer: previewContainer,
+      beforeSave: { await gate.waitIfFirstSave() }
+    )
+    let staleDocument = client.samplePolicyPipeline(
+      canvasId: "canvas-stale",
+      title: "Stale",
+      revision: 1
+    )
+    let staleWrite = Task {
+      await cache.cachePolicyDocument(
+        canvasId: "canvas-stale",
+        document: staleDocument,
+        sourceGeneration: 0
+      )
+    }
+    await gate.waitUntilFirstSaveIsBlocked()
+    let invalidation = Task {
+      await cache.clearPolicyDocuments(sourceGeneration: 1)
+    }
+
+    await gate.releaseFirstSave()
+    #expect(await staleWrite.value.didPersist)
+    #expect(await invalidation.value.didPersist)
+    let cached = await cache.loadMostRecentPolicyDocumentSnapshot()
+    #expect(cached == nil)
+
+    let rejected = await cache.cachePolicyDocument(
+      canvasId: "canvas-stale",
+      document: staleDocument,
+      sourceGeneration: 0
+    )
+    #expect(!rejected.didPersist)
+  }
 }
 
 private actor PolicyCacheFirstSaveGate {

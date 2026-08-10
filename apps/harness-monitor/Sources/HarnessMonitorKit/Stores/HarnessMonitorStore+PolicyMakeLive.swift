@@ -9,7 +9,7 @@ extension HarnessMonitorStore {
   /// no client or any daemon/transport failure (the toast surfaces the reason).
   @discardableResult
   public func makeLivePolicyPipeline(revision: UInt64) async -> Bool {
-    await withSerializedTaskBoardPolicyPublication {
+    await withSerializedTaskBoardPolicyPublication(cancellationResult: false) {
       await makeLivePolicyPipelineSerialized(revision: revision)
     }
   }

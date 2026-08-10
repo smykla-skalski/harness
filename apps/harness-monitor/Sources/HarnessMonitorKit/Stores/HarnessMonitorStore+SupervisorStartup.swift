@@ -48,6 +48,7 @@ extension HarnessMonitorStore {
       clock: supervisorClock,
       interval: SupervisorSettingsDefaults.defaultIntervalSeconds
     )
+    await service.setPolicyRecoverySuppressed(taskBoardPolicyRuntimeRecoveryPending)
     await service.setQuietHoursWindow(SupervisorSettingsDefaults.quietHoursWindow())
 
     let lifecycle = SupervisorLifecycle(

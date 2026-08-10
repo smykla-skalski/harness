@@ -22,14 +22,24 @@ extension PersistenceOfflineDurabilityTests {
       provider: .gitHub,
       externalId: "database-a"
     )
+    let stalePolicy = client.samplePolicyPipeline(
+      canvasId: "database-a-canvas",
+      title: "Database A policy"
+    )
     await store.cacheTaskBoardSnapshot(items: [staleItem], orchestratorStatus: nil)
+    _ = await store.cacheService?.cachePolicyDocument(
+      canvasId: "database-a-canvas",
+      document: stalePolicy
+    )
     store.scheduleTaskBoardSnapshotCacheWrite(items: [staleItem], orchestratorStatus: nil)
 
     _ = try await store.invalidateTaskBoardDatabaseAccess(using: client)
     try await Task.sleep(for: .milliseconds(350))
 
     let cached = await store.loadCachedTaskBoardSnapshot()
+    let cachedPolicy = await store.loadCachedPolicyDocument()
     #expect(cached == nil)
+    #expect(cachedPolicy == nil)
   }
 
   @Test("Offline bootstrap restores cached task-board items after relaunch")

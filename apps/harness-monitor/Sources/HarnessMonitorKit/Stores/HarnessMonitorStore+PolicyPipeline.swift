@@ -43,7 +43,7 @@ extension HarnessMonitorStore {
 
   @discardableResult
   public func refreshPolicyPipeline() async -> Bool {
-    await withSerializedTaskBoardPolicyPublication {
+    await withSerializedTaskBoardPolicyPublication(cancellationResult: false) {
       await refreshPolicyPipelineSerialized()
     }
   }
@@ -65,7 +65,7 @@ extension HarnessMonitorStore {
     guard synchronized, taskBoardAccessIsCurrent(access) else {
       return handleTaskBoardPolicyRecoveryFailure(access: access)
     }
-    completeTaskBoardPolicyRecovery()
+    await completeTaskBoardPolicyRecovery()
     return true
   }
 
@@ -107,7 +107,7 @@ extension HarnessMonitorStore {
   public func savePolicyPipelineDraft(
     document: PolicyPipelineDocument
   ) async -> PolicyPipelineDocument? {
-    await withSerializedTaskBoardPolicyPublication {
+    await withSerializedTaskBoardPolicyPublication(cancellationResult: nil) {
       await savePolicyPipelineDraftSerialized(document: document)
     }
   }
@@ -199,7 +199,7 @@ extension HarnessMonitorStore {
   public func simulatePolicyPipeline(
     document: PolicyPipelineDocument? = nil
   ) async -> Bool {
-    await withSerializedTaskBoardPolicyPublication {
+    await withSerializedTaskBoardPolicyPublication(cancellationResult: false) {
       await simulatePolicyPipelineSerialized(document: document)
     }
   }

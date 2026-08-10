@@ -68,7 +68,7 @@ extension HarnessMonitorStore {
     refreshOnFailure: Bool = false,
     mutation: (any HarnessMonitorClientProtocol) async throws -> PolicyCanvasWorkspace
   ) async -> Bool {
-    await withSerializedTaskBoardPolicyPublication {
+    await withSerializedTaskBoardPolicyPublication(cancellationResult: false) {
       await mutatePolicyCanvasSerialized(
         successMessage: successMessage,
         forceReloadActiveCanvas: forceReloadActiveCanvas,

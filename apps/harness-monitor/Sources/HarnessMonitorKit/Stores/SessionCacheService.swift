@@ -20,6 +20,8 @@ public actor SessionCacheService {
   var policyDocumentWriteIDsByCanvasID: [String: UUID] = [:]
   var activePolicyDocumentTransactions: Set<String> = []
   var policyDocumentTransactionWaiters: [String: [CheckedContinuation<Void, Never>]] = [:]
+  var policyDocumentQuiescenceWaiters: [CheckedContinuation<Void, Never>] = []
+  var minimumPolicyDocumentSourceGeneration: UInt64 = 0
 
   public init(
     modelContainer: ModelContainer,

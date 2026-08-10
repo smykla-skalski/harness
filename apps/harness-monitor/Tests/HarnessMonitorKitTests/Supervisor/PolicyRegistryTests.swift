@@ -1,3 +1,4 @@
+import HarnessMonitorPolicyModels
 import SwiftData
 import XCTest
 
@@ -175,6 +176,7 @@ final class PolicyRegistryTests: XCTestCase {
     )
     await store.startSupervisor()
     store.taskBoardPolicyRuntimeRecoveryPending = true
+    await store.supervisorStack?.service.setPolicyRecoverySuppressed(true)
 
     let isSuppressed = await store.isSupervisorAutoActionSuppressedForTesting(at: .now)
 
@@ -222,7 +224,12 @@ final class PolicyRegistryTests: XCTestCase {
   @MainActor
   func test_enforcedPolicyPublishesAfterQueuedSettingsRefresh() async throws {
     let client = RecordingHarnessClient()
-    let store = await makeBootstrappedStore(client: client)
+    let container = try HarnessMonitorModelContainer.preview()
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(client: client),
+      modelContainer: container
+    )
+    await store.bootstrap()
     await store.startSupervisor()
     let stack = try XCTUnwrap(store.supervisorStack)
     let repository = try XCTUnwrap(store.supervisorPolicyConfigRepository)
@@ -241,7 +248,8 @@ final class PolicyRegistryTests: XCTestCase {
     let settingsRefresh = Task { @MainActor in
       await store.refreshSupervisorPolicyOverrides()
     }
-    XCTAssertTrue(await HarnessMonitorKitTests.waitUntil { await gate.hasEntered })
+    let didEnterGate = await HarnessMonitorKitTests.waitUntil { await gate.hasEntered }
+    XCTAssertTrue(didEnterGate)
 
     let document = PolicyPipelineDocument(
       revision: 2,
@@ -272,17 +280,18 @@ final class PolicyRegistryTests: XCTestCase {
       ]
     )
     let policyRefresh = Task { @MainActor in await store.refreshPolicyPipeline() }
-    XCTAssertTrue(
-      await HarnessMonitorKitTests.waitUntil {
-        store.taskBoardRuntimeState.policyPublication.waiters.count == 1
-      }
-    )
+    let didQueuePolicyRefresh = await HarnessMonitorKitTests.waitUntil {
+      store.taskBoardRuntimeState.policyPublication.waiters.count == 1
+    }
+    XCTAssertTrue(didQueuePolicyRefresh)
 
     await gate.release()
     await settingsRefresh.value
-    XCTAssertTrue(await policyRefresh.value)
+    let didRefreshPolicy = await policyRefresh.value
+    XCTAssertTrue(didRefreshPolicy)
 
-    XCTAssertTrue(await stack.registry.isEnabled(ruleID: "unassigned-task"))
+    let isEnabled = await stack.registry.isEnabled(ruleID: "unassigned-task")
+    XCTAssertTrue(isEnabled)
     await store.stopSupervisor()
   }
 

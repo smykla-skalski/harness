@@ -147,7 +147,8 @@ extension HarnessMonitorStore {
     guard let cacheService else { return true }
     let write = await cacheService.cachePolicyDocument(
       canvasId: canvasId,
-      document: document
+      document: document,
+      sourceGeneration: access.databaseAccessGeneration
     )
     guard taskBoardAccessIsCurrent(access) else {
       if let token = write.token {
@@ -279,7 +280,7 @@ extension HarnessMonitorStore {
     document: PolicyPipelineDocument,
     title: String? = nil
   ) async -> Bool {
-    await withSerializedTaskBoardPolicyPublication {
+    await withSerializedTaskBoardPolicyPublication(cancellationResult: false) {
       await importPolicyCanvasSerialized(document: document, title: title)
     }
   }

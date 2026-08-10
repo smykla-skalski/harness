@@ -147,35 +147,20 @@ extension HarnessMonitorStore {
     validatedCapabilities: TaskBoardCapabilities? = nil,
     accessFence providedFence: TaskBoardAccessFence? = nil
   ) async -> PreparedTaskBoardDatabaseSynchronization? {
-    guard let fence = resolvedTaskBoardAccessFence(providedFence) else {
+    guard let initialFence = resolvedTaskBoardAccessFence(providedFence) else {
       return nil
     }
-    let capabilities: TaskBoardCapabilities
-    if let validatedCapabilities {
-      capabilities = validatedCapabilities
-    } else {
-      do {
-        capabilities = try await databaseBackedTaskBoardCapabilities(using: client)
-        guard
-          isCurrentTaskBoardAccessFence(fence)
-        else {
-          return nil
-        }
-      } catch {
-        guard
-          isCurrentTaskBoardAccessFence(fence)
-        else {
-          return nil
-        }
-        let description = RefreshSnapshotErrorFormatting.describeUnderlying(error)
-        HarnessMonitorLogger.store.error(
-          "task-board database capability check failed: \(description, privacy: .public)"
-        )
-        return nil
-      }
-    }
     guard
-      isCurrentTaskBoardAccessFence(fence)
+      let capabilities = await resolveTaskBoardCapabilities(
+        using: client,
+        validatedCapabilities: validatedCapabilities,
+        accessFence: initialFence
+      ),
+      let fence = await prepareTaskBoardDatabaseAccess(
+        for: capabilities,
+        using: client,
+        accessFence: initialFence
+      )
     else {
       return nil
     }
@@ -209,6 +194,58 @@ extension HarnessMonitorStore {
       resolvedMigrationSource: resolvedMigrationSource,
       accessFence: fence
     )
+  }
+
+  private func resolveTaskBoardCapabilities(
+    using client: any HarnessMonitorClientProtocol,
+    validatedCapabilities: TaskBoardCapabilities?,
+    accessFence: TaskBoardAccessFence
+  ) async -> TaskBoardCapabilities? {
+    if let validatedCapabilities {
+      return isCurrentTaskBoardAccessFence(accessFence) ? validatedCapabilities : nil
+    }
+    do {
+      let capabilities = try await databaseBackedTaskBoardCapabilities(using: client)
+      return isCurrentTaskBoardAccessFence(accessFence) ? capabilities : nil
+    } catch {
+      guard isCurrentTaskBoardAccessFence(accessFence) else { return nil }
+      let description = RefreshSnapshotErrorFormatting.describeUnderlying(error)
+      HarnessMonitorLogger.store.error(
+        "task-board database capability check failed: \(description, privacy: .public)"
+      )
+      return nil
+    }
+  }
+
+  private func prepareTaskBoardDatabaseAccess(
+    for capabilities: TaskBoardCapabilities,
+    using client: any HarnessMonitorClientProtocol,
+    accessFence: TaskBoardAccessFence
+  ) async -> TaskBoardAccessFence? {
+    guard
+      accessFence.databaseAccessGeneration == nil,
+      taskBoardDatabaseInstanceNeedsInvalidation(capabilities.instanceID)
+    else {
+      return isCurrentTaskBoardAccessFence(accessFence) ? accessFence : nil
+    }
+    do {
+      let generation = try await invalidateTaskBoardDatabaseAccess(
+        using: client,
+        connectionFence: accessFence.connection
+      )
+      return TaskBoardAccessFence(
+        containment: accessFence.containment,
+        connection: accessFence.connection,
+        databaseAccessGeneration: generation
+      )
+    } catch {
+      guard isCurrentTaskBoardAccessFence(accessFence) else { return nil }
+      let description = RefreshSnapshotErrorFormatting.describeUnderlying(error)
+      HarnessMonitorLogger.store.error(
+        "task-board database invalidation failed: \(description, privacy: .public)"
+      )
+      return nil
+    }
   }
 
   func finishTaskBoardDatabaseSynchronization(

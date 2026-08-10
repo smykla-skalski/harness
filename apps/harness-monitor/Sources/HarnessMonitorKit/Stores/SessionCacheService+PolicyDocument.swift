@@ -23,10 +23,17 @@ extension SessionCacheService {
 
   func cachePolicyDocument(
     canvasId: String,
-    document: PolicyPipelineDocument
+    document: PolicyPipelineDocument,
+    sourceGeneration: UInt64 = 0
   ) async -> PolicyDocumentCacheWriteResult {
+    guard sourceGeneration >= minimumPolicyDocumentSourceGeneration else {
+      return PolicyDocumentCacheWriteResult(didPersist: false, token: nil)
+    }
     await acquirePolicyDocumentTransaction(canvasId: canvasId)
     defer { releasePolicyDocumentTransaction(canvasId: canvasId) }
+    guard sourceGeneration >= minimumPolicyDocumentSourceGeneration else {
+      return PolicyDocumentCacheWriteResult(didPersist: false, token: nil)
+    }
     let context = makeContext()
     let writeID = UUID()
     let previousWriteID = policyDocumentWriteIDsByCanvasID[canvasId]
@@ -156,11 +163,57 @@ extension SessionCacheService {
     guard var waiters = policyDocumentTransactionWaiters[canvasId], !waiters.isEmpty else {
       activePolicyDocumentTransactions.remove(canvasId)
       policyDocumentTransactionWaiters[canvasId] = nil
+      resumePolicyDocumentQuiescenceWaitersIfNeeded()
       return
     }
     let next = waiters.removeFirst()
     policyDocumentTransactionWaiters[canvasId] = waiters.isEmpty ? nil : waiters
     next.resume()
+  }
+
+  func clearPolicyDocuments(sourceGeneration: UInt64) async -> WriteResult {
+    minimumPolicyDocumentSourceGeneration = max(
+      minimumPolicyDocumentSourceGeneration,
+      sourceGeneration
+    )
+    await waitForPolicyDocumentTransactions()
+    let context = makeContext()
+    do {
+      let rows = try context.fetch(FetchDescriptor<CachedPolicyDocument>())
+      guard !rows.isEmpty else {
+        policyDocumentWriteIDsByCanvasID.removeAll()
+        return WriteResult(didPersist: true, metadataUpdate: .none)
+      }
+      for row in rows {
+        context.delete(row)
+      }
+    } catch {
+      HarnessMonitorLogger.store.warning(
+        "clear policy document cache failed: \(error.localizedDescription, privacy: .public)"
+      )
+      return WriteResult(didPersist: false, metadataUpdate: .none)
+    }
+    let didPersist = await persist(context, operation: "clear policy document cache")
+    if didPersist {
+      policyDocumentWriteIDsByCanvasID.removeAll()
+    }
+    return WriteResult(didPersist: didPersist, metadataUpdate: .none)
+  }
+
+  private func waitForPolicyDocumentTransactions() async {
+    guard !activePolicyDocumentTransactions.isEmpty else { return }
+    await withCheckedContinuation { continuation in
+      policyDocumentQuiescenceWaiters.append(continuation)
+    }
+  }
+
+  private func resumePolicyDocumentQuiescenceWaitersIfNeeded() {
+    guard activePolicyDocumentTransactions.isEmpty else { return }
+    let waiters = policyDocumentQuiescenceWaiters
+    policyDocumentQuiescenceWaiters.removeAll()
+    for waiter in waiters {
+      waiter.resume()
+    }
   }
 
   func loadMostRecentPolicyDocument() -> PolicyPipelineDocument? {
