@@ -37,16 +37,22 @@ extension HarnessMonitorStore {
   }
 
   public func taskBoardGitSettingsSnapshot() async throws -> TaskBoardGitSettingsSnapshot {
-    let client = try await taskBoardSettingsClient()
-    guard let instanceID = taskBoardDatabaseInstanceID else {
-      throw HarnessMonitorAPIError.server(code: 503, message: "Task Board database unavailable")
-    }
+    let access = try await taskBoardSettingsClient()
+    let client = access.client
+    let instanceID = access.instanceID
 
-    _ = await migrateRuntimeSecretsUsingWorkerIfNeeded(
+    let handoffCompleted = await migrateRuntimeSecretsUsingWorkerIfNeeded(
       client: client,
       instanceID: instanceID,
       ownership: daemonOwnership
     )
+    guard handoffCompleted else {
+      throw HarnessMonitorAPIError.server(
+        code: 503,
+        message: "Task Board runtime secret handoff did not complete"
+      )
+    }
+    try requireCurrentTaskBoardClientAccess(access)
 
     async let orchestratorSettings = client.taskBoardOrchestratorSettings()
     async let runtimeConfig = client.taskBoardGitRuntimeConfig()
@@ -57,6 +63,7 @@ extension HarnessMonitorStore {
     )
 
     let baseRuntime = try await runtimeConfig
+    try requireCurrentTaskBoardClientAccess(access)
     recordTaskBoardRepositoryOverrides(instanceID: instanceID, runtime: baseRuntime)
     let hydratedRuntime = await taskBoardSettingsWorker.hydrateKeyMaterial(
       into: baseRuntime,
@@ -64,13 +71,16 @@ extension HarnessMonitorStore {
       ownership: daemonOwnership
     )
     let credentials = try await storedCredentials
+    let resolvedOrchestratorSettings = try await orchestratorSettings
+    let resolvedIdentityDefaults = await identityDefaults
+    try requireCurrentTaskBoardClientAccess(access)
 
-    return await TaskBoardGitSettingsSnapshot(
-      orchestratorSettings: try orchestratorSettings,
+    return TaskBoardGitSettingsSnapshot(
+      orchestratorSettings: resolvedOrchestratorSettings,
       runtimeConfig: hydratedRuntime,
       githubCredentials: credentials.githubCredentials,
       openRouterCredentials: credentials.openRouterCredentials,
-      identityDefaults: identityDefaults
+      identityDefaults: resolvedIdentityDefaults
     )
   }
 
@@ -103,14 +113,14 @@ extension HarnessMonitorStore {
     }
 
     do {
-      let client = try await taskBoardSettingsClient()
-      guard let instanceID = taskBoardDatabaseInstanceID else {
-        throw HarnessMonitorAPIError.server(code: 503, message: "Task Board database unavailable")
-      }
+      let access = try await taskBoardSettingsClient()
+      let client = access.client
+      let instanceID = access.instanceID
       let materializedSnapshot = try await materializeTaskBoardGitSettings(
         snapshot,
         preservingPathsFrom: pathBaseline
       )
+      try requireCurrentTaskBoardClientAccess(access)
 
       let orchestratorSettings: TaskBoardOrchestratorSettings
       do {
@@ -118,6 +128,7 @@ extension HarnessMonitorStore {
           request: Self.orchestratorSettingsUpdateRequest(
             from: materializedSnapshot.orchestratorSettings)
         )
+        try requireCurrentTaskBoardClientAccess(access)
       } catch {
         presentFailureFeedback(error.localizedDescription)
         return false
@@ -127,6 +138,7 @@ extension HarnessMonitorStore {
         _ = try await client.updateTaskBoardGitRuntimeConfig(
           request: materializedSnapshot.runtimeConfig
         )
+        try requireCurrentTaskBoardClientAccess(access)
       } catch {
         presentFailureFeedback(
           """
@@ -139,7 +151,7 @@ extension HarnessMonitorStore {
 
       guard
         await applyTaskBoardTokenSync(
-          client: client,
+          access: access,
           snapshot: materializedSnapshot,
           instanceID: instanceID
         )
@@ -154,6 +166,7 @@ extension HarnessMonitorStore {
           instanceID: instanceID,
           ownership: daemonOwnership
         )
+        try requireCurrentTaskBoardClientAccess(access)
       } catch {
         presentFailureFeedback(
           """
@@ -231,18 +244,19 @@ extension HarnessMonitorStore {
   }
 
   private func applyTaskBoardTokenSync(
-    client: any HarnessMonitorClientProtocol,
+    access: TaskBoardClientAccess,
     snapshot: TaskBoardGitSettingsSnapshot,
     instanceID: String
   ) async -> Bool {
     do {
-      async let githubTokens = client.syncTaskBoardGitHubTokens(
+      async let githubTokens = access.client.syncTaskBoardGitHubTokens(
         request: snapshot.githubCredentials.syncRequest
       )
-      async let openRouterToken = client.syncTaskBoardOpenRouterToken(
+      async let openRouterToken = access.client.syncTaskBoardOpenRouterToken(
         request: snapshot.openRouterCredentials.syncRequest
       )
       _ = try await (githubTokens, openRouterToken)
+      try requireCurrentTaskBoardClientAccess(access)
       lastTaskBoardCredentialSync = TaskBoardCredentialSyncState(
         instanceID: instanceID,
         credentials: TaskBoardStoredCredentialSnapshot(
@@ -263,7 +277,7 @@ extension HarnessMonitorStore {
     }
   }
 
-  private func taskBoardSettingsClient() async throws -> any HarnessMonitorClientProtocol {
+  private func taskBoardSettingsClient() async throws -> TaskBoardClientAccess {
     if let client {
       return try await requireCurrentDatabaseBackedTaskBoardClient(client)
     }

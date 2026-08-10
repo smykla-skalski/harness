@@ -110,10 +110,10 @@ struct HarnessMonitorStoreTaskBoardSettingsTests {
   @Test("Token sync failure runs after runtime success but leaves keychain unchanged")
   func tokenSyncFailureRunsAfterRuntimeSuccessButLeavesKeychainUnchanged() async {
     let client = RecordingHarnessClient()
+    let store = await makeBootstrappedStore(client: client)
     client.configureTaskBoardGitHubTokensSyncError(
       HarnessMonitorAPIError.server(code: 503, message: "Token sync unavailable.")
     )
-    let store = await makeBootstrappedStore(client: client)
     let baselineCallCount = client.recordedCalls().count
     let snapshot = makeSettingsSnapshot()
 

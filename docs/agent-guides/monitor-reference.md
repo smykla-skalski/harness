@@ -82,14 +82,14 @@ HARNESS_MONITOR_EXTERNAL_DAEMON=1
 
 The `HarnessMonitor.xcscheme` LaunchAction is intentionally lane-agnostic. The user's Xcode IDE Run must connect to whichever daemon they have running, regardless of any agent lane.
 
-App-side resolution in `HarnessMonitorPaths.resolveBaseRoot` checks:
+For lane-agnostic or external launches, app-side resolution in `HarnessMonitorPaths.resolveBaseRoot` checks:
 
 1. `HARNESS_DAEMON_DATA_HOME` / `XDG_DATA_HOME` explicit override.
 2. `HARNESS_MONITOR_RUNTIME_LANE` explicit lane.
 3. Cross-lane discovery through app-group `runtime-lanes/*/harness/daemon/manifest.json`, filtered by `kill(pid, 0)` liveness, newest `started_at` wins.
 4. Generic group-container fallback.
 
-Agents do not use IDE Run. They drive `xcodebuild` and pass `HARNESS_MONITOR_RUNTIME_LANE` on the command line, so step 2 wins and isolation holds.
+Managed app builds embed one signed launch-agent helper, plist identity, daemon data home, runtime lane, and bridge port. The managed app keeps that embedded identity coherent at runtime; changing `HARNESS_MONITOR_RUNTIME_LANE` after the app was built cannot retarget `SMAppService` because the alternate lane's signed plist and helper are not present. Agents do not use IDE Run: they pass `HARNESS_MONITOR_RUNTIME_LANE` to the generation and build workflows, which stamp the requested lane into the app before launch. External mode remains runtime-configurable and follows the resolution order above.
 
 Do not reintroduce LaunchAction env patching in `Scripts/post-generate.sh` without explicit opt-in through `HARNESS_MONITOR_PATCH_RUN_SCHEME=1`. Patching the user's scheme on every `monitor:generate` overwrites their lane env and can route IDE Run at an empty agent container.
 

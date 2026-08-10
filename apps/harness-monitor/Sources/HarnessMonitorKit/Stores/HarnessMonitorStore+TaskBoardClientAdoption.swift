@@ -1,5 +1,11 @@
 import Foundation
 
+struct TaskBoardClientAccess: Sendable {
+  let client: any HarnessMonitorClientProtocol
+  let instanceID: String
+  let connectionFence: ConnectionAttemptFence
+}
+
 extension HarnessMonitorStore {
   func requireDatabaseBackedTaskBoard(
     using client: any HarnessMonitorClientProtocol
@@ -43,16 +49,27 @@ extension HarnessMonitorStore {
 
   func requireCurrentDatabaseBackedTaskBoardClient(
     _ client: any HarnessMonitorClientProtocol
-  ) async throws -> any HarnessMonitorClientProtocol {
+  ) async throws -> TaskBoardClientAccess {
+    let connectionFence = try currentConnectionAttemptFence()
+    guard self.client === client else {
+      throw CancellationError()
+    }
     let capabilities = try await withCurrentLegacyContainment {
       try await databaseBackedTaskBoardCapabilities(using: client)
     }
+    guard isCurrentTaskBoardClient(client, connectionFence: connectionFence) else {
+      throw CancellationError()
+    }
     adoptDatabaseBackedTaskBoard(capabilities)
-    return client
+    return TaskBoardClientAccess(
+      client: client,
+      instanceID: capabilities.instanceID,
+      connectionFence: connectionFence
+    )
   }
 
   func bootstrapSynchronizedTaskBoardClient() async throws
-    -> any HarnessMonitorClientProtocol
+    -> TaskBoardClientAccess
   {
     try await requireLegacyManagedLaunchAgentCleanupOrThrow()
     let connectionFence = try beginConnectionAttempt()
@@ -80,6 +97,28 @@ extension HarnessMonitorStore {
       )
     }
     self.client = candidate
-    return candidate
+    return TaskBoardClientAccess(
+      client: candidate,
+      instanceID: capabilities.instanceID,
+      connectionFence: connectionFence
+    )
+  }
+
+  func requireCurrentTaskBoardClientAccess(_ access: TaskBoardClientAccess) throws {
+    guard
+      isCurrentTaskBoardClient(
+        access.client,
+        connectionFence: access.connectionFence
+      )
+    else {
+      throw CancellationError()
+    }
+  }
+
+  private func isCurrentTaskBoardClient(
+    _ client: any HarnessMonitorClientProtocol,
+    connectionFence: ConnectionAttemptFence
+  ) -> Bool {
+    isCurrentConnectionAttemptFence(connectionFence) && self.client === client
   }
 }

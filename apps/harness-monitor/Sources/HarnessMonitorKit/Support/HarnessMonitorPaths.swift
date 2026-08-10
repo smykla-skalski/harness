@@ -145,6 +145,14 @@ public enum HarnessMonitorPaths {
   public static func launchAgentLabel(
     using environment: HarnessMonitorEnvironment = .current
   ) -> String {
+    if DaemonOwnership(environment: environment) == .managed,
+      let embeddedLabel = embeddedBundleValue(
+        for: "HarnessMonitorManagedLaunchAgentLabel",
+        using: environment
+      )
+    {
+      return embeddedLabel
+    }
     if let explicitLabel = normalizedNonEmpty(
       environment.values[HarnessMonitorRuntimeLane.launchAgentLabelEnvKey]
     ) {

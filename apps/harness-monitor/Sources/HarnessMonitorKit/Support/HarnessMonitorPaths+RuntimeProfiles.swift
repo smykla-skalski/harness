@@ -46,6 +46,16 @@ extension HarnessMonitorPaths {
   static func configuredDataHomeRoot(
     using environment: HarnessMonitorEnvironment
   ) -> URL? {
+    if DaemonOwnership(environment: environment) == .managed,
+      let bundledDataHome = embeddedBundleValue(
+        for: "HarnessMonitorManagedDaemonDataHome",
+        using: environment
+      ),
+      (bundledDataHome as NSString).isAbsolutePath
+    {
+      return URL(fileURLWithPath: bundledDataHome, isDirectory: true)
+    }
+
     let daemonDataHomeValue = environment.values[
       HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey]?
       .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -78,6 +88,17 @@ extension HarnessMonitorPaths {
   static func resolvedRuntimeLane(
     using environment: HarnessMonitorEnvironment
   ) -> String? {
+    if DaemonOwnership(environment: environment) == .managed,
+      let embeddedLane = sanitizeRuntimeLane(
+        embeddedBundleValue(
+          for: "HarnessMonitorManagedDaemonRuntimeLane",
+          using: environment
+        )
+      )
+    {
+      return embeddedLane
+    }
+
     if let explicitLane = explicitlyConfiguredRuntimeLane(using: environment) {
       return explicitLane
     }
@@ -177,6 +198,15 @@ extension HarnessMonitorPaths {
   static func resolvedCodexBridgePortString(
     using environment: HarnessMonitorEnvironment
   ) -> String? {
+    if DaemonOwnership(environment: environment) == .managed,
+      let embeddedPort = embeddedBundleValue(
+        for: "HarnessMonitorManagedDaemonCodexWSPort",
+        using: environment
+      )
+    {
+      return embeddedPort
+    }
+
     if let explicitPort = normalizedNonEmpty(
       environment.values[HarnessMonitorRuntimeLane.codexWSPortEnvironmentKey]
     ) {

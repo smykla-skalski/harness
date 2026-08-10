@@ -111,6 +111,7 @@ extension HarnessMonitorStore {
       HarnessMonitorLogger.store.error(
         "task-board credential sync failed: \(description, privacy: .public)"
       )
+      return false
     }
     return isCurrentTaskBoardConnectionFence(fence, connectionFence: connectionFence)
   }
@@ -208,12 +209,13 @@ extension HarnessMonitorStore {
     else {
       return false
     }
-    _ = await taskBoardSettingsWorker.completeRuntimeSecretHandoffIfNeeded(
+    let completed = await taskBoardSettingsWorker.completeRuntimeSecretHandoffIfNeeded(
       client: client,
       instanceID: instanceID,
       ownership: ownership
     )
-    return isCurrentTaskBoardConnectionFence(fence, connectionFence: connectionFence)
+    return completed
+      && isCurrentTaskBoardConnectionFence(fence, connectionFence: connectionFence)
   }
 
   func isCurrentTaskBoardConnectionFence(

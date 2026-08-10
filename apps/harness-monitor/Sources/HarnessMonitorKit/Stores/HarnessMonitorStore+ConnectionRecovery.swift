@@ -31,7 +31,7 @@ extension HarnessMonitorStore {
 
   func beginConnectionAttempt() throws -> ConnectionAttemptFence {
     let containment = try currentLegacyContainmentFence()
-    connection.connectionAttemptGeneration &+= 1
+    invalidateConnectionAttempts()
     return ConnectionAttemptFence(
       generation: connection.connectionAttemptGeneration,
       containment: containment
@@ -40,6 +40,14 @@ extension HarnessMonitorStore {
 
   func invalidateConnectionAttempts() {
     connection.connectionAttemptGeneration &+= 1
+    cancelSecretMigrationConsentIfPending()
+  }
+
+  func currentConnectionAttemptFence() throws -> ConnectionAttemptFence {
+    ConnectionAttemptFence(
+      generation: connection.connectionAttemptGeneration,
+      containment: try currentLegacyContainmentFence()
+    )
   }
 
   func isCurrentConnectionAttemptFence(_ fence: ConnectionAttemptFence) -> Bool {

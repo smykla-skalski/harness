@@ -12,12 +12,14 @@ public struct TaskBoardHostSnapshot: Equatable, Sendable {
 
 extension HarnessMonitorStore {
   public func taskBoardHostSnapshot() async throws -> TaskBoardHostSnapshot {
-    let client = try await taskBoardHostClient()
+    let access = try await taskBoardHostClient()
 
-    async let local = client.taskBoardHostLocal()
-    async let registered = client.taskBoardHostList()
+    async let local = access.client.taskBoardHostLocal()
+    async let registered = access.client.taskBoardHostList()
 
-    return try await TaskBoardHostSnapshot(local: local, registered: registered)
+    let snapshot = try await TaskBoardHostSnapshot(local: local, registered: registered)
+    try requireCurrentTaskBoardClientAccess(access)
+    return snapshot
   }
 
   @discardableResult
@@ -26,10 +28,11 @@ extension HarnessMonitorStore {
     defer { endDaemonAction() }
 
     do {
-      let client = try await taskBoardHostClient()
-      _ = try await client.setTaskBoardHostProjectTypes(
+      let access = try await taskBoardHostClient()
+      _ = try await access.client.setTaskBoardHostProjectTypes(
         request: TaskBoardHostSetProjectTypesRequest(projectTypes: projectTypes)
       )
+      try requireCurrentTaskBoardClientAccess(access)
       recordRequestSuccess()
       presentSuccessFeedback("Updated host project types")
       return true
@@ -39,7 +42,7 @@ extension HarnessMonitorStore {
     }
   }
 
-  private func taskBoardHostClient() async throws -> any HarnessMonitorClientProtocol {
+  private func taskBoardHostClient() async throws -> TaskBoardClientAccess {
     if let client {
       return try await requireCurrentDatabaseBackedTaskBoardClient(client)
     }

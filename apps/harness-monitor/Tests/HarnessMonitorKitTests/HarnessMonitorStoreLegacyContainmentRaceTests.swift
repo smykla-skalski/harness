@@ -161,6 +161,44 @@ struct HarnessMonitorStoreLegacyContainmentRaceTests {
     await store.prepareForTermination()
   }
 
+  @Test("Task Board existing client cannot overwrite a replacement")
+  func existingTaskBoardClientCannotOverwriteReplacement() async throws {
+    let capabilitiesGate = LegacyContainmentCapabilitiesGate()
+    let staleClient = RecordingHarnessClient()
+    staleClient.taskBoardCapabilitiesHandler = { await capabilitiesGate.wait() }
+    let replacementClient = RecordingHarnessClient()
+    replacementClient.taskBoardCapabilitiesValue = TaskBoardCapabilities(
+      storage: "database",
+      revision: 7,
+      instanceID: "replacement-task-board"
+    )
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(client: replacementClient)
+    )
+    store.client = staleClient
+    store.taskBoardDatabaseInstanceID = "stale-task-board"
+    let staleSnapshot = Task { @MainActor in
+      do {
+        _ = try await store.taskBoardHostSnapshot()
+        return true
+      } catch {
+        return false
+      }
+    }
+
+    for _ in 0..<30 where await capabilitiesGate.hasEntered == false {
+      try await Task.sleep(for: .milliseconds(20))
+    }
+    #expect(await capabilitiesGate.hasEntered)
+    await store.connect(using: replacementClient)
+    await capabilitiesGate.release()
+
+    #expect(await staleSnapshot.value == false)
+    #expect(store.taskBoardDatabaseInstanceID == "replacement-task-board")
+    #expect((store.apiClient as? RecordingHarnessClient) === replacementClient)
+    await store.prepareForTermination()
+  }
+
   private func waitForGate(_ gate: LegacyContainmentVoidGate) async {
     for _ in 0..<30 where await gate.hasEntered == false {
       try? await Task.sleep(for: .milliseconds(20))
