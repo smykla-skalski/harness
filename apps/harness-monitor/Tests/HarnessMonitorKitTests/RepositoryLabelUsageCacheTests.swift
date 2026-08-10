@@ -5,20 +5,23 @@ import Testing
 
 @MainActor
 struct RepositoryLabelUsageCacheTests {
-  private func makeCache() throws -> (RepositoryLabelUsageCache, ModelContext) {
+  private func makePersistence() throws -> (
+    ModelContainer,
+    RepositoryLabelUsagePersistenceWorker
+  ) {
     let container = try HarnessMonitorModelContainer.preview()
-    let context = ModelContext(container)
-    return (RepositoryLabelUsageCache(context: context), context)
+    return (container, RepositoryLabelUsagePersistenceWorker(modelContainer: container))
   }
 
   @Test("recordUse upserts and increments per (repository, label)")
-  func recordUseUpsertsAndIncrements() throws {
-    let (cache, context) = try makeCache()
+  func recordUseUpsertsAndIncrements() async throws {
+    let (container, persistence) = try makePersistence()
 
-    cache.recordUse(repository: "owner/repo", label: "renovate")
-    cache.recordUse(repository: "owner/repo", label: "renovate")
-    cache.recordUse(repository: "owner/repo", label: "dependencies")
+    await persistence.recordUses(repositories: ["owner/repo"], label: "renovate")
+    await persistence.recordUses(repositories: ["owner/repo"], label: "renovate")
+    await persistence.recordUses(repositories: ["owner/repo"], label: "dependencies")
 
+    let context = ModelContext(container)
     let rows = try context.fetch(FetchDescriptor<CachedReviewLabelUsage>())
     #expect(rows.count == 2)
     let renovate = try #require(rows.first { $0.label == "renovate" })
@@ -28,40 +31,47 @@ struct RepositoryLabelUsageCacheTests {
   }
 
   @Test("recordUse ignores empty repository or label")
-  func recordUseIgnoresEmptyKeys() throws {
-    let (cache, context) = try makeCache()
+  func recordUseIgnoresEmptyKeys() async throws {
+    let (container, persistence) = try makePersistence()
 
-    cache.recordUse(repository: "", label: "renovate")
-    cache.recordUse(repository: "owner/repo", label: "")
+    await persistence.recordUses(repositories: [""], label: "renovate")
+    await persistence.recordUses(repositories: ["owner/repo"], label: "")
 
+    let context = ModelContext(container)
     let rows = try context.fetch(FetchDescriptor<CachedReviewLabelUsage>())
     #expect(rows.isEmpty)
   }
 
   @Test("topUsed returns labels ordered by count desc, capped at limit")
-  func topUsedRanksByCountDescending() throws {
-    let (cache, _) = try makeCache()
+  func topUsedRanksByCountDescending() async throws {
+    let (container, persistence) = try makePersistence()
     let repository = "owner/repo"
 
-    for _ in 0..<3 { cache.recordUse(repository: repository, label: "renovate") }
-    for _ in 0..<5 { cache.recordUse(repository: repository, label: "dependencies") }
-    cache.recordUse(repository: repository, label: "chore")
+    for _ in 0..<3 {
+      await persistence.recordUses(repositories: [repository], label: "renovate")
+    }
+    for _ in 0..<5 {
+      await persistence.recordUses(repositories: [repository], label: "dependencies")
+    }
+    await persistence.recordUses(repositories: [repository], label: "chore")
 
+    let cache = RepositoryLabelUsageCache(context: ModelContext(container))
     let top = cache.topUsed(repositories: [repository], limit: 2)
     #expect(top == ["dependencies", "renovate"])
   }
 
   @Test("topUsed sums counts across repositories")
-  func topUsedAggregatesAcrossRepositories() throws {
-    let (cache, _) = try makeCache()
+  func topUsedAggregatesAcrossRepositories() async throws {
+    let (container, persistence) = try makePersistence()
 
-    cache.recordUse(repository: "owner/alpha", label: "renovate")
-    cache.recordUse(repository: "owner/alpha", label: "renovate")
-    cache.recordUse(repository: "owner/beta", label: "renovate")
-    cache.recordUse(repository: "owner/alpha", label: "release")
-    cache.recordUse(repository: "owner/beta", label: "release")
-    cache.recordUse(repository: "owner/beta", label: "release")
+    await persistence.recordUses(repositories: ["owner/alpha"], label: "renovate")
+    await persistence.recordUses(repositories: ["owner/alpha"], label: "renovate")
+    await persistence.recordUses(repositories: ["owner/beta"], label: "renovate")
+    await persistence.recordUses(repositories: ["owner/alpha"], label: "release")
+    await persistence.recordUses(repositories: ["owner/beta"], label: "release")
+    await persistence.recordUses(repositories: ["owner/beta"], label: "release")
 
+    let cache = RepositoryLabelUsageCache(context: ModelContext(container))
     let top = cache.topUsed(repositories: ["owner/alpha", "owner/beta"], limit: 5)
     // Both end at 3 total; ties break on most-recent lastUsedAt, then case-insensitive name.
     #expect(top.count == 2)
@@ -69,9 +79,10 @@ struct RepositoryLabelUsageCacheTests {
   }
 
   @Test("topUsed returns empty for unknown repositories or non-positive limit")
-  func topUsedHandlesEdgeCases() throws {
-    let (cache, _) = try makeCache()
-    cache.recordUse(repository: "owner/repo", label: "renovate")
+  func topUsedHandlesEdgeCases() async throws {
+    let (container, persistence) = try makePersistence()
+    await persistence.recordUses(repositories: ["owner/repo"], label: "renovate")
+    let cache = RepositoryLabelUsageCache(context: ModelContext(container))
 
     #expect(cache.topUsed(repositories: [], limit: 5).isEmpty)
     #expect(cache.topUsed(repositories: ["owner/repo"], limit: 0).isEmpty)
@@ -79,13 +90,14 @@ struct RepositoryLabelUsageCacheTests {
   }
 
   @Test("deleteAll drops every row")
-  func deleteAllDropsRows() throws {
-    let (cache, context) = try makeCache()
-    cache.recordUse(repository: "owner/repo", label: "renovate")
-    cache.recordUse(repository: "owner/repo", label: "release")
+  func deleteAllDropsRows() async throws {
+    let (container, persistence) = try makePersistence()
+    await persistence.recordUses(repositories: ["owner/repo"], label: "renovate")
+    await persistence.recordUses(repositories: ["owner/repo"], label: "release")
 
-    cache.deleteAll()
+    await persistence.deleteAll()
 
+    let context = ModelContext(container)
     let rows = try context.fetch(FetchDescriptor<CachedReviewLabelUsage>())
     #expect(rows.isEmpty)
   }

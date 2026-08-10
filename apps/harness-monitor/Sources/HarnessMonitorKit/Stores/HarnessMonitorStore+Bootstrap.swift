@@ -36,18 +36,10 @@ extension HarnessMonitorStore {
   }
 
   private func scheduleRepositoryLabelUsageCachePrune() {
-    guard let modelContext else { return }
-    let container = modelContext.container
+    guard let worker = cacheWriteSync.repositoryLabelUsagePersistenceWorker else { return }
     Task.detached(priority: .background) {
-      Self.runRepositoryLabelUsageCachePrune(container: container)
+      await worker.pruneStale()
     }
-  }
-
-  nonisolated private static func runRepositoryLabelUsageCachePrune(
-    container: ModelContainer
-  ) {
-    let context = ModelContext(container)
-    RepositoryLabelUsageCacheMaintenance(context: context).pruneStale()
   }
 
   /// Vacuum old dependency-files rows when the per-file cache exceeds the

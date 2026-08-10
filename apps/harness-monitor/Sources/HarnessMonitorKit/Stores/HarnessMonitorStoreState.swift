@@ -1,6 +1,7 @@
 import Foundation
 
 struct CacheWriteSyncState {
+  var repositoryLabelUsagePersistenceWorker: RepositoryLabelUsagePersistenceWorker?
   var taskBoardRefreshTask: Task<Void, Never>?
   var taskBoardRefreshGeneration: UInt64 = 0
   var taskBoardRefreshRequestGeneration: UInt64 = 0

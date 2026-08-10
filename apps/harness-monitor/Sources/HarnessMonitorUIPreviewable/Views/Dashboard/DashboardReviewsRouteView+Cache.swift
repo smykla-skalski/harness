@@ -46,11 +46,12 @@ extension DashboardReviewsRouteView {
   }
 
   func recordLabelUsage(_ label: String, items: [ReviewItem]) {
-    guard let cache = repositoryLabelUsageCache else { return }
-    for item in items {
-      cache.recordUse(repository: item.repository, label: label)
+    let repositories = uniqueRepositories(for: items)
+    guard !repositories.isEmpty else { return }
+    Task {
+      await store.recordRepositoryLabelUsage(label, repositories: repositories)
+      refreshLabelMenuData()
     }
-    refreshLabelMenuData()
   }
 
   var reviewsCachePreferencesHash: String {

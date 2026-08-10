@@ -390,6 +390,7 @@ public final class HarnessMonitorStore {
       reviewFilePatchStore
     )
     self.modelContext = modelContainer?.mainContext
+    cacheWriteSync.repositoryLabelUsagePersistenceWorker = Self.makeLabelUsageWorker(modelContainer)
     self.userDataService = Self.makeUserDataService(modelContainer: modelContainer)
     self.supervisorPolicyConfigRepository = modelContainer.map(
       SupervisorPolicyConfigRepository.init)
