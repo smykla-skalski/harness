@@ -1,7 +1,5 @@
 import Foundation
 
-private let taskBoardCredentialSyncRepeatInterval: TimeInterval = 30 * 60
-
 struct TaskBoardCredentialSyncState: Sendable {
   let instanceID: String
   let credentials: TaskBoardStoredCredentialSnapshot
@@ -44,7 +42,7 @@ extension HarnessMonitorStore {
       throw HarnessMonitorAPIError.server(code: 503, message: "Task Board database unavailable")
     }
 
-    await migrateRuntimeSecretsUsingWorkerIfNeeded(
+    _ = await migrateRuntimeSecretsUsingWorkerIfNeeded(
       client: client,
       instanceID: instanceID,
       ownership: daemonOwnership
@@ -73,18 +71,6 @@ extension HarnessMonitorStore {
       githubCredentials: credentials.githubCredentials,
       openRouterCredentials: credentials.openRouterCredentials,
       identityDefaults: identityDefaults
-    )
-  }
-
-  private func migrateRuntimeSecretsUsingWorkerIfNeeded(
-    client: any HarnessMonitorClientProtocol,
-    instanceID: String,
-    ownership: DaemonOwnership
-  ) async {
-    _ = await taskBoardSettingsWorker.completeRuntimeSecretHandoffIfNeeded(
-      client: client,
-      instanceID: instanceID,
-      ownership: ownership
     )
   }
 
@@ -279,123 +265,24 @@ extension HarnessMonitorStore {
 
   private func taskBoardSettingsClient() async throws -> any HarnessMonitorClientProtocol {
     if let client {
-      _ = try await requireDatabaseBackedTaskBoard(using: client)
-      return client
+      return try await requireCurrentDatabaseBackedTaskBoardClient(client)
     }
-    try await requireLegacyManagedLaunchAgentCleanupOrThrow()
     await bootstrapIfNeeded()
     if let client {
-      _ = try await requireDatabaseBackedTaskBoard(using: client)
-      return client
+      return try await requireCurrentDatabaseBackedTaskBoardClient(client)
     }
 
-    let bootstrappedClient = try await daemonController.bootstrapClient()
-    _ = try await requireDatabaseBackedTaskBoard(using: bootstrappedClient)
+    try await requireLegacyManagedLaunchAgentCleanupOrThrow()
+    let (bootstrappedClient, capabilities) = try await withLegacyContainmentClient(
+      { try await daemonController.bootstrapClient() },
+      perform: { candidate in
+        let capabilities = try await databaseBackedTaskBoardCapabilities(using: candidate)
+        return (candidate, capabilities)
+      }
+    )
+    adoptDatabaseBackedTaskBoard(capabilities)
     self.client = bootstrappedClient
     return bootstrappedClient
-  }
-
-  func syncStoredTaskBoardCredentials(using client: any HarnessMonitorClientProtocol) async {
-    guard let instanceID = taskBoardDatabaseInstanceID else {
-      HarnessMonitorLogger.store.error("task-board credential sync skipped: database unavailable")
-      return
-    }
-    await migrateRuntimeSecretsUsingWorkerIfNeeded(
-      client: client,
-      instanceID: instanceID,
-      ownership: daemonOwnership
-    )
-    do {
-      async let storedCredentials = taskBoardSettingsWorker.loadStoredCredentials(
-        instanceID: instanceID,
-        ownership: daemonOwnership
-      )
-      async let runtimeConfig = client.taskBoardGitRuntimeConfig()
-      let baseRuntime = try await runtimeConfig
-      recordTaskBoardRepositoryOverrides(instanceID: instanceID, runtime: baseRuntime)
-      let hydratedRuntime = await taskBoardSettingsWorker.hydrateKeyMaterial(
-        into: baseRuntime,
-        instanceID: instanceID,
-        ownership: daemonOwnership
-      )
-      _ = try await client.syncTaskBoardGitRuntimeKeyMaterial(
-        request: TaskBoardGitRuntimeKeyMaterialSyncRequest(runtime: hydratedRuntime)
-      )
-      let credentials = try await storedCredentials
-      let now = Date()
-      if shouldSkipStoredTaskBoardCredentialSync(
-        credentials,
-        instanceID: instanceID,
-        now: now
-      ) {
-        return
-      }
-      _ = try await client.syncTaskBoardGitHubTokens(
-        request: credentials.githubCredentials.syncRequest
-      )
-      _ = try await client.syncTaskBoardOpenRouterToken(
-        request: credentials.openRouterCredentials.syncRequest
-      )
-      lastTaskBoardCredentialSync = TaskBoardCredentialSyncState(
-        instanceID: instanceID,
-        credentials: credentials,
-        syncedAt: now
-      )
-    } catch {
-      let description = RefreshSnapshotErrorFormatting.describeUnderlying(error)
-      HarnessMonitorLogger.store.error(
-        "task-board credential sync failed: \(description, privacy: .public)"
-      )
-    }
-  }
-
-  func syncStoredTaskBoardCredentialsForNewDaemon(
-    using client: any HarnessMonitorClientProtocol
-  ) async -> Bool {
-    do {
-      _ = try await requireDatabaseBackedTaskBoard(using: client)
-    } catch {
-      let description = RefreshSnapshotErrorFormatting.describeUnderlying(error)
-      HarnessMonitorLogger.store.error(
-        "task-board database capability check failed: \(description, privacy: .public)"
-      )
-      taskBoardDatabaseInstanceID = nil
-      return false
-    }
-    if let previousID = taskBoardPreviousDatabaseInstanceID,
-      let currentID = taskBoardDatabaseInstanceID,
-      previousID != currentID
-    {
-      await migrateStoredTaskBoardSecrets(from: previousID, to: currentID)
-    }
-    lastTaskBoardCredentialSync = nil
-    await syncStoredTaskBoardCredentials(using: client)
-    return true
-  }
-
-  private func shouldSkipStoredTaskBoardCredentialSync(
-    _ credentials: TaskBoardStoredCredentialSnapshot,
-    instanceID: String,
-    now: Date
-  ) -> Bool {
-    if credentials.isEmpty,
-      lastTaskBoardCredentialSync?.instanceID == instanceID,
-      lastTaskBoardCredentialSync?.credentials.isEmpty != false
-    {
-      lastTaskBoardCredentialSync = TaskBoardCredentialSyncState(
-        instanceID: instanceID,
-        credentials: credentials,
-        syncedAt: now
-      )
-      return true
-    }
-    guard let lastTaskBoardCredentialSync else {
-      return false
-    }
-    return lastTaskBoardCredentialSync.instanceID == instanceID
-      && lastTaskBoardCredentialSync.credentials == credentials
-      && now.timeIntervalSince(lastTaskBoardCredentialSync.syncedAt)
-        < taskBoardCredentialSyncRepeatInterval
   }
 
 }

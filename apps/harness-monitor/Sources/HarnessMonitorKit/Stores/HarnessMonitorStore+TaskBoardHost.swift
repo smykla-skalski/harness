@@ -41,17 +41,21 @@ extension HarnessMonitorStore {
 
   private func taskBoardHostClient() async throws -> any HarnessMonitorClientProtocol {
     if let client {
-      _ = try await requireDatabaseBackedTaskBoard(using: client)
-      return client
+      return try await requireCurrentDatabaseBackedTaskBoardClient(client)
     }
-    try await requireLegacyManagedLaunchAgentCleanupOrThrow()
     await bootstrapIfNeeded()
     if let client {
-      _ = try await requireDatabaseBackedTaskBoard(using: client)
-      return client
+      return try await requireCurrentDatabaseBackedTaskBoardClient(client)
     }
-    let bootstrappedClient = try await daemonController.bootstrapClient()
-    _ = try await requireDatabaseBackedTaskBoard(using: bootstrappedClient)
+    try await requireLegacyManagedLaunchAgentCleanupOrThrow()
+    let (bootstrappedClient, capabilities) = try await withLegacyContainmentClient(
+      { try await daemonController.bootstrapClient() },
+      perform: { candidate in
+        let capabilities = try await databaseBackedTaskBoardCapabilities(using: candidate)
+        return (candidate, capabilities)
+      }
+    )
+    adoptDatabaseBackedTaskBoard(capabilities)
     self.client = bootstrappedClient
     return bootstrappedClient
   }

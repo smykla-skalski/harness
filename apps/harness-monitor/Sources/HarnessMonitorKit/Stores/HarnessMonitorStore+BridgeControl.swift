@@ -255,7 +255,10 @@ extension HarnessMonitorStore {
     }
 
     try await requireLegacyManagedLaunchAgentCleanupOrThrow()
-    _ = try await daemonController.repairLaunchAgentRegistration()
+    _ = try await withControllerLegacyCleanupFailureTracking {
+      try await daemonController.repairLaunchAgentRegistration()
+    }
+    try await requireLegacyManagedLaunchAgentCleanupOrThrow()
     let registrationState = await daemonController.launchAgentRegistrationState()
     switch registrationState {
     case .enabled:
@@ -268,9 +271,11 @@ extension HarnessMonitorStore {
       throw DaemonControlError.commandFailed("Launch agent registration did not complete")
     }
 
-    let refreshedClient = try await daemonController.awaitManifestWarmUp(
-      timeout: bootstrapWarmUpTimeout
-    )
+    let refreshedClient = try await withLegacyContainmentClient {
+      try await daemonController.awaitManifestWarmUpAfterLegacyCleanup(
+        timeout: bootstrapWarmUpTimeout
+      )
+    }
     await connect(using: refreshedClient)
     guard connectionState == .online else {
       throw DaemonControlError.commandFailed(

@@ -8,17 +8,30 @@ extension HarnessMonitorStore {
       await applyGlobalPushEventFromStream(event)
       return true
     }
+    guard let containmentFence = try? currentLegacyContainmentFence() else {
+      return false
+    }
     if hasSeenReady {
-      guard await syncStoredTaskBoardCredentialsForNewDaemon(using: client) else {
-        markConnectionOffline("Connected daemon has no database-backed Task Board")
-        scheduleReconnectAfterConnectionFailure()
+      guard
+        await syncStoredTaskBoardCredentialsForNewDaemon(
+          using: client,
+          containmentFence: containmentFence
+        )
+      else {
+        if isCurrentLegacyContainmentFence(containmentFence) {
+          markConnectionOffline("Connected daemon has no database-backed Task Board")
+          scheduleReconnectAfterConnectionFailure()
+        }
         return false
       }
     } else {
       hasSeenReady = true
     }
+    guard isCurrentLegacyContainmentFence(containmentFence) else {
+      return false
+    }
     await recoverGlobalPushOnlyState(using: client)
-    return true
+    return isCurrentLegacyContainmentFence(containmentFence)
   }
 
   func recoverGlobalPushOnlyState(

@@ -15,6 +15,8 @@ public struct DaemonController: DaemonControlling {
   let launchAgentManager: any DaemonLaunchAgentManaging
   let legacyLaunchAgentManagerFactory: @Sendable (String) -> any DaemonLaunchAgentManaging
   let legacyLaunchAgentCleanupDefaults: SendableUserDefaults
+  let legacyMonitorProcessIsRunning: @Sendable () async -> Bool
+  let legacyMonitorProcessScanCache: LegacyMonitorProcessScanCache
   let ownership: DaemonOwnership
   let remoteConnectionSource: any RemoteDaemonConnectionSourcing
   let endpointProbe: @Sendable (URL) async -> Bool
@@ -38,6 +40,8 @@ public struct DaemonController: DaemonControlling {
     legacyLaunchAgentManagerFactory:
       (@Sendable (String) -> any DaemonLaunchAgentManaging)? = nil,
     legacyLaunchAgentCleanupDefaults: UserDefaults = .standard,
+    legacyMonitorProcessIsRunning:
+      (@Sendable () async -> Bool)? = nil,
     ownership: DaemonOwnership = .managed,
     remoteConnectionSource: (any RemoteDaemonConnectionSourcing)? = nil,
     autoTransportWebSocketGracePeriod: Duration = .seconds(2),
@@ -105,6 +109,14 @@ public struct DaemonController: DaemonControlling {
     self.legacyLaunchAgentCleanupDefaults = SendableUserDefaults(
       legacyLaunchAgentCleanupDefaults
     )
+    let legacyMonitorProcessScanCache = LegacyMonitorProcessScanCache()
+    self.legacyMonitorProcessScanCache = legacyMonitorProcessScanCache
+    self.legacyMonitorProcessIsRunning =
+      legacyMonitorProcessIsRunning ?? {
+        await legacyMonitorProcessScanCache.value {
+          await Self.defaultLegacyMonitorProcessIsRunning()
+        }
+      }
     self.ownership = ownership
     self.remoteConnectionSource =
       remoteConnectionSource ?? DisabledRemoteDaemonConnectionSource()
@@ -246,8 +258,7 @@ public struct DaemonController: DaemonControlling {
   public func registerLaunchAgent() async throws -> DaemonLaunchAgentRegistrationState {
     try requireLocalDaemonControl("Register Launch Agent")
     return try await withRequiredManagedLaunchAgentLock {
-      try launchAgentManager.register()
-      let state = launchAgentManager.registrationState()
+      let state = try await registerCurrentLaunchAgentAndRequireLegacyCleanup()
       if state == .enabled {
         try persistCurrentManagedLaunchAgentBundleStamp()
         try persistCurrentManagedLaunchAgentOwner()
@@ -394,20 +405,4 @@ public struct DaemonController: DaemonControlling {
     )
   }
 
-  func managedDaemonVersionMismatch(for manifest: DaemonManifest) -> DaemonControlError? {
-    guard ownership == .managed else {
-      return nil
-    }
-
-    guard
-      let expectedVersion = expectedManagedDaemonVersion()?
-        .trimmingCharacters(in: .whitespacesAndNewlines),
-      !expectedVersion.isEmpty,
-      manifest.version != expectedVersion
-    else {
-      return nil
-    }
-
-    return .managedDaemonVersionMismatch(expected: expectedVersion, actual: manifest.version)
-  }
 }

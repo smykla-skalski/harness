@@ -4,7 +4,10 @@ import Foundation
 
 extension RecordingHarnessClient {
   func taskBoardCapabilities() async throws -> TaskBoardCapabilities {
-    lock.withLock { taskBoardCapabilitiesValue }
+    if let taskBoardCapabilitiesHandler {
+      return try await taskBoardCapabilitiesHandler()
+    }
+    return lock.withLock { taskBoardCapabilitiesValue }
   }
 
   func taskBoardItems(status: TaskBoardStatus?) async throws -> [TaskBoardItem] {

@@ -38,40 +38,6 @@ extension HarnessMonitorStore {
     connectionState = .idle
   }
 
-  func ensureManagedLaunchAgentReady() async throws -> DaemonLaunchAgentRegistrationState {
-    try await requireLegacyManagedLaunchAgentCleanupOrThrow()
-    var registrationState = await daemonController.launchAgentRegistrationState()
-    if registrationState == .notRegistered || registrationState == .notFound {
-      registrationState = try await daemonController.registerLaunchAgent()
-    }
-    return registrationState
-  }
-
-  /// Once per app launch, tear down and re-register the bundled SMAppService
-  /// launch agent so launchd spawns the helper against a fresh BTM record
-  /// and Launch Constraint Record. Without this, an Xcode rebuild between
-  /// app launches leaves the prior `cs_mtime` cached in BTM and the next
-  /// `xpcproxy` call fails with `EX_CONFIG` in a tight crash loop.
-  ///
-  /// No-op in `.external` ownership and on subsequent bootstrap passes
-  /// within the same process (manifest watcher reconnects, app activation
-  /// reconnects, etc.).
-  func refreshManagedLaunchAgentOnFirstLaunchIfNeeded() async {
-    guard daemonOwnership == .managed,
-      hasRefreshedManagedLaunchAgentOnLaunch == false
-    else {
-      return
-    }
-    hasRefreshedManagedLaunchAgentOnLaunch = true
-    do {
-      _ = try await daemonController.refreshManagedLaunchAgentForLaunch()
-    } catch {
-      HarnessMonitorLogger.lifecycle.error(
-        "On-launch managed launch agent refresh failed: \(error.localizedDescription, privacy: .public)"
-      )
-    }
-  }
-
   func awaitManagedDaemonWarmUpWithRecovery() async throws
     -> any HarnessMonitorClientProtocol
   {
@@ -79,9 +45,11 @@ extension HarnessMonitorStore {
     // last persisted snapshot immediately without blocking the live connect.
     restorePersistedSessionStateWhileConnectingInBackground()
     do {
-      let client = try await daemonController.awaitManifestWarmUp(
-        timeout: bootstrapWarmUpTimeout
-      )
+      let client = try await withLegacyContainmentClient {
+        try await daemonController.awaitManifestWarmUpAfterLegacyCleanup(
+          timeout: bootstrapWarmUpTimeout
+        )
+      }
       resetManagedLaunchAgentRecoveryState()
       return client
     } catch {
@@ -104,7 +72,10 @@ extension HarnessMonitorStore {
           """
       )
       return try await withBootstrapTelemetryPhase(.managedLaunchAgentRefreshRecovery) {
-        _ = try await daemonController.repairLaunchAgentRegistration()
+        _ = try await withControllerLegacyCleanupFailureTracking {
+          try await daemonController.repairLaunchAgentRegistration()
+        }
+        try await requireLegacyManagedLaunchAgentCleanupOrThrow()
         let registrationState = await daemonController.launchAgentRegistrationState()
         switch registrationState {
         case .enabled:
@@ -116,9 +87,11 @@ extension HarnessMonitorStore {
         case .notRegistered, .notFound:
           throw DaemonControlError.commandFailed("Launch agent registration did not complete")
         }
-        let client = try await daemonController.awaitManifestWarmUp(
-          timeout: bootstrapWarmUpTimeout
-        )
+        let client = try await withLegacyContainmentClient {
+          try await daemonController.awaitManifestWarmUpAfterLegacyCleanup(
+            timeout: bootstrapWarmUpTimeout
+          )
+        }
         resetManagedLaunchAgentRecoveryState()
         return client
       }
@@ -185,7 +158,7 @@ extension HarnessMonitorStore {
     case .managedDaemonVersionMismatch:
       return true
     case .harnessBinaryNotFound, .externalDaemonOffline, .externalDaemonManifestStale,
-      .invalidManifest, .commandFailed:
+      .invalidManifest, .legacyManagedLaunchAgentCleanupFailed, .commandFailed:
       return false
     }
   }
@@ -194,7 +167,9 @@ extension HarnessMonitorStore {
   func recoverManagedBootstrapFailure(from error: any Error) async -> Bool {
     startManifestWatcher()
 
-    if let client = try? await daemonController.bootstrapClient() {
+    if let client = try? await withLegacyContainmentClient({
+      try await daemonController.bootstrapClient()
+    }) {
       await connect(using: client)
       return true
     }
@@ -302,7 +277,10 @@ extension HarnessMonitorStore {
     defer { endDaemonAction() }
 
     do {
-      _ = try await daemonController.installLaunchAgent()
+      _ = try await withControllerLegacyCleanupFailureTracking {
+        try await daemonController.installLaunchAgent()
+      }
+      try await requireLegacyManagedLaunchAgentCleanupOrThrow()
       await refreshDaemonStatus()
       presentSuccessFeedback("Install launch agent")
     } catch {
@@ -337,7 +315,10 @@ extension HarnessMonitorStore {
     defer { endDaemonAction() }
 
     do {
-      let outcome = try await daemonController.repairLaunchAgentRegistration()
+      let outcome = try await withControllerLegacyCleanupFailureTracking {
+        try await daemonController.repairLaunchAgentRegistration()
+      }
+      try await requireLegacyManagedLaunchAgentCleanupOrThrow()
       resetManagedLaunchAgentRecoveryState()
       await refreshDaemonStatus()
       presentSuccessFeedback("Repair launch agent: \(outcome)")

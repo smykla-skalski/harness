@@ -18,6 +18,23 @@ actor ManagedLaunchAgentDeferredRefreshState {
 }
 
 extension DaemonController {
+  func managedDaemonVersionMismatch(for manifest: DaemonManifest) -> DaemonControlError? {
+    guard ownership == .managed else {
+      return nil
+    }
+
+    guard
+      let expectedVersion = expectedManagedDaemonVersion()?
+        .trimmingCharacters(in: .whitespacesAndNewlines),
+      !expectedVersion.isEmpty,
+      manifest.version != expectedVersion
+    else {
+      return nil
+    }
+
+    return .managedDaemonVersionMismatch(expected: expectedVersion, actual: manifest.version)
+  }
+
   func managedLaunchAgentRefreshNeededForBundledHelperChange(
     state: inout WarmUpLoopState
   ) throws -> ManagedLaunchAgentBundleStamp? {
@@ -102,8 +119,8 @@ extension DaemonController {
       clearManagedLaunchAgentBundleStamp(at: stampURL)
       clearManagedLaunchAgentOwner()
       await awaitManagedLaunchAgentBTMSettleAfterUnregister()
-      try launchAgentManager.register()
-      if launchAgentManager.registrationState() == .enabled {
+      let registrationState = try await registerCurrentLaunchAgentAndRequireLegacyCleanup()
+      if registrationState == .enabled {
         try persistManagedLaunchAgentBundleStamp(currentStamp, to: stampURL)
         try persistCurrentManagedLaunchAgentOwner()
       }

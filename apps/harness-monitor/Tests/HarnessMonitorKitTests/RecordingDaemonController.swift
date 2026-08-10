@@ -15,9 +15,12 @@ actor RecordingDaemonController: DaemonControlling {
   private let statusReportOverride: DaemonStatusReport?
   private let bootstrapError: (any Error)?
   private let bootstrapChecksCancellation: Bool
+  private let registerLaunchAgentHandler: (@Sendable () async throws -> Void)?
   private let warmUpError: (any Error)?
+  private let warmUpHandler: (@Sendable () async throws -> any HarnessMonitorClientProtocol)?
   private let deferredManagedLaunchAgentRefreshResult: Bool
-  private let legacyCleanupError: (any Error)?
+  private var legacyCleanupError: (any Error)?
+  private let legacyCleanupHandler: (@Sendable () async throws -> Void)?
   private var lastEventMessage = "daemon ready"
   private var registerLaunchAgentCallCount = 0
   private var warmUpCallCount = 0
@@ -35,10 +38,14 @@ actor RecordingDaemonController: DaemonControlling {
     statusReport: DaemonStatusReport? = nil,
     bootstrapError: (any Error)? = nil,
     bootstrapChecksCancellation: Bool = false,
+    registerLaunchAgentHandler: (@Sendable () async throws -> Void)? = nil,
     warmUpError: (any Error)? = nil,
+    warmUpHandler:
+      (@Sendable () async throws -> any HarnessMonitorClientProtocol)? = nil,
     usesWarmUpErrorForBootstrap: Bool = true,
     deferredManagedLaunchAgentRefreshResult: Bool = false,
-    legacyCleanupError: (any Error)? = nil
+    legacyCleanupError: (any Error)? = nil,
+    legacyCleanupHandler: (@Sendable () async throws -> Void)? = nil
   ) {
     self.client = client
     self.bootstrapOutcomes = bootstrapOutcomes
@@ -47,9 +54,12 @@ actor RecordingDaemonController: DaemonControlling {
     self.statusReportOverride = statusReport
     self.bootstrapError = bootstrapError ?? (usesWarmUpErrorForBootstrap ? warmUpError : nil)
     self.bootstrapChecksCancellation = bootstrapChecksCancellation
+    self.registerLaunchAgentHandler = registerLaunchAgentHandler
     self.warmUpError = warmUpError
+    self.warmUpHandler = warmUpHandler
     self.deferredManagedLaunchAgentRefreshResult = deferredManagedLaunchAgentRefreshResult
     self.legacyCleanupError = legacyCleanupError
+    self.legacyCleanupHandler = legacyCleanupHandler
   }
 
   func bootstrapClient() async throws -> any HarnessMonitorClientProtocol {
@@ -73,6 +83,7 @@ actor RecordingDaemonController: DaemonControlling {
 
   func registerLaunchAgent() async throws -> DaemonLaunchAgentRegistrationState {
     registerLaunchAgentCallCount += 1
+    try await registerLaunchAgentHandler?()
     launchAgentInstalled = true
     lastEventMessage = "launch agent installed"
     return .enabled
@@ -109,6 +120,9 @@ actor RecordingDaemonController: DaemonControlling {
     timeout: Duration
   ) async throws -> any HarnessMonitorClientProtocol {
     warmUpCallCount += 1
+    if let warmUpHandler {
+      return try await warmUpHandler()
+    }
     if let warmUpError {
       throw warmUpError
     }
@@ -122,9 +136,17 @@ actor RecordingDaemonController: DaemonControlling {
 
   func requireLegacyManagedLaunchAgentCleanup() async throws {
     legacyCleanupCallCount += 1
+    if let legacyCleanupHandler {
+      try await legacyCleanupHandler()
+      return
+    }
     if let legacyCleanupError {
       throw legacyCleanupError
     }
+  }
+
+  func setLegacyCleanupError(_ error: (any Error)?) {
+    legacyCleanupError = error
   }
 
   func stopDaemon() async throws -> String {

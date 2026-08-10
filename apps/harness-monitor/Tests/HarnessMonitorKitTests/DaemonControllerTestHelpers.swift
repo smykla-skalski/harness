@@ -71,7 +71,9 @@ func withTempDaemonFixture(
   try manifestData.write(to: daemonRoot.appendingPathComponent("manifest.json"))
 
   var environmentValues: [String: String] = [
-    HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey: daemonHome.path
+    HarnessMonitorAppGroup.daemonDataHomeEnvironmentKey: daemonHome.path,
+    HarnessMonitorRuntimeLane.launchAgentLabelEnvKey:
+      "\(HarnessMonitorRuntimeLane.launchAgentBaseLabel)-test-\(UUID().uuidString.lowercased())",
   ]
   if ownership == .external {
     environmentValues[DaemonOwnership.environmentKey] = "1"

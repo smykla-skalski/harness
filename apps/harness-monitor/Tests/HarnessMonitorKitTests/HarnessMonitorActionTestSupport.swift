@@ -52,6 +52,9 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
     revision: 0,
     instanceID: "recording-task-board"
   )
+  var taskBoardCapabilitiesHandler: (@Sendable () async throws -> TaskBoardCapabilities)?
+  var taskBoardGitRuntimeConfigHandler: (@Sendable () async throws -> TaskBoardGitRuntimeConfig)?
+  var shutdownHandler: (@Sendable () async -> Void)?
   let taskBoardItemsReadGate = RecordingTaskBoardItemsReadGate()
   var taskBoardItemsDelay: Duration?
   var queuedTaskBoardItemSnapshots: [[TaskBoardItem]] = []

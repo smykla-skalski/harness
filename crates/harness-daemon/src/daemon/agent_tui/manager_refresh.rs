@@ -2,7 +2,6 @@ use std::collections::BTreeMap;
 use std::convert::identity;
 use std::future::Future;
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread;
 
@@ -20,7 +19,7 @@ use crate::workspace::utc_now;
 use harness_kernel::errors::{CliError, CliErrorKind};
 
 use super::LIVE_REFRESH_INTERVAL;
-use super::manager::{ActiveAgentTui, AgentTuiManagerHandle};
+use super::manager::{ActiveAgentTui, AgentTuiManagerHandle, LiveRefreshWake};
 use super::model::session_disconnect_reason;
 use super::support::{agent_id_for_tui, lock_db};
 use crate::daemon::db::prelude::*;
@@ -301,18 +300,18 @@ impl AgentTuiManagerHandle {
             || previous.agent_id != refreshed.agent_id
     }
 
-    pub(crate) fn spawn_live_refresh(&self, tui_id: String, stop_flag: Arc<AtomicBool>) {
+    pub(crate) fn spawn_live_refresh(&self, tui_id: String, refresh_wake: Arc<LiveRefreshWake>) {
         let manager = self.clone();
         let _ = thread::spawn(move || {
-            manager.run_live_refresh_loop(&tui_id, &stop_flag);
+            manager.run_live_refresh_loop(&tui_id, &refresh_wake);
         });
     }
 
-    fn run_live_refresh_loop(&self, tui_id: &str, stop_flag: &AtomicBool) {
+    fn run_live_refresh_loop(&self, tui_id: &str, refresh_wake: &LiveRefreshWake) {
         let mut delay = LIVE_REFRESH_INTERVAL;
         let mut failure_count = 0_u32;
         loop {
-            if !Self::wait_for_live_refresh_tick(stop_flag, delay) {
+            if !refresh_wake.wait(delay) {
                 break;
             }
             match self.live_refresh_step(tui_id) {
@@ -333,23 +332,6 @@ impl AgentTuiManagerHandle {
         }
 
         let _ = self.remove_active(tui_id);
-    }
-
-    pub(super) fn wait_for_live_refresh_tick(
-        stop_flag: &AtomicBool,
-        delay: std::time::Duration,
-    ) -> bool {
-        let deadline = std::time::Instant::now() + delay;
-        loop {
-            if stop_flag.load(Ordering::Relaxed) {
-                return false;
-            }
-            let remaining = deadline.saturating_duration_since(std::time::Instant::now());
-            if remaining.is_zero() {
-                return true;
-            }
-            thread::sleep(remaining.min(LIVE_REFRESH_INTERVAL));
-        }
     }
 
     pub(super) fn live_refresh_retry_delay(current: std::time::Duration) -> std::time::Duration {

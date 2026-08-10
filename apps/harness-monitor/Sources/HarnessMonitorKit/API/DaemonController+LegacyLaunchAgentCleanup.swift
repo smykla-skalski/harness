@@ -46,16 +46,20 @@ public enum LegacyManagedLaunchAgentCleanup {
     managerFactory: @escaping @Sendable (String) -> any DaemonLaunchAgentManaging = {
       ServiceManagementDaemonLaunchAgentManager(plistName: $0)
     },
+    legacyMonitorProcessIsRunning: @escaping @Sendable () async -> Bool = { false },
     afterCurrentServiceUnregister: @escaping @Sendable () async -> Void,
     quiesceOnFailure: @escaping @Sendable () async throws -> Void
   ) async throws {
     let sendableDefaults = SendableUserDefaults(defaults)
+    let legacyMonitorIsRunning = await legacyMonitorProcessIsRunning()
     var attempt = await detachedAttempt(
       defaults: sendableDefaults,
       currentName: currentName,
       legacyNames: legacyNames,
+      legacyMonitorIsRunning: legacyMonitorIsRunning,
       managerFactory: managerFactory
     )
+    try Task.checkCancellation()
     if attempt.isComplete {
       return
     }
@@ -66,8 +70,10 @@ public enum LegacyManagedLaunchAgentCleanup {
         defaults: sendableDefaults,
         currentName: currentName,
         legacyNames: legacyNames,
+        legacyMonitorIsRunning: await legacyMonitorProcessIsRunning(),
         managerFactory: managerFactory
       )
+      try Task.checkCancellation()
       if attempt.isComplete {
         return
       }
@@ -84,6 +90,7 @@ public enum LegacyManagedLaunchAgentCleanup {
     defaults: SendableUserDefaults,
     currentName: String,
     legacyNames: [String],
+    legacyMonitorIsRunning: Bool,
     managerFactory: @escaping @Sendable (String) -> any DaemonLaunchAgentManaging
   ) async -> CleanupAttempt {
     await Task.detached(priority: .userInitiated) {
@@ -91,6 +98,7 @@ public enum LegacyManagedLaunchAgentCleanup {
         defaults: defaults.value,
         currentName: currentName,
         legacyNames: legacyNames,
+        legacyMonitorIsRunning: legacyMonitorIsRunning,
         managerFactory: managerFactory
       )
     }.value
@@ -100,6 +108,7 @@ public enum LegacyManagedLaunchAgentCleanup {
     defaults: UserDefaults,
     currentName: String,
     legacyNames: [String],
+    legacyMonitorIsRunning: Bool = false,
     managerFactory: (String) -> any DaemonLaunchAgentManaging
   ) -> CleanupAttempt {
     lock.lock()
@@ -108,6 +117,7 @@ public enum LegacyManagedLaunchAgentCleanup {
       defaults: defaults,
       currentName: currentName,
       legacyNames: legacyNames,
+      legacyMonitorIsRunning: legacyMonitorIsRunning,
       managerFactory: managerFactory
     )
   }
@@ -116,6 +126,7 @@ public enum LegacyManagedLaunchAgentCleanup {
     defaults: UserDefaults,
     currentName: String,
     legacyNames: [String],
+    legacyMonitorIsRunning: Bool,
     managerFactory: (String) -> any DaemonLaunchAgentManaging
   ) -> CleanupAttempt {
     let usesCurrentStrategy =
@@ -150,9 +161,8 @@ public enum LegacyManagedLaunchAgentCleanup {
       }
     }
 
-    defaults.set(completedNames.sorted(), forKey: completedNamesDefaultsKey)
-    defaults.set(strategyVersion, forKey: strategyVersionDefaultsKey)
-    guard failedNames.isEmpty else {
+    persistCleanupStateIfChanged(completedNames, defaults: defaults)
+    guard failedNames.isEmpty, !legacyMonitorIsRunning else {
       return CleanupAttempt(
         isComplete: false,
         currentServiceWasUnregistered: disableCurrentService(
@@ -162,6 +172,19 @@ public enum LegacyManagedLaunchAgentCleanup {
       )
     }
     return CleanupAttempt(isComplete: true, currentServiceWasUnregistered: false)
+  }
+
+  private static func persistCleanupStateIfChanged(
+    _ completedNames: Set<String>,
+    defaults: UserDefaults
+  ) {
+    let sortedNames = completedNames.sorted()
+    if defaults.stringArray(forKey: completedNamesDefaultsKey) != sortedNames {
+      defaults.set(sortedNames, forKey: completedNamesDefaultsKey)
+    }
+    if defaults.integer(forKey: strategyVersionDefaultsKey) != strategyVersion {
+      defaults.set(strategyVersion, forKey: strategyVersionDefaultsKey)
+    }
   }
 
   private static func disableCurrentService(
@@ -224,6 +247,40 @@ struct SendableUserDefaults: @unchecked Sendable {
 }
 
 extension DaemonController {
+  func registerCurrentLaunchAgentAndRequireLegacyCleanup()
+    async throws -> DaemonLaunchAgentRegistrationState
+  {
+    try launchAgentManager.register()
+    let state = launchAgentManager.registrationState()
+    do {
+      try await requireLegacyManagedLaunchAgentCleanup()
+    } catch is CancellationError {
+      guard await disableCurrentLaunchAgentAfterCleanupFailure() else {
+        throw DaemonControlError.legacyManagedLaunchAgentCleanupFailed
+      }
+      throw CancellationError()
+    } catch {
+      _ = await disableCurrentLaunchAgentAfterCleanupFailure()
+      throw DaemonControlError.legacyManagedLaunchAgentCleanupFailed
+    }
+    return state
+  }
+
+  private func disableCurrentLaunchAgentAfterCleanupFailure() async -> Bool {
+    guard launchAgentManager.registrationState() != .notRegistered else {
+      return true
+    }
+    do {
+      try launchAgentManager.unregister()
+    } catch {
+      return false
+    }
+    clearManagedLaunchAgentBundleStamp()
+    clearManagedLaunchAgentOwner()
+    await awaitManagedLaunchAgentBTMSettleAfterCancelledUnregister()
+    return true
+  }
+
   public func requireLegacyManagedLaunchAgentCleanup() async throws {
     let outcome = try await withLegacyManagedLaunchAgentLock(totalTimeout: .seconds(2)) {
       try await LegacyManagedLaunchAgentCleanup.requireComplete(
@@ -231,6 +288,7 @@ extension DaemonController {
         currentName: HarnessMonitorPaths.launchAgentPlistName(using: environment),
         legacyNames: HarnessMonitorPaths.legacyLaunchAgentPlistNames,
         managerFactory: legacyLaunchAgentManagerFactory,
+        legacyMonitorProcessIsRunning: legacyMonitorProcessIsRunning,
         afterCurrentServiceUnregister: {
           clearManagedLaunchAgentBundleStamp()
           clearManagedLaunchAgentOwner()

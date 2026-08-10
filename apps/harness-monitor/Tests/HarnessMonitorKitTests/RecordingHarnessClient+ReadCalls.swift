@@ -56,6 +56,7 @@ extension RecordingHarnessClient {
   }
 
   func shutdown() async {
+    await shutdownHandler?()
     lock.withLock {
       recordedShutdownCallCount += 1
     }

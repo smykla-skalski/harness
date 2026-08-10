@@ -235,15 +235,28 @@ extension DaemonControllerTests {
       state: .notRegistered,
       registerResult: .requiresApproval
     )
+    let legacyManager = RecordingLaunchAgentManager(state: .enabled)
+    let currentName = HarnessMonitorPaths.launchAgentPlistName(
+      using: environmentFixture.environment
+    )
     let controller = DaemonController(
       environment: environmentFixture.environment,
-      launchAgentManager: manager
+      launchAgentManager: manager,
+      legacyLaunchAgentManagerFactory: { name in
+        if name == currentName {
+          manager
+        } else {
+          legacyManager
+        }
+      },
+      legacyMonitorProcessIsRunning: { false }
     )
 
     let state = try await controller.registerLaunchAgent()
 
     #expect(state == .requiresApproval)
     #expect(manager.registerCallCount == 1)
+    #expect(legacyManager.unregisterCallCount == 1)
   }
 
   @Test("awaitLaunchAgentState throws daemonDidNotStart when state never matches")

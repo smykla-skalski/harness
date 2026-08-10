@@ -60,6 +60,7 @@ public enum DaemonControlError: Error, LocalizedError, Equatable {
   case daemonDidNotStart
   case externalDaemonOffline(manifestPath: String)
   case externalDaemonManifestStale(manifestPath: String)
+  case legacyManagedLaunchAgentCleanupFailed
   case commandFailed(String)
 
   public var errorDescription: String? {
@@ -83,6 +84,8 @@ public enum DaemonControlError: Error, LocalizedError, Equatable {
       return "Background helper is not running. Start it to load live sessions"
     case .externalDaemonManifestStale:
       return "Background helper stopped unexpectedly. Restart it to reconnect"
+    case .legacyManagedLaunchAgentCleanupFailed:
+      return LegacyManagedLaunchAgentCleanup.failureMessage
     case .commandFailed(let message):
       return message
     }

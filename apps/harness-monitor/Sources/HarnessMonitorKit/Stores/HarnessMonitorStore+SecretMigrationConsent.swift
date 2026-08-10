@@ -54,7 +54,21 @@ extension HarnessMonitorStore {
   /// nothing. Nothing is written or pushed until the user applies. The migration
   /// source is cleared once the review completes, so it does not nag on every
   /// reconnect, but a scan or write failure retries on the next switch.
-  func migrateStoredTaskBoardSecrets(from previousID: String, to currentID: String) async {
+  func taskBoardSecretMigrationSource(for currentID: String) -> String? {
+    let candidates = [
+      taskBoardPreviousDatabaseInstanceID,
+      taskBoardRuntimeState.connection.lastConnectedDatabaseInstanceID,
+      taskBoardConnectionHistoryStore.lastConnectedDatabaseInstance(),
+    ]
+    return candidates.compactMap(\.self).first { $0 != currentID }
+  }
+
+  @discardableResult
+  func migrateStoredTaskBoardSecrets(
+    from previousID: String,
+    to currentID: String,
+    containmentFence: LegacyContainmentFence? = nil
+  ) async -> Bool {
     let knownRepositories = knownTaskBoardRepositorySlugs(for: previousID, currentID)
     let items: [TaskBoardSecretMigrationItem]
     do {
@@ -67,20 +81,28 @@ extension HarnessMonitorStore {
       HarnessMonitorLogger.store.error(
         "task-board secret scan failed: \(error.localizedDescription, privacy: .public)"
       )
-      return
+      return false
+    }
+
+    guard isCurrentLegacyContainmentFenceIfProvided(containmentFence) else {
+      return false
     }
 
     guard !items.isEmpty else {
       taskBoardRuntimeState.connection.previousDatabaseInstanceID = nil
-      return
+      return true
     }
 
     // Dismissing the sheet carries nothing and still clears the source, so a
     // deliberate cancel is honored without a Keychain write and is not
     // re-prompted on the next reconnect.
-    guard let selections = await presentSecretMigrationConsent(items) else {
+    let selections = await presentSecretMigrationConsent(items)
+    guard isCurrentLegacyContainmentFenceIfProvided(containmentFence) else {
+      return false
+    }
+    guard let selections else {
       taskBoardRuntimeState.connection.previousDatabaseInstanceID = nil
-      return
+      return true
     }
 
     do {
@@ -90,12 +112,24 @@ extension HarnessMonitorStore {
         knownRepositories: knownRepositories,
         selections: selections
       )
+      guard isCurrentLegacyContainmentFenceIfProvided(containmentFence) else {
+        return false
+      }
       taskBoardRuntimeState.connection.previousDatabaseInstanceID = nil
+      return true
     } catch {
       HarnessMonitorLogger.store.error(
         "task-board secret migration failed: \(error.localizedDescription, privacy: .public)"
       )
+      return false
     }
+  }
+
+  private func isCurrentLegacyContainmentFenceIfProvided(
+    _ fence: LegacyContainmentFence?
+  ) -> Bool {
+    guard let fence else { return true }
+    return isCurrentLegacyContainmentFence(fence)
   }
 
   /// Presents the review sheet and parks the connection sync until the user

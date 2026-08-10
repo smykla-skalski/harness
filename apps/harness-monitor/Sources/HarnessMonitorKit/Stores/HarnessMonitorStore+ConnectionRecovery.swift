@@ -1,6 +1,7 @@
 extension HarnessMonitorStore {
   var shouldAbandonConnectionAttempt: Bool {
-    Task.isCancelled || isAppLifecycleSuspended || connection.isPreparingForTermination
+    Task.isCancelled || !connection.legacyContainmentHealthy
+      || isAppLifecycleSuspended || connection.isPreparingForTermination
   }
 
   var hasLiveConnectionActivity: Bool {
@@ -63,7 +64,9 @@ extension HarnessMonitorStore {
       self.client = nil
       taskBoardDatabaseInstanceID = nil
     }
-    connectionState = .idle
+    if connection.legacyContainmentHealthy {
+      connectionState = .idle
+    }
   }
 
   func discardActiveConnection() async {

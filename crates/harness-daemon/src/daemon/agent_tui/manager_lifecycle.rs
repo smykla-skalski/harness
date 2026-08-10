@@ -304,14 +304,14 @@ impl AgentTuiManagerHandle {
         mut active: ActiveAgentTui,
     ) -> Result<(), CliError> {
         active.workspace_id.clone_from(&snapshot.workspace_id);
-        let stop_flag = Arc::clone(&active.stop_flag);
+        let refresh_wake = Arc::clone(&active.refresh_wake);
         let tui_id = snapshot.tui_id.clone();
         self.active()?.insert(tui_id.clone(), active);
         if let Err(error) = self.save_and_broadcast(event_name, snapshot) {
             let _ = self.remove_active(&tui_id)?;
             return Err(error);
         }
-        self.spawn_live_refresh(tui_id, stop_flag);
+        self.spawn_live_refresh(tui_id, refresh_wake);
         Ok(())
     }
 }

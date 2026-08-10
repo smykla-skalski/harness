@@ -58,6 +58,9 @@ extension RecordingHarnessClient {
 
   func taskBoardGitRuntimeConfig() async throws -> TaskBoardGitRuntimeConfig {
     recordReadCall(.taskBoardGitRuntimeConfig)
+    if let taskBoardGitRuntimeConfigHandler {
+      return try await taskBoardGitRuntimeConfigHandler()
+    }
     return sampleTaskBoardGitRuntimeConfig()
   }
 

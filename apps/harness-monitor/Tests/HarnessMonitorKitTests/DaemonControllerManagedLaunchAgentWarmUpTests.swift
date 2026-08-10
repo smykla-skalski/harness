@@ -11,7 +11,7 @@ private let managedLaunchAgentPlistPathFixture =
   + "Harness Monitor.app/Contents/Library/LaunchAgents/"
   + "Q498EB36N4.io.harnessmonitor.agent.plist"
 
-@Suite("Daemon controller managed launch-agent warm-up")
+@Suite("Daemon controller managed launch-agent warm-up", .serialized)
 struct DaemonControllerManagedLaunchAgentWarmUpTests {
   @Test(
     "awaitManifestWarmUp refreshes the managed launch agent after stale-manifest evidence when the bundled helper changed"
@@ -51,6 +51,7 @@ struct DaemonControllerManagedLaunchAgentWarmUpTests {
         environment: environment,
         transportPreference: .http,
         launchAgentManager: manager,
+        legacyMonitorProcessIsRunning: { false },
         ownership: .managed,
         sessionFactory: { _ in client },
         endpointProbe: { endpoint in
@@ -117,6 +118,7 @@ struct DaemonControllerManagedLaunchAgentWarmUpTests {
           environment: environment,
           transportPreference: .http,
           launchAgentManager: manager,
+          legacyMonitorProcessIsRunning: { false },
           ownership: .managed,
           sessionFactory: { _ in client },
           endpointProbe: { endpoint in
@@ -204,6 +206,7 @@ struct DaemonControllerManagedLaunchAgentWarmUpTests {
           environment: environment,
           transportPreference: .http,
           launchAgentManager: manager,
+          legacyMonitorProcessIsRunning: { false },
           ownership: .managed,
           sessionFactory: { _ in client },
           endpointProbe: { endpoint in
@@ -281,6 +284,7 @@ struct DaemonControllerManagedLaunchAgentWarmUpTests {
           environment: environment,
           transportPreference: .http,
           launchAgentManager: manager,
+          legacyMonitorProcessIsRunning: { false },
           ownership: .managed,
           sessionFactory: { _ in client },
           endpointProbe: { endpoint in
@@ -364,6 +368,7 @@ struct DaemonControllerManagedLaunchAgentWarmUpTests {
           environment: environment,
           transportPreference: .http,
           launchAgentManager: manager,
+          legacyMonitorProcessIsRunning: { false },
           ownership: .managed,
           sessionFactory: { _ in client },
           endpointProbe: { endpoint in

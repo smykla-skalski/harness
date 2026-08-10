@@ -14,6 +14,20 @@ extension DaemonController {
     try? await managedLaunchAgentBTMSettleSleep(managedLaunchAgentBTMSettleDelay)
   }
 
+  func awaitManagedLaunchAgentBTMSettleAfterCancelledUnregister() async {
+    guard
+      ownership == .managed,
+      managedLaunchAgentBTMSettleDelay > .zero
+    else {
+      return
+    }
+    let delay = managedLaunchAgentBTMSettleDelay
+    let sleep = managedLaunchAgentBTMSettleSleep
+    await Task.detached(priority: .userInitiated) {
+      try? await sleep(delay)
+    }.value
+  }
+
   /// Tear down and re-register the bundled SMAppService launch agent at app
   /// launch ONLY when the helper bundle on disk no longer matches the stamp
   /// we persisted on the last successful register — that's the signal an
@@ -79,8 +93,8 @@ extension DaemonController {
     clearManagedLaunchAgentBundleStamp(at: stampURL)
     clearManagedLaunchAgentOwner()
     await awaitManagedLaunchAgentBTMSettleAfterUnregister()
-    try launchAgentManager.register()
-    return try finishLaunchAgentRefresh(lockedStamp, stampURL: stampURL)
+    let state = try await registerCurrentLaunchAgentAndRequireLegacyCleanup()
+    return try finishLaunchAgentRefresh(lockedStamp, stampURL: stampURL, state: state)
   }
 
   private func deferRefreshToLiveSibling() -> Bool {
@@ -104,9 +118,10 @@ extension DaemonController {
 
   private func finishLaunchAgentRefresh(
     _ stamp: ManagedLaunchAgentBundleStamp,
-    stampURL: URL
+    stampURL: URL,
+    state: DaemonLaunchAgentRegistrationState
   ) throws -> Bool {
-    switch launchAgentManager.registrationState() {
+    switch state {
     case .enabled:
       try persistManagedLaunchAgentBundleStamp(stamp, to: stampURL)
       try persistCurrentManagedLaunchAgentOwner()
@@ -151,8 +166,7 @@ extension DaemonController {
           : "launch agent unregistered"
       }
 
-      try launchAgentManager.register()
-      let postState = launchAgentManager.registrationState()
+      let postState = try await registerCurrentLaunchAgentAndRequireLegacyCleanup()
       if postState == .enabled {
         try persistCurrentManagedLaunchAgentBundleStamp()
         try persistCurrentManagedLaunchAgentOwner()

@@ -1,35 +1,6 @@
 import Foundation
 
 extension HarnessMonitorStore {
-  func requireDatabaseBackedTaskBoard(
-    using client: any HarnessMonitorClientProtocol
-  ) async throws -> TaskBoardCapabilities {
-    taskBoardDatabaseInstanceID = nil
-    let capabilities: TaskBoardCapabilities
-    do {
-      capabilities = try await client.taskBoardCapabilities()
-    } catch {
-      taskBoardDatabaseInstanceID = nil
-      throw error
-    }
-    guard capabilities.storage == "database" else {
-      throw HarnessMonitorAPIError.server(
-        code: 426,
-        message: "Connected daemon does not provide a database-backed Task Board"
-      )
-    }
-    guard !capabilities.instanceID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-      throw HarnessMonitorAPIError.server(
-        code: 500,
-        message: "Database-backed Task Board did not provide an instance identity"
-      )
-    }
-    noteConnectedDatabaseInstance(capabilities.instanceID)
-    taskBoardDatabaseInstanceID = capabilities.instanceID
-    contentUI.dashboard.taskBoardRevision = capabilities.revision
-    return capabilities
-  }
-
   nonisolated static func hydrateKeyMaterial(
     into runtime: TaskBoardGitRuntimeConfig,
     instanceID: String,

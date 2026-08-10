@@ -38,99 +38,71 @@ extension HarnessMonitorStore {
   }
 
   func connect(using client: any HarnessMonitorClientProtocol) async {
-    if shouldAbandonConnectionAttempt {
-      await abandonConnectionAttempt(using: client, wasAdopted: false)
-      return
-    }
+    let containmentFence: LegacyContainmentFence
     do {
-      _ = try await requireDatabaseBackedTaskBoard(using: client)
+      containmentFence = try currentLegacyContainmentFence()
     } catch {
       await client.shutdown()
+      return
+    }
+    let capabilities: TaskBoardCapabilities
+    do {
+      capabilities = try await databaseBackedTaskBoardCapabilities(using: client)
+    } catch {
+      await client.shutdown()
+      guard isCurrentLegacyContainmentFence(containmentFence) else { return }
       self.client = nil
       taskBoardDatabaseInstanceID = nil
-      guard !shouldAbandonConnectionAttempt else {
-        connectionState = .idle
-        return
-      }
       await applyConnectionFailure(error)
       return
     }
-    guard !shouldAbandonConnectionAttempt else {
-      await abandonConnectionAttempt(using: client, wasAdopted: false)
+    guard isCurrentLegacyContainmentFence(containmentFence) else {
+      await client.shutdown()
+      return
+    }
+    await refreshPersistedSessionMetadata()
+    guard isCurrentLegacyContainmentFence(containmentFence) else {
+      await client.shutdown()
+      return
+    }
+    let synchronizedCredentials = await syncStoredTaskBoardCredentialsForNewDaemon(
+      using: client,
+      validatedCapabilities: capabilities,
+      containmentFence: containmentFence
+    )
+    guard
+      synchronizedCredentials,
+      isCurrentLegacyContainmentFence(containmentFence)
+    else {
+      await client.shutdown()
       return
     }
     self.client = client
-    await refreshPersistedSessionMetadata()
-    _ = await syncStoredTaskBoardCredentialsForNewDaemon(using: client)
 
     if maintainsLiveDaemonObservation {
-      await connectLive(using: client)
+      await connectLive(using: client, containmentFence: containmentFence)
       return
     }
 
     do {
       try await performPreviewConnectRefresh(using: client, preserveSelection: true)
     } catch {
-      await discardActiveConnection()
-      guard !shouldAbandonConnectionAttempt else {
-        connectionState = .idle
+      guard isCurrentLegacyContainmentFence(containmentFence) else {
+        await client.shutdown()
         return
       }
+      await discardActiveConnection()
       await applyConnectionFailure(error)
       return
     }
 
-    guard !shouldAbandonConnectionAttempt else {
-      await abandonConnectionAttempt(using: client, wasAdopted: true)
+    guard isCurrentLegacyContainmentFence(containmentFence) else {
+      await client.shutdown()
       return
     }
     withUISyncBatch {
       connectionState = .online
     }
-  }
-
-  private func connectLive(using client: any HarnessMonitorClientProtocol) async {
-    guard !shouldAbandonConnectionAttempt else {
-      await abandonConnectionAttempt(using: client, wasAdopted: true)
-      return
-    }
-    withUISyncBatch {
-      connectionState = .connecting
-    }
-
-    let transport: TransportKind = client is WebSocketTransport ? .webSocket : .httpSSE
-    resetConnectionMetrics(for: transport)
-
-    do {
-      try await performInitialConnectRefresh(using: client, preserveSelection: true)
-    } catch {
-      await discardActiveConnection()
-      guard !shouldAbandonConnectionAttempt else {
-        connectionState = .idle
-        return
-      }
-      await applyConnectionFailure(error)
-      return
-    }
-
-    guard !shouldAbandonConnectionAttempt else {
-      await abandonConnectionAttempt(using: client, wasAdopted: true)
-      return
-    }
-    withUISyncBatch {
-      connectionState = .online
-      markConnectionOnline()
-    }
-    appendConnectionEvent(kind: .connected, detail: connectedEventDetail(for: transport))
-    startConnectionProbe(using: client)
-    startManifestWatcher()
-    startGlobalStream(using: client)
-    if let selectedSessionID {
-      startSessionStream(using: client, sessionID: selectedSessionID)
-    } else {
-      stopSessionStream()
-    }
-    scheduleSupervisorTick(reason: "connect-live")
   }
 
   private func performPreviewConnectRefresh(
@@ -165,7 +137,7 @@ extension HarnessMonitorStore {
     }
   }
 
-  private func performInitialConnectRefresh(
+  func performInitialConnectRefresh(
     using client: any HarnessMonitorClientProtocol,
     preserveSelection: Bool
   ) async throws {
@@ -401,20 +373,4 @@ extension HarnessMonitorStore {
     }
     return RefreshSnapshotErrorFormatting.describeUnderlying(error)
   }
-}
-
-struct RefreshApplyOptions {
-  let preserveSelection: Bool
-  let allowPreviewReadySelection: Bool
-  let recordConnectionTelemetry: Bool
-  let isInitialConnect: Bool
-  let adoptsLocalManifest: Bool
-}
-struct TaskBoardConfirmationTick {
-  var resolvedItems: [TaskBoardItem]
-  var resolvedStatus: TaskBoardOrchestratorStatus?
-  var automationSnapshot: TaskBoardAutomationSnapshot?
-  var positionMutationGeneration: UInt64
-  var shouldApply: Bool
-  var shouldKeepWaiting: Bool
 }

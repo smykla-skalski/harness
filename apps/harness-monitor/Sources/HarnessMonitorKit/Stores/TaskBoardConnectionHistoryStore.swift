@@ -32,6 +32,10 @@ final class TaskBoardConnectionHistoryStore {
     return previous == instanceID ? nil : previous
   }
 
+  func lastConnectedDatabaseInstance() -> String? {
+    state.lastConnectedDatabaseInstanceID
+  }
+
   func recordRepositoryOverrideSlugs(_ slugs: Set<String>, instanceID: String) {
     guard !slugs.isEmpty else { return }
     let existing = Set(state.repositoryOverrideSlugs[instanceID] ?? [])

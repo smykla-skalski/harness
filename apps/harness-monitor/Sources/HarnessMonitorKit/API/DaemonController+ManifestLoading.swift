@@ -346,7 +346,8 @@ extension DaemonController {
     case .manifestMissing, .manifestUnreadable, .invalidManifest:
       return true
     case .daemonDidNotStart, .daemonOffline, .harnessBinaryNotFound, .externalDaemonOffline,
-      .externalDaemonManifestStale, .managedDaemonVersionMismatch, .commandFailed:
+      .externalDaemonManifestStale, .managedDaemonVersionMismatch,
+      .legacyManagedLaunchAgentCleanupFailed, .commandFailed:
       return false
     }
   }

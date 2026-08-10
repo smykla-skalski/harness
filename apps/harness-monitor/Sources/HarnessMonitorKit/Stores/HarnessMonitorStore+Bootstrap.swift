@@ -242,7 +242,7 @@ extension HarnessMonitorStore {
     let registrationState: DaemonLaunchAgentRegistrationState
     do {
       registrationState = try await withBootstrapTelemetryPhase(.managedLaunchAgentReady) {
-        try await ensureManagedLaunchAgentReady()
+        try await ensureManagedLaunchAgentReady(legacyCleanupAlreadyRequired: true)
       }
     } catch {
       await applyLaunchAgentOfflineState(reason: error.localizedDescription)
@@ -295,7 +295,11 @@ extension HarnessMonitorStore {
       // last persisted snapshot immediately while we wait for the manifest.
       restorePersistedSessionStateWhileConnectingInBackground()
       let client = try await withBootstrapTelemetryPhase(.externalDaemonWarmUp) {
-        try await daemonController.awaitManifestWarmUp(timeout: bootstrapWarmUpTimeout)
+        try await withLegacyContainmentClient {
+          try await daemonController.awaitManifestWarmUpAfterLegacyCleanup(
+            timeout: bootstrapWarmUpTimeout
+          )
+        }
       }
       await withBootstrapTelemetryPhase(.externalInitialConnect) {
         await connect(using: client)
@@ -323,7 +327,9 @@ extension HarnessMonitorStore {
     do {
       try await requireLegacyManagedLaunchAgentCleanupOrThrow()
       let client = try await withBootstrapTelemetryPhase(.remoteDaemonConnect) {
-        try await daemonController.bootstrapClient()
+        try await withLegacyContainmentClient {
+          try await daemonController.bootstrapClient()
+        }
       }
       await withBootstrapTelemetryPhase(.remoteInitialConnect) {
         await connect(using: client)
