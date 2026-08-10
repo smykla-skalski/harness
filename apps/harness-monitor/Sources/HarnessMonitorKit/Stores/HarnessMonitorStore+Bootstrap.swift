@@ -18,7 +18,7 @@ extension HarnessMonitorStore {
       replayQueuedReconnectAfterBootstrapIfNeeded()
     }
 
-    pruneRepositoryLabelUsageCache()
+    scheduleRepositoryLabelUsageCachePrune()
     scheduleReviewFilesVacuumIfNeeded()
 
     if usesRemoteDaemon {
@@ -35,10 +35,19 @@ extension HarnessMonitorStore {
     }
   }
 
-  private func pruneRepositoryLabelUsageCache() {
+  private func scheduleRepositoryLabelUsageCachePrune() {
     guard let modelContext else { return }
-    let cache = RepositoryLabelUsageCache(context: modelContext)
-    cache.pruneStale()
+    let container = modelContext.container
+    Task.detached(priority: .background) {
+      Self.runRepositoryLabelUsageCachePrune(container: container)
+    }
+  }
+
+  nonisolated private static func runRepositoryLabelUsageCachePrune(
+    container: ModelContainer
+  ) {
+    let context = ModelContext(container)
+    RepositoryLabelUsageCacheMaintenance(context: context).pruneStale()
   }
 
   /// Vacuum old dependency-files rows when the per-file cache exceeds the
@@ -53,14 +62,14 @@ extension HarnessMonitorStore {
     let container = modelContext.container
     let cutoff = Date.now.addingTimeInterval(-Self.reviewFilesVacuumMaxAge)
     Task.detached(priority: .background) {
-      await Self.runReviewFilesVacuum(container: container, cutoff: cutoff)
+      Self.runReviewFilesVacuum(container: container, cutoff: cutoff)
     }
   }
 
-  private static func runReviewFilesVacuum(
+  nonisolated private static func runReviewFilesVacuum(
     container: ModelContainer,
     cutoff: Date
-  ) async {
+  ) {
     let context = ModelContext(container)
     let cache = ReviewFilesCache(context: context)
     let pruned = cache.pruneStale(cutoff: cutoff)

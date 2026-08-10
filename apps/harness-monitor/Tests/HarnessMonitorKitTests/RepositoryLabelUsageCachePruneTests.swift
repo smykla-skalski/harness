@@ -12,6 +12,27 @@ struct RepositoryLabelUsageCachePruneTests {
     return (RepositoryLabelUsageCache(context: context), context)
   }
 
+  @Test("Bootstrap schedules cache maintenance outside the main actor")
+  func bootstrapSchedulesCacheMaintenanceOutsideMainActor() throws {
+    let monitorRoot = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let bootstrapURL = monitorRoot.appendingPathComponent(
+      "Sources/HarnessMonitorKit/Stores/HarnessMonitorStore+Bootstrap.swift"
+    )
+    let source = try String(contentsOf: bootstrapURL, encoding: .utf8)
+
+    #expect(source.contains("scheduleRepositoryLabelUsageCachePrune()"))
+    #expect(source.contains("Task.detached(priority: .background)"))
+    #expect(
+      source.contains(
+        "nonisolated private static func runRepositoryLabelUsageCachePrune("
+      )
+    )
+    #expect(source.contains("nonisolated private static func runReviewFilesVacuum("))
+  }
+
   @Test("pruneStale caps rows per repository at the lowest-rank tail")
   func pruneStaleCapsLowestRankTailPerRepository() throws {
     let (cache, context) = try makeCache()
