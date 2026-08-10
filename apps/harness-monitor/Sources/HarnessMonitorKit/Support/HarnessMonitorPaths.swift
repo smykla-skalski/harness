@@ -150,6 +150,9 @@ public enum HarnessMonitorPaths {
     ) {
       return explicitLabel
     }
+    if let lane = explicitlyConfiguredRuntimeLane(using: environment) {
+      return "\(managedLaunchAgentLabelBase())-\(lane)"
+    }
     if let embeddedLabel = embeddedBundleValue(
       for: "HarnessMonitorManagedLaunchAgentLabel",
       using: environment

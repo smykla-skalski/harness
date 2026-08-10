@@ -50,4 +50,36 @@ extension HarnessMonitorStore {
     adoptDatabaseBackedTaskBoard(capabilities)
     return client
   }
+
+  func bootstrapSynchronizedTaskBoardClient() async throws
+    -> any HarnessMonitorClientProtocol
+  {
+    try await requireLegacyManagedLaunchAgentCleanupOrThrow()
+    let connectionFence = try beginConnectionAttempt()
+    let (candidate, capabilities) = try await withLegacyContainmentClient(
+      { try await daemonController.bootstrapClient() },
+      perform: { candidate in
+        let capabilities = try await databaseBackedTaskBoardCapabilities(using: candidate)
+        return (candidate, capabilities)
+      }
+    )
+    guard isCurrentConnectionAttemptFence(connectionFence) else {
+      await candidate.shutdown()
+      throw CancellationError()
+    }
+    let synchronized = await syncStoredTaskBoardCredentialsForNewDaemon(
+      using: candidate,
+      validatedCapabilities: capabilities,
+      connectionFence: connectionFence
+    )
+    guard synchronized, isCurrentConnectionAttemptFence(connectionFence) else {
+      await candidate.shutdown()
+      throw HarnessMonitorAPIError.server(
+        code: 503,
+        message: "Task Board credential synchronization did not complete"
+      )
+    }
+    self.client = candidate
+    return candidate
+  }
 }

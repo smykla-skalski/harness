@@ -1,3 +1,8 @@
+struct ConnectionAttemptFence: Sendable {
+  let generation: UInt64
+  let containment: LegacyContainmentFence
+}
+
 extension HarnessMonitorStore {
   var shouldAbandonConnectionAttempt: Bool {
     Task.isCancelled || !connection.legacyContainmentHealthy
@@ -22,6 +27,31 @@ extension HarnessMonitorStore {
   var connectionRecoveryGeneration: UInt64 {
     get { connection.connectionRecoveryGeneration }
     set { connection.connectionRecoveryGeneration = newValue }
+  }
+
+  func beginConnectionAttempt() throws -> ConnectionAttemptFence {
+    let containment = try currentLegacyContainmentFence()
+    connection.connectionAttemptGeneration &+= 1
+    return ConnectionAttemptFence(
+      generation: connection.connectionAttemptGeneration,
+      containment: containment
+    )
+  }
+
+  func invalidateConnectionAttempts() {
+    connection.connectionAttemptGeneration &+= 1
+  }
+
+  func isCurrentConnectionAttemptFence(_ fence: ConnectionAttemptFence) -> Bool {
+    fence.generation == connection.connectionAttemptGeneration
+      && isCurrentLegacyContainmentFence(fence.containment)
+  }
+
+  func isCurrentConnectionAttemptFenceIfProvided(
+    _ fence: ConnectionAttemptFence?
+  ) -> Bool {
+    guard let fence else { return !shouldAbandonConnectionAttempt }
+    return isCurrentConnectionAttemptFence(fence)
   }
 
   func scheduleReconnectAfterConnectionFailure() {

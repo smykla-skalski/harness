@@ -8,9 +8,15 @@ extension HarnessMonitorStore {
     using client: any HarnessMonitorClientProtocol,
     instanceID providedInstanceID: String? = nil,
     forceCredentialSync: Bool = false,
-    containmentFence providedFence: LegacyContainmentFence? = nil
+    containmentFence providedFence: LegacyContainmentFence? = nil,
+    connectionFence: ConnectionAttemptFence? = nil
   ) async -> Bool {
-    guard let fence = resolvedLegacyContainmentFence(providedFence) else {
+    guard
+      let fence = resolvedLegacyContainmentFence(
+        providedFence ?? connectionFence?.containment
+      ),
+      isCurrentTaskBoardConnectionFence(fence, connectionFence: connectionFence)
+    else {
       return false
     }
     guard let instanceID = providedInstanceID ?? taskBoardDatabaseInstanceID else {
@@ -22,7 +28,8 @@ extension HarnessMonitorStore {
         client: client,
         instanceID: instanceID,
         ownership: daemonOwnership,
-        containmentFence: fence
+        containmentFence: fence,
+        connectionFence: connectionFence
       )
     else {
       return false
@@ -31,7 +38,8 @@ extension HarnessMonitorStore {
       using: client,
       instanceID: instanceID,
       forceCredentialSync: forceCredentialSync,
-      containmentFence: fence
+      containmentFence: fence,
+      connectionFence: connectionFence
     )
   }
 
@@ -39,7 +47,8 @@ extension HarnessMonitorStore {
     using client: any HarnessMonitorClientProtocol,
     instanceID: String,
     forceCredentialSync: Bool,
-    containmentFence fence: LegacyContainmentFence
+    containmentFence fence: LegacyContainmentFence,
+    connectionFence: ConnectionAttemptFence?
   ) async -> Bool {
     do {
       async let storedCredentials = taskBoardSettingsWorker.loadStoredCredentials(
@@ -48,20 +57,28 @@ extension HarnessMonitorStore {
       )
       async let runtimeConfig = client.taskBoardGitRuntimeConfig()
       let baseRuntime = try await runtimeConfig
-      guard isCurrentLegacyContainmentFence(fence) else { return false }
+      guard isCurrentTaskBoardConnectionFence(fence, connectionFence: connectionFence) else {
+        return false
+      }
       recordTaskBoardRepositoryOverrides(instanceID: instanceID, runtime: baseRuntime)
       let hydratedRuntime = await taskBoardSettingsWorker.hydrateKeyMaterial(
         into: baseRuntime,
         instanceID: instanceID,
         ownership: daemonOwnership
       )
-      guard isCurrentLegacyContainmentFence(fence) else { return false }
+      guard isCurrentTaskBoardConnectionFence(fence, connectionFence: connectionFence) else {
+        return false
+      }
       _ = try await client.syncTaskBoardGitRuntimeKeyMaterial(
         request: TaskBoardGitRuntimeKeyMaterialSyncRequest(runtime: hydratedRuntime)
       )
-      guard isCurrentLegacyContainmentFence(fence) else { return false }
+      guard isCurrentTaskBoardConnectionFence(fence, connectionFence: connectionFence) else {
+        return false
+      }
       let credentials = try await storedCredentials
-      guard isCurrentLegacyContainmentFence(fence) else { return false }
+      guard isCurrentTaskBoardConnectionFence(fence, connectionFence: connectionFence) else {
+        return false
+      }
       let now = Date()
       if !forceCredentialSync,
         shouldSkipStoredTaskBoardCredentialSync(
@@ -75,11 +92,15 @@ extension HarnessMonitorStore {
       _ = try await client.syncTaskBoardGitHubTokens(
         request: credentials.githubCredentials.syncRequest
       )
-      guard isCurrentLegacyContainmentFence(fence) else { return false }
+      guard isCurrentTaskBoardConnectionFence(fence, connectionFence: connectionFence) else {
+        return false
+      }
       _ = try await client.syncTaskBoardOpenRouterToken(
         request: credentials.openRouterCredentials.syncRequest
       )
-      guard isCurrentLegacyContainmentFence(fence) else { return false }
+      guard isCurrentTaskBoardConnectionFence(fence, connectionFence: connectionFence) else {
+        return false
+      }
       lastTaskBoardCredentialSync = TaskBoardCredentialSyncState(
         instanceID: instanceID,
         credentials: credentials,
@@ -91,15 +112,21 @@ extension HarnessMonitorStore {
         "task-board credential sync failed: \(description, privacy: .public)"
       )
     }
-    return isCurrentLegacyContainmentFence(fence)
+    return isCurrentTaskBoardConnectionFence(fence, connectionFence: connectionFence)
   }
 
   func syncStoredTaskBoardCredentialsForNewDaemon(
     using client: any HarnessMonitorClientProtocol,
     validatedCapabilities: TaskBoardCapabilities? = nil,
-    containmentFence providedFence: LegacyContainmentFence? = nil
+    containmentFence providedFence: LegacyContainmentFence? = nil,
+    connectionFence: ConnectionAttemptFence? = nil
   ) async -> Bool {
-    guard let fence = resolvedLegacyContainmentFence(providedFence) else {
+    guard
+      let fence = resolvedLegacyContainmentFence(
+        providedFence ?? connectionFence?.containment
+      ),
+      isCurrentTaskBoardConnectionFence(fence, connectionFence: connectionFence)
+    else {
       return false
     }
     let capabilities: TaskBoardCapabilities
@@ -108,9 +135,13 @@ extension HarnessMonitorStore {
     } else {
       do {
         capabilities = try await databaseBackedTaskBoardCapabilities(using: client)
-        try requireCurrentLegacyContainmentFence(fence)
+        guard isCurrentTaskBoardConnectionFence(fence, connectionFence: connectionFence) else {
+          return false
+        }
       } catch {
-        guard isCurrentLegacyContainmentFence(fence) else { return false }
+        guard isCurrentTaskBoardConnectionFence(fence, connectionFence: connectionFence) else {
+          return false
+        }
         let description = RefreshSnapshotErrorFormatting.describeUnderlying(error)
         HarnessMonitorLogger.store.error(
           "task-board database capability check failed: \(description, privacy: .public)"
@@ -118,23 +149,32 @@ extension HarnessMonitorStore {
         return false
       }
     }
-    guard isCurrentLegacyContainmentFence(fence) else { return false }
+    guard isCurrentTaskBoardConnectionFence(fence, connectionFence: connectionFence) else {
+      return false
+    }
     var resolvedMigrationSource = false
     if let previousID = taskBoardSecretMigrationSource(for: capabilities.instanceID) {
       resolvedMigrationSource = await migrateStoredTaskBoardSecrets(
         from: previousID,
         to: capabilities.instanceID,
-        containmentFence: fence
+        containmentFence: fence,
+        connectionFence: connectionFence
       )
-      guard isCurrentLegacyContainmentFence(fence) else { return false }
+      guard isCurrentTaskBoardConnectionFence(fence, connectionFence: connectionFence) else {
+        return false
+      }
     }
     let synchronized = await syncStoredTaskBoardCredentials(
       using: client,
       instanceID: capabilities.instanceID,
       forceCredentialSync: true,
-      containmentFence: fence
+      containmentFence: fence,
+      connectionFence: connectionFence
     )
-    guard synchronized, isCurrentLegacyContainmentFence(fence) else {
+    guard
+      synchronized,
+      isCurrentTaskBoardConnectionFence(fence, connectionFence: connectionFence)
+    else {
       return false
     }
     adoptDatabaseBackedTaskBoard(capabilities)
@@ -157,9 +197,15 @@ extension HarnessMonitorStore {
     client: any HarnessMonitorClientProtocol,
     instanceID: String,
     ownership: DaemonOwnership,
-    containmentFence providedFence: LegacyContainmentFence? = nil
+    containmentFence providedFence: LegacyContainmentFence? = nil,
+    connectionFence: ConnectionAttemptFence? = nil
   ) async -> Bool {
-    guard let fence = resolvedLegacyContainmentFence(providedFence) else {
+    guard
+      let fence = resolvedLegacyContainmentFence(
+        providedFence ?? connectionFence?.containment
+      ),
+      isCurrentTaskBoardConnectionFence(fence, connectionFence: connectionFence)
+    else {
       return false
     }
     _ = await taskBoardSettingsWorker.completeRuntimeSecretHandoffIfNeeded(
@@ -167,7 +213,16 @@ extension HarnessMonitorStore {
       instanceID: instanceID,
       ownership: ownership
     )
-    return isCurrentLegacyContainmentFence(fence)
+    return isCurrentTaskBoardConnectionFence(fence, connectionFence: connectionFence)
+  }
+
+  func isCurrentTaskBoardConnectionFence(
+    _ containmentFence: LegacyContainmentFence,
+    connectionFence: ConnectionAttemptFence?
+  ) -> Bool {
+    guard isCurrentLegacyContainmentFence(containmentFence) else { return false }
+    guard let connectionFence else { return true }
+    return isCurrentConnectionAttemptFence(connectionFence)
   }
 
   private func shouldSkipStoredTaskBoardCredentialSync(

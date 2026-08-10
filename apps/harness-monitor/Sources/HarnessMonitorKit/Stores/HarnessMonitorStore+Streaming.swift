@@ -6,7 +6,10 @@ extension HarnessMonitorStore {
   ]
   static let streamReconnectMaxAttempts = 6
 
-  func startGlobalStream(using client: any HarnessMonitorClientProtocol) {
+  func startGlobalStream(
+    using client: any HarnessMonitorClientProtocol,
+    connectionFence: ConnectionAttemptFence? = nil
+  ) {
     stopGlobalStream()
     guard maintainsLiveDaemonObservation else {
       return
@@ -19,7 +22,13 @@ extension HarnessMonitorStore {
         // the recovery they schedule starts them again, so a reference held
         // across the wait would keep a store nobody owns any more reconnecting
         // for the life of the process.
-        guard let outcome = await self?.runGlobalStreamPass(using: client, state: &state) else {
+        guard
+          let outcome = await self?.runGlobalStreamPass(
+            using: client,
+            state: &state,
+            connectionFence: connectionFence
+          )
+        else {
           return
         }
         guard case .retry(let delay) = outcome else {

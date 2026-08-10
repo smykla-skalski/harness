@@ -272,17 +272,7 @@ extension HarnessMonitorStore {
       return try await requireCurrentDatabaseBackedTaskBoardClient(client)
     }
 
-    try await requireLegacyManagedLaunchAgentCleanupOrThrow()
-    let (bootstrappedClient, capabilities) = try await withLegacyContainmentClient(
-      { try await daemonController.bootstrapClient() },
-      perform: { candidate in
-        let capabilities = try await databaseBackedTaskBoardCapabilities(using: candidate)
-        return (candidate, capabilities)
-      }
-    )
-    adoptDatabaseBackedTaskBoard(capabilities)
-    self.client = bootstrappedClient
-    return bootstrappedClient
+    return try await bootstrapSynchronizedTaskBoardClient()
   }
 
 }

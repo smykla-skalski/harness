@@ -34,6 +34,7 @@ extension HarnessMonitorStore {
       LiveRemoteDaemonReconnectSleeper()
     @ObservationIgnored var connectionRecoveryTask: Task<Void, Never>?
     @ObservationIgnored var connectionRecoveryGeneration: UInt64 = 0
+    @ObservationIgnored var connectionAttemptGeneration: UInt64 = 0
     @ObservationIgnored var legacyContainmentHealthy = true
     @ObservationIgnored var legacyContainmentGeneration: UInt64 = 0
     @ObservationIgnored var legacyContainmentReconnectTask: Task<Void, Never>?

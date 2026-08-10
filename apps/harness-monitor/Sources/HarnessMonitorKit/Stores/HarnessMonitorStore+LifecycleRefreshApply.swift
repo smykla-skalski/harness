@@ -4,22 +4,19 @@ extension HarnessMonitorStore {
   func applyRefreshSnapshot(
     _ refreshSnapshot: RefreshSnapshot,
     using client: any HarnessMonitorClientProtocol,
-    options: RefreshApplyOptions
+    options: RefreshApplyOptions,
+    connectionFence: ConnectionAttemptFence? = nil
   ) async {
     let preserveSelection = options.preserveSelection
     let allowPreviewReadySelection = options.allowPreviewReadySelection
     let recordConnectionTelemetry = options.recordConnectionTelemetry
     cancelInitialTaskBoardConfirmationRefresh()
     let measuredDiagnostics = refreshSnapshot.diagnostics
-    let measuredProjects = refreshSnapshot.projects
-    let measuredSessions = refreshSnapshot.sessions
     let refreshTimings = refreshSnapshot.refreshTimings()
-    let generation = beginSessionIndexSnapshotApply()
     guard
-      let filteredSnapshot = await preparedSessionIndexSnapshot(
-        projects: measuredProjects.value,
-        sessions: measuredSessions.value,
-        generation: generation
+      let filteredSnapshot = await preparedRefreshSessionSnapshot(
+        refreshSnapshot,
+        connectionFence: connectionFence
       )
     else {
       return
@@ -97,6 +94,25 @@ extension HarnessMonitorStore {
       using: client,
       sessions: filteredSnapshot.sessions
     )
+  }
+
+  private func preparedRefreshSessionSnapshot(
+    _ refreshSnapshot: RefreshSnapshot,
+    connectionFence: ConnectionAttemptFence?
+  ) async -> SessionSnapshotWorkerOutput? {
+    guard isCurrentConnectionAttemptFenceIfProvided(connectionFence) else { return nil }
+    let generation = beginSessionIndexSnapshotApply()
+    guard
+      let snapshot = await preparedSessionIndexSnapshot(
+        projects: refreshSnapshot.projects.value,
+        sessions: refreshSnapshot.sessions.value,
+        generation: generation
+      ),
+      isCurrentConnectionAttemptFenceIfProvided(connectionFence)
+    else {
+      return nil
+    }
+    return snapshot
   }
 
   private func restoreSelectionAfterRefresh(

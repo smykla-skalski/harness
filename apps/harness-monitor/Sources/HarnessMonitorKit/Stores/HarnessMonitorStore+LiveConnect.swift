@@ -3,9 +3,9 @@ import Foundation
 extension HarnessMonitorStore {
   func connectLive(
     using client: any HarnessMonitorClientProtocol,
-    containmentFence: LegacyContainmentFence
+    connectionFence: ConnectionAttemptFence
   ) async {
-    guard isCurrentLegacyContainmentFence(containmentFence) else {
+    guard isCurrentConnectionAttemptFence(connectionFence) else {
       await client.shutdown()
       return
     }
@@ -17,9 +17,13 @@ extension HarnessMonitorStore {
     resetConnectionMetrics(for: transport)
 
     do {
-      try await performInitialConnectRefresh(using: client, preserveSelection: true)
+      try await performInitialConnectRefresh(
+        using: client,
+        preserveSelection: true,
+        connectionFence: connectionFence
+      )
     } catch {
-      guard isCurrentLegacyContainmentFence(containmentFence) else {
+      guard isCurrentConnectionAttemptFence(connectionFence) else {
         await client.shutdown()
         return
       }
@@ -28,7 +32,7 @@ extension HarnessMonitorStore {
       return
     }
 
-    guard isCurrentLegacyContainmentFence(containmentFence) else {
+    guard isCurrentConnectionAttemptFence(connectionFence) else {
       await client.shutdown()
       return
     }
@@ -37,9 +41,9 @@ extension HarnessMonitorStore {
       markConnectionOnline()
     }
     appendConnectionEvent(kind: .connected, detail: connectedEventDetail(for: transport))
-    startConnectionProbe(using: client)
+    startConnectionProbe(using: client, connectionFence: connectionFence)
     startManifestWatcher()
-    startGlobalStream(using: client)
+    startGlobalStream(using: client, connectionFence: connectionFence)
     if let selectedSessionID {
       startSessionStream(using: client, sessionID: selectedSessionID)
     } else {

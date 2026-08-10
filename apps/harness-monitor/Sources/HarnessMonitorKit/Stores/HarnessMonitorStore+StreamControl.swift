@@ -29,6 +29,7 @@ extension HarnessMonitorStore {
   }
 
   func stopAllStreams(resetSubscriptions: Bool = true) {
+    invalidateConnectionAttempts()
     stopGlobalStream()
     stopSessionStream(resetSubscriptions: resetSubscriptions)
     stopConnectionProbe()

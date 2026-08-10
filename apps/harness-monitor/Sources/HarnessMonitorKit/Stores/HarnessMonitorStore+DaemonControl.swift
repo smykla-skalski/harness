@@ -20,6 +20,7 @@ extension HarnessMonitorStore {
     }
 
     isAppLifecycleSuspended = true
+    resolveSecretMigrationConsent(nil)
     stopRemoteDaemonReconnect()
     stopManifestWatcher()
     stopAllStreams()

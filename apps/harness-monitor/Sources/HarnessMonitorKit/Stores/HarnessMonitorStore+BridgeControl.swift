@@ -247,6 +247,7 @@ extension HarnessMonitorStore {
   private func restartManagedDaemonForHostBridgeReconfigure() async throws
     -> any HarnessMonitorClientProtocol
   {
+    stopConnectionRecovery()
     stopAllStreams()
     let staleClient = client
     client = nil

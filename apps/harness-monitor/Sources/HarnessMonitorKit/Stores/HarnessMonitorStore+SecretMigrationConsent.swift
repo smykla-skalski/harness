@@ -67,7 +67,8 @@ extension HarnessMonitorStore {
   func migrateStoredTaskBoardSecrets(
     from previousID: String,
     to currentID: String,
-    containmentFence: LegacyContainmentFence? = nil
+    containmentFence: LegacyContainmentFence? = nil,
+    connectionFence: ConnectionAttemptFence? = nil
   ) async -> Bool {
     let knownRepositories = knownTaskBoardRepositorySlugs(for: previousID, currentID)
     let items: [TaskBoardSecretMigrationItem]
@@ -84,7 +85,7 @@ extension HarnessMonitorStore {
       return false
     }
 
-    guard isCurrentLegacyContainmentFenceIfProvided(containmentFence) else {
+    guard isCurrentSecretMigrationFence(containmentFence, connectionFence) else {
       return false
     }
 
@@ -97,7 +98,7 @@ extension HarnessMonitorStore {
     // deliberate cancel is honored without a Keychain write and is not
     // re-prompted on the next reconnect.
     let selections = await presentSecretMigrationConsent(items)
-    guard isCurrentLegacyContainmentFenceIfProvided(containmentFence) else {
+    guard isCurrentSecretMigrationFence(containmentFence, connectionFence) else {
       return false
     }
     guard let selections else {
@@ -112,7 +113,7 @@ extension HarnessMonitorStore {
         knownRepositories: knownRepositories,
         selections: selections
       )
-      guard isCurrentLegacyContainmentFenceIfProvided(containmentFence) else {
+      guard isCurrentSecretMigrationFence(containmentFence, connectionFence) else {
         return false
       }
       taskBoardRuntimeState.connection.previousDatabaseInstanceID = nil
@@ -132,6 +133,14 @@ extension HarnessMonitorStore {
     return isCurrentLegacyContainmentFence(fence)
   }
 
+  private func isCurrentSecretMigrationFence(
+    _ containmentFence: LegacyContainmentFence?,
+    _ connectionFence: ConnectionAttemptFence?
+  ) -> Bool {
+    isCurrentLegacyContainmentFenceIfProvided(containmentFence)
+      && isCurrentConnectionAttemptFenceIfProvided(connectionFence)
+  }
+
   /// Presents the review sheet and parks the connection sync until the user
   /// applies or dismisses it. Returns the per-secret choices, or `nil` when the
   /// prompt is dismissed without a choice (treated as carry nothing).
@@ -139,6 +148,7 @@ extension HarnessMonitorStore {
     _ items: [TaskBoardSecretMigrationItem]
   ) async -> TaskBoardSecretMigrationSelections? {
     await withCheckedContinuation { continuation in
+      resolveSecretMigrationConsent(nil)
       taskBoardRuntimeState.connection.secretMigrationConsent =
         TaskBoardSecretMigrationConsentState(
           items: items,
@@ -161,8 +171,6 @@ extension HarnessMonitorStore {
   /// Fallback for a sheet dismissed by other means (Escape, window close):
   /// resumes the parked sync with no explicit choice.
   func cancelSecretMigrationConsentIfPending() {
-    guard let consent = taskBoardRuntimeState.connection.secretMigrationConsent else { return }
-    taskBoardRuntimeState.connection.secretMigrationConsent = nil
-    consent.continuation?.resume(returning: nil)
+    resolveSecretMigrationConsent(nil)
   }
 }

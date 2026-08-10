@@ -2,23 +2,34 @@ extension HarnessMonitorStore {
   func processGlobalStreamEvent(
     _ event: DaemonPushEvent,
     using client: any HarnessMonitorClientProtocol,
-    hasSeenReady: inout Bool
+    hasSeenReady: inout Bool,
+    connectionFence: ConnectionAttemptFence? = nil
   ) async -> Bool {
+    guard isCurrentConnectionAttemptFenceIfProvided(connectionFence) else {
+      return false
+    }
     guard case .ready = event.kind else {
       await applyGlobalPushEventFromStream(event)
-      return true
+      return isCurrentConnectionAttemptFenceIfProvided(connectionFence)
     }
-    guard let containmentFence = try? currentLegacyContainmentFence() else {
+    guard
+      let containmentFence = connectionFence?.containment
+        ?? (try? currentLegacyContainmentFence())
+    else {
       return false
     }
     if hasSeenReady {
       guard
         await syncStoredTaskBoardCredentialsForNewDaemon(
           using: client,
-          containmentFence: containmentFence
+          containmentFence: containmentFence,
+          connectionFence: connectionFence
         )
       else {
-        if isCurrentLegacyContainmentFence(containmentFence) {
+        if isCurrentTaskBoardConnectionFence(
+          containmentFence,
+          connectionFence: connectionFence
+        ) {
           markConnectionOffline("Connected daemon has no database-backed Task Board")
           scheduleReconnectAfterConnectionFailure()
         }
@@ -27,20 +38,25 @@ extension HarnessMonitorStore {
     } else {
       hasSeenReady = true
     }
-    guard isCurrentLegacyContainmentFence(containmentFence) else {
+    guard isCurrentConnectionAttemptFenceIfProvided(connectionFence) else {
       return false
     }
-    await recoverGlobalPushOnlyState(using: client)
-    return isCurrentLegacyContainmentFence(containmentFence)
+    await recoverGlobalPushOnlyState(using: client, connectionFence: connectionFence)
+    return isCurrentTaskBoardConnectionFence(
+      containmentFence,
+      connectionFence: connectionFence
+    )
   }
 
   func recoverGlobalPushOnlyState(
-    using client: any HarnessMonitorClientProtocol
+    using client: any HarnessMonitorClientProtocol,
+    connectionFence: ConnectionAttemptFence? = nil
   ) async {
     do {
       let measuredLogLevel = try await Self.measureOperation {
         try await client.logLevel()
       }
+      guard isCurrentConnectionAttemptFenceIfProvided(connectionFence) else { return }
       recordRequestSuccess()
       daemonLogLevel = measuredLogLevel.value.level
     } catch {
@@ -49,6 +65,7 @@ extension HarnessMonitorStore {
         "websocket reconnect log-level refresh failed: \(err, privacy: .public)"
       )
     }
-    await recoverGitHubDataPushState(using: client)
+    guard isCurrentConnectionAttemptFenceIfProvided(connectionFence) else { return }
+    await recoverGitHubDataPushState(using: client, connectionFence: connectionFence)
   }
 }

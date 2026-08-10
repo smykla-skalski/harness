@@ -98,6 +98,69 @@ struct HarnessMonitorStoreLegacyContainmentRaceTests {
     await store.prepareForTermination()
   }
 
+  @Test("Repeated ready stops recovery after containment fails during log-level refresh")
+  func repeatedReadyStopsRecoveryAfterLogLevelFailure() async throws {
+    let logLevelGate = LegacyContainmentVoidGate()
+    let client = RecordingHarnessClient()
+    client.logLevelHandler = {
+      await logLevelGate.wait()
+      return LogLevelResponse(level: "debug", filter: "harness=debug")
+    }
+    let daemon = RecordingDaemonController(client: client)
+    let store = HarnessMonitorStore(daemonController: daemon)
+    store.client = client
+    let readyTask = Task { @MainActor in
+      var hasSeenReady = false
+      return await store.processGlobalStreamEvent(
+        DaemonPushEvent(recordedAt: "2026-08-10T00:00:00Z", sessionId: nil, kind: .ready),
+        using: client,
+        hasSeenReady: &hasSeenReady
+      )
+    }
+
+    await waitForGate(logLevelGate)
+    await store.recordControllerLegacyCleanupFailureIfNeeded(
+      DaemonControlError.legacyManagedLaunchAgentCleanupFailed
+    )
+    await logLevelGate.release()
+
+    #expect(await readyTask.value == false)
+    #expect(client.readCallCount(.diagnostics) == 0)
+    #expect(store.contentUI.dashboard.taskBoardRevision == 0)
+    #expect(store.contentUI.dashboard.githubDataRevision == 0)
+    await store.prepareForTermination()
+  }
+
+  @Test("Older connection failure cannot clear a replacement client")
+  func olderConnectionFailureCannotClearReplacement() async throws {
+    let capabilityGate = LegacyContainmentVoidGate()
+    let shutdownGate = LegacyContainmentVoidGate()
+    let staleClient = RecordingHarnessClient()
+    staleClient.taskBoardCapabilitiesHandler = {
+      await capabilityGate.wait()
+      throw HarnessMonitorAPIError.server(code: 503, message: "stale daemon")
+    }
+    staleClient.shutdownHandler = { await shutdownGate.wait() }
+    let replacementClient = RecordingHarnessClient()
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(client: replacementClient)
+    )
+    let staleConnect = Task { await store.connect(using: staleClient) }
+
+    await waitForGate(capabilityGate)
+    await capabilityGate.release()
+    await waitForGate(shutdownGate)
+    await store.connect(using: replacementClient)
+    #expect(store.apiClient as? RecordingHarnessClient === replacementClient)
+    #expect(store.connectionState == .online)
+
+    await shutdownGate.release()
+    await staleConnect.value
+    #expect(store.apiClient as? RecordingHarnessClient === replacementClient)
+    #expect(store.connectionState == .online)
+    await store.prepareForTermination()
+  }
+
   private func waitForGate(_ gate: LegacyContainmentVoidGate) async {
     for _ in 0..<30 where await gate.hasEntered == false {
       try? await Task.sleep(for: .milliseconds(20))

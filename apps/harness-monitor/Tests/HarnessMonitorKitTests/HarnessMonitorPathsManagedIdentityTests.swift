@@ -46,4 +46,52 @@ struct HarnessMonitorPathsManagedIdentityTests {
         == "\(dataHome)/harness/daemon/managed"
     )
   }
+
+  @Test("Explicit runtime profile overrides bundled managed identity")
+  func explicitRuntimeProfileOverridesBundledIdentity() throws {
+    let bundleURL = FileManager.default.temporaryDirectory
+      .appendingPathComponent("HarnessMonitorPathsTests-\(UUID().uuidString).app")
+    defer { try? FileManager.default.removeItem(at: bundleURL) }
+    let contentsURL = bundleURL.appendingPathComponent("Contents", isDirectory: true)
+    try FileManager.default.createDirectory(at: contentsURL, withIntermediateDirectories: true)
+    let info: [String: Any] = [
+      "CFBundleIdentifier": "io.harnessmonitor.tests.paths",
+      "CFBundleName": "HarnessMonitorPathsTests",
+      "CFBundlePackageType": "APPL",
+      "HarnessMonitorManagedLaunchAgentLabel":
+        "Q498EB36N4.io.harnessmonitor.agent-lane-a",
+      "HarnessMonitorManagedDaemonDataHome": "/tmp/runtime-lanes/lane-a",
+      "HarnessMonitorManagedDaemonRuntimeLane": "lane-a",
+      "HarnessMonitorManagedDaemonCodexWSPort": "4812",
+    ]
+    let infoData = try PropertyListSerialization.data(
+      fromPropertyList: info,
+      format: .xml,
+      options: 0
+    )
+    try infoData.write(to: contentsURL.appendingPathComponent("Info.plist"))
+    let explicitDataHome = "/tmp/runtime-lanes/lane-b"
+    let environment = HarnessMonitorEnvironment(
+      values: [
+        HarnessMonitorRuntimeLane.environmentKey: "lane-b",
+        "XDG_DATA_HOME": explicitDataHome,
+      ],
+      homeDirectory: URL(fileURLWithPath: "/Users/example", isDirectory: true),
+      bundleURL: bundleURL
+    )
+
+    #expect(HarnessMonitorPaths.runtimeLane(using: environment) == "lane-b")
+    #expect(
+      HarnessMonitorPaths.launchAgentLabel(using: environment)
+        == "Q498EB36N4.io.harnessmonitor.agent-lane-b"
+    )
+    #expect(
+      HarnessMonitorPaths.codexBridgePort(using: environment)
+        == HarnessMonitorPaths.derivedCodexBridgePort(for: "lane-b")
+    )
+    #expect(
+      HarnessMonitorPaths.daemonRoot(using: environment).path
+        == "\(explicitDataHome)/harness/daemon/managed"
+    )
+  }
 }

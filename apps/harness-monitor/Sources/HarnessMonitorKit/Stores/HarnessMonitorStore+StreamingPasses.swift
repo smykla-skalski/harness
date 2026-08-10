@@ -14,10 +14,14 @@ extension HarnessMonitorStore {
 
   func runGlobalStreamPass(
     using client: any HarnessMonitorClientProtocol,
-    state: inout GlobalStreamPassState
+    state: inout GlobalStreamPassState,
+    connectionFence: ConnectionAttemptFence? = nil
   ) async -> StreamPassOutcome {
     do {
       for try await event in await client.globalStream() {
+        guard isCurrentConnectionAttemptFenceIfProvided(connectionFence) else {
+          return .stop
+        }
         recordReconnectRecovery(detail: "Global stream restored")
         state.attempt = 0
         recordStreamEvent(countedInTraffic: true)
@@ -25,7 +29,8 @@ extension HarnessMonitorStore {
           await processGlobalStreamEvent(
             event,
             using: client,
-            hasSeenReady: &state.hasSeenReady
+            hasSeenReady: &state.hasSeenReady,
+            connectionFence: connectionFence
           )
         else {
           return .stop

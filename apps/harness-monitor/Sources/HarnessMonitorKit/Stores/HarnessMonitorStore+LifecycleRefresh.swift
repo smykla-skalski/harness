@@ -38,9 +38,9 @@ extension HarnessMonitorStore {
   }
 
   func connect(using client: any HarnessMonitorClientProtocol) async {
-    let containmentFence: LegacyContainmentFence
+    let connectionFence: ConnectionAttemptFence
     do {
-      containmentFence = try currentLegacyContainmentFence()
+      connectionFence = try beginConnectionAttempt()
     } catch {
       await client.shutdown()
       return
@@ -50,29 +50,29 @@ extension HarnessMonitorStore {
       capabilities = try await databaseBackedTaskBoardCapabilities(using: client)
     } catch {
       await client.shutdown()
-      guard isCurrentLegacyContainmentFence(containmentFence) else { return }
+      guard isCurrentConnectionAttemptFence(connectionFence) else { return }
       self.client = nil
       taskBoardDatabaseInstanceID = nil
       await applyConnectionFailure(error)
       return
     }
-    guard isCurrentLegacyContainmentFence(containmentFence) else {
+    guard isCurrentConnectionAttemptFence(connectionFence) else {
       await client.shutdown()
       return
     }
     await refreshPersistedSessionMetadata()
-    guard isCurrentLegacyContainmentFence(containmentFence) else {
+    guard isCurrentConnectionAttemptFence(connectionFence) else {
       await client.shutdown()
       return
     }
     let synchronizedCredentials = await syncStoredTaskBoardCredentialsForNewDaemon(
       using: client,
       validatedCapabilities: capabilities,
-      containmentFence: containmentFence
+      connectionFence: connectionFence
     )
     guard
       synchronizedCredentials,
-      isCurrentLegacyContainmentFence(containmentFence)
+      isCurrentConnectionAttemptFence(connectionFence)
     else {
       await client.shutdown()
       return
@@ -80,14 +80,18 @@ extension HarnessMonitorStore {
     self.client = client
 
     if maintainsLiveDaemonObservation {
-      await connectLive(using: client, containmentFence: containmentFence)
+      await connectLive(using: client, connectionFence: connectionFence)
       return
     }
 
     do {
-      try await performPreviewConnectRefresh(using: client, preserveSelection: true)
+      try await performPreviewConnectRefresh(
+        using: client,
+        preserveSelection: true,
+        connectionFence: connectionFence
+      )
     } catch {
-      guard isCurrentLegacyContainmentFence(containmentFence) else {
+      guard isCurrentConnectionAttemptFence(connectionFence) else {
         await client.shutdown()
         return
       }
@@ -96,7 +100,7 @@ extension HarnessMonitorStore {
       return
     }
 
-    guard isCurrentLegacyContainmentFence(containmentFence) else {
+    guard isCurrentConnectionAttemptFence(connectionFence) else {
       await client.shutdown()
       return
     }
@@ -107,9 +111,14 @@ extension HarnessMonitorStore {
 
   private func performPreviewConnectRefresh(
     using client: any HarnessMonitorClientProtocol,
-    preserveSelection: Bool
+    preserveSelection: Bool,
+    connectionFence: ConnectionAttemptFence
   ) async throws {
-    try await performPreviewRefresh(using: client, preserveSelection: preserveSelection)
+    try await performPreviewRefresh(
+      using: client,
+      preserveSelection: preserveSelection,
+      connectionFence: connectionFence
+    )
   }
 
   func refresh(
@@ -139,7 +148,8 @@ extension HarnessMonitorStore {
 
   func performInitialConnectRefresh(
     using client: any HarnessMonitorClientProtocol,
-    preserveSelection: Bool
+    preserveSelection: Bool,
+    connectionFence: ConnectionAttemptFence
   ) async throws {
     let deadline = ContinuousClock.now.advanced(by: initialConnectRefreshRetryGracePeriod)
     var attempt = 0
@@ -149,7 +159,8 @@ extension HarnessMonitorStore {
         try await performRefresh(
           using: client,
           preserveSelection: preserveSelection,
-          isInitialConnect: true
+          isInitialConnect: true,
+          connectionFence: connectionFence
         )
         return
       } catch {
@@ -179,7 +190,8 @@ extension HarnessMonitorStore {
     preserveSelection: Bool,
     allowPreviewReadySelection: Bool = true,
     recordConnectionTelemetry: Bool = true,
-    isInitialConnect: Bool = false
+    isInitialConnect: Bool = false,
+    connectionFence: ConnectionAttemptFence? = nil
   ) async throws {
     let adoptsLocalManifest = !usesRemoteDaemon
     let stepModeConfirmationRevision =
@@ -200,13 +212,15 @@ extension HarnessMonitorStore {
         recordConnectionTelemetry: recordConnectionTelemetry,
         isInitialConnect: isInitialConnect,
         adoptsLocalManifest: adoptsLocalManifest
-      )
+      ),
+      connectionFence: connectionFence
     )
   }
 
   private func performPreviewRefresh(
     using client: any HarnessMonitorClientProtocol,
-    preserveSelection: Bool
+    preserveSelection: Bool,
+    connectionFence: ConnectionAttemptFence? = nil
   ) async throws {
     let adoptsLocalManifest = !usesRemoteDaemon
     let stepModeConfirmationRevision =
@@ -227,7 +241,8 @@ extension HarnessMonitorStore {
         recordConnectionTelemetry: false,
         isInitialConnect: false,
         adoptsLocalManifest: adoptsLocalManifest
-      )
+      ),
+      connectionFence: connectionFence
     )
   }
 

@@ -320,7 +320,10 @@ extension RecordingHarnessClient {
   }
 
   func logLevel() async throws -> LogLevelResponse {
-    LogLevelResponse(
+    if let logLevelHandler {
+      return try await logLevelHandler()
+    }
+    return LogLevelResponse(
       level: HarnessMonitorLogger.defaultDaemonLogLevel,
       filter: HarnessMonitorLogger.defaultDaemonFilter
     )
