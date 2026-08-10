@@ -4,7 +4,7 @@ extension HarnessMonitorStore {
   func connectLive(
     using client: any HarnessMonitorClientProtocol,
     connectionFence: ConnectionAttemptFence
-  ) async {
+  ) async throws {
     guard isCurrentConnectionAttemptFence(connectionFence) else {
       await client.shutdown()
       return
@@ -28,8 +28,7 @@ extension HarnessMonitorStore {
         return
       }
       await discardActiveConnection()
-      await applyConnectionFailure(error)
-      return
+      throw error
     }
 
     guard isCurrentConnectionAttemptFence(connectionFence) else {

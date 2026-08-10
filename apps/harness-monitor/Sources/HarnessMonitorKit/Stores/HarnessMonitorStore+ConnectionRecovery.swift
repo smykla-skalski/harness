@@ -41,6 +41,7 @@ extension HarnessMonitorStore {
   func invalidateConnectionAttempts() {
     connection.connectionAttemptGeneration &+= 1
     cancelSecretMigrationConsentIfPending()
+    cancelTaskBoardDashboardSnapshotRefresh()
   }
 
   func currentConnectionAttemptFence() throws -> ConnectionAttemptFence {

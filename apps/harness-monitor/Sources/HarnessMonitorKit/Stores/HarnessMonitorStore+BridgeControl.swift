@@ -277,7 +277,7 @@ extension HarnessMonitorStore {
         timeout: bootstrapWarmUpTimeout
       )
     }
-    await connect(using: refreshedClient)
+    try await connect(using: refreshedClient)
     guard connectionState == .online else {
       throw DaemonControlError.commandFailed(
         "The harness daemon did not become healthy before the timeout"

@@ -194,7 +194,7 @@ extension HarnessMonitorStore {
 
       recordRequestSuccess()
       presentSuccessFeedback("Saved task board settings")
-      scheduleTaskBoardSettingsPostSaveRefresh(client: client)
+      scheduleTaskBoardSettingsPostSaveRefresh(access: access)
       return true
     } catch {
       presentFailureFeedback(error.localizedDescription)
@@ -203,21 +203,28 @@ extension HarnessMonitorStore {
   }
 
   private func scheduleTaskBoardSettingsPostSaveRefresh(
-    client: any HarnessMonitorClientProtocol
+    access: TaskBoardClientAccess
   ) {
     Task { [weak self] in
       guard let self else { return }
-      await runTaskBoardSettingsPostSaveRefresh(client: client)
+      await runTaskBoardSettingsPostSaveRefresh(access: access)
     }
   }
 
   private func runTaskBoardSettingsPostSaveRefresh(
-    client: any HarnessMonitorClientProtocol
+    access: TaskBoardClientAccess
   ) async {
+    guard (try? requireCurrentTaskBoardClientAccess(access)) != nil else { return }
+    let client = access.client
     async let verifyOutcome = verifyTaskBoardSigning(client: client, repository: nil)
     async let refresh: Void = refreshTaskBoardDashboardSnapshot(using: client)
 
-    switch await verifyOutcome {
+    let resolvedVerifyOutcome = await verifyOutcome
+    guard (try? requireCurrentTaskBoardClientAccess(access)) != nil else {
+      await refresh
+      return
+    }
+    switch resolvedVerifyOutcome {
     case .skipped:
       break
     case .signed:

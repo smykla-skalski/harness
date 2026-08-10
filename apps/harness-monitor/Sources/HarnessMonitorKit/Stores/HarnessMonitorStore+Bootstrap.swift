@@ -269,7 +269,7 @@ extension HarnessMonitorStore {
         try await awaitManagedDaemonWarmUpWithRecovery()
       }
       await withBootstrapTelemetryPhase(.managedInitialConnect) {
-        await connect(using: client)
+        try await connect(using: client)
       }
     } catch {
       let recovered = await recoverManagedBootstrapFailure(from: error)
@@ -302,7 +302,7 @@ extension HarnessMonitorStore {
         }
       }
       await withBootstrapTelemetryPhase(.externalInitialConnect) {
-        await connect(using: client)
+        try await connect(using: client)
       }
     } catch {
       let recovery = externalDaemonRecoveryFeedback(
@@ -332,7 +332,7 @@ extension HarnessMonitorStore {
         }
       }
       await withBootstrapTelemetryPhase(.remoteInitialConnect) {
-        await connect(using: client)
+        try await connect(using: client)
       }
     } catch {
       guard !shouldAbandonConnectionAttempt, !(error is CancellationError) else {

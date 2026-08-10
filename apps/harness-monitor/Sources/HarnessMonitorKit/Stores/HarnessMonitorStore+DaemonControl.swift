@@ -165,21 +165,22 @@ extension HarnessMonitorStore {
   }
 
   @discardableResult
-  func recoverManagedBootstrapFailure(from error: any Error) async -> Bool {
+  func recoverManagedBootstrapFailure(from _: any Error) async -> Bool {
     startManifestWatcher()
 
-    if let client = try? await withLegacyContainmentClient({
-      try await daemonController.bootstrapClient()
-    }) {
-      await connect(using: client)
+    do {
+      let client = try await withLegacyContainmentClient {
+        try await daemonController.bootstrapClient()
+      }
+      try await connect(using: client)
       return true
+    } catch {
+      let message = error.localizedDescription
+      markConnectionOffline(message)
+      presentFailureFeedback(message)
+      await restorePersistedSessionState()
+      return false
     }
-
-    let message = error.localizedDescription
-    markConnectionOffline(message)
-    presentFailureFeedback(message)
-    await restorePersistedSessionState()
-    return false
   }
 
   func applyLaunchAgentOfflineState(reason: String) async {
@@ -239,7 +240,7 @@ extension HarnessMonitorStore {
 
     do {
       let client = try await awaitManagedDaemonWarmUpWithRecovery()
-      await connect(using: client)
+      try await connect(using: client)
     } catch {
       let recovered = await recoverManagedBootstrapFailure(from: error)
       guard !recovered else {

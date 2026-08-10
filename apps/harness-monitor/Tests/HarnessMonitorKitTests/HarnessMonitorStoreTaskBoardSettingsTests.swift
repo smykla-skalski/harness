@@ -22,7 +22,7 @@ struct HarnessMonitorStoreTaskBoardSettingsTests {
       #expect(store.taskBoardDatabaseInstanceID == nil)
     }
 
-    await store.connect(using: client)
+    try? await store.connect(using: client)
 
     #expect(store.client == nil)
     #expect(client.readCallCount(.taskBoardItems(nil)) == 0)
@@ -181,6 +181,49 @@ struct HarnessMonitorStoreTaskBoardSettingsTests {
     #expect(store.contentUI.dashboard.taskBoardOrchestratorStatus?.settings.stepMode == true)
     #expect(credentialPersistence.github.savedSnapshots == [snapshot.githubCredentials])
     #expect(keychainBundle.ssh.recorded.isEmpty)
+  }
+
+  @Test("Post-save work cannot publish after daemon replacement")
+  func postSaveWorkCannotPublishAfterDaemonReplacement() async throws {
+    let signingGate = LegacyContainmentVoidGate()
+    let staleClient = RecordingHarnessClient()
+    let store = await makeBootstrappedStore(client: staleClient)
+    staleClient.taskBoardGitSigningVerifyHandler = {
+      await signingGate.wait()
+      return .failed(message: "stale signing failure")
+    }
+    staleClient.configureTaskBoardItems([taskBoardItem(id: "stale", status: .todo)])
+    await staleClient.blockNextTaskBoardItemsRead()
+
+    let saved = await store.updateTaskBoardGitSettings(
+      snapshot: makeSettingsSnapshot(),
+      origin: .settingsSecretsSaveButton
+    )
+    #expect(saved)
+    await staleClient.waitUntilTaskBoardItemsReadIsBlocked()
+    for _ in 0..<30 where await signingGate.hasEntered == false {
+      try await Task.sleep(for: .milliseconds(20))
+    }
+    #expect(await signingGate.hasEntered)
+
+    let replacementClient = RecordingHarnessClient()
+    replacementClient.taskBoardCapabilitiesValue = TaskBoardCapabilities(
+      storage: "database",
+      revision: 9,
+      instanceID: "replacement-task-board"
+    )
+    replacementClient.configureTaskBoardItems([
+      taskBoardItem(id: "replacement", status: .todo)
+    ])
+    try await store.connect(using: replacementClient)
+    await signingGate.release()
+    await staleClient.releaseTaskBoardItemsRead()
+    try await Task.sleep(for: .milliseconds(100))
+
+    #expect(store.taskBoardDatabaseInstanceID == "replacement-task-board")
+    #expect(store.globalTaskBoardItems.map(\.id) == ["replacement"])
+    #expect(store.currentFailureFeedbackMessage?.contains("stale signing failure") != true)
+    await store.prepareForTermination()
   }
 
   @Test("Settings saves and Step Mode queue orchestrator settings writes")

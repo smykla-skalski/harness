@@ -37,13 +37,13 @@ extension HarnessMonitorStore {
     case taskBoardProjects(TaskBoardSnapshotLoad<[TaskBoardProjectSummary]>)
   }
 
-  func connect(using client: any HarnessMonitorClientProtocol) async {
+  func connect(using client: any HarnessMonitorClientProtocol) async throws {
     let connectionFence: ConnectionAttemptFence
     do {
       connectionFence = try beginConnectionAttempt()
     } catch {
       await client.shutdown()
-      return
+      throw error
     }
     let capabilities: TaskBoardCapabilities
     do {
@@ -51,10 +51,10 @@ extension HarnessMonitorStore {
     } catch {
       await client.shutdown()
       guard isCurrentConnectionAttemptFence(connectionFence) else { return }
-      self.client = nil
-      taskBoardDatabaseInstanceID = nil
-      await applyConnectionFailure(error)
-      return
+      if self.client === client {
+        self.client = nil
+      }
+      throw error
     }
     guard isCurrentConnectionAttemptFence(connectionFence) else {
       await client.shutdown()
@@ -70,17 +70,24 @@ extension HarnessMonitorStore {
       validatedCapabilities: capabilities,
       connectionFence: connectionFence
     )
-    guard
-      synchronizedCredentials,
-      isCurrentConnectionAttemptFence(connectionFence)
-    else {
+    guard isCurrentConnectionAttemptFence(connectionFence) else {
       await client.shutdown()
       return
+    }
+    guard synchronizedCredentials else {
+      await client.shutdown()
+      if self.client === client {
+        self.client = nil
+      }
+      throw HarnessMonitorAPIError.server(
+        code: 503,
+        message: "Task Board credential synchronization did not complete"
+      )
     }
     self.client = client
 
     if maintainsLiveDaemonObservation {
-      await connectLive(using: client, connectionFence: connectionFence)
+      try await connectLive(using: client, connectionFence: connectionFence)
       return
     }
 
@@ -96,8 +103,7 @@ extension HarnessMonitorStore {
         return
       }
       await discardActiveConnection()
-      await applyConnectionFailure(error)
-      return
+      throw error
     }
 
     guard isCurrentConnectionAttemptFence(connectionFence) else {

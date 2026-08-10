@@ -109,7 +109,8 @@ extension HarnessMonitorStore {
       isCurrentTaskBoardClient(
         access.client,
         connectionFence: access.connectionFence
-      )
+      ),
+      taskBoardDatabaseInstanceID == access.instanceID
     else {
       throw CancellationError()
     }

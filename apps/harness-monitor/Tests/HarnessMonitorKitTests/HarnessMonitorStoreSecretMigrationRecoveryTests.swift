@@ -29,7 +29,7 @@ struct HarnessMonitorStoreSecretMigrationRecoveryTests {
       revision: 2,
       instanceID: "daemon-B"
     )
-    let interruptedConnect = Task { await store.connect(using: replacementClient) }
+    let interruptedConnect = Task { try? await store.connect(using: replacementClient) }
     #expect(await waitUntil { store.presentedSheet != nil })
 
     await store.performAppInactivitySuspend()
@@ -37,7 +37,7 @@ struct HarnessMonitorStoreSecretMigrationRecoveryTests {
     #expect(store.presentedSheet == nil)
 
     store.isAppLifecycleSuspended = false
-    let resumedConnect = Task { await store.connect(using: replacementClient) }
+    let resumedConnect = Task { try? await store.connect(using: replacementClient) }
     #expect(await waitUntil { store.presentedSheet != nil })
     store.resolveSecretMigrationConsent([.githubGlobalToken: true])
     await resumedConnect.value
@@ -68,10 +68,10 @@ struct HarnessMonitorStoreSecretMigrationRecoveryTests {
       revision: 2,
       instanceID: "daemon-B"
     )
-    let supersededConnect = Task { await store.connect(using: replacementClient) }
+    let supersededConnect = Task { try? await store.connect(using: replacementClient) }
     #expect(await waitUntil { store.presentedSheet != nil })
 
-    await store.connect(using: initialClient)
+    try await store.connect(using: initialClient)
     await supersededConnect.value
 
     #expect(store.presentedSheet == nil)

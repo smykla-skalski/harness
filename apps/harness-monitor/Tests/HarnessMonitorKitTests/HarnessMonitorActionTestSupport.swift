@@ -105,6 +105,8 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var taskBoardGitHubTokensSyncError: (any Error)?
   var taskBoardGitIdentityDefaultsValue = TaskBoardGitIdentityDefaults()
   var taskBoardGitSigningVerifyValue: TaskBoardGitSigningVerifyResponse = .skipped
+  var taskBoardGitSigningVerifyHandler:
+    (@Sendable () async throws -> TaskBoardGitSigningVerifyResponse)?
   var taskBoardSecretHandoffStub = RecordingTaskBoardSecretHandoffStub()
   var policyValidationOverride: PolicyPipelineValidation?
   var policySimulationOverride: Bool?

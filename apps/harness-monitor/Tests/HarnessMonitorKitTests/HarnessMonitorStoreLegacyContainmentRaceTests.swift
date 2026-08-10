@@ -42,7 +42,7 @@ struct HarnessMonitorStoreLegacyContainmentRaceTests {
     let daemon = RecordingDaemonController(client: client)
     let store = HarnessMonitorStore(daemonController: daemon)
     store.taskBoardDatabaseInstanceID = "accepted-task-board"
-    let connectTask = Task { await store.connect(using: client) }
+    let connectTask = Task { try? await store.connect(using: client) }
 
     await waitForGate(runtimeGate)
     await daemon.setLegacyCleanupError(
@@ -145,12 +145,12 @@ struct HarnessMonitorStoreLegacyContainmentRaceTests {
     let store = HarnessMonitorStore(
       daemonController: RecordingDaemonController(client: replacementClient)
     )
-    let staleConnect = Task { await store.connect(using: staleClient) }
+    let staleConnect = Task { try? await store.connect(using: staleClient) }
 
     await waitForGate(capabilityGate)
     await capabilityGate.release()
     await waitForGate(shutdownGate)
-    await store.connect(using: replacementClient)
+    try await store.connect(using: replacementClient)
     #expect(store.apiClient as? RecordingHarnessClient === replacementClient)
     #expect(store.connectionState == .online)
 
@@ -190,12 +190,51 @@ struct HarnessMonitorStoreLegacyContainmentRaceTests {
       try await Task.sleep(for: .milliseconds(20))
     }
     #expect(await capabilitiesGate.hasEntered)
-    await store.connect(using: replacementClient)
+    try await store.connect(using: replacementClient)
     await capabilitiesGate.release()
 
     #expect(await staleSnapshot.value == false)
     #expect(store.taskBoardDatabaseInstanceID == "replacement-task-board")
     #expect((store.apiClient as? RecordingHarnessClient) === replacementClient)
+    await store.prepareForTermination()
+  }
+
+  @Test("Task Board access rejects a database switch on the same client")
+  func taskBoardAccessRejectsSameClientDatabaseSwitch() async throws {
+    let runtimeGate = LegacyContainmentVoidGate()
+    let client = RecordingHarnessClient()
+    let store = await makeBootstrappedStore(client: client)
+    client.taskBoardCapabilitiesValue = TaskBoardCapabilities(
+      storage: "database",
+      revision: 1,
+      instanceID: "task-board-a"
+    )
+    store.adoptDatabaseBackedTaskBoard(client.taskBoardCapabilitiesValue)
+    client.taskBoardGitRuntimeConfigHandler = {
+      await runtimeGate.wait()
+      return client.sampleTaskBoardGitRuntimeConfig()
+    }
+    let staleSnapshot = Task { @MainActor in
+      do {
+        _ = try await store.taskBoardGitSettingsSnapshot()
+        return true
+      } catch {
+        return false
+      }
+    }
+
+    await waitForGate(runtimeGate)
+    store.adoptDatabaseBackedTaskBoard(
+      TaskBoardCapabilities(
+        storage: "database",
+        revision: 2,
+        instanceID: "task-board-b"
+      )
+    )
+    await runtimeGate.release()
+
+    #expect(await staleSnapshot.value == false)
+    #expect(store.taskBoardDatabaseInstanceID == "task-board-b")
     await store.prepareForTermination()
   }
 

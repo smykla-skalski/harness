@@ -109,6 +109,9 @@ extension RecordingHarnessClient {
     request: TaskBoardGitSigningVerifyRequest
   ) async throws -> TaskBoardGitSigningVerifyResponse {
     record(.verifyTaskBoardGitSigning(repository: request.repository))
+    if let taskBoardGitSigningVerifyHandler {
+      return try await taskBoardGitSigningVerifyHandler()
+    }
     return lock.withLock { taskBoardGitSigningVerifyValue }
   }
 

@@ -125,6 +125,30 @@ struct HarnessMonitorStoreLifecycleCoreTests {
     #expect(await daemon.recordedWarmUpCallCount() == 1)
   }
 
+  @Test("External bootstrap surfaces credential synchronization failure")
+  func externalBootstrapSurfacesCredentialSynchronizationFailure() async {
+    let client = RecordingHarnessClient()
+    client.configureTaskBoardGitHubTokensSyncError(
+      HarnessMonitorAPIError.server(code: 503, message: "credential sync unavailable")
+    )
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(client: client),
+      daemonOwnership: .external
+    )
+
+    await store.bootstrapIfNeeded()
+
+    #expect(store.hasBootstrapped)
+    #expect(store.client == nil)
+    #expect(client.shutdownCallCount() == 1)
+    guard case .offline(let reason) = store.connectionState else {
+      Issue.record("Expected failed bootstrap to leave the store offline")
+      return
+    }
+    #expect(reason.contains("credential synchronization did not complete"))
+    await store.prepareForTermination()
+  }
+
   @Test("Bootstrap adopts trace as the default daemon log level")
   func bootstrapAdoptsTraceAsDefaultDaemonLogLevel() async {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
