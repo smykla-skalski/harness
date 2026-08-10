@@ -52,10 +52,10 @@ extension DaemonController {
     let quietWindow = min(managedLaunchAgentBTMSettleDelay, .milliseconds(250))
     var quietSince: ContinuousClock.Instant?
     var stoppedDaemons: [URL: Int32] = [:]
+    var candidates = HarnessMonitorPaths.managedDaemonRootCandidates(using: environment)
+    var candidateRoots = Set(candidates.map(\.rootURL))
 
     while true {
-      let candidates = HarnessMonitorPaths.managedDaemonRootCandidates(using: environment)
-      let candidateRoots = Set(candidates.map(\.rootURL))
       let results = await quiesceManagedDaemonCandidates(
         candidates,
         stoppedDaemons: stoppedDaemons,
@@ -76,15 +76,17 @@ extension DaemonController {
         }
       }
 
-      let refreshedRoots = Set(
-        HarnessMonitorPaths.managedDaemonRootCandidates(using: environment).map(\.rootURL)
-      )
-      if refreshedRoots == candidateRoots {
-        quietSince = quietSince ?? ContinuousClock.now
-        if let quietSince, ContinuousClock.now - quietSince >= quietWindow {
+      quietSince = quietSince ?? ContinuousClock.now
+      if let quietStart = quietSince, ContinuousClock.now - quietStart >= quietWindow {
+        let refreshedCandidates = HarnessMonitorPaths.managedDaemonRootCandidates(
+          using: environment
+        )
+        let refreshedRoots = Set(refreshedCandidates.map(\.rootURL))
+        if refreshedRoots == candidateRoots {
           break
         }
-      } else {
+        candidates = refreshedCandidates
+        candidateRoots = refreshedRoots
         quietSince = nil
       }
       guard ContinuousClock.now < deadline else {

@@ -1,6 +1,10 @@
 import Foundation
 import SwiftData
 
+enum RepositoryLabelUsagePersistence {
+  static let lock = NSLock()
+}
+
 struct RepositoryLabelUsageCacheMaintenance {
   private let context: ModelContext
 
@@ -9,6 +13,12 @@ struct RepositoryLabelUsageCacheMaintenance {
   }
 
   func pruneStale(perRepoCap: Int = 50) {
+    RepositoryLabelUsagePersistence.lock.withLock {
+      pruneStaleLocked(perRepoCap: perRepoCap)
+    }
+  }
+
+  private func pruneStaleLocked(perRepoCap: Int) {
     guard perRepoCap > 0 else { return }
     let allRowsDescriptor = FetchDescriptor<CachedReviewLabelUsage>()
     guard let rows = try? context.fetch(allRowsDescriptor) else { return }

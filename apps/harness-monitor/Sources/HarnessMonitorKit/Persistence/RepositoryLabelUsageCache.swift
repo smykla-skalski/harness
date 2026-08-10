@@ -15,6 +15,12 @@ public struct RepositoryLabelUsageCache {
   /// behavior.
   public func recordUse(repository: String, label: String) {
     guard !repository.isEmpty, !label.isEmpty else { return }
+    RepositoryLabelUsagePersistence.lock.withLock {
+      recordUseLocked(repository: repository, label: label)
+    }
+  }
+
+  private func recordUseLocked(repository: String, label: String) {
     do {
       let key = CachedReviewLabelUsage.makeCompoundKey(
         repository: repository,
@@ -77,12 +83,14 @@ public struct RepositoryLabelUsageCache {
   }
 
   public func deleteAll() {
-    let descriptor = FetchDescriptor<CachedReviewLabelUsage>()
-    guard let rows = try? context.fetch(descriptor) else { return }
-    for row in rows {
-      context.delete(row)
+    RepositoryLabelUsagePersistence.lock.withLock {
+      let descriptor = FetchDescriptor<CachedReviewLabelUsage>()
+      guard let rows = try? context.fetch(descriptor) else { return }
+      for row in rows {
+        context.delete(row)
+      }
+      try? context.save()
     }
-    try? context.save()
   }
 
   /// Cap the per-repository row count at `perRepoCap`, deleting the rows
