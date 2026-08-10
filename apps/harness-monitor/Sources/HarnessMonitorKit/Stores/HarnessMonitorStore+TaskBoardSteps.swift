@@ -2,9 +2,10 @@ import Foundation
 
 extension HarnessMonitorStore {
   public func pickTaskBoardDispatch() async -> TaskBoardDispatchSelection? {
-    guard let client = availableTaskBoardClient else {
+    guard let access = availableTaskBoardClientAccess else {
       return nil
     }
+    let client = access.client
     beginDaemonAction()
     beginTaskBoardAction()
     defer {
@@ -16,6 +17,7 @@ extension HarnessMonitorStore {
       let measuredResult = try await Self.measureOperation {
         try await client.pickTaskBoardDispatch(request: TaskBoardDispatchPickRequest())
       }
+      try requireCurrentTaskBoardClientAccess(access)
       recordRequestSuccess()
       guard let selection = measuredResult.value.selection else {
         presentSuccessFeedback("No ready task-board item to pick")
@@ -23,6 +25,8 @@ extension HarnessMonitorStore {
       }
       presentSuccessFeedback("Picked top task-board item")
       return selection
+    } catch is CancellationError {
+      return nil
     } catch {
       presentFailureFeedback(error.localizedDescription)
       return nil
@@ -34,9 +38,10 @@ extension HarnessMonitorStore {
     dryRun: Bool = false,
     refreshDashboard: Bool = true
   ) async -> TaskBoardDispatchDelivery? {
-    guard let client = availableTaskBoardClient else {
+    guard let access = availableTaskBoardClientAccess else {
       return nil
     }
+    let client = access.client
     beginDaemonAction()
     beginTaskBoardAction()
     defer {
@@ -50,6 +55,7 @@ extension HarnessMonitorStore {
           request: TaskBoardDispatchDeliverRequest(itemId: itemID, dryRun: dryRun)
         )
       }
+      try requireCurrentTaskBoardClientAccess(access)
       recordRequestSuccess()
       let delivery = measuredDelivery.value
       if !dryRun {
@@ -60,6 +66,8 @@ extension HarnessMonitorStore {
       }
       presentSuccessFeedback(dryRun ? "Previewed task-board delivery" : "Delivered task-board item")
       return delivery
+    } catch is CancellationError {
+      return nil
     } catch {
       if refreshDashboard && !dryRun {
         await refreshTaskBoardDashboardSnapshot(using: client)
@@ -82,10 +90,11 @@ extension HarnessMonitorStore {
     request: TaskBoardDispatchRequest,
     isAlreadyHeld: Bool = false
   ) async -> TaskBoardDispatchDelivery? {
-    guard let client = availableTaskBoardClient, let itemID = request.itemId else {
+    guard let access = availableTaskBoardClientAccess, let itemID = request.itemId else {
       presentFailureFeedback("Task-board delivery requires a selected item")
       return nil
     }
+    let client = access.client
 
     beginDaemonAction()
     beginTaskBoardAction()
@@ -99,7 +108,7 @@ extension HarnessMonitorStore {
       request: request,
       itemID: itemID,
       isAlreadyHeld: isAlreadyHeld,
-      using: client
+      access: access
     )
     await finishTaskBoardDashboardRefreshDeferral(using: client)
     return delivery
@@ -109,8 +118,9 @@ extension HarnessMonitorStore {
     request: TaskBoardDispatchRequest,
     itemID: String,
     isAlreadyHeld: Bool,
-    using client: any HarnessMonitorClientProtocol
+    access: TaskBoardClientAccess
   ) async -> TaskBoardDispatchDelivery? {
+    let client = access.client
     var didReserveItem = false
     var reserveFailure: String?
     if !isAlreadyHeld {
@@ -118,10 +128,13 @@ extension HarnessMonitorStore {
         let measuredSummary = try await Self.measureOperation {
           try await client.dispatchTaskBoard(request: request)
         }
+        try requireCurrentTaskBoardClientAccess(access)
         recordRequestSuccess()
         let summary = measuredSummary.value
         didReserveItem = summary.applied.contains { $0.boardItemId == itemID }
         reserveFailure = summary.failures.first { $0.boardItemId == itemID }?.message
+      } catch is CancellationError {
+        return nil
       } catch {
         presentFailureFeedback(error.localizedDescription)
         return nil
@@ -132,7 +145,7 @@ extension HarnessMonitorStore {
     // its own step mode rather than from this request, so the held set is the
     // only trustworthy answer. Claiming without checking is what surfaced as
     // the "is not held" conflict.
-    guard await taskBoardDeliveryIsHeld(itemID: itemID, using: client) else {
+    guard await taskBoardDeliveryIsHeld(itemID: itemID, access: access) else {
       presentUnheldTaskBoardDeliveryFeedback(
         itemID: itemID,
         didReserveItem: didReserveItem,
@@ -143,7 +156,7 @@ extension HarnessMonitorStore {
     return await claimHeldTaskBoardDelivery(
       itemID: itemID,
       dryRun: request.dryRun,
-      using: client
+      access: access
     )
   }
 
@@ -151,12 +164,14 @@ extension HarnessMonitorStore {
   /// never dropped; the daemon stays the final authority either way.
   private func taskBoardDeliveryIsHeld(
     itemID: String,
-    using client: any HarnessMonitorClientProtocol
+    access: TaskBoardClientAccess
   ) async -> Bool {
+    let client = access.client
     do {
       let measuredStatus = try await Self.measureOperation {
         try await client.taskBoardOrchestratorStatus()
       }
+      try requireCurrentTaskBoardClientAccess(access)
       recordRequestSuccess()
       return measuredStatus.value.heldDispatches.items.contains { $0.boardItemId == itemID }
     } catch {
@@ -193,14 +208,16 @@ extension HarnessMonitorStore {
   private func claimHeldTaskBoardDelivery(
     itemID: String,
     dryRun: Bool,
-    using client: any HarnessMonitorClientProtocol
+    access: TaskBoardClientAccess
   ) async -> TaskBoardDispatchDelivery? {
+    let client = access.client
     do {
       let measuredDelivery = try await Self.measureOperation {
         try await client.deliverTaskBoardDispatch(
           request: TaskBoardDispatchDeliverRequest(itemId: itemID, dryRun: dryRun)
         )
       }
+      try requireCurrentTaskBoardClientAccess(access)
       recordRequestSuccess()
       let delivery = measuredDelivery.value
       if !dryRun {
@@ -210,6 +227,8 @@ extension HarnessMonitorStore {
         dryRun ? "Previewed task-board delivery" : "Prepared and delivered task-board item"
       )
       return delivery
+    } catch is CancellationError {
+      return nil
     } catch {
       presentFailureFeedback(error.localizedDescription)
       return nil
@@ -237,9 +256,10 @@ extension HarnessMonitorStore {
     approve: Bool,
     actor: String? = nil
   ) async -> PolicyApprovalGrant? {
-    guard let client = availableTaskBoardClient else {
+    guard let access = availableTaskBoardClientAccess else {
       return nil
     }
+    let client = access.client
     beginDaemonAction()
     beginTaskBoardAction()
     defer {
@@ -257,9 +277,12 @@ extension HarnessMonitorStore {
           )
         )
       }
+      try requireCurrentTaskBoardClientAccess(access)
       recordRequestSuccess()
       presentSuccessFeedback(approve ? "Approved policy grant" : "Denied policy grant")
       return measuredGrant.value
+    } catch is CancellationError {
+      return nil
     } catch {
       presentFailureFeedback(error.localizedDescription)
       return nil
@@ -270,9 +293,10 @@ extension HarnessMonitorStore {
     grantID: String,
     actor: String? = nil
   ) async -> PolicyApprovalGrant? {
-    guard let client = availableTaskBoardClient else {
+    guard let access = availableTaskBoardClientAccess else {
       return nil
     }
+    let client = access.client
     beginDaemonAction()
     beginTaskBoardAction()
     defer {
@@ -286,9 +310,12 @@ extension HarnessMonitorStore {
           request: PolicyApprovalGrantRevokeRequest(grantId: grantID, actor: actor)
         )
       }
+      try requireCurrentTaskBoardClientAccess(access)
       recordRequestSuccess()
       presentSuccessFeedback("Revoked policy grant")
       return measuredGrant.value
+    } catch is CancellationError {
+      return nil
     } catch {
       presentFailureFeedback(error.localizedDescription)
       return nil
@@ -323,9 +350,10 @@ extension HarnessMonitorStore {
       @escaping @Sendable (any HarnessMonitorClientProtocol) async throws
       -> PolicyCanvasWorkspace
   ) async -> Bool {
-    guard let client = availableTaskBoardClient else {
+    guard let access = availableTaskBoardClientAccess else {
       return false
     }
+    let client = access.client
     beginDaemonAction()
     beginTaskBoardAction()
     defer {
@@ -337,10 +365,13 @@ extension HarnessMonitorStore {
       let measuredWorkspace = try await Self.measureOperation {
         try await mutation(client)
       }
+      try requireCurrentTaskBoardClientAccess(access)
       recordRequestSuccess()
       await syncPolicyCanvasWorkspace(measuredWorkspace.value, using: client)
       presentSuccessFeedback(actionName)
       return true
+    } catch is CancellationError {
+      return false
     } catch {
       presentFailureFeedback(error.localizedDescription)
       return false

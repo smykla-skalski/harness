@@ -157,7 +157,6 @@ struct HarnessMonitorStoreTaskBoardWorkingDirectoryTests {
 
   @Test("A daemon-obtained working copy resolves delivery without prompting")
   func managedWorkingCopyResolvesDelivery() async {
-    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
     let client = RecordingHarnessClient()
     client.setTaskBoardWorkingCopies([
       WorkingCopyListEntry(
@@ -169,7 +168,7 @@ struct HarnessMonitorStoreTaskBoardWorkingDirectoryTests {
         lastUsedAt: "2026-07-24T00:00:00Z"
       )
     ])
-    store.client = client
+    let store = await makeBootstrappedStore(client: client)
     let decision = await store.taskBoardDeliveryDirectory(
       hasExistingSession: false,
       executionRepository: "Obtained/Repo",
@@ -181,7 +180,6 @@ struct HarnessMonitorStoreTaskBoardWorkingDirectoryTests {
 
   @Test("Unresolved repositories exclude ones with a working copy")
   func managedWorkingCopyExcludedFromUnresolved() async {
-    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
     let client = RecordingHarnessClient()
     client.setTaskBoardWorkingCopies([
       WorkingCopyListEntry(
@@ -193,7 +191,7 @@ struct HarnessMonitorStoreTaskBoardWorkingDirectoryTests {
         lastUsedAt: "2026-07-24T00:00:00Z"
       )
     ])
-    store.client = client
+    let store = await makeBootstrappedStore(client: client)
     let items = [
       TaskBoardWorkingDirectoryResolver.ItemNeed(
         hasExistingSession: false, executionRepository: "managed/repo"),
@@ -209,9 +207,8 @@ struct HarnessMonitorStoreTaskBoardWorkingDirectoryTests {
 
   @Test("Obtain, list, and reclaim a working copy round-trip")
   func workingCopyStoreRoundTrip() async throws {
-    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
     let client = RecordingHarnessClient()
-    store.client = client
+    let store = await makeBootstrappedStore(client: client)
 
     let obtained = await store.obtainRepositoryWorkingCopy(repository: "round/trip")
     let entry = try #require(obtained)
@@ -219,5 +216,18 @@ struct HarnessMonitorStoreTaskBoardWorkingDirectoryTests {
 
     #expect(await store.deleteRepositoryWorkingCopy(repoKeySegment: entry.repoKeySegment))
     #expect(await store.listRepositoryWorkingCopies().isEmpty)
+  }
+
+  @Test("Repeated ready blocks working-copy mutations during database handoff")
+  func repeatedReadyBlocksWorkingCopyMutations() async throws {
+    let client = RecordingHarnessClient()
+    let store = await makeBootstrappedStore(client: client)
+    _ = await store.invalidateTaskBoardDatabaseAccess(using: client)
+
+    #expect(await store.obtainRepositoryWorkingCopy(repository: "blocked/repo") == nil)
+    #expect(await store.deleteRepositoryWorkingCopy(repoKeySegment: "blocked") == false)
+    #expect(await store.listRepositoryWorkingCopies().isEmpty)
+    #expect(client.recordedCalls().isEmpty)
+    await store.prepareForTermination()
   }
 }

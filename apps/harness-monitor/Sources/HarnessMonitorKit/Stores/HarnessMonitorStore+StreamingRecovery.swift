@@ -20,7 +20,7 @@ extension HarnessMonitorStore {
     }
     let databaseAccessGeneration =
       hasSeenReady
-      ? invalidateTaskBoardDatabaseAccess()
+      ? await invalidateTaskBoardDatabaseAccess(using: client)
       : taskBoardRuntimeState.connection.databaseAccessGeneration
     let accessFence = TaskBoardAccessFence(
       containment: containmentFence,

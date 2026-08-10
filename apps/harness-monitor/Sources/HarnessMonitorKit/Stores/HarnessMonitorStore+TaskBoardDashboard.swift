@@ -3,7 +3,7 @@ import Foundation
 extension HarnessMonitorStore {
   public func refreshTaskBoardDashboard() async {
     guard
-      let client = availableTaskBoardClient,
+      let access = availableTaskBoardClientAccess,
       !isTaskBoardBusy,
       taskBoardSyncPhase == .idle
     else {
@@ -14,7 +14,7 @@ extension HarnessMonitorStore {
       setTaskBoardSyncPhase(.idle)
     }
     _ = await syncAndRefreshTaskBoardDashboard(
-      using: client,
+      access: access,
       request: Self.taskBoardDashboardSyncRequest,
       successMessage: "Task board refreshed",
       activityKey: Self.taskBoardDashboardRefreshActivityKey,
@@ -32,9 +32,10 @@ extension HarnessMonitorStore {
 
   @discardableResult
   public func createTaskBoardItem(request: TaskBoardCreateItemRequest) async -> Bool {
-    guard let client = availableTaskBoardClient else {
+    guard let access = availableTaskBoardClientAccess else {
       return false
     }
+    let client = access.client
     beginDaemonAction()
     beginTaskBoardAction()
     defer {
@@ -46,11 +47,15 @@ extension HarnessMonitorStore {
       let measuredItem = try await Self.measureOperation {
         try await client.createTaskBoardItem(request: request)
       }
+      try requireCurrentTaskBoardClientAccess(access)
       recordRequestSuccess()
       mergeTaskBoardItem(measuredItem.value)
       await refreshTaskBoardDashboardSnapshot(using: client)
+      try requireCurrentTaskBoardClientAccess(access)
       presentSuccessFeedback("Created task board item")
       return true
+    } catch is CancellationError {
+      return false
     } catch {
       presentFailureFeedback(error.localizedDescription)
       return false
@@ -63,9 +68,10 @@ extension HarnessMonitorStore {
     request: TaskBoardUpdateItemRequest,
     successMessage: String = "Saved task board item"
   ) async -> Bool {
-    guard let client = availableTaskBoardClient else {
+    guard let access = availableTaskBoardClientAccess else {
       return false
     }
+    let client = access.client
     beginDaemonAction()
     beginTaskBoardAction()
     defer {
@@ -77,11 +83,15 @@ extension HarnessMonitorStore {
       let measuredItem = try await Self.measureOperation {
         try await client.updateTaskBoardItem(id: id, request: request)
       }
+      try requireCurrentTaskBoardClientAccess(access)
       recordRequestSuccess()
       mergeTaskBoardItem(measuredItem.value)
       await refreshTaskBoardDashboardSnapshot(using: client)
+      try requireCurrentTaskBoardClientAccess(access)
       presentSuccessFeedback(successMessage)
       return true
+    } catch is CancellationError {
+      return false
     } catch {
       presentFailureFeedback(error.localizedDescription)
       return false
@@ -174,9 +184,10 @@ extension HarnessMonitorStore {
 
   @discardableResult
   public func evaluateTaskBoard(request: TaskBoardEvaluateRequest) async -> Bool {
-    guard let client = availableTaskBoardClient else {
+    guard let access = availableTaskBoardClientAccess else {
       return false
     }
+    let client = access.client
     beginDaemonAction()
     beginTaskBoardAction()
     defer {
@@ -188,16 +199,20 @@ extension HarnessMonitorStore {
       let measuredSummary = try await Self.measureOperation {
         try await client.evaluateTaskBoard(request: request)
       }
+      try requireCurrentTaskBoardClientAccess(access)
       recordRequestSuccess()
       let preRefreshBaselineRunID = globalTaskBoardOrchestratorStatus?.lastRun?.runId
       globalTaskBoardEvaluationSummary = measuredSummary.value
       scheduleUISync([.contentDashboard])
       await refreshTaskBoardDashboardSnapshot(using: client)
+      try requireCurrentTaskBoardClientAccess(access)
       cacheWriteSync.taskBoardEvaluationBaselineRunID =
         preRefreshBaselineRunID ?? globalTaskBoardOrchestratorStatus?.lastRun?.runId
       scheduleUISync([.contentDashboard])
       presentSuccessFeedback("Evaluated task board")
       return true
+    } catch is CancellationError {
+      return false
     } catch {
       presentFailureFeedback(error.localizedDescription)
       return false
@@ -206,7 +221,7 @@ extension HarnessMonitorStore {
 
   @discardableResult
   public func syncTaskBoard(request: TaskBoardSyncRequest) async -> Bool {
-    guard let client = availableTaskBoardClient, taskBoardSyncPhase == .idle else {
+    guard let access = availableTaskBoardClientAccess, taskBoardSyncPhase == .idle else {
       return false
     }
     setTaskBoardSyncPhase(.syncing)
@@ -214,7 +229,7 @@ extension HarnessMonitorStore {
       setTaskBoardSyncPhase(.idle)
     }
     return await syncAndRefreshTaskBoardDashboard(
-      using: client,
+      access: access,
       request: request,
       successMessage: "Synced task board"
     )
@@ -222,15 +237,19 @@ extension HarnessMonitorStore {
 
   @discardableResult
   public func cancelTaskBoardSync() async -> Bool {
-    guard let client = availableTaskBoardClient, taskBoardSyncPhase == .syncing else {
+    guard let access = availableTaskBoardClientAccess, taskBoardSyncPhase == .syncing else {
       return false
     }
+    let client = access.client
     setTaskBoardSyncPhase(.stopping)
     do {
       _ = try await client.cancelTaskBoardSync()
+      try requireCurrentTaskBoardClientAccess(access)
       cancelTaskBoardDashboardSnapshotRefresh()
       recordRequestSuccess()
       return true
+    } catch is CancellationError {
+      return false
     } catch {
       setTaskBoardSyncPhase(.syncing)
       presentFailureFeedback("Could not stop task board sync: \(error.localizedDescription)")
@@ -243,9 +262,10 @@ extension HarnessMonitorStore {
     request: TaskBoardDispatchRequest,
     refreshDashboard: Bool = true
   ) async -> Bool {
-    guard let client = availableTaskBoardClient else {
+    guard let access = availableTaskBoardClientAccess else {
       return false
     }
+    let client = access.client
     beginDaemonAction()
     beginTaskBoardAction()
     defer {
@@ -257,15 +277,19 @@ extension HarnessMonitorStore {
       let measuredSummary = try await Self.measureOperation {
         try await client.dispatchTaskBoard(request: request)
       }
+      try requireCurrentTaskBoardClientAccess(access)
       recordRequestSuccess()
       globalTaskBoardDispatchSummary = measuredSummary.value
       if refreshDashboard {
         await refreshTaskBoardDashboardSnapshot(using: client)
+        try requireCurrentTaskBoardClientAccess(access)
       }
       presentSuccessFeedback(
         request.dryRun ? "Prepared task board dispatch" : "Dispatched task board"
       )
       return true
+    } catch is CancellationError {
+      return false
     } catch {
       presentFailureFeedback(error.localizedDescription)
       return false
@@ -274,9 +298,10 @@ extension HarnessMonitorStore {
 
   @discardableResult
   public func auditTaskBoard(status: TaskBoardStatus? = nil) async -> Bool {
-    guard let client = availableTaskBoardClient else {
+    guard let access = availableTaskBoardClientAccess else {
       return false
     }
+    let client = access.client
     beginDaemonAction()
     beginTaskBoardAction()
     defer {
@@ -288,10 +313,13 @@ extension HarnessMonitorStore {
       let measuredSummary = try await Self.measureOperation {
         try await client.auditTaskBoard(status: status)
       }
+      try requireCurrentTaskBoardClientAccess(access)
       recordRequestSuccess()
       globalTaskBoardItemAuditSummary = measuredSummary.value
       presentSuccessFeedback("Loaded task board audit")
       return true
+    } catch is CancellationError {
+      return false
     } catch {
       presentFailureFeedback(error.localizedDescription)
       return false
@@ -300,9 +328,10 @@ extension HarnessMonitorStore {
 
   @discardableResult
   public func refreshTaskBoardProjects(status: TaskBoardStatus? = nil) async -> Bool {
-    guard let client = availableTaskBoardClient else {
+    guard let access = availableTaskBoardClientAccess else {
       return false
     }
+    let client = access.client
     beginDaemonAction()
     beginTaskBoardAction()
     defer {
@@ -314,10 +343,13 @@ extension HarnessMonitorStore {
       let measuredProjects = try await Self.measureOperation {
         try await client.taskBoardProjects(status: status)
       }
+      try requireCurrentTaskBoardClientAccess(access)
       recordRequestSuccess()
       globalTaskBoardProjects = measuredProjects.value
       presentSuccessFeedback("Loaded task board projects")
       return true
+    } catch is CancellationError {
+      return false
     } catch {
       presentFailureFeedback(error.localizedDescription)
       return false
@@ -328,9 +360,10 @@ extension HarnessMonitorStore {
   public func updateTaskBoardProject(
     request: TaskBoardProjectUpdateRequest
   ) async -> Bool {
-    guard let client = availableTaskBoardClient else {
+    guard let access = availableTaskBoardClientAccess else {
       return false
     }
+    let client = access.client
     beginDaemonAction()
     beginTaskBoardAction()
     defer {
@@ -340,8 +373,11 @@ extension HarnessMonitorStore {
 
     do {
       let updated = try await client.updateTaskBoardProject(request: request)
+      try requireCurrentTaskBoardClientAccess(access)
       recordRequestSuccess()
       presentSuccessFeedback("Updated \(updated.displayName ?? updated.slug)")
+    } catch is CancellationError {
+      return false
     } catch {
       presentFailureFeedback(error.localizedDescription)
       return false
@@ -353,9 +389,10 @@ extension HarnessMonitorStore {
 
   @discardableResult
   public func refreshTaskBoardMachines(status: TaskBoardStatus? = nil) async -> Bool {
-    guard let client = availableTaskBoardClient else {
+    guard let access = availableTaskBoardClientAccess else {
       return false
     }
+    let client = access.client
     beginDaemonAction()
     beginTaskBoardAction()
     defer {
@@ -367,10 +404,13 @@ extension HarnessMonitorStore {
       let measuredMachines = try await Self.measureOperation {
         try await client.taskBoardMachines(status: status)
       }
+      try requireCurrentTaskBoardClientAccess(access)
       recordRequestSuccess()
       globalTaskBoardMachines = measuredMachines.value
       presentSuccessFeedback("Loaded task board machines")
       return true
+    } catch is CancellationError {
+      return false
     } catch {
       presentFailureFeedback(error.localizedDescription)
       return false

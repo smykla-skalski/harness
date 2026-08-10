@@ -67,4 +67,58 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     #expect(store.connectionRecoveryTask == nil)
     await store.prepareForTermination()
   }
+
+  @Test("Managed bootstrap keeps retrying after its foreground retry fails")
+  func managedBootstrapKeepsRetryingAfterForegroundRetryFails() async {
+    let recoveredClient = RecordingHarnessClient()
+    let daemon = RecordingDaemonController(
+      client: recoveredClient,
+      bootstrapOutcomes: [
+        .failure(HarnessMonitorAPIError.server(code: 503, message: "foreground retry failed"))
+      ]
+    )
+    let store = HarnessMonitorStore(daemonController: daemon)
+    store.connectionRecoveryRetryDelays = [.milliseconds(1)]
+
+    #expect(
+      await store.recoverManagedBootstrapFailure(
+        from: HarnessMonitorAPIError.server(code: 503, message: "managed connect failed")
+      ) == false
+    )
+    #expect(
+      await waitUntil(timeout: .seconds(2)) {
+        store.connectionState == .online
+          && (store.client as? RecordingHarnessClient) === recoveredClient
+      }
+    )
+    #expect(await daemon.recordedBootstrapCallCount() == 1)
+    #expect(await daemon.recordedWarmUpCallCount() == 1)
+    await store.prepareForTermination()
+  }
+
+  @Test("Managed retry honors app suspension before publishing failure")
+  func managedRetryHonorsAppSuspension() async {
+    let capabilitiesGate = LegacyContainmentCapabilitiesGate()
+    let retryClient = RecordingHarnessClient()
+    retryClient.taskBoardCapabilitiesHandler = { await capabilitiesGate.wait() }
+    let daemon = RecordingDaemonController(bootstrapOutcomes: [.success(retryClient)])
+    let store = HarnessMonitorStore(daemonController: daemon)
+    store.isBootstrapping = true
+    let recovery = Task { @MainActor in
+      await store.recoverManagedBootstrapFailure(
+        from: HarnessMonitorAPIError.server(code: 503, message: "managed connect failed")
+      )
+    }
+
+    #expect(await waitUntil { await capabilitiesGate.hasEntered })
+    await store.performAppInactivitySuspend()
+    await capabilitiesGate.release()
+
+    #expect(await recovery.value)
+    #expect(store.connectionState == .idle)
+    #expect(store.currentFailureFeedbackMessage == nil)
+    #expect(store.connectionRecoveryTask == nil)
+    store.isBootstrapping = false
+    await store.prepareForTermination()
+  }
 }

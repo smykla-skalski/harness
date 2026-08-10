@@ -61,11 +61,12 @@ extension HarnessMonitorStore {
     else {
       return false
     }
-    guard let client = availableTaskBoardClient else {
+    guard let access = availableTaskBoardClientAccess else {
       rollbackOptimisticTaskBoardPosition(resolvedMutation)
       finishTaskBoardPositionMutation(resolvedMutation)
       return false
     }
+    let client = access.client
     beginDaemonAction()
     beginTaskBoardAction()
     defer {
@@ -86,6 +87,7 @@ extension HarnessMonitorStore {
           remainingRetries: Self.taskBoardPositionConflictRetryLimit
         )
       }.value
+      try requireCurrentTaskBoardClientAccess(access)
       recordRequestSuccess()
       completeSuccessfulTaskBoardPosition(
         response.snapshot.item,
@@ -93,6 +95,10 @@ extension HarnessMonitorStore {
       )
       await refreshTaskBoardDashboardSnapshot(using: client)
       return true
+    } catch is CancellationError {
+      rollbackOptimisticTaskBoardPosition(resolvedMutation)
+      finishTaskBoardPositionMutation(resolvedMutation)
+      return false
     } catch {
       rollbackOptimisticTaskBoardPosition(resolvedMutation)
       finishTaskBoardPositionMutation(resolvedMutation)
@@ -217,7 +223,8 @@ extension HarnessMonitorStore {
     id: String,
     actor: String = "Harness Monitor"
   ) async -> Bool {
-    guard let client = availableTaskBoardClient else { return false }
+    guard let access = availableTaskBoardClientAccess else { return false }
+    let client = access.client
     beginDaemonAction()
     beginTaskBoardAction()
     defer {
@@ -233,10 +240,13 @@ extension HarnessMonitorStore {
           remainingRetries: Self.taskBoardPositionConflictRetryLimit
         )
       }.value
+      try requireCurrentTaskBoardClientAccess(access)
       recordRequestSuccess()
       mergeTaskBoardItem(response.snapshot.item)
       await refreshTaskBoardDashboardSnapshot(using: client)
       return true
+    } catch is CancellationError {
+      return false
     } catch {
       presentFailureFeedback(error.localizedDescription)
       await refreshTaskBoardDashboardSnapshot(using: client)

@@ -128,7 +128,10 @@ final class LegacyManagedLaunchAgentContainment: @unchecked Sendable {
         else {
           return
         }
-        self?.requestCheck(invalidatingLegacyMonitorProcessScan: true)
+        self?.requestCheck(
+          invalidatingLegacyMonitorProcessScan:
+            Self.invalidatesLegacyMonitorProcessScan(for: name)
+        )
       }
       return (
         workspaceCenter,
@@ -142,7 +145,7 @@ final class LegacyManagedLaunchAgentContainment: @unchecked Sendable {
         object: nil,
         queue: nil
       ) { [weak self] _ in
-        self?.requestCheck(invalidatingLegacyMonitorProcessScan: true)
+        self?.requestCheck()
       }
     )
     state.lock.withLock {
@@ -162,6 +165,11 @@ final class LegacyManagedLaunchAgentContainment: @unchecked Sendable {
 
   static func shouldCheckApplicationLifecycle(bundleIdentifier: String?) -> Bool {
     bundleIdentifier?.hasPrefix("io.harnessmonitor.app") == true
+  }
+
+  static func invalidatesLegacyMonitorProcessScan(for notificationName: Notification.Name) -> Bool {
+    notificationName == NSWorkspace.didLaunchApplicationNotification
+      || notificationName == NSWorkspace.didTerminateApplicationNotification
   }
 
   private static func runChecks(

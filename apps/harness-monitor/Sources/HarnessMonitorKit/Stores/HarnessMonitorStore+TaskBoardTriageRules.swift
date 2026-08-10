@@ -77,7 +77,8 @@ extension HarnessMonitorStore {
     expectedRevision: Int64?,
     actor: String = "Harness Monitor"
   ) async -> TriageRuleSetDraftSaveResult? {
-    guard let client = availableTaskBoardClient else { return nil }
+    guard let access = availableTaskBoardClientAccess else { return nil }
+    let client = access.client
     beginDaemonAction()
     beginTaskBoardAction()
     defer {
@@ -93,11 +94,14 @@ extension HarnessMonitorStore {
       let result = try await Self.measureOperation {
         try await client.saveTaskBoardTriageRulesDraft(request: request)
       }.value
+      try requireCurrentTaskBoardClientAccess(access)
       recordRequestSuccess()
       if result.persisted {
         presentSuccessFeedback("Save triage rules draft")
       }
       return result
+    } catch is CancellationError {
+      return nil
     } catch {
       presentFailureFeedback(error.localizedDescription)
       return nil
@@ -110,7 +114,8 @@ extension HarnessMonitorStore {
     expectedActiveRevision: Int64?,
     actor: String = "Harness Monitor"
   ) async -> TriageRuleSetActivationResult? {
-    guard let client = availableTaskBoardClient else { return nil }
+    guard let access = availableTaskBoardClientAccess else { return nil }
+    let client = access.client
     beginDaemonAction()
     beginTaskBoardAction()
     defer {
@@ -126,12 +131,15 @@ extension HarnessMonitorStore {
       let result = try await Self.measureOperation {
         try await client.activateTaskBoardTriageRules(request: request)
       }.value
+      try requireCurrentTaskBoardClientAccess(access)
       recordRequestSuccess()
       if result.activated {
         presentSuccessFeedback(rules == nil ? "Deactivate triage rules" : "Activate triage rules")
         await refreshTaskBoardDashboardSnapshot(using: client)
       }
       return result
+    } catch is CancellationError {
+      return nil
     } catch {
       presentFailureFeedback(error.localizedDescription)
       await refreshTaskBoardDashboardSnapshot(using: client)

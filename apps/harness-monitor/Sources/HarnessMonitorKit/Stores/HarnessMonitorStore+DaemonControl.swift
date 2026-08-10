@@ -175,10 +175,15 @@ extension HarnessMonitorStore {
       try await retryLocalDaemonConnection()
       return true
     } catch {
+      guard !shouldAbandonConnectionAttempt, !(error is CancellationError) else {
+        connectionState = .idle
+        return true
+      }
       let message = error.localizedDescription
       markConnectionOffline(message)
       presentFailureFeedback(message)
       await restorePersistedSessionState()
+      scheduleReconnectAfterConnectionFailure()
       return false
     }
   }

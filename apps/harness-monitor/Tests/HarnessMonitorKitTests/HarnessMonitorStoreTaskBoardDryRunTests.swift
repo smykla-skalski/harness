@@ -29,6 +29,35 @@ struct HarnessMonitorStoreTaskBoardDryRunTests {
     #expect(!store.isDaemonActionInFlight)
   }
 
+  @Test("Repeated ready cancels a dry-run mutation waiting for the settings lock")
+  func repeatedReadyCancelsWaitingDryRunMutation() async throws {
+    let client = RecordingHarnessClient()
+    let store = await makeBootstrappedStore(client: client)
+    await store.acquireTaskBoardOrchestratorSettingsMutationLock()
+    let mutation = Task { @MainActor in
+      await store.setTaskBoardDryRunDefault(enabled: true)
+    }
+    #expect(
+      await waitUntil {
+        store.taskBoardRuntimeState.orchestratorSettingsMutation.waiters.count == 1
+      }
+    )
+
+    var hasSeenReady = true
+    #expect(
+      await store.processGlobalStreamEvent(
+        DaemonPushEvent(recordedAt: "2026-08-10T00:00:00Z", sessionId: nil, kind: .ready),
+        using: client,
+        hasSeenReady: &hasSeenReady
+      )
+    )
+    store.releaseTaskBoardOrchestratorSettingsMutationLock()
+
+    #expect(await mutation.value == false)
+    #expect(recordedDryRunMutations(client).isEmpty)
+    await store.prepareForTermination()
+  }
+
   private func taskBoardReadCounts(_ client: RecordingHarnessClient) -> [Int] {
     [
       client.readCallCount(.taskBoardItems(nil)),

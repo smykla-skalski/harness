@@ -26,7 +26,8 @@ extension HarnessMonitorStore {
       @escaping @Sendable (any HarnessMonitorClientProtocol) async throws
       -> TaskBoardItemPositionMutationResponse
   ) async -> Bool {
-    guard let client = availableTaskBoardClient else { return false }
+    guard let access = availableTaskBoardClientAccess else { return false }
+    let client = access.client
     beginDaemonAction()
     beginTaskBoardAction()
     defer {
@@ -35,10 +36,13 @@ extension HarnessMonitorStore {
     }
     do {
       let response = try await Self.measureOperation { try await operation(client) }.value
+      try requireCurrentTaskBoardClientAccess(access)
       recordRequestSuccess()
       mergeTaskBoardItem(response.snapshot.item)
       await refreshTaskBoardDashboardSnapshot(using: client)
       return true
+    } catch is CancellationError {
+      return false
     } catch {
       presentFailureFeedback(error.localizedDescription)
       return false

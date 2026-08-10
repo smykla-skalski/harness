@@ -212,6 +212,42 @@ extension HarnessMonitorStoreTaskBoardSettingsTests {
     await store.prepareForTermination()
   }
 
+  @Test("Repeated ready stops an active task source refresh before credential sync")
+  func repeatedReadyStopsActiveTaskSourceRefresh() async throws {
+    let client = RecordingHarnessClient()
+    client.taskBoardSyncStatusResponse = TaskBoardSyncStatusResponse(
+      active: true,
+      cancellationRequested: false
+    )
+    let store = connectedTaskBoardStore(client: client)
+    store.adoptDatabaseBackedTaskBoard(client.taskBoardCapabilitiesValue)
+    let sourceRefresh = Task { @MainActor in
+      await store.syncTaskBoard(request: TaskBoardSyncRequest(direction: .pull))
+    }
+    #expect(
+      await waitUntil {
+        client.recordedCalls().contains(.taskBoardSyncStatus)
+      }
+    )
+
+    var hasSeenReady = true
+    #expect(
+      await store.processGlobalStreamEvent(
+        DaemonPushEvent(recordedAt: "2026-08-10T00:00:00Z", sessionId: nil, kind: .ready),
+        using: client,
+        hasSeenReady: &hasSeenReady
+      )
+    )
+    #expect(await sourceRefresh.value == false)
+    let settledStatusCalls = client.recordedCalls().filter { $0 == .taskBoardSyncStatus }.count
+    try await Task.sleep(for: .milliseconds(250))
+
+    #expect(client.recordedCalls().contains(.cancelTaskBoardSync))
+    let finalStatusCalls = client.recordedCalls().filter { $0 == .taskBoardSyncStatus }.count
+    #expect(finalStatusCalls == settledStatusCalls)
+    await store.prepareForTermination()
+  }
+
   @Test("Connected Task Board clients bypass launch-agent cleanup")
   func connectedTaskBoardClientsBypassLaunchAgentCleanup() async throws {
     let client = RecordingHarnessClient()

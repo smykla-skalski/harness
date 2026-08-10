@@ -4,6 +4,21 @@ import Testing
 @testable import HarnessMonitorKit
 
 extension HarnessMonitorStoreRemoteConnectionTests {
+  @Test("Remote stores use only the remote reconnect scheduler")
+  func remoteStoresDoNotStartGenericRecovery() throws {
+    let fixture = try RemoteStoreFixture()
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(),
+      remoteDaemonServices: fixture.services
+    )
+
+    store.scheduleReconnectAfterConnectionFailure()
+
+    #expect(store.connectionRecoveryTask == nil)
+    #expect(store.remoteDaemonReconnectTask != nil)
+    store.stopRemoteDaemonReconnect()
+  }
+
   @Test("Remote stream closure keeps retrying until the server returns")
   func remoteStreamClosureKeepsRetryingUntilServerReturns() async throws {
     let fixture = try RemoteStoreFixture()

@@ -69,6 +69,13 @@ extension HarnessMonitorStore {
   }
 
   func scheduleReconnectAfterConnectionFailure() {
+    if connectionState == .online {
+      markConnectionOffline("Daemon connection interrupted")
+    }
+    if usesRemoteDaemon {
+      scheduleRemoteDaemonReconnect(immediately: true)
+      return
+    }
     guard
       connectionRecoveryTask == nil,
       !isReconnecting,
@@ -114,6 +121,22 @@ extension HarnessMonitorStore {
       return
     }
     await disconnectedClient.shutdown()
+  }
+
+  func discardConnectionCandidateIfOwned(
+    _ candidate: any HarnessMonitorClientProtocol
+  ) async {
+    guard self.client === candidate else { return }
+    await discardActiveConnection()
+  }
+
+  func settleAbandonedConnectionAttempt(
+    using candidate: any HarnessMonitorClientProtocol
+  ) async {
+    await discardConnectionCandidateIfOwned(candidate)
+    if shouldAbandonConnectionAttempt {
+      connectionState = .idle
+    }
   }
 
   func discardFailedConnectionUnlessReplaced() async -> Bool {

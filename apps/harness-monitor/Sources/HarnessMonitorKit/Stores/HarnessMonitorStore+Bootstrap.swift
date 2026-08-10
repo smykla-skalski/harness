@@ -353,10 +353,11 @@ extension HarnessMonitorStore {
         connectionState = .idle
         return
       }
-      handleRemoteDaemonConnectionFailure(error)
+      let underlyingError = Self.underlyingRefreshSnapshotError(error)
+      handleRemoteDaemonConnectionFailure(underlyingError)
       markConnectionOffline(error.localizedDescription)
       await restorePersistedSessionState()
-      scheduleRemoteDaemonReconnect(after: error)
+      scheduleRemoteDaemonReconnect(after: underlyingError)
     }
   }
 

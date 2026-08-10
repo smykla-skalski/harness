@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 
@@ -194,6 +195,30 @@ struct LegacyManagedLaunchAgentContainmentTests {
       LegacyManagedLaunchAgentContainment.shouldCheckApplicationLifecycle(
         bundleIdentifier: "io.harnessmonitor.app"
       )
+    )
+  }
+
+  @Test("Only process lifecycle changes invalidate the legacy Monitor scan")
+  func processScanInvalidationFollowsProcessLifecycle() {
+    #expect(
+      LegacyManagedLaunchAgentContainment.invalidatesLegacyMonitorProcessScan(
+        for: NSWorkspace.didLaunchApplicationNotification
+      )
+    )
+    #expect(
+      LegacyManagedLaunchAgentContainment.invalidatesLegacyMonitorProcessScan(
+        for: NSWorkspace.didTerminateApplicationNotification
+      )
+    )
+    #expect(
+      LegacyManagedLaunchAgentContainment.invalidatesLegacyMonitorProcessScan(
+        for: NSWorkspace.didWakeNotification
+      ) == false
+    )
+    #expect(
+      LegacyManagedLaunchAgentContainment.invalidatesLegacyMonitorProcessScan(
+        for: NSApplication.didBecomeActiveNotification
+      ) == false
     )
   }
 

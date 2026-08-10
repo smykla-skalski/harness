@@ -65,6 +65,38 @@ extension HarnessMonitorStoreTaskBoardStatusUpdateTests {
     #expect(store.currentFailureFeedbackMessage != nil)
   }
 
+  @Test("Repeated ready revokes an in-flight optimistic move")
+  func repeatedReadyRevokesInFlightOptimisticMove() async throws {
+    let client = RecordingHarnessClient()
+    client.configureTaskBoardItems([taskBoardItem(id: "board-1", status: .todo)])
+    client.configureMutationDelay(.milliseconds(200))
+    let store = await makeBootstrappedStore(client: client)
+    let mutation = Task { @MainActor in
+      await store.updateTaskBoardItemStatuses([
+        TaskBoardItemStatusUpdate(id: "board-1", status: .inProgress)
+      ])
+    }
+    #expect(
+      await waitUntil {
+        store.globalTaskBoardItems.first(where: { $0.id == "board-1" })?.status == .inProgress
+      }
+    )
+
+    var hasSeenReady = true
+    #expect(
+      await store.processGlobalStreamEvent(
+        DaemonPushEvent(recordedAt: "2026-08-10T00:00:00Z", sessionId: nil, kind: .ready),
+        using: client,
+        hasSeenReady: &hasSeenReady
+      )
+    )
+
+    #expect(await mutation.value == false)
+    #expect(store.globalTaskBoardItems.first(where: { $0.id == "board-1" })?.status == .todo)
+    #expect(store.currentFailureFeedbackMessage == nil)
+    await store.prepareForTermination()
+  }
+
   @Test("Optimistic move preserves the item's kind")
   func optimisticMovePreservesKind() async {
     let client = RecordingHarnessClient()

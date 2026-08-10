@@ -60,7 +60,10 @@ extension HarnessMonitorStore {
   public func forceCancelTaskBoardAutomation(
     request: TaskBoardAutomationForceCancelRequest
   ) async -> Bool {
-    guard connectionState == .online, let client = availableTaskBoardClient else { return false }
+    guard connectionState == .online, let access = availableTaskBoardClientAccess else {
+      return false
+    }
+    let client = access.client
     guard isCurrentForceCancelTarget(request.target) else {
       presentFailureFeedback("Cancellation target changed. Refresh and try again.")
       return false
@@ -77,6 +80,7 @@ extension HarnessMonitorStore {
       let measuredResponse = try await Self.measureOperation {
         try await client.forceCancelTaskBoardAutomation(request: request)
       }
+      try requireCurrentTaskBoardClientAccess(access)
       recordRequestSuccess()
       await refreshTaskBoardDashboardSnapshot(using: client)
       presentSuccessFeedback(Self.forceCancelSuccessMessage(measuredResponse.value.disposition))

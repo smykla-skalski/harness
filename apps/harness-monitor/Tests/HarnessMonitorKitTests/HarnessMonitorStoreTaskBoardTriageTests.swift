@@ -99,6 +99,7 @@ struct HarnessMonitorStoreTaskBoardTriageTests {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController(client: client))
     store.client = client
     store.connectionState = .online
+    store.adoptDatabaseBackedTaskBoard(client.taskBoardCapabilitiesValue)
     store.globalTaskBoardItems = [Self.item(id: "task-1")]
 
     client.taskBoardItemsStorage.append(Self.item(id: "task-2"))
@@ -223,6 +224,7 @@ struct HarnessMonitorStoreTaskBoardTriageTests {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController(client: client))
     store.client = client
     store.connectionState = .online
+    store.adoptDatabaseBackedTaskBoard(client.taskBoardCapabilitiesValue)
     store.globalTaskBoardItems = items
     return store
   }

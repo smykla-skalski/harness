@@ -165,7 +165,12 @@ struct HarnessMonitorStoreRemoteConnectionTests {
   @Test("Forgetting a remote daemon reconnects with the local manifest")
   func forgettingRemoteDaemonRestoresLocalManifest() async throws {
     let fixture = try RemoteStoreFixture()
+    let remoteClient = RecordingHarnessClient()
     let daemon = RecordingDaemonController(
+      bootstrapOutcomes: [
+        .success(remoteClient),
+        .failure(DaemonControlError.daemonDidNotStart),
+      ],
       warmUpError: DaemonControlError.daemonDidNotStart,
       usesWarmUpErrorForBootstrap: false
     )
@@ -195,6 +200,7 @@ struct HarnessMonitorStoreRemoteConnectionTests {
   func revocationFailureStillForgetsLocallyWithWarning() async throws {
     let fixture = try RemoteStoreFixture(revoker: FailingRemoteDaemonRevoker())
     let daemon = RecordingDaemonController(
+      bootstrapOutcomes: [.failure(DaemonControlError.daemonDidNotStart)],
       warmUpError: DaemonControlError.daemonDidNotStart,
       usesWarmUpErrorForBootstrap: false
     )

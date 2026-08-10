@@ -96,7 +96,7 @@ extension HarnessMonitorStore {
     let targets = orderedUniqueTaskBoardDeletionTargets(targets)
     guard !targets.isEmpty else { return false }
     let actionName = targets.count == 1 ? "Delete task" : "Delete tasks"
-    guard taskBoardDeletionActionIsAvailable(actionName: actionName), let client else {
+    guard taskBoardDeletionActionIsAvailable(actionName: actionName) else {
       return false
     }
 
@@ -118,10 +118,11 @@ extension HarnessMonitorStore {
     }
 
     if !taskBoardItemIDs.isEmpty {
+      guard let access = availableTaskBoardClientAccess else { return false }
       guard
         await performTaskBoardItemDeletion(
           ids: taskBoardItemIDs,
-          using: client,
+          access: access,
           presentsSuccessFeedback: false
         )
       else {
@@ -157,23 +158,24 @@ extension HarnessMonitorStore {
     presentsSuccessFeedback: Bool
   ) async -> Bool {
     let ids = orderedUniqueDeletionTaskIDs(ids)
-    guard let client, !ids.isEmpty, !isTaskBoardBusy else {
+    guard let access = availableTaskBoardClientAccess, !ids.isEmpty, !isTaskBoardBusy else {
       return false
     }
     beginTaskBoardAction()
     defer { endTaskBoardAction() }
     return await performTaskBoardItemDeletion(
       ids: ids,
-      using: client,
+      access: access,
       presentsSuccessFeedback: presentsSuccessFeedback
     )
   }
 
   private func performTaskBoardItemDeletion(
     ids: [String],
-    using client: any HarnessMonitorClientProtocol,
+    access: TaskBoardClientAccess,
     presentsSuccessFeedback: Bool
   ) async -> Bool {
+    let client = access.client
     beginDaemonAction()
     defer { endDaemonAction() }
 
@@ -181,11 +183,15 @@ extension HarnessMonitorStore {
     var firstFailure: (index: Int, error: any Error)?
     for (index, id) in ids.enumerated() {
       do {
+        try requireCurrentTaskBoardClientAccess(access)
         _ = try await Self.measureOperation {
           try await client.deleteTaskBoardItem(id: id)
         }
+        try requireCurrentTaskBoardClientAccess(access)
         recordRequestSuccess()
         deletedIDs.insert(id)
+      } catch is CancellationError {
+        return false
       } catch {
         firstFailure = (index, error)
         break

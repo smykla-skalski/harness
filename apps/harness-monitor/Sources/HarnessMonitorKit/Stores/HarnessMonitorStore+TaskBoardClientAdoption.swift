@@ -29,6 +29,22 @@ extension HarnessMonitorStore {
     return client
   }
 
+  var availableTaskBoardClientAccess: TaskBoardClientAccess? {
+    guard
+      let client = availableTaskBoardClient,
+      let instanceID = taskBoardDatabaseInstanceID,
+      let connectionFence = try? currentConnectionAttemptFence()
+    else {
+      return nil
+    }
+    return TaskBoardClientAccess(
+      client: client,
+      instanceID: instanceID,
+      connectionFence: connectionFence,
+      databaseAccessGeneration: taskBoardRuntimeState.connection.databaseAccessGeneration
+    )
+  }
+
   func requireDatabaseBackedTaskBoard(
     using client: any HarnessMonitorClientProtocol
   ) async throws -> TaskBoardCapabilities {
@@ -158,13 +174,19 @@ extension HarnessMonitorStore {
   }
 
   @discardableResult
-  func invalidateTaskBoardDatabaseAccess() -> UInt64 {
+  func invalidateTaskBoardDatabaseAccess(
+    using client: any HarnessMonitorClientProtocol
+  ) async -> UInt64 {
     taskBoardRuntimeState.connection.databaseAccessGeneration &+= 1
     taskBoardRuntimeState.connection.databaseAccessSuspended = true
     taskBoardDatabaseInstanceID = nil
     lastTaskBoardCredentialSync = nil
     cancelTaskBoardDashboardSnapshotRefresh()
     scheduleUISync([.contentDashboard])
+    if taskBoardSyncPhase != .idle {
+      setTaskBoardSyncPhase(.stopping)
+      _ = try? await client.cancelTaskBoardSync()
+    }
     return taskBoardRuntimeState.connection.databaseAccessGeneration
   }
 

@@ -20,13 +20,14 @@ extension HarnessMonitorStore {
     let taskBoardUpdates = deduplicatedTaskBoardItemStatusUpdates(taskBoardUpdates)
     let inboxUpdates = deduplicatedTaskBoardInboxStatusUpdates(inboxUpdates)
     guard
-      let client = availableTaskBoardClient,
+      let access = availableTaskBoardClientAccess,
       !taskBoardUpdates.isEmpty || !inboxUpdates.isEmpty,
       inboxUpdates.isEmpty || !isSessionReadOnly,
       !isTaskBoardBusy
     else {
       return false
     }
+    let client = access.client
 
     beginTaskBoardAction()
     if !taskBoardUpdates.isEmpty {
@@ -50,17 +51,19 @@ extension HarnessMonitorStore {
     if !taskBoardUpdates.isEmpty {
       taskBoardSucceeded = await performTaskBoardItemStatusUpdates(
         taskBoardUpdates,
-        using: client
+        access: access
       )
     }
     var inboxSucceeded = true
     if !inboxUpdates.isEmpty {
+      guard (try? requireCurrentTaskBoardClientAccess(access)) != nil else { return false }
       inboxSucceeded = await performTaskBoardInboxStatusUpdates(
         inboxUpdates,
         actor: actor,
         actionID: "task-board/inbox-status-batch",
         using: client
       )
+      guard (try? requireCurrentTaskBoardClientAccess(access)) != nil else { return false }
     }
 
     return taskBoardSucceeded && inboxSucceeded
@@ -68,8 +71,9 @@ extension HarnessMonitorStore {
 
   func performTaskBoardItemStatusUpdates(
     _ updates: [TaskBoardItemStatusUpdate],
-    using client: any HarnessMonitorClientProtocol
+    access: TaskBoardClientAccess
   ) async -> Bool {
+    let client = access.client
     let priorItemsByID = priorTaskBoardItems(for: updates.map(\.id))
     withUISyncBatch {
       for update in updates {
@@ -84,15 +88,15 @@ extension HarnessMonitorStore {
     var reconciledItems: [TaskBoardItem] = []
     for update in updates {
       do {
-        let measuredItem = try await Self.measureOperation {
-          try await client.updateTaskBoardItem(
-            id: update.id,
-            request: priorItemsByID[update.id]?.statusUpdateRequest(update.status)
-              ?? TaskBoardUpdateItemRequest(status: update.status)
-          )
-        }
-        recordRequestSuccess()
-        reconciledItems.append(measuredItem.value)
+        let item = try await performTaskBoardItemStatusUpdate(
+          update,
+          priorItem: priorItemsByID[update.id],
+          access: access
+        )
+        reconciledItems.append(item)
+      } catch is CancellationError {
+        restoreTaskBoardItems(priorItemsByID.values)
+        return false
       } catch {
         if firstFailure == nil {
           firstFailure = error
@@ -103,6 +107,10 @@ extension HarnessMonitorStore {
       }
     }
 
+    guard (try? requireCurrentTaskBoardClientAccess(access)) != nil else {
+      restoreTaskBoardItems(priorItemsByID.values)
+      return false
+    }
     withUISyncBatch {
       for item in reconciledItems {
         mergeTaskBoardItem(item)
@@ -114,6 +122,32 @@ extension HarnessMonitorStore {
       return false
     }
     return true
+  }
+
+  private func performTaskBoardItemStatusUpdate(
+    _ update: TaskBoardItemStatusUpdate,
+    priorItem: TaskBoardItem?,
+    access: TaskBoardClientAccess
+  ) async throws -> TaskBoardItem {
+    try requireCurrentTaskBoardClientAccess(access)
+    let measuredItem = try await Self.measureOperation {
+      try await access.client.updateTaskBoardItem(
+        id: update.id,
+        request: priorItem?.statusUpdateRequest(update.status)
+          ?? TaskBoardUpdateItemRequest(status: update.status)
+      )
+    }
+    try requireCurrentTaskBoardClientAccess(access)
+    recordRequestSuccess()
+    return measuredItem.value
+  }
+
+  private func restoreTaskBoardItems<S: Sequence>(_ items: S) where S.Element == TaskBoardItem {
+    withUISyncBatch {
+      for item in items {
+        mergeTaskBoardItem(item)
+      }
+    }
   }
 
   private func priorTaskBoardItems(for ids: [String]) -> [String: TaskBoardItem] {

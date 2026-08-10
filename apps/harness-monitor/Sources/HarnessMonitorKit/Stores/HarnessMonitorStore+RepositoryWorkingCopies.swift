@@ -6,9 +6,11 @@ extension HarnessMonitorStore {
   /// or the request fails, so the UI renders the empty state without extra
   /// error plumbing.
   public func listRepositoryWorkingCopies() async -> [WorkingCopyListEntry] {
-    guard let client else { return [] }
+    guard let access = availableTaskBoardClientAccess else { return [] }
     do {
-      return try await client.taskBoardWorkingCopies()
+      let entries = try await access.client.taskBoardWorkingCopies()
+      try requireCurrentTaskBoardClientAccess(access)
+      return entries
     } catch {
       return []
     }
@@ -21,12 +23,14 @@ extension HarnessMonitorStore {
   public func obtainRepositoryWorkingCopy(
     repository: String
   ) async -> WorkingCopyListEntry? {
-    guard let client else { return nil }
+    guard let access = availableTaskBoardClientAccess else { return nil }
     do {
-      return try await client.obtainTaskBoardWorkingCopy(
+      let entry = try await access.client.obtainTaskBoardWorkingCopy(
         repository: repository,
         allowClone: true
       )
+      try requireCurrentTaskBoardClientAccess(access)
+      return entry
     } catch {
       return nil
     }
@@ -36,9 +40,10 @@ extension HarnessMonitorStore {
   /// `true` on daemon-confirmed deletion.
   @discardableResult
   public func deleteRepositoryWorkingCopy(repoKeySegment: String) async -> Bool {
-    guard let client else { return false }
+    guard let access = availableTaskBoardClientAccess else { return false }
     do {
-      try await client.deleteTaskBoardWorkingCopy(repoKeySegment: repoKeySegment)
+      try await access.client.deleteTaskBoardWorkingCopy(repoKeySegment: repoKeySegment)
+      try requireCurrentTaskBoardClientAccess(access)
       return true
     } catch {
       return false
