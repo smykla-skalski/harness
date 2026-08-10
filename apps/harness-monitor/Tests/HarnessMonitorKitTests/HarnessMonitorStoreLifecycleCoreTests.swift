@@ -140,12 +140,37 @@ struct HarnessMonitorStoreLifecycleCoreTests {
 
     #expect(store.hasBootstrapped)
     #expect(store.client == nil)
-    #expect(client.shutdownCallCount() == 1)
+    #expect(client.shutdownCallCount() == 2)
     guard case .offline(let reason) = store.connectionState else {
       Issue.record("Expected failed bootstrap to leave the store offline")
       return
     }
     #expect(reason.contains("credential synchronization did not complete"))
+    await store.prepareForTermination()
+  }
+
+  @Test("External bootstrap retries a transient credential synchronization failure")
+  func externalBootstrapRetriesTransientCredentialSynchronizationFailure() async {
+    let failedClient = RecordingHarnessClient()
+    failedClient.configureTaskBoardGitHubTokensSyncError(
+      HarnessMonitorAPIError.server(code: 503, message: "credential sync unavailable")
+    )
+    let recoveredClient = RecordingHarnessClient()
+    let daemon = RecordingDaemonController(
+      client: failedClient,
+      bootstrapOutcomes: [.success(recoveredClient)]
+    )
+    let store = HarnessMonitorStore(
+      daemonController: daemon,
+      daemonOwnership: .external
+    )
+
+    await store.bootstrapIfNeeded()
+
+    #expect(store.connectionState == .online)
+    #expect(store.client as? RecordingHarnessClient === recoveredClient)
+    #expect(failedClient.shutdownCallCount() == 1)
+    #expect(await daemon.recordedBootstrapCallCount() == 1)
     await store.prepareForTermination()
   }
 

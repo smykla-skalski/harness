@@ -11,7 +11,7 @@ actor RecordingDaemonController: DaemonControlling {
   private let client: any HarnessMonitorClientProtocol
   private var bootstrapOutcomes: [BootstrapOutcome]
   private var launchAgentInstalled: Bool
-  private let registrationStateOverride: DaemonLaunchAgentRegistrationState?
+  private var registrationStateOverride: DaemonLaunchAgentRegistrationState?
   private let statusReportOverride: DaemonStatusReport?
   private let bootstrapError: (any Error)?
   private let bootstrapChecksCancellation: Bool
@@ -85,6 +85,7 @@ actor RecordingDaemonController: DaemonControlling {
     registerLaunchAgentCallCount += 1
     try await registerLaunchAgentHandler?()
     launchAgentInstalled = true
+    registrationStateOverride = .enabled
     lastEventMessage = "launch agent installed"
     return .enabled
   }

@@ -93,7 +93,7 @@ struct HarnessMonitorStoreLegacyContainmentRaceTests {
 
     #expect(await readyTask.value == false)
     #expect(store.client == nil)
-    #expect(store.taskBoardDatabaseInstanceID == "accepted-task-board")
+    #expect(store.taskBoardDatabaseInstanceID == nil)
     assertNoCredentialMutations(client)
     await store.prepareForTermination()
   }

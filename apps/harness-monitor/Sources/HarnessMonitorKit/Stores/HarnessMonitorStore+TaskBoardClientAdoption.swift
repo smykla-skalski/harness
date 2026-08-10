@@ -1,9 +1,24 @@
 import Foundation
 
+struct TaskBoardAccessFence: Sendable {
+  let containment: LegacyContainmentFence
+  let connection: ConnectionAttemptFence?
+  let databaseAccessGeneration: UInt64?
+}
+
 struct TaskBoardClientAccess: Sendable {
   let client: any HarnessMonitorClientProtocol
   let instanceID: String
   let connectionFence: ConnectionAttemptFence
+  let databaseAccessGeneration: UInt64
+
+  var accessFence: TaskBoardAccessFence {
+    TaskBoardAccessFence(
+      containment: connectionFence.containment,
+      connection: connectionFence,
+      databaseAccessGeneration: databaseAccessGeneration
+    )
+  }
 }
 
 extension HarnessMonitorStore {
@@ -51,20 +66,25 @@ extension HarnessMonitorStore {
     _ client: any HarnessMonitorClientProtocol
   ) async throws -> TaskBoardClientAccess {
     let connectionFence = try currentConnectionAttemptFence()
+    let databaseAccessGeneration = taskBoardRuntimeState.connection.databaseAccessGeneration
     guard self.client === client else {
       throw CancellationError()
     }
     let capabilities = try await withCurrentLegacyContainment {
       try await databaseBackedTaskBoardCapabilities(using: client)
     }
-    guard isCurrentTaskBoardClient(client, connectionFence: connectionFence) else {
+    guard
+      isCurrentTaskBoardClient(client, connectionFence: connectionFence),
+      isCurrentTaskBoardDatabaseAccessGeneration(databaseAccessGeneration)
+    else {
       throw CancellationError()
     }
     adoptDatabaseBackedTaskBoard(capabilities)
     return TaskBoardClientAccess(
       client: client,
       instanceID: capabilities.instanceID,
-      connectionFence: connectionFence
+      connectionFence: connectionFence,
+      databaseAccessGeneration: databaseAccessGeneration
     )
   }
 
@@ -87,7 +107,11 @@ extension HarnessMonitorStore {
     let synchronized = await syncStoredTaskBoardCredentialsForNewDaemon(
       using: candidate,
       validatedCapabilities: capabilities,
-      connectionFence: connectionFence
+      accessFence: TaskBoardAccessFence(
+        containment: connectionFence.containment,
+        connection: connectionFence,
+        databaseAccessGeneration: nil
+      )
     )
     guard synchronized, isCurrentConnectionAttemptFence(connectionFence) else {
       await candidate.shutdown()
@@ -100,7 +124,8 @@ extension HarnessMonitorStore {
     return TaskBoardClientAccess(
       client: candidate,
       instanceID: capabilities.instanceID,
-      connectionFence: connectionFence
+      connectionFence: connectionFence,
+      databaseAccessGeneration: taskBoardRuntimeState.connection.databaseAccessGeneration
     )
   }
 
@@ -110,10 +135,24 @@ extension HarnessMonitorStore {
         access.client,
         connectionFence: access.connectionFence
       ),
-      taskBoardDatabaseInstanceID == access.instanceID
+      taskBoardDatabaseInstanceID == access.instanceID,
+      isCurrentTaskBoardDatabaseAccessGeneration(access.databaseAccessGeneration)
     else {
       throw CancellationError()
     }
+  }
+
+  @discardableResult
+  func invalidateTaskBoardDatabaseAccess() -> UInt64 {
+    taskBoardRuntimeState.connection.databaseAccessGeneration &+= 1
+    taskBoardDatabaseInstanceID = nil
+    lastTaskBoardCredentialSync = nil
+    cancelTaskBoardDashboardSnapshotRefresh()
+    return taskBoardRuntimeState.connection.databaseAccessGeneration
+  }
+
+  func isCurrentTaskBoardDatabaseAccessGeneration(_ generation: UInt64) -> Bool {
+    generation == taskBoardRuntimeState.connection.databaseAccessGeneration
   }
 
   private func isCurrentTaskBoardClient(

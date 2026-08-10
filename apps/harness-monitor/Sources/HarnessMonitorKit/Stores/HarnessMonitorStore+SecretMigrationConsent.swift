@@ -67,8 +67,7 @@ extension HarnessMonitorStore {
   func migrateStoredTaskBoardSecrets(
     from previousID: String,
     to currentID: String,
-    containmentFence: LegacyContainmentFence? = nil,
-    connectionFence: ConnectionAttemptFence? = nil
+    accessFence: TaskBoardAccessFence? = nil
   ) async -> Bool {
     let knownRepositories = knownTaskBoardRepositorySlugs(for: previousID, currentID)
     let items: [TaskBoardSecretMigrationItem]
@@ -85,7 +84,7 @@ extension HarnessMonitorStore {
       return false
     }
 
-    guard isCurrentSecretMigrationFence(containmentFence, connectionFence) else {
+    guard isCurrentSecretMigrationFence(accessFence) else {
       return false
     }
 
@@ -98,7 +97,7 @@ extension HarnessMonitorStore {
     // deliberate cancel is honored without a Keychain write and is not
     // re-prompted on the next reconnect.
     let selections = await presentSecretMigrationConsent(items)
-    guard isCurrentSecretMigrationFence(containmentFence, connectionFence) else {
+    guard isCurrentSecretMigrationFence(accessFence) else {
       return false
     }
     guard let selections else {
@@ -113,7 +112,7 @@ extension HarnessMonitorStore {
         knownRepositories: knownRepositories,
         selections: selections
       )
-      guard isCurrentSecretMigrationFence(containmentFence, connectionFence) else {
+      guard isCurrentSecretMigrationFence(accessFence) else {
         return false
       }
       taskBoardRuntimeState.connection.previousDatabaseInstanceID = nil
@@ -126,19 +125,10 @@ extension HarnessMonitorStore {
     }
   }
 
-  private func isCurrentLegacyContainmentFenceIfProvided(
-    _ fence: LegacyContainmentFence?
-  ) -> Bool {
-    guard let fence else { return true }
-    return isCurrentLegacyContainmentFence(fence)
-  }
-
   private func isCurrentSecretMigrationFence(
-    _ containmentFence: LegacyContainmentFence?,
-    _ connectionFence: ConnectionAttemptFence?
+    _ accessFence: TaskBoardAccessFence?
   ) -> Bool {
-    isCurrentLegacyContainmentFenceIfProvided(containmentFence)
-      && isCurrentConnectionAttemptFenceIfProvided(connectionFence)
+    accessFence.map(isCurrentTaskBoardAccessFence) != false
   }
 
   /// Presents the review sheet and parks the connection sync until the user

@@ -18,19 +18,24 @@ extension HarnessMonitorStore {
     else {
       return false
     }
+    let databaseAccessGeneration =
+      hasSeenReady
+      ? invalidateTaskBoardDatabaseAccess()
+      : taskBoardRuntimeState.connection.databaseAccessGeneration
+    let accessFence = TaskBoardAccessFence(
+      containment: containmentFence,
+      connection: connectionFence,
+      databaseAccessGeneration: databaseAccessGeneration
+    )
     if hasSeenReady {
       guard
         await syncStoredTaskBoardCredentialsForNewDaemon(
           using: client,
-          containmentFence: containmentFence,
-          connectionFence: connectionFence
+          accessFence: accessFence
         )
       else {
-        if isCurrentTaskBoardConnectionFence(
-          containmentFence,
-          connectionFence: connectionFence
-        ) {
-          markConnectionOffline("Connected daemon has no database-backed Task Board")
+        if isCurrentTaskBoardAccessFence(accessFence) {
+          markConnectionOffline("Connected daemon Task Board could not be synchronized")
           scheduleReconnectAfterConnectionFailure()
         }
         return false
@@ -42,10 +47,7 @@ extension HarnessMonitorStore {
       return false
     }
     await recoverGlobalPushOnlyState(using: client, connectionFence: connectionFence)
-    return isCurrentTaskBoardConnectionFence(
-      containmentFence,
-      connectionFence: connectionFence
-    )
+    return isCurrentTaskBoardAccessFence(accessFence)
   }
 
   func recoverGlobalPushOnlyState(

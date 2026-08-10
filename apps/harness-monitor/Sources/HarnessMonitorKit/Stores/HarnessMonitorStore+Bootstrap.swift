@@ -268,7 +268,7 @@ extension HarnessMonitorStore {
       let client = try await withBootstrapTelemetryPhase(.managedDaemonWarmUp) {
         try await awaitManagedDaemonWarmUpWithRecovery()
       }
-      await withBootstrapTelemetryPhase(.managedInitialConnect) {
+      try await withBootstrapTelemetryPhase(.managedInitialConnect) {
         try await connect(using: client)
       }
     } catch {
@@ -301,22 +301,31 @@ extension HarnessMonitorStore {
           )
         }
       }
-      await withBootstrapTelemetryPhase(.externalInitialConnect) {
+      try await withBootstrapTelemetryPhase(.externalInitialConnect) {
         try await connect(using: client)
       }
     } catch {
-      let recovery = externalDaemonRecoveryFeedback(
-        for: error,
-        daemonCommand: daemonCommand
-      )
-      markConnectionOffline(recovery.offlineMessage)
-      toast.presentWarning(
-        recovery.message,
-        title: recovery.title,
-        details: recovery.details,
-        primaryAction: recovery.primaryAction,
-        rollupDuplicates: true
-      )
+      guard !shouldAbandonConnectionAttempt, !(error is CancellationError) else {
+        connectionState = .idle
+        return
+      }
+      do {
+        try await retryLocalDaemonConnection()
+        return
+      } catch {
+        let recovery = externalDaemonRecoveryFeedback(
+          for: error,
+          daemonCommand: daemonCommand
+        )
+        markConnectionOffline(recovery.offlineMessage)
+        toast.presentWarning(
+          recovery.message,
+          title: recovery.title,
+          details: recovery.details,
+          primaryAction: recovery.primaryAction,
+          rollupDuplicates: true
+        )
+      }
       await restorePersistedSessionState()
       startManifestWatcher()
     }
@@ -331,7 +340,7 @@ extension HarnessMonitorStore {
           try await daemonController.bootstrapClient()
         }
       }
-      await withBootstrapTelemetryPhase(.remoteInitialConnect) {
+      try await withBootstrapTelemetryPhase(.remoteInitialConnect) {
         try await connect(using: client)
       }
     } catch {

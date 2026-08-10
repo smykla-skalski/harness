@@ -237,6 +237,8 @@ extension HarnessMonitorStore {
           announceFeedback: true
         )
         return .success
+      } catch is CancellationError {
+        return .failed
       } catch {
         presentFailureFeedback(error.localizedDescription)
         return .failed
@@ -277,13 +279,19 @@ extension HarnessMonitorStore {
         timeout: bootstrapWarmUpTimeout
       )
     }
-    try await connect(using: refreshedClient)
-    guard connectionState == .online else {
-      throw DaemonControlError.commandFailed(
-        "The harness daemon did not become healthy before the timeout"
-      )
+    do {
+      try await connect(using: refreshedClient)
+    } catch is CancellationError {
+      throw CancellationError()
+    } catch {
+      guard await recoverManagedBootstrapFailure(from: error) else {
+        throw error
+      }
     }
-    return refreshedClient
+    guard connectionState == .online, let activeClient = client else {
+      throw CancellationError()
+    }
+    return activeClient
   }
 
   private func hostBridgeActionLabel(for capability: String, enabled: Bool) -> String {

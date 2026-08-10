@@ -178,10 +178,10 @@ extension HarnessMonitorStoreHostBridgeTests {
       recordedOperations
         == [
           "legacy-cleanup",
-          "legacy-cleanup",
           "warm-up",
           "legacy-cleanup",
           "repair",
+          "legacy-cleanup",
           "warm-up",
         ]
     )
@@ -256,7 +256,7 @@ extension HarnessMonitorStoreHostBridgeTests {
     #expect(failureMessage.contains("Restart `"))
     #expect(failureMessage.contains("harness-daemon dev"))
     #expect(failureMessage.contains("and try again"))
-    #expect(await daemon.recordedOperations() == ["warm-up"])
+    #expect(await daemon.recordedOperations() == ["legacy-cleanup", "warm-up"])
   }
 
   @Test("Host bridge enable clears stale excluded state when the bridge is no longer running")
