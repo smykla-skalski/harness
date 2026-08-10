@@ -53,6 +53,18 @@ extension HarnessMonitorStore {
     successMessage: String,
     perform: (any HarnessMonitorClientProtocol) async throws -> PolicyCanvasWorkspace
   ) async -> Bool {
+    await withSerializedTaskBoardPolicyPublication {
+      await mutatePolicyScenariosSerialized(
+        successMessage: successMessage,
+        perform: perform
+      )
+    }
+  }
+
+  private func mutatePolicyScenariosSerialized(
+    successMessage: String,
+    perform: (any HarnessMonitorClientProtocol) async throws -> PolicyCanvasWorkspace
+  ) async -> Bool {
     guard let access = availableTaskBoardClientAccess else { return false }
     let client = access.client
     beginDaemonAction()

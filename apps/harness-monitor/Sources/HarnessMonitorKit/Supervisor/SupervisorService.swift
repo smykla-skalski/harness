@@ -74,7 +74,10 @@ public actor SupervisorService {
 
   public func quarantinedRuleIDs() -> Set<String> { quarantined }
 
-  public func isAutoActionSuppressed(at date: Date) -> Bool { suppressionActive(at: date) }
+  public func isAutoActionSuppressed(at date: Date) async -> Bool {
+    guard !suppressionActive(at: date) else { return true }
+    return await policyRecoverySuppressionActive()
+  }
 
   public func liveTickSnapshot() -> DecisionLiveTickSnapshot {
     DecisionLiveTickSnapshot(
@@ -297,7 +300,7 @@ public actor SupervisorService {
           actionKey: action.actionKey
         )
         let actionNow = clock.now()
-        if shouldSuppress(action, behavior: behavior, at: actionNow) {
+        if await shouldSuppress(action, behavior: behavior, at: actionNow) {
           HarnessMonitorLogger.supervisorTrace(
             "supervisor.action.suppressed key=\(action.actionKey)"
           )

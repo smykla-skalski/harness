@@ -30,6 +30,21 @@ struct RepositoryLabelUsageCacheTests {
     #expect(dependencies.usageCount == 1)
   }
 
+  @Test("recordUse preserves one increment per same-repository item")
+  func recordUsePreservesSameRepositoryBatchCount() async throws {
+    let (container, persistence) = try makePersistence()
+
+    await persistence.recordUses(
+      repositories: ["owner/repo", "owner/repo", "owner/repo"],
+      label: "renovate"
+    )
+
+    let context = ModelContext(container)
+    let rows = try context.fetch(FetchDescriptor<CachedReviewLabelUsage>())
+    let renovate = try #require(rows.first { $0.label == "renovate" })
+    #expect(renovate.usageCount == 3)
+  }
+
   @Test("recordUse ignores empty repository or label")
   func recordUseIgnoresEmptyKeys() async throws {
     let (container, persistence) = try makePersistence()

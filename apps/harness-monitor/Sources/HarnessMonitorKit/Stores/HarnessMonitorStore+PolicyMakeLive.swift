@@ -9,6 +9,12 @@ extension HarnessMonitorStore {
   /// no client or any daemon/transport failure (the toast surfaces the reason).
   @discardableResult
   public func makeLivePolicyPipeline(revision: UInt64) async -> Bool {
+    await withSerializedTaskBoardPolicyPublication {
+      await makeLivePolicyPipelineSerialized(revision: revision)
+    }
+  }
+
+  private func makeLivePolicyPipelineSerialized(revision: UInt64) async -> Bool {
     guard let access = availableTaskBoardClientAccess else { return false }
     let client = access.client
     beginDaemonAction()
@@ -23,7 +29,6 @@ extension HarnessMonitorStore {
       )
       try requireCurrentTaskBoardClientAccess(access)
       recordRequestSuccess()
-      globalPolicyPipeline = response.document
       // The response workspace already reflects the Enforced canvas mode and the
       // enabled global flag; force-reload the active canvas so the audit + the
       // supervisor overrides re-derive from the now-live document in one pass.

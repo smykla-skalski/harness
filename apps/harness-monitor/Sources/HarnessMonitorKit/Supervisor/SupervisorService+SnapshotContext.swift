@@ -71,11 +71,21 @@ extension SupervisorService {
     _ action: SupervisorAction,
     behavior: RuleDefaultBehavior,
     at now: Date
-  ) -> Bool {
+  ) async -> Bool {
     guard action.isAutomaticSideEffect else {
       return false
     }
-    return behavior == .cautious || suppressionActive(at: now)
+    guard behavior != .cautious, !suppressionActive(at: now) else {
+      return true
+    }
+    return await policyRecoverySuppressionActive()
+  }
+
+  func policyRecoverySuppressionActive() async -> Bool {
+    guard let store else { return false }
+    return await MainActor.run {
+      store.taskBoardPolicyRuntimeRecoveryPending
+    }
   }
 
   func suppressionActive(at now: Date) -> Bool {

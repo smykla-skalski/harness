@@ -46,7 +46,7 @@ extension DashboardReviewsRouteView {
   }
 
   func recordLabelUsage(_ label: String, items: [ReviewItem]) {
-    let repositories = uniqueRepositories(for: items)
+    let repositories = items.map(\.repository)
     guard !repositories.isEmpty else { return }
     Task {
       await store.recordRepositoryLabelUsage(label, repositories: repositories)

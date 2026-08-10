@@ -254,6 +254,12 @@ extension HarnessMonitorStore {
   }
 
   public func refreshSupervisorPolicyOverrides() async {
+    await withSerializedTaskBoardPolicyPublication {
+      await refreshSupervisorPolicyOverridesSerialized()
+    }
+  }
+
+  private func refreshSupervisorPolicyOverridesSerialized() async {
     while !Task.isCancelled {
       let generation = taskBoardRuntimeState.connection.databaseAccessGeneration
       if let gate = supervisorBindings.policyOverrideRefreshGate {

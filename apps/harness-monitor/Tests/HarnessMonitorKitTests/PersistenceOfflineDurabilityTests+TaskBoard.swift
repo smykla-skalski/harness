@@ -7,6 +7,31 @@ import XCTest
 
 @MainActor
 extension PersistenceOfflineDurabilityTests {
+  @Test("Database handoff removes the previous task-board cache")
+  func databaseHandoffRemovesPreviousTaskBoardCache() async throws {
+    let container = try HarnessMonitorModelContainer.preview()
+    let client = RecordingHarnessClient()
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(client: client),
+      modelContainer: container
+    )
+    store.installConnectedTestClient(client)
+    store.adoptDatabaseBackedTaskBoard(client.taskBoardCapabilitiesValue)
+    let staleItem = makeTaskBoardItem(
+      id: "database-a-item",
+      provider: .gitHub,
+      externalId: "database-a"
+    )
+    await store.cacheTaskBoardSnapshot(items: [staleItem], orchestratorStatus: nil)
+    store.scheduleTaskBoardSnapshotCacheWrite(items: [staleItem], orchestratorStatus: nil)
+
+    _ = try await store.invalidateTaskBoardDatabaseAccess(using: client)
+    try await Task.sleep(for: .milliseconds(350))
+
+    let cached = await store.loadCachedTaskBoardSnapshot()
+    #expect(cached == nil)
+  }
+
   @Test("Offline bootstrap restores cached task-board items after relaunch")
   func offlineBootstrapRestoresCachedTaskBoardItemsAfterRelaunch() async throws {
     let githubItem = makeTaskBoardItem(

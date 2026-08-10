@@ -28,7 +28,9 @@ public actor PolicyRegistry {
   }
 
   public func advanceOverrideSourceGeneration(to generation: UInt64) {
-    minimumOverrideSourceGeneration = max(minimumOverrideSourceGeneration, generation)
+    guard generation > minimumOverrideSourceGeneration else { return }
+    minimumOverrideSourceGeneration = generation
+    overrides.removeAll()
   }
 
   @discardableResult

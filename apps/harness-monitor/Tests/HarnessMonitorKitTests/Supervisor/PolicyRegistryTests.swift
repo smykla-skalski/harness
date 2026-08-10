@@ -111,6 +111,14 @@ final class PolicyRegistryTests: XCTestCase {
 
   func test_staleTaskBoardOverrideGenerationCannotReplaceCurrentPolicy() async {
     let registry = PolicyRegistry()
+    await registry.applyOverrides([
+      PolicyConfigOverride(
+        ruleID: "database-a",
+        enabled: true,
+        defaultBehavior: .aggressive,
+        parameters: [:]
+      )
+    ])
     await registry.advanceOverrideSourceGeneration(to: 2)
 
     let applied = await registry.applyOverrides(
@@ -159,6 +167,22 @@ final class PolicyRegistryTests: XCTestCase {
   }
 
   @MainActor
+  func test_taskBoardPolicyRecoverySuppressesSupervisorAutoActions() async throws {
+    let container = try HarnessMonitorModelContainer.preview()
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(),
+      modelContainer: container
+    )
+    await store.startSupervisor()
+    store.taskBoardPolicyRuntimeRecoveryPending = true
+
+    let isSuppressed = await store.isSupervisorAutoActionSuppressedForTesting(at: .now)
+
+    XCTAssertTrue(isSuppressed)
+    await store.stopSupervisor()
+  }
+
+  @MainActor
   func test_settingsRefreshRetriesAcrossTaskBoardGenerationChange() async throws {
     let container = try HarnessMonitorModelContainer.preview()
     let store = HarnessMonitorStore(
@@ -192,6 +216,73 @@ final class PolicyRegistryTests: XCTestCase {
 
     let isEnabled = await stack.registry.isEnabled(ruleID: "unassigned-task")
     XCTAssertFalse(isEnabled)
+    await store.stopSupervisor()
+  }
+
+  @MainActor
+  func test_enforcedPolicyPublishesAfterQueuedSettingsRefresh() async throws {
+    let client = RecordingHarnessClient()
+    let store = await makeBootstrappedStore(client: client)
+    await store.startSupervisor()
+    let stack = try XCTUnwrap(store.supervisorStack)
+    let repository = try XCTUnwrap(store.supervisorPolicyConfigRepository)
+    try await repository.save(
+      PolicyConfigRowSnapshot(
+        ruleID: "unassigned-task",
+        enabled: false,
+        defaultBehaviorRaw: RuleDefaultBehavior.cautious.rawValue,
+        parametersJSON: "{}"
+      )
+    )
+    store.globalPolicyCanvasWorkspace = nil
+    store.globalPolicyPipeline = nil
+    let gate = LegacyContainmentVoidGate()
+    store.supervisorBindings.policyOverrideRefreshGate = { await gate.wait() }
+    let settingsRefresh = Task { @MainActor in
+      await store.refreshSupervisorPolicyOverrides()
+    }
+    XCTAssertTrue(await HarnessMonitorKitTests.waitUntil { await gate.hasEntered })
+
+    let document = PolicyPipelineDocument(
+      revision: 2,
+      mode: .enforced,
+      nodes: [
+        PolicyPipelineNode(
+          id: PolicyGraphNodeId("unassigned-task"),
+          title: "Allow unassigned task",
+          kind: .supervisorRule(decision: .allow, reasonCodes: [])
+        )
+      ],
+      edges: [],
+      groups: []
+    )
+    let canvasId = "canvas-enforced"
+    client.policyPipelinesByCanvasID = [canvasId: document]
+    client.policyAuditByCanvasID = [canvasId: client.samplePolicyPipelineAudit(for: document)]
+    client.policyCanvasWorkspaceStorage = PolicyCanvasWorkspace(
+      schemaVersion: 1,
+      activeCanvasId: canvasId,
+      canvases: [
+        client.policyCanvasSummary(
+          canvasId: canvasId,
+          title: "Enforced",
+          document: document,
+          latestSimulation: nil
+        )
+      ]
+    )
+    let policyRefresh = Task { @MainActor in await store.refreshPolicyPipeline() }
+    XCTAssertTrue(
+      await HarnessMonitorKitTests.waitUntil {
+        store.taskBoardRuntimeState.policyPublication.waiters.count == 1
+      }
+    )
+
+    await gate.release()
+    await settingsRefresh.value
+    XCTAssertTrue(await policyRefresh.value)
+
+    XCTAssertTrue(await stack.registry.isEnabled(ruleID: "unassigned-task"))
     await store.stopSupervisor()
   }
 

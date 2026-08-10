@@ -41,25 +41,36 @@ extension HarnessMonitorStore {
     }
   }
 
-  public func refreshPolicyPipeline() async {
-    guard let access = availableTaskBoardClientAccess else { return }
+  @discardableResult
+  public func refreshPolicyPipeline() async -> Bool {
+    await withSerializedTaskBoardPolicyPublication {
+      await refreshPolicyPipelineSerialized()
+    }
+  }
+
+  private func refreshPolicyPipelineSerialized() async -> Bool {
+    guard let access = availableTaskBoardClientAccess else { return false }
     let client = access.client
     let workspaceLoad = await Self.loadPolicyCanvasWorkspace(using: client)
-    guard taskBoardAccessIsCurrent(access) else { return }
-    guard let measuredWorkspace = workspaceLoad.measured else { return }
+    guard taskBoardAccessIsCurrent(access) else { return false }
+    guard let measuredWorkspace = workspaceLoad.measured else {
+      return handleTaskBoardPolicyRecoveryFailure(access: access)
+    }
     let synchronized = await syncPolicyCanvasWorkspace(
       measuredWorkspace.value,
       using: client,
       forceReloadActiveCanvas: true,
       taskBoardAccess: access
     )
-    if synchronized, taskBoardAccessIsCurrent(access) {
-      taskBoardPolicyRuntimeRecoveryPending = false
+    guard synchronized, taskBoardAccessIsCurrent(access) else {
+      return handleTaskBoardPolicyRecoveryFailure(access: access)
     }
+    completeTaskBoardPolicyRecovery()
+    return true
   }
 
   public func ensurePolicyCanvasWorkspaceLoadedForRuntimePolicies() async {
-    guard globalPolicyCanvasWorkspace == nil else {
+    guard globalPolicyCanvasWorkspace == nil || taskBoardPolicyRuntimeRecoveryPending else {
       return
     }
     await bootstrapIfNeeded()
@@ -94,6 +105,14 @@ extension HarnessMonitorStore {
   /// rollback path; distinguishing the two (tracking-id P3I.3) stays deferred.
   @discardableResult
   public func savePolicyPipelineDraft(
+    document: PolicyPipelineDocument
+  ) async -> PolicyPipelineDocument? {
+    await withSerializedTaskBoardPolicyPublication {
+      await savePolicyPipelineDraftSerialized(document: document)
+    }
+  }
+
+  private func savePolicyPipelineDraftSerialized(
     document: PolicyPipelineDocument
   ) async -> PolicyPipelineDocument? {
     guard let access = availableTaskBoardClientAccess else { return nil }
@@ -179,6 +198,14 @@ extension HarnessMonitorStore {
   @discardableResult
   public func simulatePolicyPipeline(
     document: PolicyPipelineDocument? = nil
+  ) async -> Bool {
+    await withSerializedTaskBoardPolicyPublication {
+      await simulatePolicyPipelineSerialized(document: document)
+    }
+  }
+
+  private func simulatePolicyPipelineSerialized(
+    document: PolicyPipelineDocument?
   ) async -> Bool {
     guard let access = availableTaskBoardClientAccess else { return false }
     let client = access.client

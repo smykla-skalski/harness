@@ -14,6 +14,10 @@ struct CacheWriteSyncState {
   var taskBoardRefreshRequiresImmediate = false
   var pendingTaskBoardOrchestratorRefresh = false
   var pendingTaskBoardPolicyPipelineRefresh = false
+  var taskBoardPolicyRecoveryTask: Task<Void, Never>?
+  var taskBoardPolicyRecoveryGeneration: UInt64 = 0
+  var taskBoardPolicyRecoveryAttempt = 0
+  var taskBoardPolicyRecoveryRetryDelayOverride: Duration?
   var pendingTaskBoardFallbackStatus: TaskBoardOrchestratorStatus?
   var taskBoardEvaluationBaselineRunID: String?
   var pendingCacheWriteTask: Task<Void, Never>?
@@ -28,12 +32,18 @@ struct CacheWriteSyncState {
 struct TaskBoardRuntimeState {
   var connection = TaskBoardConnectionState()
   var orchestratorSettingsMutation = TaskBoardOrchestratorSettingsMutationState()
+  var policyPublication = TaskBoardPolicyPublicationState()
   var stepModeMutation = TaskBoardStepModeMutationState()
   var positionMutation = TaskBoardPositionMutationState()
   var syncPhase = TaskBoardSyncPhase.idle
   var actionCount = 0
   var pendingRunOnceReservations: Set<UUID> = []
   var activeRunOnceReservations: Set<UUID> = []
+}
+
+struct TaskBoardPolicyPublicationState {
+  var isLocked = false
+  var waiters: [CheckedContinuation<Void, Never>] = []
 }
 
 struct TaskBoardOrchestratorSettingsMutationState {

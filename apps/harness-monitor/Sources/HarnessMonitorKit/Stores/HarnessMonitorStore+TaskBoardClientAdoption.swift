@@ -213,6 +213,7 @@ extension HarnessMonitorStore {
     resetTaskBoardDatabaseScopedRecoveryState()
     cancelTaskBoardDashboardSnapshotRefresh()
     cancelInitialTaskBoardConfirmationRefresh()
+    await clearCachedTaskBoardSnapshot()
     scheduleUISync([.contentDashboard])
     await supervisorStack?.registry.advanceOverrideSourceGeneration(
       to: databaseAccessGeneration
@@ -222,6 +223,7 @@ extension HarnessMonitorStore {
   }
 
   private func resetTaskBoardDatabaseScopedRecoveryState() {
+    resetTaskBoardPolicyRecoveryRetry()
     withUISyncBatch {
       globalTaskBoardItems = []
       globalTaskBoardItemsSnapshotAvailable = false
@@ -243,7 +245,6 @@ extension HarnessMonitorStore {
     if !taskBoardRuntimeState.positionMutation.pendingTokens.isEmpty {
       taskBoardRuntimeState.positionMutation.pendingTokens.removeAll()
       taskBoardRuntimeState.positionMutation.generation &+= 1
-      cancelPendingTaskBoardSnapshotCacheWriteTask()
     }
   }
 

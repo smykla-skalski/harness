@@ -5,6 +5,9 @@ import Foundation
 extension RecordingHarnessClient {
   func policyCanvasWorkspace() async throws -> PolicyCanvasWorkspace {
     recordReadCall(.policyCanvasWorkspace)
+    if let handler = lock.withLock({ policyCanvasWorkspaceHandler }) {
+      return try await handler()
+    }
     let workspaceError = lock.withLock { policyCanvasWorkspaceError }
     if let workspaceError {
       throw workspaceError

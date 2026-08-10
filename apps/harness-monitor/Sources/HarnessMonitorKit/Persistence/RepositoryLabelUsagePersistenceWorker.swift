@@ -15,13 +15,21 @@ actor RepositoryLabelUsagePersistenceWorker {
 
   func recordUses(repositories: [String], label: String) {
     guard !label.isEmpty else { return }
-    let repositories = Set(repositories.filter { !$0.isEmpty })
-    guard !repositories.isEmpty else { return }
+    let countsByRepository = repositories.reduce(into: [String: Int]()) { counts, repository in
+      guard !repository.isEmpty else { return }
+      counts[repository, default: 0] += 1
+    }
+    guard !countsByRepository.isEmpty else { return }
     let context = ModelContext(modelContainer)
     context.autosaveEnabled = false
     do {
-      for repository in repositories {
-        try recordUse(repository: repository, label: label, context: context)
+      for repository in countsByRepository.keys.sorted() {
+        try recordUse(
+          repository: repository,
+          label: label,
+          increment: countsByRepository[repository] ?? 0,
+          context: context
+        )
       }
       try context.save()
     } catch {
@@ -56,6 +64,7 @@ actor RepositoryLabelUsagePersistenceWorker {
   private func recordUse(
     repository: String,
     label: String,
+    increment: Int,
     context: ModelContext
   ) throws {
     let key = CachedReviewLabelUsage.makeCompoundKey(repository: repository, label: label)
@@ -63,10 +72,12 @@ actor RepositoryLabelUsagePersistenceWorker {
       predicate: #Predicate { $0.compoundKey == key }
     )
     if let existing = try context.fetch(descriptor).first {
-      existing.usageCount += 1
+      existing.usageCount += increment
       existing.lastUsedAt = .now
     } else {
-      context.insert(CachedReviewLabelUsage(repository: repository, label: label))
+      let row = CachedReviewLabelUsage(repository: repository, label: label)
+      row.usageCount = increment
+      context.insert(row)
     }
   }
 }

@@ -68,6 +68,22 @@ extension HarnessMonitorStore {
     refreshOnFailure: Bool = false,
     mutation: (any HarnessMonitorClientProtocol) async throws -> PolicyCanvasWorkspace
   ) async -> Bool {
+    await withSerializedTaskBoardPolicyPublication {
+      await mutatePolicyCanvasSerialized(
+        successMessage: successMessage,
+        forceReloadActiveCanvas: forceReloadActiveCanvas,
+        refreshOnFailure: refreshOnFailure,
+        mutation: mutation
+      )
+    }
+  }
+
+  private func mutatePolicyCanvasSerialized(
+    successMessage: String?,
+    forceReloadActiveCanvas: Bool,
+    refreshOnFailure: Bool,
+    mutation: (any HarnessMonitorClientProtocol) async throws -> PolicyCanvasWorkspace
+  ) async -> Bool {
     guard let access = availableTaskBoardClientAccess else { return false }
     let client = access.client
     beginDaemonAction()
@@ -96,7 +112,9 @@ extension HarnessMonitorStore {
       guard taskBoardAccessIsCurrent(access) else { return false }
       presentFailureFeedback(error.localizedDescription)
       if refreshOnFailure {
-        await refreshPolicyPipeline()
+        Task { @MainActor [weak self] in
+          await self?.refreshPolicyPipeline()
+        }
       }
       return false
     }

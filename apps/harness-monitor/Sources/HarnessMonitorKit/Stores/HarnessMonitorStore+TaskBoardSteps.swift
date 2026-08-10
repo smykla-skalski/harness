@@ -355,6 +355,20 @@ extension HarnessMonitorStore {
       @escaping @Sendable (any HarnessMonitorClientProtocol) async throws
       -> PolicyCanvasWorkspace
   ) async -> Bool {
+    await withSerializedTaskBoardPolicyPublication {
+      await mutatePolicySpawnGateSerialized(
+        actionName: actionName,
+        mutation: mutation
+      )
+    }
+  }
+
+  private func mutatePolicySpawnGateSerialized(
+    actionName: String,
+    mutation:
+      @escaping @Sendable (any HarnessMonitorClientProtocol) async throws
+      -> PolicyCanvasWorkspace
+  ) async -> Bool {
     guard let access = availableTaskBoardClientAccess else {
       return false
     }

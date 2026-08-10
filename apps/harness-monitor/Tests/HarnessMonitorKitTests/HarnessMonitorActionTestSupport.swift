@@ -112,6 +112,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var policyValidationOverride: PolicyPipelineValidation?
   var policySimulationOverride: Bool?
   var policyCanvasWorkspaceError: (any Error)?
+  var policyCanvasWorkspaceHandler: (@Sendable () async throws -> PolicyCanvasWorkspace)?
   var policyCanvasWorkspaceStorage: PolicyCanvasWorkspace?
   var policyCanvasSpawnKillSwitchRequests: [Bool] = []
   var stopDaemonRequestCount = 0

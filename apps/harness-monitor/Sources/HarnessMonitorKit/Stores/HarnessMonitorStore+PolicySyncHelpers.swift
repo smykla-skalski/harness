@@ -279,6 +279,15 @@ extension HarnessMonitorStore {
     document: PolicyPipelineDocument,
     title: String? = nil
   ) async -> Bool {
+    await withSerializedTaskBoardPolicyPublication {
+      await importPolicyCanvasSerialized(document: document, title: title)
+    }
+  }
+
+  private func importPolicyCanvasSerialized(
+    document: PolicyPipelineDocument,
+    title: String?
+  ) async -> Bool {
     guard let access = availableTaskBoardClientAccess else { return false }
     let client = access.client
     beginDaemonAction()
