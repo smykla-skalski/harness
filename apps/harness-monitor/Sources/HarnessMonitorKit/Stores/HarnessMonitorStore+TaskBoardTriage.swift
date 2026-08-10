@@ -2,7 +2,7 @@ import Foundation
 
 extension HarnessMonitorStore {
   public func taskBoardItemTriageCurrent(id: String) async -> TaskBoardTriageCurrentResponse? {
-    guard connectionState == .online, let client else { return nil }
+    guard connectionState == .online, let client = availableTaskBoardClient else { return nil }
     do {
       let measuredResponse = try await Self.measureOperation {
         try await client.taskBoardItemTriageCurrent(id: id)
@@ -22,7 +22,7 @@ extension HarnessMonitorStore {
     beforeGeneration: UInt64? = nil,
     limit: UInt32? = nil
   ) async -> TaskBoardTriageHistoryResponse? {
-    guard connectionState == .online, let client else { return nil }
+    guard connectionState == .online, let client = availableTaskBoardClient else { return nil }
     do {
       let measuredResponse = try await Self.measureOperation {
         try await client.taskBoardItemTriageHistory(
@@ -67,7 +67,7 @@ extension HarnessMonitorStore {
       @escaping @Sendable (any HarnessMonitorClientProtocol) async throws
       -> TaskBoardTriageOverrideMutationResponse
   ) async -> Bool {
-    guard let client else { return false }
+    guard let client = availableTaskBoardClient else { return false }
     beginDaemonAction()
     beginTaskBoardAction()
     defer {

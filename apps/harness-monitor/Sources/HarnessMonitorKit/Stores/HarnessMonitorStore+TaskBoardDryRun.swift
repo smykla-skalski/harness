@@ -4,7 +4,7 @@ extension HarnessMonitorStore {
   @discardableResult
   public func setTaskBoardDryRunDefault(enabled: Bool) async -> Bool {
     guard
-      let client,
+      let client = availableTaskBoardClient,
       globalTaskBoardOrchestratorStatus != nil
     else {
       return false

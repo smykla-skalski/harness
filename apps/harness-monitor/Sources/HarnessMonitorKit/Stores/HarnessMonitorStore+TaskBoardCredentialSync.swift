@@ -181,7 +181,21 @@ extension HarnessMonitorStore {
     else {
       return false
     }
-    adoptDatabaseBackedTaskBoard(capabilities)
+    return finishTaskBoardDatabaseSynchronization(
+      capabilities,
+      resolvedMigrationSource: resolvedMigrationSource,
+      accessFence: fence
+    )
+  }
+
+  private func finishTaskBoardDatabaseSynchronization(
+    _ capabilities: TaskBoardCapabilities,
+    resolvedMigrationSource: Bool,
+    accessFence: TaskBoardAccessFence
+  ) -> Bool {
+    guard completeTaskBoardDatabaseSynchronization(capabilities, accessFence: accessFence) else {
+      return false
+    }
     if resolvedMigrationSource {
       taskBoardRuntimeState.connection.previousDatabaseInstanceID = nil
     }

@@ -161,6 +161,64 @@ struct HarnessMonitorStoreLegacyContainmentRaceTests {
     await store.prepareForTermination()
   }
 
+  @Test("Startup snapshot failure cannot clear a replacement client")
+  func startupSnapshotFailureCannotClearReplacement() async throws {
+    let shutdownGate = LegacyContainmentVoidGate()
+    let staleClient = RecordingHarnessClient()
+    staleClient.configureDiagnosticsErrors([
+      HarnessMonitorAPIError.server(code: 503, message: "stale startup snapshot")
+    ])
+    staleClient.shutdownHandler = { await shutdownGate.wait() }
+    let replacementClient = RecordingHarnessClient()
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(client: replacementClient)
+    )
+    store.initialConnectRefreshRetryGracePeriod = .zero
+    let staleConnect = Task { try? await store.connect(using: staleClient) }
+
+    await waitForGate(shutdownGate)
+    try await store.connect(using: replacementClient)
+    #expect(store.apiClient as? RecordingHarnessClient === replacementClient)
+    #expect(store.connectionState == .online)
+
+    await shutdownGate.release()
+    await staleConnect.value
+    #expect(store.apiClient as? RecordingHarnessClient === replacementClient)
+    #expect(store.connectionState == .online)
+    await store.prepareForTermination()
+  }
+
+  @Test("Superseded startup snapshot stops retrying")
+  func supersededStartupSnapshotStopsRetrying() async throws {
+    let staleClient = RecordingHarnessClient()
+    staleClient.configureDiagnosticsErrors([
+      HarnessMonitorAPIError.server(code: 503, message: "stale startup snapshot")
+    ])
+    let replacementClient = RecordingHarnessClient()
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(client: replacementClient)
+    )
+    store.initialConnectRefreshRetryGracePeriod = .seconds(1)
+    store.initialConnectRefreshRetryInterval = .milliseconds(250)
+    let staleConnect = Task { try? await store.connect(using: staleClient) }
+
+    #expect(
+      await waitUntil {
+        staleClient.readCallCount(.diagnostics) == 1
+          && store.connectionEvents.contains {
+            $0.detail.contains("startup snapshot is still warming up")
+          }
+      }
+    )
+    try await store.connect(using: replacementClient)
+    await staleConnect.value
+
+    #expect(staleClient.readCallCount(.diagnostics) == 1)
+    #expect(store.apiClient as? RecordingHarnessClient === replacementClient)
+    #expect(store.connectionState == .online)
+    await store.prepareForTermination()
+  }
+
   @Test("Task Board existing client cannot overwrite a replacement")
   func existingTaskBoardClientCannotOverwriteReplacement() async throws {
     let capabilitiesGate = LegacyContainmentCapabilitiesGate()

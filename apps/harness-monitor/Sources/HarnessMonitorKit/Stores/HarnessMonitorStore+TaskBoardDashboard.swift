@@ -2,7 +2,11 @@ import Foundation
 
 extension HarnessMonitorStore {
   public func refreshTaskBoardDashboard() async {
-    guard let client, !isTaskBoardBusy, taskBoardSyncPhase == .idle else {
+    guard
+      let client = availableTaskBoardClient,
+      !isTaskBoardBusy,
+      taskBoardSyncPhase == .idle
+    else {
       return
     }
     setTaskBoardSyncPhase(.syncing)
@@ -28,7 +32,7 @@ extension HarnessMonitorStore {
 
   @discardableResult
   public func createTaskBoardItem(request: TaskBoardCreateItemRequest) async -> Bool {
-    guard let client else {
+    guard let client = availableTaskBoardClient else {
       return false
     }
     beginDaemonAction()
@@ -59,7 +63,7 @@ extension HarnessMonitorStore {
     request: TaskBoardUpdateItemRequest,
     successMessage: String = "Saved task board item"
   ) async -> Bool {
-    guard let client else {
+    guard let client = availableTaskBoardClient else {
       return false
     }
     beginDaemonAction()
@@ -170,7 +174,7 @@ extension HarnessMonitorStore {
 
   @discardableResult
   public func evaluateTaskBoard(request: TaskBoardEvaluateRequest) async -> Bool {
-    guard let client else {
+    guard let client = availableTaskBoardClient else {
       return false
     }
     beginDaemonAction()
@@ -202,7 +206,7 @@ extension HarnessMonitorStore {
 
   @discardableResult
   public func syncTaskBoard(request: TaskBoardSyncRequest) async -> Bool {
-    guard let client, taskBoardSyncPhase == .idle else {
+    guard let client = availableTaskBoardClient, taskBoardSyncPhase == .idle else {
       return false
     }
     setTaskBoardSyncPhase(.syncing)
@@ -218,7 +222,7 @@ extension HarnessMonitorStore {
 
   @discardableResult
   public func cancelTaskBoardSync() async -> Bool {
-    guard let client, taskBoardSyncPhase == .syncing else {
+    guard let client = availableTaskBoardClient, taskBoardSyncPhase == .syncing else {
       return false
     }
     setTaskBoardSyncPhase(.stopping)
@@ -239,7 +243,7 @@ extension HarnessMonitorStore {
     request: TaskBoardDispatchRequest,
     refreshDashboard: Bool = true
   ) async -> Bool {
-    guard let client else {
+    guard let client = availableTaskBoardClient else {
       return false
     }
     beginDaemonAction()
@@ -270,7 +274,7 @@ extension HarnessMonitorStore {
 
   @discardableResult
   public func auditTaskBoard(status: TaskBoardStatus? = nil) async -> Bool {
-    guard let client else {
+    guard let client = availableTaskBoardClient else {
       return false
     }
     beginDaemonAction()
@@ -296,7 +300,7 @@ extension HarnessMonitorStore {
 
   @discardableResult
   public func refreshTaskBoardProjects(status: TaskBoardStatus? = nil) async -> Bool {
-    guard let client else {
+    guard let client = availableTaskBoardClient else {
       return false
     }
     beginDaemonAction()
@@ -324,7 +328,7 @@ extension HarnessMonitorStore {
   public func updateTaskBoardProject(
     request: TaskBoardProjectUpdateRequest
   ) async -> Bool {
-    guard let client else {
+    guard let client = availableTaskBoardClient else {
       return false
     }
     beginDaemonAction()
@@ -349,7 +353,7 @@ extension HarnessMonitorStore {
 
   @discardableResult
   public func refreshTaskBoardMachines(status: TaskBoardStatus? = nil) async -> Bool {
-    guard let client else {
+    guard let client = availableTaskBoardClient else {
       return false
     }
     beginDaemonAction()

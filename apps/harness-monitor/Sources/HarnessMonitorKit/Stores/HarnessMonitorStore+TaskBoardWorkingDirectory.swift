@@ -64,7 +64,7 @@ extension HarnessMonitorStore {
   /// cloning: returns the checkout path when a copy already exists (bumping its
   /// last_used_at), or `nil` so delivery falls through to prompting the user.
   private func managedWorkingCopyProjectDir(for executionRepository: String?) async -> String? {
-    guard let executionRepository, let client else { return nil }
+    guard let executionRepository, let client = availableTaskBoardClient else { return nil }
     let normalized = RepositoryDirectoryStore.normalizedRepository(executionRepository)
     guard !normalized.isEmpty else { return nil }
     return try? await client

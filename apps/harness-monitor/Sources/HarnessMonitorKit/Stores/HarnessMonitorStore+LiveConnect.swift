@@ -27,7 +27,9 @@ extension HarnessMonitorStore {
         await client.shutdown()
         return
       }
-      await discardActiveConnection()
+      guard await discardFailedConnectionUnlessReplaced() else {
+        return
+      }
       throw error
     }
 

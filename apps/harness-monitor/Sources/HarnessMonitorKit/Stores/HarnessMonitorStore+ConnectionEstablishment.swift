@@ -27,7 +27,9 @@ extension HarnessMonitorStore {
         await client.shutdown()
         return
       }
-      await discardActiveConnection()
+      guard await discardFailedConnectionUnlessReplaced() else {
+        return
+      }
       throw error
     }
 
@@ -119,6 +121,9 @@ extension HarnessMonitorStore {
     }
     guard synchronizedCredentials else {
       await client.shutdown()
+      guard isCurrentConnectionAttemptFence(connectionFence) else {
+        return false
+      }
       if self.client === client {
         self.client = nil
       }

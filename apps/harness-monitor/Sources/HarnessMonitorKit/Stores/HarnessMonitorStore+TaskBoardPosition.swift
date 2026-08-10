@@ -26,7 +26,7 @@ extension HarnessMonitorStore {
       @escaping @Sendable (any HarnessMonitorClientProtocol) async throws
       -> TaskBoardItemPositionMutationResponse
   ) async -> Bool {
-    guard let client else { return false }
+    guard let client = availableTaskBoardClient else { return false }
     beginDaemonAction()
     beginTaskBoardAction()
     defer {

@@ -2,7 +2,7 @@ import Foundation
 
 extension HarnessMonitorStore {
   public func taskBoardTriageRulesDraft() async -> TaskBoardTriageRulesDraftResponse? {
-    guard connectionState == .online, let client else { return nil }
+    guard connectionState == .online, let client = availableTaskBoardClient else { return nil }
     do {
       let measuredResponse = try await Self.measureOperation {
         try await client.taskBoardTriageRulesDraft()
@@ -20,7 +20,7 @@ extension HarnessMonitorStore {
   public func previewTaskBoardTriageRules(
     request: TaskBoardPreviewTriageRulesRequest
   ) async -> TriageRuleSetPreviewResult? {
-    guard connectionState == .online, let client else { return nil }
+    guard connectionState == .online, let client = availableTaskBoardClient else { return nil }
     do {
       let measuredResponse = try await Self.measureOperation {
         try await client.previewTaskBoardTriageRules(request: request)
@@ -38,7 +38,7 @@ extension HarnessMonitorStore {
   public func taskBoardTriageRulesRevisions(limit: UInt32? = nil) async
     -> TaskBoardTriageRulesRevisionsResponse?
   {
-    guard connectionState == .online, let client else { return nil }
+    guard connectionState == .online, let client = availableTaskBoardClient else { return nil }
     do {
       let measuredResponse = try await Self.measureOperation {
         try await client.taskBoardTriageRulesRevisions(limit: limit)
@@ -56,7 +56,7 @@ extension HarnessMonitorStore {
   public func taskBoardTriageRulesAudit(limit: UInt32? = nil) async
     -> TaskBoardTriageRulesAuditResponse?
   {
-    guard connectionState == .online, let client else { return nil }
+    guard connectionState == .online, let client = availableTaskBoardClient else { return nil }
     do {
       let measuredResponse = try await Self.measureOperation {
         try await client.taskBoardTriageRulesAudit(limit: limit)
@@ -77,7 +77,7 @@ extension HarnessMonitorStore {
     expectedRevision: Int64?,
     actor: String = "Harness Monitor"
   ) async -> TriageRuleSetDraftSaveResult? {
-    guard let client else { return nil }
+    guard let client = availableTaskBoardClient else { return nil }
     beginDaemonAction()
     beginTaskBoardAction()
     defer {
@@ -110,7 +110,7 @@ extension HarnessMonitorStore {
     expectedActiveRevision: Int64?,
     actor: String = "Harness Monitor"
   ) async -> TriageRuleSetActivationResult? {
-    guard let client else { return nil }
+    guard let client = availableTaskBoardClient else { return nil }
     beginDaemonAction()
     beginTaskBoardAction()
     defer {

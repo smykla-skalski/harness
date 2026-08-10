@@ -52,6 +52,7 @@ extension HarnessMonitorStore {
     resolveSecretMigrationConsent(nil)
     cancelPendingAppInactivitySuspend()
     stopRemoteDaemonReconnect()
+    stopConnectionRecovery()
     stopAllStreams()
     stopManifestWatcher()
     connection.legacyContainmentReconnectTask?.cancel()

@@ -29,6 +29,11 @@ extension HarnessMonitorStore {
     set { connection.connectionRecoveryGeneration = newValue }
   }
 
+  var connectionRecoveryRetryDelays: [Duration] {
+    get { connection.recoveryRetryDelays }
+    set { connection.recoveryRetryDelays = newValue }
+  }
+
   func beginConnectionAttempt() throws -> ConnectionAttemptFence {
     let containment = try currentLegacyContainmentFence()
     invalidateConnectionAttempts()
@@ -66,7 +71,6 @@ extension HarnessMonitorStore {
   func scheduleReconnectAfterConnectionFailure() {
     guard
       connectionRecoveryTask == nil,
-      !isBootstrapping,
       !isReconnecting,
       !isAppLifecycleSuspended,
       !connection.isPreparingForTermination
@@ -79,10 +83,7 @@ extension HarnessMonitorStore {
     connectionRecoveryTask = Task { @MainActor [weak self] in
       guard let self else { return }
       defer { self.finishConnectionRecovery(generation: generation) }
-      guard self.shouldRunConnectionRecovery(generation: generation) else {
-        return
-      }
-      await self.reconnect()
+      await self.runConnectionRecovery(generation: generation)
     }
   }
 
@@ -115,6 +116,18 @@ extension HarnessMonitorStore {
     await disconnectedClient.shutdown()
   }
 
+  func discardFailedConnectionUnlessReplaced() async -> Bool {
+    guard let disconnectedClient = disconnectActiveConnection() else {
+      return false
+    }
+    guard let postDisconnectFence = try? currentConnectionAttemptFence() else {
+      await disconnectedClient.shutdown()
+      return false
+    }
+    await disconnectedClient.shutdown()
+    return isCurrentConnectionAttemptFence(postDisconnectFence)
+  }
+
   func applyConnectionFailure(_ error: any Error) async {
     let underlyingError = Self.underlyingRefreshSnapshotError(error)
     let wasUsingRemoteDaemon = usesRemoteDaemon
@@ -128,13 +141,34 @@ extension HarnessMonitorStore {
     }
   }
 
-  private func shouldRunConnectionRecovery(generation: UInt64) -> Bool {
+  private func shouldContinueConnectionRecovery(generation: UInt64) -> Bool {
     !Task.isCancelled
       && generation == connectionRecoveryGeneration
-      && !isBootstrapping
-      && !isReconnecting
+      && connectionState != .online
       && !isAppLifecycleSuspended
       && !connection.isPreparingForTermination
+  }
+
+  private func runConnectionRecovery(generation: UInt64) async {
+    guard !connectionRecoveryRetryDelays.isEmpty else { return }
+    var attempt = 0
+    while true {
+      let delayIndex = min(attempt, connectionRecoveryRetryDelays.count - 1)
+      do {
+        try await Task.sleep(for: connectionRecoveryRetryDelays[delayIndex])
+      } catch {
+        return
+      }
+      guard shouldContinueConnectionRecovery(generation: generation) else {
+        return
+      }
+      guard !isBootstrapping, !isReconnecting else { continue }
+      await reconnect()
+      guard connectionState != .online else {
+        return
+      }
+      attempt += 1
+    }
   }
 
   private func finishConnectionRecovery(generation: UInt64) {

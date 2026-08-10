@@ -313,6 +313,10 @@ extension HarnessMonitorStore {
         try await retryLocalDaemonConnection()
         return
       } catch {
+        guard !shouldAbandonConnectionAttempt, !(error is CancellationError) else {
+          connectionState = .idle
+          return
+        }
         let recovery = externalDaemonRecoveryFeedback(
           for: error,
           daemonCommand: daemonCommand
@@ -328,6 +332,7 @@ extension HarnessMonitorStore {
       }
       await restorePersistedSessionState()
       startManifestWatcher()
+      scheduleReconnectAfterConnectionFailure()
     }
   }
 

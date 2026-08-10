@@ -20,7 +20,7 @@ extension HarnessMonitorStore {
     let taskBoardUpdates = deduplicatedTaskBoardItemStatusUpdates(taskBoardUpdates)
     let inboxUpdates = deduplicatedTaskBoardInboxStatusUpdates(inboxUpdates)
     guard
-      let client,
+      let client = availableTaskBoardClient,
       !taskBoardUpdates.isEmpty || !inboxUpdates.isEmpty,
       inboxUpdates.isEmpty || !isSessionReadOnly,
       !isTaskBoardBusy

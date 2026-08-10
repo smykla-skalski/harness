@@ -4,7 +4,7 @@ extension HarnessMonitorStore {
   @discardableResult
   public func setTaskBoardStepMode(enabled: Bool) async -> Bool {
     guard
-      let client,
+      let client = availableTaskBoardClient,
       let currentStatus = globalTaskBoardOrchestratorStatus
     else {
       return false

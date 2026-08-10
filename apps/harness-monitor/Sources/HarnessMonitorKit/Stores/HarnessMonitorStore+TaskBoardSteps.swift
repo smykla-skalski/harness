@@ -2,7 +2,7 @@ import Foundation
 
 extension HarnessMonitorStore {
   public func pickTaskBoardDispatch() async -> TaskBoardDispatchSelection? {
-    guard let client else {
+    guard let client = availableTaskBoardClient else {
       return nil
     }
     beginDaemonAction()
@@ -34,7 +34,7 @@ extension HarnessMonitorStore {
     dryRun: Bool = false,
     refreshDashboard: Bool = true
   ) async -> TaskBoardDispatchDelivery? {
-    guard let client else {
+    guard let client = availableTaskBoardClient else {
       return nil
     }
     beginDaemonAction()
@@ -82,7 +82,7 @@ extension HarnessMonitorStore {
     request: TaskBoardDispatchRequest,
     isAlreadyHeld: Bool = false
   ) async -> TaskBoardDispatchDelivery? {
-    guard let client, let itemID = request.itemId else {
+    guard let client = availableTaskBoardClient, let itemID = request.itemId else {
       presentFailureFeedback("Task-board delivery requires a selected item")
       return nil
     }
@@ -217,7 +217,7 @@ extension HarnessMonitorStore {
   }
 
   public func policyApprovalGrants() async -> [PolicyApprovalGrant]? {
-    guard let client else {
+    guard let client = availableTaskBoardClient else {
       return nil
     }
     do {
@@ -237,7 +237,7 @@ extension HarnessMonitorStore {
     approve: Bool,
     actor: String? = nil
   ) async -> PolicyApprovalGrant? {
-    guard let client else {
+    guard let client = availableTaskBoardClient else {
       return nil
     }
     beginDaemonAction()
@@ -270,7 +270,7 @@ extension HarnessMonitorStore {
     grantID: String,
     actor: String? = nil
   ) async -> PolicyApprovalGrant? {
-    guard let client else {
+    guard let client = availableTaskBoardClient else {
       return nil
     }
     beginDaemonAction()
@@ -323,7 +323,7 @@ extension HarnessMonitorStore {
       @escaping @Sendable (any HarnessMonitorClientProtocol) async throws
       -> PolicyCanvasWorkspace
   ) async -> Bool {
-    guard let client else {
+    guard let client = availableTaskBoardClient else {
       return false
     }
     beginDaemonAction()

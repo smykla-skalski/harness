@@ -9,6 +9,7 @@ struct TaskBoardCredentialSyncState: Sendable {
 struct TaskBoardConnectionState: Sendable {
   var databaseInstanceID: String?
   var databaseAccessGeneration: UInt64 = 0
+  var databaseAccessSuspended = false
   var previousDatabaseInstanceID: String?
   /// Last non-nil instance id ever connected this session. Unlike
   /// `databaseInstanceID` it survives disconnects, so a switch to a different

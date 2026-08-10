@@ -2,7 +2,7 @@ import Foundation
 
 extension HarnessMonitorStore {
   public func taskBoardItemProgress(id: String) async -> TaskBoardWorkItemProgressResponse? {
-    guard connectionState == .online, let client else { return nil }
+    guard connectionState == .online, let client = availableTaskBoardClient else { return nil }
     do {
       let measuredResponse = try await Self.measureOperation {
         try await client.taskBoardItemProgress(id: id)

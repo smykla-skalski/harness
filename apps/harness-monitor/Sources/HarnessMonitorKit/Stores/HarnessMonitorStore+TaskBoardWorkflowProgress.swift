@@ -4,7 +4,7 @@ extension HarnessMonitorStore {
   public func taskBoardItemWorkflowProgress(id: String) async
     -> TaskBoardWorkflowProgressResponse?
   {
-    guard connectionState == .online, let client else { return nil }
+    guard connectionState == .online, let client = availableTaskBoardClient else { return nil }
     do {
       let measuredResponse = try await Self.measureOperation {
         try await client.taskBoardItemWorkflowProgress(id: id)

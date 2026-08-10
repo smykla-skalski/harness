@@ -22,7 +22,7 @@ extension HarnessMonitorStore {
     status: TaskBoardStatus? = nil,
     itemID: String? = nil
   ) async -> TaskBoardEvaluationSummary? {
-    guard let client else {
+    guard let client = availableTaskBoardClient else {
       return nil
     }
     beginDaemonAction()

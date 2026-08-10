@@ -22,9 +22,19 @@ struct TaskBoardClientAccess: Sendable {
 }
 
 extension HarnessMonitorStore {
+  var availableTaskBoardClient: (any HarnessMonitorClientProtocol)? {
+    guard taskBoardRuntimeState.connection.databaseAccessSuspended == false else {
+      return nil
+    }
+    return client
+  }
+
   func requireDatabaseBackedTaskBoard(
     using client: any HarnessMonitorClientProtocol
   ) async throws -> TaskBoardCapabilities {
+    guard taskBoardRuntimeState.connection.databaseAccessSuspended == false else {
+      throw CancellationError()
+    }
     taskBoardDatabaseInstanceID = nil
     let capabilities: TaskBoardCapabilities
     do {
@@ -67,7 +77,10 @@ extension HarnessMonitorStore {
   ) async throws -> TaskBoardClientAccess {
     let connectionFence = try currentConnectionAttemptFence()
     let databaseAccessGeneration = taskBoardRuntimeState.connection.databaseAccessGeneration
-    guard self.client === client else {
+    guard
+      taskBoardRuntimeState.connection.databaseAccessSuspended == false,
+      self.client === client
+    else {
       throw CancellationError()
     }
     let capabilities = try await withCurrentLegacyContainment {
@@ -75,6 +88,7 @@ extension HarnessMonitorStore {
     }
     guard
       isCurrentTaskBoardClient(client, connectionFence: connectionFence),
+      taskBoardRuntimeState.connection.databaseAccessSuspended == false,
       isCurrentTaskBoardDatabaseAccessGeneration(databaseAccessGeneration)
     else {
       throw CancellationError()
@@ -136,6 +150,7 @@ extension HarnessMonitorStore {
         connectionFence: access.connectionFence
       ),
       taskBoardDatabaseInstanceID == access.instanceID,
+      taskBoardRuntimeState.connection.databaseAccessSuspended == false,
       isCurrentTaskBoardDatabaseAccessGeneration(access.databaseAccessGeneration)
     else {
       throw CancellationError()
@@ -145,14 +160,27 @@ extension HarnessMonitorStore {
   @discardableResult
   func invalidateTaskBoardDatabaseAccess() -> UInt64 {
     taskBoardRuntimeState.connection.databaseAccessGeneration &+= 1
+    taskBoardRuntimeState.connection.databaseAccessSuspended = true
     taskBoardDatabaseInstanceID = nil
     lastTaskBoardCredentialSync = nil
     cancelTaskBoardDashboardSnapshotRefresh()
+    scheduleUISync([.contentDashboard])
     return taskBoardRuntimeState.connection.databaseAccessGeneration
   }
 
   func isCurrentTaskBoardDatabaseAccessGeneration(_ generation: UInt64) -> Bool {
     generation == taskBoardRuntimeState.connection.databaseAccessGeneration
+  }
+
+  func completeTaskBoardDatabaseSynchronization(
+    _ capabilities: TaskBoardCapabilities,
+    accessFence: TaskBoardAccessFence
+  ) -> Bool {
+    guard isCurrentTaskBoardAccessFence(accessFence) else { return false }
+    adoptDatabaseBackedTaskBoard(capabilities)
+    taskBoardRuntimeState.connection.databaseAccessSuspended = false
+    scheduleUISync([.contentDashboard])
+    return true
   }
 
   private func isCurrentTaskBoardClient(

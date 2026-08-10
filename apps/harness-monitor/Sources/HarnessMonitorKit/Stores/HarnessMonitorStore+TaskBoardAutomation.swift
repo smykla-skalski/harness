@@ -5,7 +5,7 @@ extension HarnessMonitorStore {
     before: String? = nil,
     limit: UInt32 = 50
   ) async -> TaskBoardAutomationHistoryResponse? {
-    guard connectionState == .online, let client else { return nil }
+    guard connectionState == .online, let client = availableTaskBoardClient else { return nil }
     do {
       let measuredResponse = try await Self.measureOperation {
         try await client.taskBoardAutomationRuns(
@@ -25,7 +25,7 @@ extension HarnessMonitorStore {
   public func taskBoardAutomationRunDetail(
     runID: String
   ) async -> TaskBoardAutomationRunDetail? {
-    guard connectionState == .online, let client else { return nil }
+    guard connectionState == .online, let client = availableTaskBoardClient else { return nil }
     do {
       let measuredDetail = try await Self.measureOperation {
         try await client.taskBoardAutomationRunDetail(runID: runID)
@@ -41,7 +41,7 @@ extension HarnessMonitorStore {
   }
 
   public func taskBoardAutomationMetrics() async -> TaskBoardAutomationMetrics? {
-    guard connectionState == .online, let client else { return nil }
+    guard connectionState == .online, let client = availableTaskBoardClient else { return nil }
     do {
       let measuredMetrics = try await Self.measureOperation {
         try await client.taskBoardAutomationMetrics()
@@ -60,7 +60,7 @@ extension HarnessMonitorStore {
   public func forceCancelTaskBoardAutomation(
     request: TaskBoardAutomationForceCancelRequest
   ) async -> Bool {
-    guard connectionState == .online, let client else { return false }
+    guard connectionState == .online, let client = availableTaskBoardClient else { return false }
     guard isCurrentForceCancelTarget(request.target) else {
       presentFailureFeedback("Cancellation target changed. Refresh and try again.")
       return false

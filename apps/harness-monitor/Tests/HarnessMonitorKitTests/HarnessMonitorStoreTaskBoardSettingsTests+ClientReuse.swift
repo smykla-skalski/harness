@@ -125,9 +125,27 @@ extension HarnessMonitorStoreTaskBoardSettingsTests {
       return
     }
     #expect(store.taskBoardDatabaseInstanceID == nil)
+    let concurrentSaveResult = RecordingTaskBoardOperationResult<Bool>()
+    let concurrentSave = Task { @MainActor in
+      let result = await store.updateTaskBoardGitSettings(
+        snapshot: makeSettingsSnapshot(),
+        origin: .settingsSecretsSaveButton
+      )
+      await concurrentSaveResult.record(result)
+    }
+    let concurrentTriageMutation = await store.setTaskBoardItemTriageOverride(
+      id: "task-during-sync",
+      verdict: .todo,
+      reason: nil
+    )
+    #expect(concurrentTriageMutation == false)
+    #expect(client.taskBoardTriageOverrideSetRequests.isEmpty)
     await client.releaseNextTaskBoardOrchestratorSettingsMutation()
     #expect(await waitUntil({ await staleSaveResult.value != nil }))
     #expect(await staleSaveResult.value == false)
+    #expect(await waitUntil({ await concurrentSaveResult.value != nil }))
+    #expect(await concurrentSaveResult.value == false)
+    concurrentSave.cancel()
     client.taskBoardCapabilitiesValue = TaskBoardCapabilities(
       storage: "database",
       revision: 2,

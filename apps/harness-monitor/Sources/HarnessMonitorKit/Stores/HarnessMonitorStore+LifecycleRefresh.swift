@@ -83,6 +83,9 @@ extension HarnessMonitorStore {
     var attempt = 0
 
     while true {
+      guard isCurrentConnectionAttemptFence(connectionFence), !Task.isCancelled else {
+        throw CancellationError()
+      }
       do {
         try await performRefresh(
           using: client,
@@ -92,6 +95,9 @@ extension HarnessMonitorStore {
         )
         return
       } catch {
+        guard isCurrentConnectionAttemptFence(connectionFence), !Task.isCancelled else {
+          throw CancellationError()
+        }
         guard ContinuousClock.now < deadline else {
           throw error
         }

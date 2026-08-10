@@ -4,7 +4,7 @@ extension HarnessMonitorStore {
   @discardableResult
   public func setTaskBoardTriageAutomation(enabled: Bool) async -> Bool {
     guard
-      let client,
+      let client = availableTaskBoardClient,
       globalTaskBoardOrchestratorStatus != nil
     else {
       return false

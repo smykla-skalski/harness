@@ -61,7 +61,7 @@ extension HarnessMonitorStore {
     else {
       return false
     }
-    guard let client else {
+    guard let client = availableTaskBoardClient else {
       rollbackOptimisticTaskBoardPosition(resolvedMutation)
       finishTaskBoardPositionMutation(resolvedMutation)
       return false
@@ -217,7 +217,7 @@ extension HarnessMonitorStore {
     id: String,
     actor: String = "Harness Monitor"
   ) async -> Bool {
-    guard let client else { return false }
+    guard let client = availableTaskBoardClient else { return false }
     beginDaemonAction()
     beginTaskBoardAction()
     defer {
