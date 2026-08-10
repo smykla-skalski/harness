@@ -78,4 +78,79 @@ extension PersistenceOfflineDurabilityTests {
     #expect(preserved.revision == document.revision)
     #expect(preserved.nodes.first?.title == "Identical")
   }
+
+  @Test("Policy cache writes for one canvas persist in invocation order")
+  func policyCacheWritesPersistInInvocationOrder() async throws {
+    let client = RecordingHarnessClient()
+    let gate = PolicyCacheFirstSaveGate()
+    let cache = SessionCacheService(
+      modelContainer: previewContainer,
+      beforeSave: { await gate.waitIfFirstSave() }
+    )
+    let firstDocument = client.samplePolicyPipeline(
+      canvasId: "canvas-serialized",
+      title: "First",
+      revision: 1
+    )
+    let secondDocument = client.samplePolicyPipeline(
+      canvasId: "canvas-serialized",
+      title: "Second",
+      revision: 2
+    )
+    let firstWrite = Task {
+      await cache.cachePolicyDocument(
+        canvasId: "canvas-serialized",
+        document: firstDocument
+      )
+    }
+    await gate.waitUntilFirstSaveIsBlocked()
+    let secondWrite = Task {
+      await cache.cachePolicyDocument(
+        canvasId: "canvas-serialized",
+        document: secondDocument
+      )
+    }
+    try await Task.sleep(for: .milliseconds(50))
+    #expect(await gate.saveEntryCount == 1)
+
+    await gate.releaseFirstSave()
+    #expect(await firstWrite.value.didPersist)
+    #expect(await secondWrite.value.didPersist)
+    let cached = try #require(
+      await cache.loadPolicyDocument(canvasId: "canvas-serialized")
+    )
+    #expect(cached.revision == secondDocument.revision)
+    #expect(cached.nodes.first?.title == "Second")
+  }
+}
+
+private actor PolicyCacheFirstSaveGate {
+  private(set) var saveEntryCount = 0
+  private var firstSaveContinuation: CheckedContinuation<Void, Never>?
+  private var arrivalContinuations: [CheckedContinuation<Void, Never>] = []
+
+  func waitIfFirstSave() async {
+    saveEntryCount += 1
+    guard saveEntryCount == 1 else { return }
+    let arrivals = arrivalContinuations
+    arrivalContinuations.removeAll()
+    for arrival in arrivals {
+      arrival.resume()
+    }
+    await withCheckedContinuation { continuation in
+      firstSaveContinuation = continuation
+    }
+  }
+
+  func waitUntilFirstSaveIsBlocked() async {
+    guard saveEntryCount == 0 else { return }
+    await withCheckedContinuation { continuation in
+      arrivalContinuations.append(continuation)
+    }
+  }
+
+  func releaseFirstSave() {
+    firstSaveContinuation?.resume()
+    firstSaveContinuation = nil
+  }
 }

@@ -1,3 +1,4 @@
+import SwiftData
 import XCTest
 
 @testable import HarnessMonitorKit
@@ -127,6 +128,34 @@ final class PolicyRegistryTests: XCTestCase {
     XCTAssertFalse(applied)
     let overrides = await registry.currentOverrides()
     XCTAssertTrue(overrides.isEmpty)
+  }
+
+  @MainActor
+  func test_settingsRefreshUsesCurrentTaskBoardPolicyGeneration() async throws {
+    let container = try HarnessMonitorModelContainer.preview()
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(),
+      modelContainer: container
+    )
+    await store.startSupervisor()
+    let stack = try XCTUnwrap(store.supervisorStack)
+    let repository = try XCTUnwrap(store.supervisorPolicyConfigRepository)
+    store.taskBoardRuntimeState.connection.databaseAccessGeneration = 1
+    await stack.registry.advanceOverrideSourceGeneration(to: 1)
+    try await repository.save(
+      PolicyConfigRowSnapshot(
+        ruleID: "unassigned-task",
+        enabled: false,
+        defaultBehaviorRaw: RuleDefaultBehavior.cautious.rawValue,
+        parametersJSON: "{}"
+      )
+    )
+
+    await store.refreshSupervisorPolicyOverrides()
+
+    let isEnabled = await stack.registry.isEnabled(ruleID: "unassigned-task")
+    XCTAssertFalse(isEnabled)
+    await store.stopSupervisor()
   }
 
   func test_isEnabledDefaultsToTrueWhenNoOverride() async {

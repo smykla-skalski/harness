@@ -25,6 +25,8 @@ extension SessionCacheService {
     canvasId: String,
     document: PolicyPipelineDocument
   ) async -> PolicyDocumentCacheWriteResult {
+    await acquirePolicyDocumentTransaction(canvasId: canvasId)
+    defer { releasePolicyDocumentTransaction(canvasId: canvasId) }
     let context = makeContext()
     let writeID = UUID()
     let previousWriteID = policyDocumentWriteIDsByCanvasID[canvasId]
@@ -105,6 +107,8 @@ extension SessionCacheService {
   func rollbackPolicyDocumentCacheWrite(
     _ token: PolicyDocumentCacheWriteToken
   ) async -> Bool {
+    await acquirePolicyDocumentTransaction(canvasId: token.canvasId)
+    defer { releasePolicyDocumentTransaction(canvasId: token.canvasId) }
     guard policyDocumentWriteIDsByCanvasID[token.canvasId] == token.writeID else {
       return false
     }
@@ -137,6 +141,26 @@ extension SessionCacheService {
       return true
     }
     return false
+  }
+
+  private func acquirePolicyDocumentTransaction(canvasId: String) async {
+    if activePolicyDocumentTransactions.insert(canvasId).inserted {
+      return
+    }
+    await withCheckedContinuation { continuation in
+      policyDocumentTransactionWaiters[canvasId, default: []].append(continuation)
+    }
+  }
+
+  private func releasePolicyDocumentTransaction(canvasId: String) {
+    guard var waiters = policyDocumentTransactionWaiters[canvasId], !waiters.isEmpty else {
+      activePolicyDocumentTransactions.remove(canvasId)
+      policyDocumentTransactionWaiters[canvasId] = nil
+      return
+    }
+    let next = waiters.removeFirst()
+    policyDocumentTransactionWaiters[canvasId] = waiters.isEmpty ? nil : waiters
+    next.resume()
   }
 
   func loadMostRecentPolicyDocument() -> PolicyPipelineDocument? {

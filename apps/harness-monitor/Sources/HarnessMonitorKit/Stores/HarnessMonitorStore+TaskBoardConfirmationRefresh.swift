@@ -1,7 +1,16 @@
 import Foundation
 
+private struct InitialTaskBoardConfirmationContext {
+  let access: TaskBoardClientAccess
+  let generation: UInt64
+  let preservedItemIDs: Set<String>
+  let preservedStatus: Bool
+  let deadline: ContinuousClock.Instant
+}
+
 extension HarnessMonitorStore {
   func cancelInitialTaskBoardConfirmationRefresh() {
+    initialTaskBoardConfirmationGeneration &+= 1
     initialTaskBoardConfirmationTask?.cancel()
     initialTaskBoardConfirmationTask = nil
   }
@@ -18,38 +27,43 @@ extension HarnessMonitorStore {
       access.client === client
     else { return }
     cancelInitialTaskBoardConfirmationRefresh()
+    let generation = initialTaskBoardConfirmationGeneration
     let deadline = ContinuousClock.now.advanced(by: initialTaskBoardConfirmationGracePeriod)
     initialTaskBoardConfirmationTask = Task(priority: .utility) { @MainActor [weak self] in
       guard let self else { return }
-      defer { self.initialTaskBoardConfirmationTask = nil }
+      defer {
+        if self.initialTaskBoardConfirmationGeneration == generation {
+          self.initialTaskBoardConfirmationTask = nil
+        }
+      }
       await self.runInitialTaskBoardConfirmationRefresh(
         using: client,
-        access: access,
-        preservedItemIDs: preservedItemIDs,
-        preservedStatus: preservedStatus,
-        deadline: deadline
+        context: InitialTaskBoardConfirmationContext(
+          access: access,
+          generation: generation,
+          preservedItemIDs: preservedItemIDs,
+          preservedStatus: preservedStatus,
+          deadline: deadline
+        )
       )
     }
   }
 
   private func runInitialTaskBoardConfirmationRefresh(
     using client: any HarnessMonitorClientProtocol,
-    access: TaskBoardClientAccess,
-    preservedItemIDs: Set<String>,
-    preservedStatus: Bool,
-    deadline: ContinuousClock.Instant
+    context: InitialTaskBoardConfirmationContext
   ) async {
     var retryInterval = taskBoardConfirmationRetryInterval
-    while !Task.isCancelled {
-      guard taskBoardAccessIsCurrent(access) else { return }
+    while confirmationRefreshIsCurrent(context) {
       do {
         try await Task.sleep(for: retryInterval)
       } catch {
         return
       }
       guard
+        confirmationRefreshIsCurrent(context),
         connectionState == .online || connectionState == .connecting,
-        taskBoardAccessIsCurrent(access)
+        taskBoardAccessIsCurrent(context.access)
       else { return }
       let stepModeConfirmationRevision =
         taskBoardRuntimeState.stepModeMutation.confirmationRevision
@@ -57,16 +71,16 @@ extension HarnessMonitorStore {
       let snapshot = await Self.loadTaskBoardRefreshSnapshot(
         using: client,
         stepModeConfirmationRevision: stepModeConfirmationRevision,
-        includeItems: !preservedItemIDs.isEmpty,
-        includeOrchestratorStatus: preservedStatus,
+        includeItems: !context.preservedItemIDs.isEmpty,
+        includeOrchestratorStatus: context.preservedStatus,
         includeProjects: false
       )
-      guard taskBoardAccessIsCurrent(access) else { return }
-      let reachedDeadline = ContinuousClock.now >= deadline
+      guard confirmationRefreshIsCurrent(context) else { return }
+      let reachedDeadline = ContinuousClock.now >= context.deadline
       let tick = evaluateTaskBoardConfirmationTick(
         snapshot: snapshot,
-        preservedItemIDs: preservedItemIDs,
-        preservedStatus: preservedStatus,
+        preservedItemIDs: context.preservedItemIDs,
+        preservedStatus: context.preservedStatus,
         reachedDeadline: reachedDeadline,
         positionMutationGeneration: positionMutationGeneration
       )
@@ -75,10 +89,18 @@ extension HarnessMonitorStore {
         continue
       }
       guard tick.shouldApply else { return }
-      guard taskBoardAccessIsCurrent(access) else { return }
+      guard confirmationRefreshIsCurrent(context) else { return }
       commitTaskBoardConfirmationTick(tick)
       return
     }
+  }
+
+  private func confirmationRefreshIsCurrent(
+    _ context: InitialTaskBoardConfirmationContext
+  ) -> Bool {
+    !Task.isCancelled
+      && initialTaskBoardConfirmationGeneration == context.generation
+      && taskBoardAccessIsCurrent(context.access)
   }
 
   func evaluateTaskBoardConfirmationTick(

@@ -205,6 +205,7 @@ extension HarnessMonitorStore {
     taskBoardRuntimeState.connection.databaseAccessSuspended = true
     taskBoardDatabaseInstanceID = nil
     lastTaskBoardCredentialSync = nil
+    resetTaskBoardDatabaseScopedRecoveryState()
     cancelTaskBoardDashboardSnapshotRefresh()
     cancelInitialTaskBoardConfirmationRefresh()
     scheduleUISync([.contentDashboard])
@@ -213,6 +214,20 @@ extension HarnessMonitorStore {
     )
     try await quiesceTaskBoardSourceSync(using: client, connectionFence: connectionFence)
     return databaseAccessGeneration
+  }
+
+  private func resetTaskBoardDatabaseScopedRecoveryState() {
+    globalTaskBoardAutomationSnapshot = nil
+    globalTaskBoardSyncSummary = nil
+    globalTaskBoardDispatchSummary = nil
+    globalTaskBoardEvaluationSummary = nil
+    globalTaskBoardItemAuditSummary = nil
+    cacheWriteSync.taskBoardEvaluationBaselineRunID = nil
+    if !taskBoardRuntimeState.positionMutation.pendingTokens.isEmpty {
+      taskBoardRuntimeState.positionMutation.pendingTokens.removeAll()
+      taskBoardRuntimeState.positionMutation.generation &+= 1
+      cancelPendingTaskBoardSnapshotCacheWriteTask()
+    }
   }
 
   private func quiesceTaskBoardSourceSync(

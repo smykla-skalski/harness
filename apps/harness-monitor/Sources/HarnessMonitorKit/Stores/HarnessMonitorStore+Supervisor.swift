@@ -254,12 +254,10 @@ extension HarnessMonitorStore {
   }
 
   public func refreshSupervisorPolicyOverrides() async {
-    guard let registry = supervisorStack?.registry else {
-      return
-    }
-    _ = await registry.applyOverrides(
-      await loadPolicyOverrides(),
-      sourceGeneration: 0
+    _ = await applyEffectivePolicyCanvasSupervisorOverrides(
+      for: globalPolicyCanvasWorkspace,
+      activeDocument: globalPolicyPipeline,
+      taskBoardSourceGeneration: taskBoardRuntimeState.connection.databaseAccessGeneration
     )
   }
 

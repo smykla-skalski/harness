@@ -293,6 +293,7 @@ public final class HarnessMonitorStore {
   var sessionPushFallbackTask: Task<Void, Never>?
   @ObservationIgnored var appInactivitySuspendTask: Task<Void, Never>?
   @ObservationIgnored var initialTaskBoardConfirmationTask: Task<Void, Never>?
+  @ObservationIgnored var initialTaskBoardConfirmationGeneration: UInt64 = 0
   @ObservationIgnored var selectedSessionRefreshFallbackTask: Task<Void, Never>?
   var sessionSnapshotHydrationTask: Task<Void, Never>?
   @ObservationIgnored var sessionLoadTask: Task<Void, Never>?

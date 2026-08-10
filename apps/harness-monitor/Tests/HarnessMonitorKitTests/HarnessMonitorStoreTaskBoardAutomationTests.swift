@@ -36,6 +36,26 @@ struct HarnessMonitorStoreTaskBoardAutomationTests {
     #expect(store.globalTaskBoardAutomationSnapshot?.observedAt == "2026-07-19T12:02:00Z")
   }
 
+  @Test("Database handoff resets database-scoped automation state")
+  func databaseHandoffResetsDatabaseScopedAutomationState() async throws {
+    let client = RecordingHarnessClient()
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController(client: client))
+    store.client = client
+    store.connectionState = .online
+    store.adoptDatabaseBackedTaskBoard(client.taskBoardCapabilitiesValue)
+    store.mergeTaskBoardAutomationSnapshot(snapshot(revision: 100))
+    store.globalTaskBoardSyncSummary = TaskBoardSyncSummary(total: 100, providers: [])
+    store.globalTaskBoardEvaluationSummary = TaskBoardEvaluationSummary(total: 100, evaluated: 100)
+
+    _ = try await store.invalidateTaskBoardDatabaseAccess(using: client)
+
+    #expect(store.globalTaskBoardAutomationSnapshot == nil)
+    #expect(store.globalTaskBoardSyncSummary == nil)
+    #expect(store.globalTaskBoardEvaluationSummary == nil)
+    store.mergeTaskBoardAutomationSnapshot(snapshot(revision: 1))
+    #expect(store.globalTaskBoardAutomationSnapshot?.revision == 1)
+  }
+
   @Test("Force cancel sends the exact target and refreshes automation status")
   func forceCancelSendsExactTargetAndRefreshes() async {
     let client = RecordingHarnessClient()

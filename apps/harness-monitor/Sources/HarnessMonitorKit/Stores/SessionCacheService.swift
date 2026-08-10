@@ -18,6 +18,8 @@ public actor SessionCacheService {
   let beforeSave: () async throws -> Void
   let saveChanges: (ModelContext) throws -> Void
   var policyDocumentWriteIDsByCanvasID: [String: UUID] = [:]
+  var activePolicyDocumentTransactions: Set<String> = []
+  var policyDocumentTransactionWaiters: [String: [CheckedContinuation<Void, Never>]] = [:]
 
   public init(
     modelContainer: ModelContainer,

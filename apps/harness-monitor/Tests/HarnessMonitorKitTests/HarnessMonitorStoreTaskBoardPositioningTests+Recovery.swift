@@ -22,7 +22,21 @@ extension HarnessMonitorStoreTaskBoardPositioningTests {
 
     await client.waitUntilTaskBoardItemsReadIsBlocked()
     _ = try await store.invalidateTaskBoardDatabaseAccess(using: client)
-    store.globalTaskBoardItems = [taskBoardItem(id: item.id, status: .blocked)]
+    let recoveredItem = taskBoardItem(id: item.id, status: .blocked)
+    store.applyTaskBoardDashboardSnapshot(
+      HarnessMonitorStore.TaskBoardRefreshSnapshot(
+        items: HarnessMonitorStore.TaskBoardSnapshotLoad(
+          measured: HarnessMonitorStore.MeasuredOperation(
+            value: [recoveredItem],
+            latencyMs: 0
+          )
+        ),
+        orchestratorStatus: HarnessMonitorStore.TaskBoardSnapshotLoad(measured: nil),
+        projects: HarnessMonitorStore.TaskBoardSnapshotLoad(measured: nil),
+        stepModeConfirmationRevision: 0
+      ),
+      positionMutationGeneration: store.taskBoardRuntimeState.positionMutation.generation
+    )
     await client.releaseTaskBoardItemsRead()
 
     #expect(await mutation.value == false)
