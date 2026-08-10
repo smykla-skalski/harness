@@ -5,7 +5,7 @@ extension HarnessMonitorStore {
   func applyEffectivePolicyCanvasSupervisorOverrides(
     for workspace: PolicyCanvasWorkspace?,
     activeDocument: PolicyPipelineDocument? = nil,
-    taskBoardSourceGeneration: UInt64? = nil
+    taskBoardSourceGeneration: UInt64
   ) async -> Bool {
     guard let registry = supervisorStack?.registry else {
       return true
@@ -14,14 +14,10 @@ extension HarnessMonitorStore {
       for: workspace,
       activeDocument: activeDocument
     )
-    if let taskBoardSourceGeneration {
-      return await registry.applyOverrides(
-        overrides,
-        sourceGeneration: taskBoardSourceGeneration
-      )
-    }
-    await registry.applyOverrides(overrides)
-    return true
+    return await registry.applyOverrides(
+      overrides,
+      sourceGeneration: taskBoardSourceGeneration
+    )
   }
 
   private func effectivePolicyCanvasSupervisorOverrides(
@@ -48,7 +44,7 @@ extension HarnessMonitorStore {
     _ workspace: PolicyCanvasWorkspace,
     using client: any HarnessMonitorClientProtocol,
     forceReloadActiveCanvas: Bool = false,
-    taskBoardAccess: TaskBoardClientAccess? = nil
+    taskBoardAccess: TaskBoardClientAccess
   ) async -> Bool {
     guard taskBoardAccessIsCurrent(taskBoardAccess) else { return false }
     let previousActiveCanvasId = globalPolicyCanvasWorkspace?.activeCanvasId
@@ -86,7 +82,7 @@ extension HarnessMonitorStore {
       await applyEffectivePolicyCanvasSupervisorOverrides(
         for: syncedWorkspace,
         activeDocument: activeDocument,
-        taskBoardSourceGeneration: taskBoardAccess?.databaseAccessGeneration
+        taskBoardSourceGeneration: taskBoardAccess.databaseAccessGeneration
       )
     else { return false }
     guard taskBoardAccessIsCurrent(taskBoardAccess) else { return false }
@@ -98,20 +94,7 @@ extension HarnessMonitorStore {
         globalPolicyAudit = activeAudit
       }
     }
-    let activeCanvasId = syncedWorkspace.activeCanvasId
-    if taskBoardAccess == nil,
-      shouldReloadActiveCanvas,
-      let doc = activeDocument,
-      !activeCanvasId.isEmpty
-    {
-      _ = await cacheService?.cachePolicyDocument(canvasId: activeCanvasId, document: doc)
-    }
     return taskBoardAccessIsCurrent(taskBoardAccess)
-  }
-
-  private func taskBoardAccessIsCurrent(_ access: TaskBoardClientAccess?) -> Bool {
-    guard let access else { return true }
-    return (try? requireCurrentTaskBoardClientAccess(access)) != nil
   }
 
   func hydrateEffectivePolicyCanvasWorkspace(
@@ -214,10 +197,16 @@ extension HarnessMonitorStore {
   public func exportPolicyCanvas(
     canvasId: String? = nil
   ) async -> PolicyCanvasExportResponse? {
-    guard let client else { return nil }
-    return try? await client.exportPolicyCanvas(
-      request: PolicyCanvasExportRequest(canvasId: canvasId)
-    )
+    guard let access = availableTaskBoardClientAccess else { return nil }
+    do {
+      let response = try await access.client.exportPolicyCanvas(
+        request: PolicyCanvasExportRequest(canvasId: canvasId)
+      )
+      try requireCurrentTaskBoardClientAccess(access)
+      return response
+    } catch {
+      return nil
+    }
   }
 
   @discardableResult
@@ -225,22 +214,31 @@ extension HarnessMonitorStore {
     document: PolicyPipelineDocument,
     title: String? = nil
   ) async -> Bool {
-    guard let client else { return false }
+    guard let access = availableTaskBoardClientAccess else { return false }
+    let client = access.client
     beginDaemonAction()
     defer { endDaemonAction() }
     do {
       let workspace = try await client.importPolicyCanvas(
         request: PolicyCanvasImportRequest(document: document, title: title)
       )
+      try requireCurrentTaskBoardClientAccess(access)
       recordRequestSuccess()
-      await syncPolicyCanvasWorkspace(
-        workspace,
-        using: client,
-        forceReloadActiveCanvas: true
-      )
+      guard
+        await syncPolicyCanvasWorkspace(
+          workspace,
+          using: client,
+          forceReloadActiveCanvas: true,
+          taskBoardAccess: access
+        )
+      else { return false }
+      try requireCurrentTaskBoardClientAccess(access)
       presentSuccessFeedback("Imported policy canvas")
       return true
+    } catch is CancellationError {
+      return false
     } catch {
+      guard taskBoardAccessIsCurrent(access) else { return false }
       presentFailureFeedback(error.localizedDescription)
       return false
     }

@@ -48,6 +48,30 @@ extension SessionCacheService {
     return try? cached.decodedDocument()
   }
 
+  func removePolicyDocument(
+    canvasId: String,
+    matching document: PolicyPipelineDocument
+  ) async {
+    let context = makeContext()
+    do {
+      let data = try Codecs.encoder.encode(document)
+      var descriptor = FetchDescriptor<CachedPolicyDocument>(
+        predicate: #Predicate { $0.canvasId == canvasId }
+      )
+      descriptor.fetchLimit = 1
+      guard let cached = try context.fetch(descriptor).first,
+        cached.documentData == data
+      else { return }
+      context.delete(cached)
+    } catch {
+      HarnessMonitorLogger.store.warning(
+        "remove stale policy document failed: \(error.localizedDescription, privacy: .public)"
+      )
+      return
+    }
+    _ = await persist(context, operation: "remove stale policy document")
+  }
+
   func loadMostRecentPolicyDocument() -> PolicyPipelineDocument? {
     loadMostRecentPolicyDocumentSnapshot()?.document
   }

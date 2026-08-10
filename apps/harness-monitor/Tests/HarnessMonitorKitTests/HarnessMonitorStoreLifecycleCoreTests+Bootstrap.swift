@@ -184,6 +184,7 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     let store = HarnessMonitorStore(
       daemonController: RecordingDaemonController(client: client)
     )
+    store.installConnectedTestClient(client)
     let clock = ContinuousClock()
     let startedAt = clock.now
 

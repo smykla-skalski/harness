@@ -98,9 +98,7 @@ extension HarnessMonitorStore {
         restoreTaskBoardItems(priorItemsByID.values)
         return false
       } catch {
-        if firstFailure == nil {
-          firstFailure = error
-        }
+        firstFailure = firstFailure ?? error
         if let priorItem = priorItemsByID[update.id] {
           reconciledItems.append(priorItem)
         }
@@ -116,7 +114,8 @@ extension HarnessMonitorStore {
         mergeTaskBoardItem(item)
       }
     }
-    await refreshTaskBoardDashboardSnapshot(using: client)
+    await refreshTaskBoardDashboardSnapshot(using: client, access: access)
+    guard taskBoardAccessIsCurrent(access) else { return false }
     if let firstFailure {
       presentFailureFeedback(firstFailure.localizedDescription)
       return false

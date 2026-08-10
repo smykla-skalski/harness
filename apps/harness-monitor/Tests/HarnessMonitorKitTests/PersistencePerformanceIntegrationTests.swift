@@ -181,6 +181,7 @@ struct PersistencePerformanceIntegrationTests {
         daemonController: RecordingDaemonController(client: client),
         modelContainer: container
       )
+      store.installConnectedTestClient(client)
       store.connectionState = .online
       await store.refresh(using: client, preserveSelection: true)
       store.sessionSnapshotHydrationTask?.cancel()

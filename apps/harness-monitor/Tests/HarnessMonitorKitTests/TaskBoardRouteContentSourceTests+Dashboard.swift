@@ -124,7 +124,7 @@ extension TaskBoardRouteContentSourceTests {
       dashboardSource.contains("await store.loadTaskBoardPolicyWorkspaceSnapshot()")
     )
     #expect(!dashboardSource.contains("ensurePolicyCanvasWorkspaceLoadedForRuntimePolicies"))
-    #expect(dashboardSource.contains("store.adoptTaskBoardPolicyWorkspaceSnapshot(workspace)"))
+    #expect(dashboardSource.contains("store.adoptTaskBoardPolicyWorkspaceSnapshot(snapshot)"))
     #expect(dashboardSource.contains(".onChange(of: isRouteVisible, initial: true)"))
   }
 

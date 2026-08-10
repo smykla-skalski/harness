@@ -14,6 +14,7 @@ final class TaskBoardURLProtocol: URLProtocol, @unchecked Sendable {
     let query: String?
     let method: String
     let body: [String: Any]?
+    let timeoutInterval: TimeInterval
   }
 
   private struct Route: Hashable {
@@ -166,7 +167,8 @@ final class TaskBoardURLProtocol: URLProtocol, @unchecked Sendable {
             ?? url.path,
           query: url.query,
           method: request.httpMethod ?? "",
-          body: Self.jsonBody(for: request)
+          body: Self.jsonBody(for: request),
+          timeoutInterval: request.timeoutInterval
         )
       )
     }

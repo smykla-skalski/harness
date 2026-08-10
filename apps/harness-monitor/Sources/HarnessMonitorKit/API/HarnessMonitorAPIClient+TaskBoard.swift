@@ -103,9 +103,31 @@ extension HarnessMonitorAPIClient {
     )
   }
 
+  public func cancelTaskBoardSync(
+    recoveryTimeout: Duration
+  ) async throws -> TaskBoardSyncCancelResponse {
+    try await post(
+      "/v1/task-board/sync/cancel",
+      body: EmptyBody(),
+      decoder: PolicyWireCoding.decoder,
+      timeout: recoveryTimeout
+    )
+  }
+
   public func taskBoardSyncStatus() async throws -> TaskBoardSyncStatusResponse {
     let wire: TaskBoardSyncStatusResponseWire = try await get(
       "/v1/task-board/sync/status", decoder: PolicyWireCoding.decoder
+    )
+    return TaskBoardSyncStatusResponse(wire: wire)
+  }
+
+  public func taskBoardSyncStatus(
+    recoveryTimeout: Duration
+  ) async throws -> TaskBoardSyncStatusResponse {
+    let wire: TaskBoardSyncStatusResponseWire = try await get(
+      "/v1/task-board/sync/status",
+      decoder: PolicyWireCoding.decoder,
+      timeout: recoveryTimeout
     )
     return TaskBoardSyncStatusResponse(wire: wire)
   }

@@ -115,42 +115,18 @@ extension HarnessMonitorStore {
       releaseTaskBoardOrchestratorSettingsMutationLock()
     }
 
+    var acquiredAccess: TaskBoardClientAccess?
     do {
       let access = try await taskBoardSettingsClient()
-      let client = access.client
+      acquiredAccess = access
       let instanceID = access.instanceID
-      let materializedSnapshot = try await materializeTaskBoardGitSettings(
-        snapshot,
-        preservingPathsFrom: pathBaseline
-      )
-      try requireCurrentTaskBoardClientAccess(access)
-
-      let orchestratorSettings: TaskBoardOrchestratorSettings
-      do {
-        orchestratorSettings = try await client.updateTaskBoardOrchestratorSettings(
-          request: Self.orchestratorSettingsUpdateRequest(
-            from: materializedSnapshot.orchestratorSettings)
+      guard
+        let (materializedSnapshot, orchestratorSettings) = try await updateTaskBoardDaemonSettings(
+          snapshot: snapshot,
+          pathBaseline: pathBaseline,
+          access: access
         )
-        try requireCurrentTaskBoardClientAccess(access)
-      } catch {
-        presentFailureFeedback(error.localizedDescription)
-        return false
-      }
-
-      do {
-        _ = try await client.updateTaskBoardGitRuntimeConfig(
-          request: materializedSnapshot.runtimeConfig
-        )
-        try requireCurrentTaskBoardClientAccess(access)
-      } catch {
-        presentFailureFeedback(
-          """
-          Partial save: orchestrator settings saved, runtime config did not: \
-          \(error.localizedDescription) - review and retry.
-          """
-        )
-        return false
-      }
+      else { return false }
 
       guard
         await applyTaskBoardTokenSync(
@@ -171,6 +147,7 @@ extension HarnessMonitorStore {
         )
         try requireCurrentTaskBoardClientAccess(access)
       } catch {
+        guard taskBoardAccessIsCurrent(access) else { return false }
         presentFailureFeedback(
           """
           Partial save: daemon updated, but storing credentials in keychain failed: \
@@ -200,9 +177,52 @@ extension HarnessMonitorStore {
       scheduleTaskBoardSettingsPostSaveRefresh(access: access)
       return true
     } catch {
+      if let acquiredAccess, !taskBoardAccessIsCurrent(acquiredAccess) {
+        return false
+      }
       presentFailureFeedback(error.localizedDescription)
       return false
     }
+  }
+
+  private func updateTaskBoardDaemonSettings(
+    snapshot: TaskBoardGitSettingsSnapshot,
+    pathBaseline: TaskBoardGitSettingsPathBaseline?,
+    access: TaskBoardClientAccess
+  ) async throws -> (TaskBoardGitSettingsSnapshot, TaskBoardOrchestratorSettings)? {
+    let materializedSnapshot = try await materializeTaskBoardGitSettings(
+      snapshot,
+      preservingPathsFrom: pathBaseline
+    )
+    try requireCurrentTaskBoardClientAccess(access)
+    let orchestratorSettings: TaskBoardOrchestratorSettings
+    do {
+      orchestratorSettings = try await access.client.updateTaskBoardOrchestratorSettings(
+        request: Self.orchestratorSettingsUpdateRequest(
+          from: materializedSnapshot.orchestratorSettings)
+      )
+      try requireCurrentTaskBoardClientAccess(access)
+    } catch {
+      guard taskBoardAccessIsCurrent(access) else { return nil }
+      presentFailureFeedback(error.localizedDescription)
+      return nil
+    }
+    do {
+      _ = try await access.client.updateTaskBoardGitRuntimeConfig(
+        request: materializedSnapshot.runtimeConfig
+      )
+      try requireCurrentTaskBoardClientAccess(access)
+    } catch {
+      guard taskBoardAccessIsCurrent(access) else { return nil }
+      presentFailureFeedback(
+        """
+        Partial save: orchestrator settings saved, runtime config did not: \
+        \(error.localizedDescription) - review and retry.
+        """
+      )
+      return nil
+    }
+    return (materializedSnapshot, orchestratorSettings)
   }
 
   private func scheduleTaskBoardSettingsPostSaveRefresh(
@@ -220,7 +240,7 @@ extension HarnessMonitorStore {
     guard (try? requireCurrentTaskBoardClientAccess(access)) != nil else { return }
     let client = access.client
     async let verifyOutcome = verifyTaskBoardSigning(client: client, repository: nil)
-    async let refresh: Void = refreshTaskBoardDashboardSnapshot(using: client)
+    async let refresh: Void = refreshTaskBoardDashboardSnapshot(using: client, access: access)
 
     let resolvedVerifyOutcome = await verifyOutcome
     guard (try? requireCurrentTaskBoardClientAccess(access)) != nil else {
@@ -277,6 +297,7 @@ extension HarnessMonitorStore {
       )
       return true
     } catch {
+      guard taskBoardAccessIsCurrent(access) else { return false }
       presentFailureFeedback(
         """
         Partial save: orchestrator and runtime saved, token sync did not: \

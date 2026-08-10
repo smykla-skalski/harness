@@ -62,14 +62,15 @@ extension HarnessMonitorStore {
       try requireCurrentTaskBoardClientAccess(access)
       recordRequestSuccess()
       mergeTaskBoardItem(response.snapshot.item)
-      await refreshTaskBoardDashboardSnapshot(using: client)
+      await refreshTaskBoardDashboardSnapshot(using: client, access: access)
       presentSuccessFeedback(actionName)
       return true
     } catch is CancellationError {
       return false
     } catch {
+      guard taskBoardAccessIsCurrent(access) else { return false }
       presentFailureFeedback(error.localizedDescription)
-      await refreshTaskBoardDashboardSnapshot(using: client)
+      await refreshTaskBoardDashboardSnapshot(using: client, access: access)
       return false
     }
   }

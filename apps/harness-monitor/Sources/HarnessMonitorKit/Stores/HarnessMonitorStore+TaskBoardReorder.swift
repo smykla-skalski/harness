@@ -93,7 +93,7 @@ extension HarnessMonitorStore {
         response.snapshot.item,
         mutation: resolvedMutation
       )
-      await refreshTaskBoardDashboardSnapshot(using: client)
+      await refreshTaskBoardDashboardSnapshot(using: client, access: access)
       return true
     } catch is CancellationError {
       rollbackOptimisticTaskBoardPosition(resolvedMutation)
@@ -102,8 +102,9 @@ extension HarnessMonitorStore {
     } catch {
       rollbackOptimisticTaskBoardPosition(resolvedMutation)
       finishTaskBoardPositionMutation(resolvedMutation)
+      guard taskBoardAccessIsCurrent(access) else { return false }
       presentFailureFeedback(error.localizedDescription)
-      await refreshTaskBoardDashboardSnapshot(using: client)
+      await refreshTaskBoardDashboardSnapshot(using: client, access: access)
       return false
     }
   }
@@ -243,13 +244,14 @@ extension HarnessMonitorStore {
       try requireCurrentTaskBoardClientAccess(access)
       recordRequestSuccess()
       mergeTaskBoardItem(response.snapshot.item)
-      await refreshTaskBoardDashboardSnapshot(using: client)
+      await refreshTaskBoardDashboardSnapshot(using: client, access: access)
       return true
     } catch is CancellationError {
       return false
     } catch {
+      guard taskBoardAccessIsCurrent(access) else { return false }
       presentFailureFeedback(error.localizedDescription)
-      await refreshTaskBoardDashboardSnapshot(using: client)
+      await refreshTaskBoardDashboardSnapshot(using: client, access: access)
       return false
     }
   }

@@ -28,6 +28,7 @@ extension HarnessMonitorStore {
     } catch is CancellationError {
       return nil
     } catch {
+      guard taskBoardAccessIsCurrent(access) else { return nil }
       presentFailureFeedback(error.localizedDescription)
       return nil
     }
@@ -62,15 +63,16 @@ extension HarnessMonitorStore {
         mergeTaskBoardItem(delivery.applied.item)
       }
       if refreshDashboard && !dryRun {
-        await refreshTaskBoardDashboardSnapshot(using: client)
+        await refreshTaskBoardDashboardSnapshot(using: client, access: access)
       }
       presentSuccessFeedback(dryRun ? "Previewed task-board delivery" : "Delivered task-board item")
       return delivery
     } catch is CancellationError {
       return nil
     } catch {
+      guard taskBoardAccessIsCurrent(access) else { return nil }
       if refreshDashboard && !dryRun {
-        await refreshTaskBoardDashboardSnapshot(using: client)
+        await refreshTaskBoardDashboardSnapshot(using: client, access: access)
       }
       presentFailureFeedback(error.localizedDescription)
       return nil
@@ -136,6 +138,7 @@ extension HarnessMonitorStore {
       } catch is CancellationError {
         return nil
       } catch {
+        guard taskBoardAccessIsCurrent(access) else { return nil }
         presentFailureFeedback(error.localizedDescription)
         return nil
       }
@@ -235,6 +238,7 @@ extension HarnessMonitorStore {
     } catch is CancellationError {
       return nil
     } catch {
+      guard taskBoardAccessIsCurrent(access) else { return nil }
       presentFailureFeedback(error.localizedDescription)
       return nil
     }
@@ -279,6 +283,7 @@ extension HarnessMonitorStore {
     } catch is CancellationError {
       return nil
     } catch {
+      guard taskBoardAccessIsCurrent(access) else { return nil }
       presentFailureFeedback(error.localizedDescription)
       return nil
     }
@@ -312,6 +317,7 @@ extension HarnessMonitorStore {
     } catch is CancellationError {
       return nil
     } catch {
+      guard taskBoardAccessIsCurrent(access) else { return nil }
       presentFailureFeedback(error.localizedDescription)
       return nil
     }

@@ -38,6 +38,7 @@ extension HarnessMonitorStore {
     } catch is CancellationError {
       return false
     } catch {
+      guard taskBoardAccessIsCurrent(access) else { return false }
       presentFailureFeedback(error.localizedDescription)
       return false
     }

@@ -52,13 +52,14 @@ extension HarnessMonitorStore {
       }
       try requireCurrentTaskBoardClientAccess(access)
       recordRequestSuccess()
-      await refreshTaskBoardDashboardSnapshot(using: client)
+      await refreshTaskBoardDashboardSnapshot(using: client, access: access)
       presentSuccessFeedback(Self.forceCancelSuccessMessage(measuredResponse.value.disposition))
       return true
     } catch is CancellationError {
       return false
     } catch {
-      await refreshTaskBoardDashboardSnapshot(using: client)
+      guard taskBoardAccessIsCurrent(access) else { return false }
+      await refreshTaskBoardDashboardSnapshot(using: client, access: access)
       presentFailureFeedback(error.localizedDescription)
       return false
     }

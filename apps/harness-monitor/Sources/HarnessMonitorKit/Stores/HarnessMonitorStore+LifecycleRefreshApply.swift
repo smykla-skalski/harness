@@ -1,26 +1,65 @@
 import Foundation
 
+struct PreparedRefreshApplication: Sendable {
+  let refreshSnapshot: HarnessMonitorStore.RefreshSnapshot
+  let sessionSnapshot: SessionSnapshotWorkerOutput
+}
+
 extension HarnessMonitorStore {
   func applyRefreshSnapshot(
     _ refreshSnapshot: RefreshSnapshot,
     using client: any HarnessMonitorClientProtocol,
     options: RefreshApplyOptions,
-    connectionFence: ConnectionAttemptFence? = nil
+    connectionFence: ConnectionAttemptFence? = nil,
+    taskBoardAccess: TaskBoardClientAccess
   ) async {
+    guard
+      let prepared = await prepareRefreshApplication(
+        refreshSnapshot,
+        connectionFence: connectionFence
+      ),
+      taskBoardAccessIsCurrent(taskBoardAccess)
+    else {
+      return
+    }
+    applyPreparedRefreshSnapshot(prepared, using: client, options: options)
+  }
+
+  func prepareRefreshApplication(
+    _ refreshSnapshot: RefreshSnapshot,
+    connectionFence: ConnectionAttemptFence?
+  ) async -> PreparedRefreshApplication? {
+    guard isCurrentConnectionAttemptFenceIfProvided(connectionFence) else { return nil }
+    let generation = beginSessionIndexSnapshotApply()
+    guard
+      let snapshot = await preparedSessionIndexSnapshot(
+        projects: refreshSnapshot.projects.value,
+        sessions: refreshSnapshot.sessions.value,
+        generation: generation
+      ),
+      isCurrentConnectionAttemptFenceIfProvided(connectionFence)
+    else {
+      return nil
+    }
+    return PreparedRefreshApplication(
+      refreshSnapshot: refreshSnapshot,
+      sessionSnapshot: snapshot
+    )
+  }
+
+  func applyPreparedRefreshSnapshot(
+    _ prepared: PreparedRefreshApplication,
+    using client: any HarnessMonitorClientProtocol,
+    options: RefreshApplyOptions
+  ) {
+    let refreshSnapshot = prepared.refreshSnapshot
+    let filteredSnapshot = prepared.sessionSnapshot
     let preserveSelection = options.preserveSelection
     let allowPreviewReadySelection = options.allowPreviewReadySelection
     let recordConnectionTelemetry = options.recordConnectionTelemetry
     cancelInitialTaskBoardConfirmationRefresh()
     let measuredDiagnostics = refreshSnapshot.diagnostics
     let refreshTimings = refreshSnapshot.refreshTimings()
-    guard
-      let filteredSnapshot = await preparedRefreshSessionSnapshot(
-        refreshSnapshot,
-        connectionFence: connectionFence
-      )
-    else {
-      return
-    }
     let resolvedTaskBoardSnapshot = resolvedTaskBoardRefreshSnapshot(
       items: refreshSnapshot.taskBoardItems,
       orchestratorStatus: refreshSnapshot.taskBoardOrchestratorStatus,
@@ -94,25 +133,6 @@ extension HarnessMonitorStore {
       using: client,
       sessions: filteredSnapshot.sessions
     )
-  }
-
-  private func preparedRefreshSessionSnapshot(
-    _ refreshSnapshot: RefreshSnapshot,
-    connectionFence: ConnectionAttemptFence?
-  ) async -> SessionSnapshotWorkerOutput? {
-    guard isCurrentConnectionAttemptFenceIfProvided(connectionFence) else { return nil }
-    let generation = beginSessionIndexSnapshotApply()
-    guard
-      let snapshot = await preparedSessionIndexSnapshot(
-        projects: refreshSnapshot.projects.value,
-        sessions: refreshSnapshot.sessions.value,
-        generation: generation
-      ),
-      isCurrentConnectionAttemptFenceIfProvided(connectionFence)
-    else {
-      return nil
-    }
-    return snapshot
   }
 
   private func restoreSelectionAfterRefresh(
@@ -235,165 +255,6 @@ extension HarnessMonitorStore {
     return mergedItems
   }
 
-  func cancelInitialTaskBoardConfirmationRefresh() {
-    initialTaskBoardConfirmationTask?.cancel()
-    initialTaskBoardConfirmationTask = nil
-  }
-
-  func scheduleInitialTaskBoardConfirmationRefresh(
-    using client: any HarnessMonitorClientProtocol,
-    preservedItemIDs: Set<String>,
-    preservedStatus: Bool
-  ) {
-    guard !preservedItemIDs.isEmpty || preservedStatus else {
-      return
-    }
-    guard initialTaskBoardConfirmationGracePeriod > .zero else {
-      return
-    }
-    cancelInitialTaskBoardConfirmationRefresh()
-    let deadline = ContinuousClock.now.advanced(by: initialTaskBoardConfirmationGracePeriod)
-    initialTaskBoardConfirmationTask = Task(priority: .utility) { @MainActor [weak self] in
-      guard let self else { return }
-      defer { self.initialTaskBoardConfirmationTask = nil }
-
-      while !Task.isCancelled {
-        do {
-          try await Task.sleep(for: self.taskBoardConfirmationRetryInterval)
-        } catch {
-          return
-        }
-        guard self.connectionState == .online || self.connectionState == .connecting else {
-          return
-        }
-        let stepModeConfirmationRevision =
-          self.taskBoardRuntimeState.stepModeMutation.confirmationRevision
-        let positionMutationGeneration =
-          self.taskBoardRuntimeState.positionMutation.generation
-        let snapshot = await Self.loadTaskBoardRefreshSnapshot(
-          using: client,
-          stepModeConfirmationRevision: stepModeConfirmationRevision
-        )
-        let reachedDeadline = ContinuousClock.now >= deadline
-        let tick = self.evaluateTaskBoardConfirmationTick(
-          snapshot: snapshot,
-          preservedItemIDs: preservedItemIDs,
-          preservedStatus: preservedStatus,
-          reachedDeadline: reachedDeadline,
-          positionMutationGeneration: positionMutationGeneration
-        )
-        if tick.shouldKeepWaiting && !reachedDeadline {
-          continue
-        }
-        guard tick.shouldApply else {
-          return
-        }
-        self.commitTaskBoardConfirmationTick(tick)
-        return
-      }
-    }
-  }
-
-  func evaluateTaskBoardConfirmationTick(
-    snapshot: TaskBoardRefreshSnapshot,
-    preservedItemIDs: Set<String>,
-    preservedStatus: Bool,
-    reachedDeadline: Bool,
-    positionMutationGeneration: UInt64
-  ) -> TaskBoardConfirmationTick {
-    var tick = TaskBoardConfirmationTick(
-      resolvedItems: globalTaskBoardItems,
-      resolvedStatus: globalTaskBoardOrchestratorStatus,
-      automationSnapshot: nil,
-      positionMutationGeneration: positionMutationGeneration,
-      shouldApply: false,
-      shouldKeepWaiting: false
-    )
-    if !preservedItemIDs.isEmpty {
-      resolveTaskBoardItems(
-        snapshot: snapshot,
-        preservedItemIDs: preservedItemIDs,
-        reachedDeadline: reachedDeadline,
-        tick: &tick
-      )
-    }
-    if preservedStatus {
-      resolveTaskBoardStatus(
-        snapshot: snapshot,
-        reachedDeadline: reachedDeadline,
-        tick: &tick
-      )
-    }
-    return tick
-  }
-
-  func resolveTaskBoardItems(
-    snapshot: TaskBoardRefreshSnapshot,
-    preservedItemIDs: Set<String>,
-    reachedDeadline: Bool,
-    tick: inout TaskBoardConfirmationTick
-  ) {
-    guard let measuredItems = snapshot.items.measured else {
-      if !reachedDeadline {
-        tick.shouldKeepWaiting = true
-      }
-      return
-    }
-    let liveIDs = Set(measuredItems.value.map(\.id))
-    if preservedItemIDs.isSubset(of: liveIDs) || reachedDeadline {
-      tick.resolvedItems = measuredItems.value
-      tick.shouldApply = true
-    } else {
-      tick.shouldKeepWaiting = true
-    }
-  }
-
-  func resolveTaskBoardStatus(
-    snapshot: TaskBoardRefreshSnapshot,
-    reachedDeadline: Bool,
-    tick: inout TaskBoardConfirmationTick
-  ) {
-    guard let measuredStatus = snapshot.orchestratorStatus.measured else {
-      if !reachedDeadline {
-        tick.shouldKeepWaiting = true
-      }
-      return
-    }
-    if measuredStatus.value != nil || reachedDeadline {
-      tick.automationSnapshot = measuredStatus.value?.automation
-      tick.resolvedStatus = reconcileTaskBoardOrchestratorStatus(
-        measuredStatus.value,
-        snapshotConfirmationRevision: snapshot.stepModeConfirmationRevision
-      )
-      tick.shouldApply = true
-    } else {
-      tick.shouldKeepWaiting = true
-    }
-  }
-
-  func commitTaskBoardConfirmationTick(_ tick: TaskBoardConfirmationTick) {
-    let resolvedItems = taskBoardItemsPreservingPositionMutation(
-      tick.resolvedItems,
-      positionMutationGeneration: tick.positionMutationGeneration
-    )
-    let didChangeTaskBoardSnapshot =
-      globalTaskBoardItems != resolvedItems
-      || globalTaskBoardOrchestratorStatus?.withoutAutomationSnapshot
-        != tick.resolvedStatus?.withoutAutomationSnapshot
-    withUISyncBatch {
-      self.globalTaskBoardItems = resolvedItems
-      self.globalTaskBoardOrchestratorStatus = tick.resolvedStatus
-      mergeTaskBoardAutomationSnapshot(tick.automationSnapshot)
-    }
-    if didChangeTaskBoardSnapshot
-      && taskBoardRuntimeState.positionMutation.pendingTokens.isEmpty
-    {
-      scheduleTaskBoardSnapshotCacheWrite(
-        items: resolvedItems,
-        orchestratorStatus: tick.resolvedStatus
-      )
-    }
-  }
 }
 
 extension HarnessMonitorStore.RefreshSnapshot {

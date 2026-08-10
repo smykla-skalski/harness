@@ -25,13 +25,14 @@ extension HarnessMonitorStore {
       try requireCurrentTaskBoardClientAccess(access)
       recordRequestSuccess()
       mergeTaskBoardItem(measuredResponse.value.item)
-      await refreshTaskBoardDashboardSnapshot(using: client)
+      await refreshTaskBoardDashboardSnapshot(using: client, access: access)
       try requireCurrentTaskBoardClientAccess(access)
       presentSuccessFeedback(actionName)
       return true
     } catch is CancellationError {
       return false
     } catch {
+      guard taskBoardAccessIsCurrent(access) else { return false }
       presentFailureFeedback(error.localizedDescription)
       return false
     }
@@ -63,15 +64,20 @@ extension HarnessMonitorStore {
       recordRequestSuccess()
       globalTaskBoardOrchestratorStatus = measuredStatus.value
       mergeTaskBoardAutomationSnapshot(measuredStatus.value.automation)
-      await refreshTaskBoardDashboardSnapshot(using: client, fallbackStatus: measuredStatus.value)
+      await refreshTaskBoardDashboardSnapshot(
+        using: client,
+        fallbackStatus: measuredStatus.value,
+        access: access
+      )
       try requireCurrentTaskBoardClientAccess(access)
       presentSuccessFeedback(actionName)
       return true
     } catch is CancellationError {
       return false
     } catch {
+      guard taskBoardAccessIsCurrent(access) else { return false }
       if suppressExpectedCancellation && Self.isTaskBoardRunCancellation(error) {
-        await refreshTaskBoardDashboardSnapshot(using: client)
+        await refreshTaskBoardDashboardSnapshot(using: client, access: access)
         return false
       }
       presentFailureFeedback(error.localizedDescription)

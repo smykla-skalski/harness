@@ -278,6 +278,10 @@ extension WebSocketTransport {
       try Task.checkCancellation()
       return try await withCheckedThrowingContinuation { continuation in
         store.register(id: id, continuation: continuation)
+        if Task.isCancelled {
+          store.fail(id: id, error: CancellationError())
+          return
+        }
         task.send(.string(text)) { error in
           if let error {
             let errorDescription = error.localizedDescription

@@ -2,6 +2,12 @@ import Foundation
 
 private let taskBoardCredentialSyncRepeatInterval: TimeInterval = 30 * 60
 
+struct PreparedTaskBoardDatabaseSynchronization: Sendable {
+  let capabilities: TaskBoardCapabilities
+  let resolvedMigrationSource: Bool
+  let accessFence: TaskBoardAccessFence
+}
+
 extension HarnessMonitorStore {
   @discardableResult
   func syncStoredTaskBoardCredentials(
@@ -124,8 +130,25 @@ extension HarnessMonitorStore {
     validatedCapabilities: TaskBoardCapabilities? = nil,
     accessFence providedFence: TaskBoardAccessFence? = nil
   ) async -> Bool {
-    guard let fence = resolvedTaskBoardAccessFence(providedFence) else {
+    guard
+      let prepared = await prepareStoredTaskBoardCredentialsForNewDaemon(
+        using: client,
+        validatedCapabilities: validatedCapabilities,
+        accessFence: providedFence
+      )
+    else {
       return false
+    }
+    return finishTaskBoardDatabaseSynchronization(prepared)
+  }
+
+  func prepareStoredTaskBoardCredentialsForNewDaemon(
+    using client: any HarnessMonitorClientProtocol,
+    validatedCapabilities: TaskBoardCapabilities? = nil,
+    accessFence providedFence: TaskBoardAccessFence? = nil
+  ) async -> PreparedTaskBoardDatabaseSynchronization? {
+    guard let fence = resolvedTaskBoardAccessFence(providedFence) else {
+      return nil
     }
     let capabilities: TaskBoardCapabilities
     if let validatedCapabilities {
@@ -136,25 +159,25 @@ extension HarnessMonitorStore {
         guard
           isCurrentTaskBoardAccessFence(fence)
         else {
-          return false
+          return nil
         }
       } catch {
         guard
           isCurrentTaskBoardAccessFence(fence)
         else {
-          return false
+          return nil
         }
         let description = RefreshSnapshotErrorFormatting.describeUnderlying(error)
         HarnessMonitorLogger.store.error(
           "task-board database capability check failed: \(description, privacy: .public)"
         )
-        return false
+        return nil
       }
     }
     guard
       isCurrentTaskBoardAccessFence(fence)
     else {
-      return false
+      return nil
     }
     var resolvedMigrationSource = false
     if let previousID = taskBoardSecretMigrationSource(for: capabilities.instanceID) {
@@ -166,7 +189,7 @@ extension HarnessMonitorStore {
       guard
         isCurrentTaskBoardAccessFence(fence)
       else {
-        return false
+        return nil
       }
     }
     let synchronized = await syncStoredTaskBoardCredentials(
@@ -179,24 +202,27 @@ extension HarnessMonitorStore {
       synchronized,
       isCurrentTaskBoardAccessFence(fence)
     else {
-      return false
+      return nil
     }
-    return finishTaskBoardDatabaseSynchronization(
-      capabilities,
+    return PreparedTaskBoardDatabaseSynchronization(
+      capabilities: capabilities,
       resolvedMigrationSource: resolvedMigrationSource,
       accessFence: fence
     )
   }
 
-  private func finishTaskBoardDatabaseSynchronization(
-    _ capabilities: TaskBoardCapabilities,
-    resolvedMigrationSource: Bool,
-    accessFence: TaskBoardAccessFence
+  func finishTaskBoardDatabaseSynchronization(
+    _ prepared: PreparedTaskBoardDatabaseSynchronization
   ) -> Bool {
-    guard completeTaskBoardDatabaseSynchronization(capabilities, accessFence: accessFence) else {
+    guard
+      completeTaskBoardDatabaseSynchronization(
+        prepared.capabilities,
+        accessFence: prepared.accessFence
+      )
+    else {
       return false
     }
-    if resolvedMigrationSource {
+    if prepared.resolvedMigrationSource {
       taskBoardRuntimeState.connection.previousDatabaseInstanceID = nil
     }
     return true

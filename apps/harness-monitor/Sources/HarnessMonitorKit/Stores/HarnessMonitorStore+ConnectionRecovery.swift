@@ -138,7 +138,8 @@ extension HarnessMonitorStore {
 
   func adoptConnectionCandidate(
     _ candidate: any HarnessMonitorClientProtocol,
-    connectionFence: ConnectionAttemptFence
+    connectionFence: ConnectionAttemptFence,
+    onAdopt: () -> Bool = { true }
   ) async -> Bool {
     guard isCurrentConnectionAttemptFence(connectionFence) else {
       await candidate.shutdown()
@@ -153,6 +154,11 @@ extension HarnessMonitorStore {
       }
     }
     self.client = candidate
+    guard onAdopt() else {
+      self.client = nil
+      await candidate.shutdown()
+      return false
+    }
     return true
   }
 

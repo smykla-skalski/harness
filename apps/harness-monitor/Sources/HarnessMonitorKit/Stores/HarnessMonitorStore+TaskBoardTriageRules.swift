@@ -63,6 +63,7 @@ extension HarnessMonitorStore {
     } catch is CancellationError {
       return nil
     } catch {
+      guard taskBoardAccessIsCurrent(access) else { return nil }
       presentFailureFeedback(error.localizedDescription)
       return nil
     }
@@ -95,14 +96,15 @@ extension HarnessMonitorStore {
       recordRequestSuccess()
       if result.activated {
         presentSuccessFeedback(rules == nil ? "Deactivate triage rules" : "Activate triage rules")
-        await refreshTaskBoardDashboardSnapshot(using: client)
+        await refreshTaskBoardDashboardSnapshot(using: client, access: access)
       }
       return result
     } catch is CancellationError {
       return nil
     } catch {
+      guard taskBoardAccessIsCurrent(access) else { return nil }
       presentFailureFeedback(error.localizedDescription)
-      await refreshTaskBoardDashboardSnapshot(using: client)
+      await refreshTaskBoardDashboardSnapshot(using: client, access: access)
       return nil
     }
   }

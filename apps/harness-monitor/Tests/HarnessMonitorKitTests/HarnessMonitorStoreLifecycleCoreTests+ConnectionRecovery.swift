@@ -15,11 +15,13 @@ extension HarnessMonitorStoreLifecycleCoreTests {
 
     await client.waitUntilTaskBoardItemsReadIsBlocked()
     #expect(store.client == nil)
+    #expect(store.taskBoardDatabaseInstanceID == nil)
     store.invalidateConnectionAttempts()
     await client.releaseTaskBoardItemsRead()
     await connection.value
 
     #expect(store.client == nil)
+    #expect(store.taskBoardDatabaseInstanceID == nil)
     #expect(client.shutdownCallCount() == 1)
     await store.prepareForTermination()
   }
@@ -45,6 +47,39 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     #expect(activeClient.shutdownCallCount() == 0)
     #expect(store.client === activeClient)
     #expect(store.connectionState == .online)
+    await store.prepareForTermination()
+  }
+
+  @Test("A stale manual refresh cannot overwrite its replacement")
+  func staleManualRefreshCannotOverwriteReplacement() async throws {
+    let staleClient = RecordingHarnessClient()
+    staleClient.configureTaskBoardItems([connectionRecoveryTaskBoardItem(id: "initial")])
+    let store = await makeBootstrappedStore(client: staleClient)
+    store.stopGlobalStream()
+    staleClient.configureTaskBoardItems([connectionRecoveryTaskBoardItem(id: "stale")])
+    await staleClient.blockNextTaskBoardItemsRead()
+    let refresh = Task { @MainActor in
+      await store.refresh(using: staleClient, preserveSelection: false)
+    }
+    await staleClient.waitUntilTaskBoardItemsReadIsBlocked()
+
+    let replacementClient = RecordingHarnessClient()
+    replacementClient.taskBoardCapabilitiesValue = TaskBoardCapabilities(
+      storage: "database",
+      revision: 7,
+      instanceID: "replacement-database"
+    )
+    replacementClient.configureTaskBoardItems([
+      connectionRecoveryTaskBoardItem(id: "replacement")
+    ])
+    try await store.connect(using: replacementClient)
+    await staleClient.releaseTaskBoardItemsRead()
+    await refresh.value
+
+    #expect(store.client as? RecordingHarnessClient === replacementClient)
+    #expect(store.taskBoardDatabaseInstanceID == "replacement-database")
+    #expect(store.globalTaskBoardItems.map(\.id) == ["replacement"])
+    #expect(replacementClient.shutdownCallCount() == 0)
     await store.prepareForTermination()
   }
 
@@ -164,5 +199,29 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     #expect(store.connectionRecoveryTask == nil)
     store.isBootstrapping = false
     await store.prepareForTermination()
+  }
+
+  private func connectionRecoveryTaskBoardItem(id: String) -> TaskBoardItem {
+    TaskBoardItem(
+      schemaVersion: 1,
+      id: id,
+      title: id,
+      body: "Body",
+      status: .todo,
+      priority: .medium,
+      tags: [],
+      projectId: "project-1",
+      agentMode: .interactive,
+      kind: .task,
+      externalRefs: [],
+      planning: TaskBoardPlanningState(),
+      workflow: nil,
+      sessionId: nil,
+      workItemId: nil,
+      usage: TaskBoardUsage(),
+      createdAt: "2026-08-10T08:00:00Z",
+      updatedAt: "2026-08-10T08:00:00Z",
+      deletedAt: nil
+    )
   }
 }

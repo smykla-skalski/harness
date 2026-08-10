@@ -37,16 +37,23 @@ extension HarnessMonitorStore {
     case taskBoardProjects(TaskBoardSnapshotLoad<[TaskBoardProjectSummary]>)
   }
 
-  func performPreviewConnectRefresh(
+  func preparePreviewConnectRefresh(
     using client: any HarnessMonitorClientProtocol,
-    preserveSelection: Bool,
     connectionFence: ConnectionAttemptFence
-  ) async throws {
-    try await performPreviewRefresh(
+  ) async throws -> PreparedRefreshApplication {
+    let snapshot = try await Self.loadRefreshSnapshot(
       using: client,
-      preserveSelection: preserveSelection,
-      connectionFence: connectionFence
+      stepModeConfirmationRevision:
+        taskBoardRuntimeState.stepModeMutation.confirmationRevision,
+      positionMutationGeneration: taskBoardRuntimeState.positionMutation.generation
     )
+    guard
+      let prepared = await prepareRefreshApplication(
+        snapshot,
+        connectionFence: connectionFence
+      )
+    else { throw CancellationError() }
+    return prepared
   }
 
   func refresh(
@@ -54,6 +61,12 @@ extension HarnessMonitorStore {
     preserveSelection: Bool,
     allowPreviewReadySelection: Bool = true
   ) async {
+    guard
+      self.client === client,
+      let connectionFence = try? currentConnectionAttemptFence(),
+      let taskBoardAccess = availableTaskBoardClientAccess,
+      taskBoardAccess.client === client
+    else { return }
     isRefreshing = true
     defer { isRefreshing = false }
 
@@ -62,10 +75,16 @@ extension HarnessMonitorStore {
         using: client,
         preserveSelection: preserveSelection,
         allowPreviewReadySelection: allowPreviewReadySelection,
-        isInitialConnect: false
+        isInitialConnect: false,
+        connectionFence: connectionFence,
+        taskBoardAccess: taskBoardAccess
       )
     } catch {
-      await discardActiveConnection()
+      guard
+        isCurrentConnectionAttemptFence(connectionFence),
+        self.client === client
+      else { return }
+      guard await discardFailedConnectionUnlessReplaced() else { return }
       guard !shouldAbandonConnectionAttempt else {
         connectionState = .idle
         return
@@ -74,11 +93,10 @@ extension HarnessMonitorStore {
     }
   }
 
-  func performInitialConnectRefresh(
+  func prepareInitialConnectRefresh(
     using client: any HarnessMonitorClientProtocol,
-    preserveSelection: Bool,
     connectionFence: ConnectionAttemptFence
-  ) async throws {
+  ) async throws -> PreparedRefreshApplication {
     let deadline = ContinuousClock.now.advanced(by: initialConnectRefreshRetryGracePeriod)
     var attempt = 0
 
@@ -87,13 +105,19 @@ extension HarnessMonitorStore {
         throw CancellationError()
       }
       do {
-        try await performRefresh(
+        let snapshot = try await Self.loadRefreshSnapshot(
           using: client,
-          preserveSelection: preserveSelection,
-          isInitialConnect: true,
-          connectionFence: connectionFence
+          stepModeConfirmationRevision:
+            taskBoardRuntimeState.stepModeMutation.confirmationRevision,
+          positionMutationGeneration: taskBoardRuntimeState.positionMutation.generation
         )
-        return
+        guard
+          let prepared = await prepareRefreshApplication(
+            snapshot,
+            connectionFence: connectionFence
+          )
+        else { throw CancellationError() }
+        return prepared
       } catch {
         guard isCurrentConnectionAttemptFence(connectionFence), !Task.isCancelled else {
           throw CancellationError()
@@ -125,7 +149,8 @@ extension HarnessMonitorStore {
     allowPreviewReadySelection: Bool = true,
     recordConnectionTelemetry: Bool = true,
     isInitialConnect: Bool = false,
-    connectionFence: ConnectionAttemptFence? = nil
+    connectionFence: ConnectionAttemptFence? = nil,
+    taskBoardAccess: TaskBoardClientAccess
   ) async throws {
     let adoptsLocalManifest = !usesRemoteDaemon
     let stepModeConfirmationRevision =
@@ -147,36 +172,8 @@ extension HarnessMonitorStore {
         isInitialConnect: isInitialConnect,
         adoptsLocalManifest: adoptsLocalManifest
       ),
-      connectionFence: connectionFence
-    )
-  }
-
-  private func performPreviewRefresh(
-    using client: any HarnessMonitorClientProtocol,
-    preserveSelection: Bool,
-    connectionFence: ConnectionAttemptFence? = nil
-  ) async throws {
-    let adoptsLocalManifest = !usesRemoteDaemon
-    let stepModeConfirmationRevision =
-      taskBoardRuntimeState.stepModeMutation.confirmationRevision
-    let positionMutationGeneration =
-      taskBoardRuntimeState.positionMutation.generation
-    let refreshSnapshot = try await Self.loadRefreshSnapshot(
-      using: client,
-      stepModeConfirmationRevision: stepModeConfirmationRevision,
-      positionMutationGeneration: positionMutationGeneration
-    )
-    await applyRefreshSnapshot(
-      refreshSnapshot,
-      using: client,
-      options: RefreshApplyOptions(
-        preserveSelection: preserveSelection,
-        allowPreviewReadySelection: true,
-        recordConnectionTelemetry: false,
-        isInitialConnect: false,
-        adoptsLocalManifest: adoptsLocalManifest
-      ),
-      connectionFence: connectionFence
+      connectionFence: connectionFence,
+      taskBoardAccess: taskBoardAccess
     )
   }
 

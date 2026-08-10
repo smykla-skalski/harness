@@ -10,6 +10,42 @@ private struct TaskBoardSourceRefreshError: LocalizedError {
 
 extension HarnessMonitorStore {
   @discardableResult
+  public func syncTaskBoard(request: TaskBoardSyncRequest) async -> Bool {
+    guard let access = availableTaskBoardClientAccess, taskBoardSyncPhase == .idle else {
+      return false
+    }
+    setTaskBoardSyncPhase(.syncing)
+    defer { setTaskBoardSyncPhase(.idle) }
+    return await syncAndRefreshTaskBoardDashboard(
+      access: access,
+      request: request,
+      successMessage: "Synced task board"
+    )
+  }
+
+  @discardableResult
+  public func cancelTaskBoardSync() async -> Bool {
+    guard let access = availableTaskBoardClientAccess, taskBoardSyncPhase == .syncing else {
+      return false
+    }
+    setTaskBoardSyncPhase(.stopping)
+    do {
+      _ = try await access.client.cancelTaskBoardSync()
+      try requireCurrentTaskBoardClientAccess(access)
+      cancelTaskBoardDashboardSnapshotRefresh()
+      recordRequestSuccess()
+      return true
+    } catch is CancellationError {
+      return false
+    } catch {
+      guard taskBoardAccessIsCurrent(access) else { return false }
+      setTaskBoardSyncPhase(.syncing)
+      presentFailureFeedback("Could not stop task board sync: \(error.localizedDescription)")
+      return false
+    }
+  }
+
+  @discardableResult
   func syncAndRefreshTaskBoardDashboard(
     access: TaskBoardClientAccess,
     request: TaskBoardSyncRequest,
@@ -40,7 +76,7 @@ extension HarnessMonitorStore {
         message: "Board ready · refreshing task sources",
         position: feedbackPosition
       )
-      await refreshTaskBoardDashboardSnapshot(using: client)
+      await refreshTaskBoardDashboardSnapshot(using: client, access: access)
       try requireCurrentTaskBoardClientAccess(access)
       let completion = try await waitForTaskBoardSourceRefresh(access: access)
       if taskBoardSyncPhase == .stopping || completion.cancelled {
@@ -59,7 +95,7 @@ extension HarnessMonitorStore {
         message: "Loading refreshed tasks",
         position: feedbackPosition
       )
-      await refreshTaskBoardDashboardSnapshot(using: client)
+      await refreshTaskBoardDashboardSnapshot(using: client, access: access)
       try requireCurrentTaskBoardClientAccess(access)
       if let successMessage {
         presentSuccessFeedback(successMessage, position: feedbackPosition)
@@ -86,7 +122,7 @@ extension HarnessMonitorStore {
         message: "Reloading current tasks",
         position: feedbackPosition
       )
-      await refreshTaskBoardDashboardSnapshot(using: client)
+      await refreshTaskBoardDashboardSnapshot(using: client, access: access)
       let failureDescription =
         if let failureMessagePrefix {
           "\(failureMessagePrefix): \(error.localizedDescription)"

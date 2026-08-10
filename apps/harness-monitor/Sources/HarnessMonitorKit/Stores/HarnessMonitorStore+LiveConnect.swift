@@ -3,8 +3,9 @@ import Foundation
 extension HarnessMonitorStore {
   func connectLive(
     using client: any HarnessMonitorClientProtocol,
-    connectionFence: ConnectionAttemptFence
+    preparedConnection: PreparedConnection
   ) async throws {
+    let connectionFence = preparedConnection.fence
     guard isCurrentConnectionAttemptFence(connectionFence) else {
       await client.shutdown()
       return
@@ -16,10 +17,10 @@ extension HarnessMonitorStore {
     let transport: TransportKind = client is WebSocketTransport ? .webSocket : .httpSSE
     resetConnectionMetrics(for: transport)
 
+    let preparedRefresh: PreparedRefreshApplication
     do {
-      try await performInitialConnectRefresh(
+      preparedRefresh = try await prepareInitialConnectRefresh(
         using: client,
-        preserveSelection: true,
         connectionFence: connectionFence
       )
     } catch {
@@ -41,7 +42,30 @@ extension HarnessMonitorStore {
       await settleAbandonedConnectionAttempt(using: client, connectionFence: connectionFence)
       return
     }
-    guard await adoptConnectionCandidate(client, connectionFence: connectionFence) else {
+    let adopted = await adoptConnectionCandidate(
+      client,
+      connectionFence: connectionFence,
+      onAdopt: {
+        guard
+          finishTaskBoardDatabaseSynchronization(
+            preparedConnection.taskBoardSynchronization
+          )
+        else { return false }
+        applyPreparedRefreshSnapshot(
+          preparedRefresh,
+          using: client,
+          options: RefreshApplyOptions(
+            preserveSelection: true,
+            allowPreviewReadySelection: true,
+            recordConnectionTelemetry: true,
+            isInitialConnect: true,
+            adoptsLocalManifest: !usesRemoteDaemon
+          )
+        )
+        return true
+      }
+    )
+    guard adopted else {
       return
     }
     withUISyncBatch {

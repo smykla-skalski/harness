@@ -53,23 +53,30 @@ extension HarnessMonitorStore {
     successMessage: String,
     perform: (any HarnessMonitorClientProtocol) async throws -> PolicyCanvasWorkspace
   ) async -> Bool {
-    guard let client else {
-      return false
-    }
+    guard let access = availableTaskBoardClientAccess else { return false }
+    let client = access.client
     beginDaemonAction()
     defer { endDaemonAction() }
 
     do {
       let workspace = try await perform(client)
+      try requireCurrentTaskBoardClientAccess(access)
       recordRequestSuccess()
-      await syncPolicyCanvasWorkspace(
-        workspace,
-        using: client,
-        forceReloadActiveCanvas: false
-      )
+      guard
+        await syncPolicyCanvasWorkspace(
+          workspace,
+          using: client,
+          forceReloadActiveCanvas: false,
+          taskBoardAccess: access
+        )
+      else { return false }
+      try requireCurrentTaskBoardClientAccess(access)
       presentSuccessFeedback(successMessage)
       return true
+    } catch is CancellationError {
+      return false
     } catch {
+      guard taskBoardAccessIsCurrent(access) else { return false }
       presentFailureFeedback(error.localizedDescription)
       return false
     }

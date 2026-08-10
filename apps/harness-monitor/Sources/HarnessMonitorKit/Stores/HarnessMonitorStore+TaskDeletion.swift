@@ -198,8 +198,10 @@ extension HarnessMonitorStore {
       }
     }
 
+    guard taskBoardAccessIsCurrent(access) else { return false }
     globalTaskBoardItems.removeAll { deletedIDs.contains($0.id) }
-    await refreshTaskBoardDashboardSnapshot(using: client)
+    await refreshTaskBoardDashboardSnapshot(using: client, access: access)
+    guard taskBoardAccessIsCurrent(access) else { return false }
     if let firstFailure {
       presentFailureFeedback(
         taskBoardDeletionFailureMessage(

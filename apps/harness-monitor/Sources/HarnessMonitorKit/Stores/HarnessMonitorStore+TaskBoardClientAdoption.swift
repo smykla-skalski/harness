@@ -142,7 +142,7 @@ extension HarnessMonitorStore {
       await candidate.shutdown()
       throw CancellationError()
     }
-    let synchronized = await syncStoredTaskBoardCredentialsForNewDaemon(
+    let synchronization = await prepareStoredTaskBoardCredentialsForNewDaemon(
       using: candidate,
       validatedCapabilities: capabilities,
       accessFence: TaskBoardAccessFence(
@@ -151,14 +151,21 @@ extension HarnessMonitorStore {
         databaseAccessGeneration: nil
       )
     )
-    guard synchronized, isCurrentConnectionAttemptFence(connectionFence) else {
+    guard let synchronization, isCurrentConnectionAttemptFence(connectionFence) else {
       await candidate.shutdown()
       throw HarnessMonitorAPIError.server(
         code: 503,
         message: "Task Board credential synchronization did not complete"
       )
     }
-    guard await adoptConnectionCandidate(candidate, connectionFence: connectionFence) else {
+    let adopted = await adoptConnectionCandidate(
+      candidate,
+      connectionFence: connectionFence,
+      onAdopt: {
+        finishTaskBoardDatabaseSynchronization(synchronization)
+      }
+    )
+    guard adopted else {
       throw CancellationError()
     }
     return TaskBoardClientAccess(
@@ -181,6 +188,10 @@ extension HarnessMonitorStore {
     else {
       throw CancellationError()
     }
+  }
+
+  func taskBoardAccessIsCurrent(_ access: TaskBoardClientAccess) -> Bool {
+    return (try? requireCurrentTaskBoardClientAccess(access)) != nil
   }
 
   @discardableResult

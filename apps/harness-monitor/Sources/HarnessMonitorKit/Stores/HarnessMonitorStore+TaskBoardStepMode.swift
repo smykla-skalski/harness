@@ -61,6 +61,12 @@ extension HarnessMonitorStore {
       guard generation == taskBoardRuntimeState.stepModeMutation.latestGeneration else {
         return true
       }
+      guard taskBoardAccessIsCurrent(access) else {
+        finishTaskBoardStepModeMutation(
+          settings: taskBoardRuntimeState.stepModeMutation.lastAuthoritativeSettings
+        )
+        return false
+      }
       finishTaskBoardStepModeFailure(error, generation: generation)
       return false
     }

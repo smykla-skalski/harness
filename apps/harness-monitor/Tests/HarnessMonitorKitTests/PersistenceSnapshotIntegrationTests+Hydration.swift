@@ -253,6 +253,7 @@ extension PersistenceSnapshotIntegrationTests {
     )
     await store.cacheSessionDetail(detail, timeline: [], markViewed: true)
     store.locallyRemovedSessionIDs.insert(session.sessionId)
+    store.installConnectedTestClient(client)
     store.connectionState = .online
 
     await store.refresh(using: client, preserveSelection: false)

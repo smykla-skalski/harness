@@ -247,6 +247,7 @@ extension PersistenceOfflineDurabilityTests {
       daemonController: RecordingDaemonController(client: client),
       modelContainer: previewContainer
     )
+    store.installConnectedTestClient(client)
 
     await store.refresh(using: client, preserveSelection: false)
     await store.flushPendingCacheWrite()

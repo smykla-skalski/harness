@@ -50,13 +50,14 @@ extension HarnessMonitorStore {
       try requireCurrentTaskBoardClientAccess(access)
       recordRequestSuccess()
       mergeTaskBoardItem(measuredItem.value)
-      await refreshTaskBoardDashboardSnapshot(using: client)
+      await refreshTaskBoardDashboardSnapshot(using: client, access: access)
       try requireCurrentTaskBoardClientAccess(access)
       presentSuccessFeedback("Created task board item")
       return true
     } catch is CancellationError {
       return false
     } catch {
+      guard taskBoardAccessIsCurrent(access) else { return false }
       presentFailureFeedback(error.localizedDescription)
       return false
     }
@@ -86,13 +87,14 @@ extension HarnessMonitorStore {
       try requireCurrentTaskBoardClientAccess(access)
       recordRequestSuccess()
       mergeTaskBoardItem(measuredItem.value)
-      await refreshTaskBoardDashboardSnapshot(using: client)
+      await refreshTaskBoardDashboardSnapshot(using: client, access: access)
       try requireCurrentTaskBoardClientAccess(access)
       presentSuccessFeedback(successMessage)
       return true
     } catch is CancellationError {
       return false
     } catch {
+      guard taskBoardAccessIsCurrent(access) else { return false }
       presentFailureFeedback(error.localizedDescription)
       return false
     }
@@ -204,7 +206,7 @@ extension HarnessMonitorStore {
       let preRefreshBaselineRunID = globalTaskBoardOrchestratorStatus?.lastRun?.runId
       globalTaskBoardEvaluationSummary = measuredSummary.value
       scheduleUISync([.contentDashboard])
-      await refreshTaskBoardDashboardSnapshot(using: client)
+      await refreshTaskBoardDashboardSnapshot(using: client, access: access)
       try requireCurrentTaskBoardClientAccess(access)
       cacheWriteSync.taskBoardEvaluationBaselineRunID =
         preRefreshBaselineRunID ?? globalTaskBoardOrchestratorStatus?.lastRun?.runId
@@ -214,45 +216,8 @@ extension HarnessMonitorStore {
     } catch is CancellationError {
       return false
     } catch {
+      guard taskBoardAccessIsCurrent(access) else { return false }
       presentFailureFeedback(error.localizedDescription)
-      return false
-    }
-  }
-
-  @discardableResult
-  public func syncTaskBoard(request: TaskBoardSyncRequest) async -> Bool {
-    guard let access = availableTaskBoardClientAccess, taskBoardSyncPhase == .idle else {
-      return false
-    }
-    setTaskBoardSyncPhase(.syncing)
-    defer {
-      setTaskBoardSyncPhase(.idle)
-    }
-    return await syncAndRefreshTaskBoardDashboard(
-      access: access,
-      request: request,
-      successMessage: "Synced task board"
-    )
-  }
-
-  @discardableResult
-  public func cancelTaskBoardSync() async -> Bool {
-    guard let access = availableTaskBoardClientAccess, taskBoardSyncPhase == .syncing else {
-      return false
-    }
-    let client = access.client
-    setTaskBoardSyncPhase(.stopping)
-    do {
-      _ = try await client.cancelTaskBoardSync()
-      try requireCurrentTaskBoardClientAccess(access)
-      cancelTaskBoardDashboardSnapshotRefresh()
-      recordRequestSuccess()
-      return true
-    } catch is CancellationError {
-      return false
-    } catch {
-      setTaskBoardSyncPhase(.syncing)
-      presentFailureFeedback("Could not stop task board sync: \(error.localizedDescription)")
       return false
     }
   }
@@ -281,7 +246,7 @@ extension HarnessMonitorStore {
       recordRequestSuccess()
       globalTaskBoardDispatchSummary = measuredSummary.value
       if refreshDashboard {
-        await refreshTaskBoardDashboardSnapshot(using: client)
+        await refreshTaskBoardDashboardSnapshot(using: client, access: access)
         try requireCurrentTaskBoardClientAccess(access)
       }
       presentSuccessFeedback(
@@ -291,6 +256,7 @@ extension HarnessMonitorStore {
     } catch is CancellationError {
       return false
     } catch {
+      guard taskBoardAccessIsCurrent(access) else { return false }
       presentFailureFeedback(error.localizedDescription)
       return false
     }
@@ -321,6 +287,7 @@ extension HarnessMonitorStore {
     } catch is CancellationError {
       return false
     } catch {
+      guard taskBoardAccessIsCurrent(access) else { return false }
       presentFailureFeedback(error.localizedDescription)
       return false
     }
@@ -351,6 +318,7 @@ extension HarnessMonitorStore {
     } catch is CancellationError {
       return false
     } catch {
+      guard taskBoardAccessIsCurrent(access) else { return false }
       presentFailureFeedback(error.localizedDescription)
       return false
     }
@@ -379,6 +347,7 @@ extension HarnessMonitorStore {
     } catch is CancellationError {
       return false
     } catch {
+      guard taskBoardAccessIsCurrent(access) else { return false }
       presentFailureFeedback(error.localizedDescription)
       return false
     }
@@ -412,6 +381,7 @@ extension HarnessMonitorStore {
     } catch is CancellationError {
       return false
     } catch {
+      guard taskBoardAccessIsCurrent(access) else { return false }
       presentFailureFeedback(error.localizedDescription)
       return false
     }

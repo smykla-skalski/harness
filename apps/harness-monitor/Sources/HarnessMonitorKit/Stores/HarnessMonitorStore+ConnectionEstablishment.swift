@@ -1,8 +1,9 @@
 import Foundation
 
 extension HarnessMonitorStore {
-  private struct PreparedConnection: Sendable {
+  struct PreparedConnection: Sendable {
     let fence: ConnectionAttemptFence
+    let taskBoardSynchronization: PreparedTaskBoardDatabaseSynchronization
   }
 
   func connect(using client: any HarnessMonitorClientProtocol) async throws {
@@ -11,14 +12,14 @@ extension HarnessMonitorStore {
     }
 
     if maintainsLiveDaemonObservation {
-      try await connectLive(using: client, connectionFence: prepared.fence)
+      try await connectLive(using: client, preparedConnection: prepared)
       return
     }
 
+    let preparedRefresh: PreparedRefreshApplication
     do {
-      try await performPreviewConnectRefresh(
+      preparedRefresh = try await preparePreviewConnectRefresh(
         using: client,
-        preserveSelection: true,
         connectionFence: prepared.fence
       )
     } catch {
@@ -40,7 +41,28 @@ extension HarnessMonitorStore {
       await settleAbandonedConnectionAttempt(using: client, connectionFence: prepared.fence)
       return
     }
-    guard await adoptConnectionCandidate(client, connectionFence: prepared.fence) else {
+    let adopted = await adoptConnectionCandidate(
+      client,
+      connectionFence: prepared.fence,
+      onAdopt: {
+        guard finishTaskBoardDatabaseSynchronization(prepared.taskBoardSynchronization) else {
+          return false
+        }
+        applyPreparedRefreshSnapshot(
+          preparedRefresh,
+          using: client,
+          options: RefreshApplyOptions(
+            preserveSelection: true,
+            allowPreviewReadySelection: true,
+            recordConnectionTelemetry: false,
+            isInitialConnect: false,
+            adoptsLocalManifest: !usesRemoteDaemon
+          )
+        )
+        return true
+      }
+    )
+    guard adopted else {
       return
     }
     withUISyncBatch {
@@ -65,7 +87,7 @@ extension HarnessMonitorStore {
       return nil
     }
     guard
-      try await synchronizeConnectionCandidate(
+      let taskBoardSynchronization = try await synchronizeConnectionCandidate(
         client,
         capabilities: capabilities,
         connectionFence: connectionFence
@@ -73,7 +95,10 @@ extension HarnessMonitorStore {
     else {
       return nil
     }
-    return PreparedConnection(fence: connectionFence)
+    return PreparedConnection(
+      fence: connectionFence,
+      taskBoardSynchronization: taskBoardSynchronization
+    )
   }
 
   private func beginConnectionAttempt(
@@ -112,8 +137,8 @@ extension HarnessMonitorStore {
     _ client: any HarnessMonitorClientProtocol,
     capabilities: TaskBoardCapabilities,
     connectionFence: ConnectionAttemptFence
-  ) async throws -> Bool {
-    let synchronizedCredentials = await syncStoredTaskBoardCredentialsForNewDaemon(
+  ) async throws -> PreparedTaskBoardDatabaseSynchronization? {
+    let synchronization = await prepareStoredTaskBoardCredentialsForNewDaemon(
       using: client,
       validatedCapabilities: capabilities,
       accessFence: TaskBoardAccessFence(
@@ -123,12 +148,12 @@ extension HarnessMonitorStore {
       )
     )
     guard await retainCurrentConnectionCandidate(client, connectionFence: connectionFence) else {
-      return false
+      return nil
     }
-    guard synchronizedCredentials else {
+    guard let synchronization else {
       await client.shutdown()
       guard isCurrentConnectionAttemptFence(connectionFence) else {
-        return false
+        return nil
       }
       if self.client === client {
         self.client = nil
@@ -138,7 +163,7 @@ extension HarnessMonitorStore {
         message: "Task Board credential synchronization did not complete"
       )
     }
-    return true
+    return synchronization
   }
 
   private func retainCurrentConnectionCandidate(
