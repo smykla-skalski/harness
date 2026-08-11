@@ -4,8 +4,12 @@ import ProjectDescription
 public enum BuildPhases {
   private static let managedDaemonBaseLaunchAgentLabel =
     "Q498EB36N4.io.harnessmonitor.managed-service"
-  private static let managedDaemonLegacyBaseLaunchAgentLabel =
-    "Q498EB36N4.io.harnessmonitor.agent"
+  private static let managedDaemonLegacyBaseLaunchAgentLabels = [
+    "Q498EB36N4.io.harnessmonitor.agent",
+    "Q498EB36N4.io.harnessmonitor.daemon",
+    "Q498EB36N4.io.harnessmonitor.managed-agent",
+    "Q498EB36N4.io.harnessmonitor.managed-daemon",
+  ]
   private static let managedDaemonLaunchAgentLabel =
     ProcessInfo.processInfo.environment["TUIST_MANAGED_DAEMON_LAUNCH_AGENT_LABEL"]
     ?? managedDaemonBaseLaunchAgentLabel
@@ -13,9 +17,15 @@ public enum BuildPhases {
     ProcessInfo.processInfo.environment["TUIST_MANAGED_DAEMON_RUNTIME_LANE"] ?? ""
 
   private static var managedDaemonLegacyAgentOutputs: [Path] {
-    var labels = [managedDaemonLegacyBaseLaunchAgentLabel]
+    var labels = managedDaemonLegacyBaseLaunchAgentLabels.filter {
+      $0 != "Q498EB36N4.io.harnessmonitor.daemon"
+    }
     if managedDaemonRuntimeLane.isEmpty == false {
-      labels.append("\(managedDaemonLegacyBaseLaunchAgentLabel)-\(managedDaemonRuntimeLane)")
+      labels.append(
+        contentsOf: managedDaemonLegacyBaseLaunchAgentLabels.map {
+          "\($0)-\(managedDaemonRuntimeLane)"
+        }
+      )
     }
     return labels.map {
       "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/\($0).plist"

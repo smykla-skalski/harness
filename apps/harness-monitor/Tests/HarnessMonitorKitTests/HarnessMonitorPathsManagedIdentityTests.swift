@@ -5,6 +5,59 @@ import Testing
 
 @Suite("Harness Monitor managed identity paths")
 struct HarnessMonitorPathsManagedIdentityTests {
+  @Test("Every churned lane service identity remains available for cleanup")
+  func everyChurnedLaneServiceIdentityRemainsAvailableForCleanup() {
+    let environment = HarnessMonitorEnvironment(
+      values: [HarnessMonitorRuntimeLane.environmentKey: "lane-a"],
+      homeDirectory: URL(fileURLWithPath: "/Users/example", isDirectory: true),
+      bundleURL: nil
+    )
+
+    #expect(
+      HarnessMonitorPaths.legacyGeneratedLaneLaunchAgentLabels(using: environment) == [
+        "Q498EB36N4.io.harnessmonitor.agent-lane-a",
+        "Q498EB36N4.io.harnessmonitor.daemon-lane-a",
+        "Q498EB36N4.io.harnessmonitor.managed-agent-lane-a",
+        "Q498EB36N4.io.harnessmonitor.managed-daemon-lane-a",
+      ]
+    )
+  }
+
+  @Test("Development lanes only inspect their lane-owned legacy services")
+  func developmentLaneOnlyInspectsLaneOwnedLegacyServices() throws {
+    let bundleURL = FileManager.default.temporaryDirectory
+      .appendingPathComponent("HarnessMonitorPathsTests-\(UUID().uuidString).app")
+    defer { try? FileManager.default.removeItem(at: bundleURL) }
+    let contentsURL = bundleURL.appendingPathComponent("Contents", isDirectory: true)
+    try FileManager.default.createDirectory(at: contentsURL, withIntermediateDirectories: true)
+    let info: [String: Any] = [
+      "CFBundleIdentifier": "io.harnessmonitor.app.development.lane-lane-a",
+      "CFBundleName": "HarnessMonitorPathsTests",
+      "CFBundlePackageType": "APPL",
+      "HarnessMonitorManagedDaemonRuntimeLane": "lane-a",
+    ]
+    let infoData = try PropertyListSerialization.data(
+      fromPropertyList: info,
+      format: .xml,
+      options: 0
+    )
+    try infoData.write(to: contentsURL.appendingPathComponent("Info.plist"))
+    let environment = HarnessMonitorEnvironment(
+      values: [:],
+      homeDirectory: URL(fileURLWithPath: "/Users/example", isDirectory: true),
+      bundleURL: bundleURL
+    )
+
+    #expect(
+      HarnessMonitorPaths.legacyLaunchAgentPlistNames(using: environment) == [
+        "Q498EB36N4.io.harnessmonitor.agent-lane-a.plist",
+        "Q498EB36N4.io.harnessmonitor.daemon-lane-a.plist",
+        "Q498EB36N4.io.harnessmonitor.managed-agent-lane-a.plist",
+        "Q498EB36N4.io.harnessmonitor.managed-daemon-lane-a.plist",
+      ]
+    )
+  }
+
   @Test("Bundled managed daemon identity remains one coherent runtime lane")
   func bundledManagedDaemonIdentityRemainsCoherent() throws {
     let bundleURL = FileManager.default.temporaryDirectory

@@ -8,9 +8,19 @@ public enum DaemonLaunchAgentRegistrationState: Equatable, Sendable {
   case requiresApproval
   case notFound
 
-  var isAbsent: Bool {
+  var isConfirmedAbsent: Bool {
+    self == .notRegistered
+  }
+
+  var isLegacyCleanupAbsent: Bool {
     self == .notRegistered || self == .notFound
   }
+}
+
+func serviceManagementJobIsAlreadyAbsent(_ error: Error) -> Bool {
+  let error = error as NSError
+  return error.code == kSMErrorJobNotFound
+    && error.domain == SMAppServiceErrorDomain
 }
 
 public protocol DaemonLaunchAgentManaging: Sendable {

@@ -10,7 +10,7 @@ public enum LegacyManagedLaunchAgentCleanup {
     "HarnessMonitor.LegacyLaunchAgentCleanup.CompletedNames"
   static let strategyVersionDefaultsKey =
     "HarnessMonitor.LegacyLaunchAgentCleanup.StrategyVersion"
-  static let strategyVersion = 2
+  static let strategyVersion = 3
   static let failureMessage =
     "Legacy daemon cleanup failed; daemon startup remains disabled to prevent duplicate automation"
   private static let lock = NSLock()
@@ -140,7 +140,7 @@ public enum LegacyManagedLaunchAgentCleanup {
     where legacyName != currentName {
       let legacyService = managerFactory(legacyName)
       let state = legacyService.registrationState()
-      if completedNames.contains(legacyName), state.isAbsent {
+      if completedNames.contains(legacyName), state.isConfirmedAbsent {
         continue
       }
       completedNames.remove(legacyName)
@@ -151,7 +151,8 @@ public enum LegacyManagedLaunchAgentCleanup {
         status=\(String(describing: state), privacy: .public)
         """
       )
-      let completed = state.isAbsent || attemptUnregister(legacyService, name: legacyName)
+      let completed =
+        state.isLegacyCleanupAbsent || attemptUnregister(legacyService, name: legacyName)
       if completed {
         completedNames.insert(legacyName)
       } else {
@@ -190,15 +191,20 @@ public enum LegacyManagedLaunchAgentCleanup {
     name: String
   ) -> Bool {
     switch service.registrationState() {
-    case .notRegistered, .notFound:
+    case .notRegistered:
       return false
-    case .enabled, .requiresApproval:
+    case .enabled, .requiresApproval, .notFound:
       break
     }
     do {
       try service.unregister()
       HarnessMonitorLogger.lifecycle.notice(
         "Disabled current SMAppService after legacy cleanup failed: \(name, privacy: .public)"
+      )
+      return true
+    } catch let error where serviceManagementJobIsAlreadyAbsent(error) {
+      HarnessMonitorLogger.lifecycle.notice(
+        "Current SMAppService was already absent during fail-closed cleanup: \(name, privacy: .public)"
       )
       return true
     } catch {
@@ -220,6 +226,11 @@ public enum LegacyManagedLaunchAgentCleanup {
       try service.unregister()
       HarnessMonitorLogger.lifecycle.info(
         "Auto-unregistered legacy SMAppService plist \(name, privacy: .public)"
+      )
+      return true
+    } catch let error where serviceManagementJobIsAlreadyAbsent(error) {
+      HarnessMonitorLogger.lifecycle.info(
+        "Legacy SMAppService plist was already absent: \(name, privacy: .public)"
       )
       return true
     } catch {
@@ -265,11 +276,13 @@ extension DaemonController {
   }
 
   private func disableCurrentLaunchAgentAfterCleanupFailure() async -> Bool {
-    guard !launchAgentManager.registrationState().isAbsent else {
+    guard !launchAgentManager.registrationState().isConfirmedAbsent else {
       return true
     }
     do {
       try launchAgentManager.unregister()
+    } catch let error where serviceManagementJobIsAlreadyAbsent(error) {
+      // The service disappeared between the status check and unregister.
     } catch {
       return false
     }
@@ -284,7 +297,7 @@ extension DaemonController {
       try await LegacyManagedLaunchAgentCleanup.requireComplete(
         defaults: legacyLaunchAgentCleanupDefaults.value,
         currentName: HarnessMonitorPaths.launchAgentPlistName(using: environment),
-        legacyNames: HarnessMonitorPaths.legacyLaunchAgentPlistNames,
+        legacyNames: HarnessMonitorPaths.legacyLaunchAgentPlistNames(using: environment),
         managerFactory: legacyLaunchAgentManagerFactory,
         legacyMonitorProcessIsRunning: legacyMonitorProcessIsRunning,
         afterCurrentServiceUnregister: {

@@ -103,6 +103,48 @@ final class ScreenRecorderWindowSelectorTests: XCTestCase {
     XCTAssertEqual(selected.windowID, 31)
   }
 
+  func testCaptureWindowSelectsNamedLaneAppBeforeNamedLaneUITestHost() throws {
+    let selected = try ScreenRecorderWindowSelector.captureWindow(from: [
+      ScreenRecorderWindowCandidate(
+        windowID: 34,
+        title: "Dashboard",
+        bundleIdentifier: "io.harnessmonitor.app.development.lane-fix-automation.ui-testing",
+        isOnScreen: true
+      ),
+      ScreenRecorderWindowCandidate(
+        windowID: 35,
+        title: "Dashboard",
+        bundleIdentifier: "io.harnessmonitor.app.development.lane-fix-automation",
+        isOnScreen: true
+      ),
+    ])
+
+    XCTAssertEqual(selected.windowID, 35)
+  }
+
+  func testCaptureWindowRejectsNamedLaneBundleLookalikes() {
+    for bundleIdentifier in [
+      "io.harnessmonitor.app.development.lane-",
+      "io.harnessmonitor.app.development.lane--fix-automation",
+      "io.harnessmonitor.app.development.lane-Fix-Automation",
+      "io.harnessmonitor.app.development.lane-fix-automation.extra",
+      "io.harnessmonitor.app.development.lane-fix-automation.ui-testing.extra",
+    ] {
+      XCTAssertThrowsError(
+        try ScreenRecorderWindowSelector.captureWindow(from: [
+          ScreenRecorderWindowCandidate(
+            windowID: 36,
+            title: "Dashboard",
+            bundleIdentifier: bundleIdentifier,
+            isOnScreen: true
+          )
+        ])
+      ) { error in
+        XCTAssertEqual(error as? ScreenRecorder.Failure, .monitorWindowNotFound)
+      }
+    }
+  }
+
   func testCaptureWindowFailsWhenMultipleShippingAppMainWindowsAreShareable() {
     XCTAssertThrowsError(
       try ScreenRecorderWindowSelector.captureWindow(from: [

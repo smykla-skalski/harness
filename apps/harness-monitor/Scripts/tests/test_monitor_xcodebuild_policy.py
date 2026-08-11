@@ -59,6 +59,25 @@ class MonitorXcodebuildPolicyTests(unittest.TestCase):
         assert task_match is not None
         self.assertNotIn("CODE_SIGNING_ALLOWED=NO", task_match.group("body"))
 
+    def test_mise_external_release_targets_the_lane_bundle_domain(self) -> None:
+        mise_toml = MISE_TOML.read_text(encoding="utf-8")
+        task_match = re.search(
+            r'^\[tasks\."monitor:release:external"\]\n(?P<body>.*?)(?=^\[tasks\.|\Z)',
+            mise_toml,
+            re.MULTILINE | re.DOTALL,
+        )
+        self.assertIsNotNone(task_match)
+        assert task_match is not None
+        task_body = task_match.group("body")
+        self.assertIn(
+            'app_bundle_id="$(harness_monitor_managed_app_bundle_id)"', task_body
+        )
+        self.assertIn(
+            'defaults write "$app_bundle_id" HarnessMonitor.DaemonOwnership',
+            task_body,
+        )
+        self.assertNotIn("defaults write io.harnessmonitor.app", task_body)
+
     def test_mise_monitor_policy_lab_task_uses_the_fixed_user_lane(self) -> None:
         mise_toml = MISE_TOML.read_text(encoding="utf-8")
         task_match = re.search(

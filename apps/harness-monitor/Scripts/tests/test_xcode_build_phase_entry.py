@@ -79,9 +79,9 @@ class XcodeBuildPhaseEntryTests(unittest.TestCase):
 
         self.assertIn('"Q498EB36N4.io.harnessmonitor.managed-service"', source)
         self.assertIn('"Q498EB36N4.io.harnessmonitor.agent"', source)
+        self.assertIn('"Q498EB36N4.io.harnessmonitor.managed-agent"', source)
+        self.assertIn('"Q498EB36N4.io.harnessmonitor.managed-daemon"', source)
         self.assertIn("managedDaemonLaunchAgentLabel).plist", source)
-        self.assertNotIn("managed-daemon.plist", source)
-        self.assertNotIn("managed-agent.plist", source)
 
         # bundleDaemonAgent opts out because Cargo discovers Rust inputs
         # dynamically; all other sandboxed phases use dependency analysis.

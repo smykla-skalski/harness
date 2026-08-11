@@ -59,7 +59,7 @@ extension DaemonController {
       )
     }
     let executableURL = URL(fileURLWithPath: runningPath).resolvingSymlinksInPath()
-    guard executableURL.path.hasSuffix("/Contents/Helpers/harness-daemon") else {
+    guard Self.isTrustedManagedHelperExecutablePath(executableURL.path) else {
       throw DaemonControlError.invalidManifest(
         "managed daemon process does not use the bundled helper path"
       )
@@ -78,5 +78,10 @@ extension DaemonController {
       )
     }
     return pid
+  }
+
+  static func isTrustedManagedHelperExecutablePath(_ path: String) -> Bool {
+    path.hasSuffix("/Contents/Helpers/harness-daemon")
+      || path.hasSuffix("/Contents/Resources/harness-daemon")
   }
 }

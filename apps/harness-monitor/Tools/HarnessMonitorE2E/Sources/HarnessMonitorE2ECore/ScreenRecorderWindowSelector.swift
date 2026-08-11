@@ -25,21 +25,15 @@ struct ScreenRecorderWindowCandidate: Equatable {
 
 @available(macOS 15.0, *)
 enum ScreenRecorderWindowSelector {
-  private static let allowedBundleIdentifiers: Set<String> = [
-    "io.harnessmonitor.app",
-    "io.harnessmonitor.app.ui-testing",
-  ]
+  private static let productionBundleIdentifier = "io.harnessmonitor.app"
+  private static let uiTestingSuffix = ".ui-testing"
+  private static let developmentLanePrefix = "io.harnessmonitor.app.development.lane-"
   private static let mainWindowTitles: Set<String> = [
     "Harness Monitor",
     "Dashboard",
     "Session Cockpit",
     "Cockpit",
   ]
-  private static let preferredBundleIdentifiers: [String] = [
-    "io.harnessmonitor.app",
-    "io.harnessmonitor.app.ui-testing",
-  ]
-
   static func captureWindow(
     from candidates: [ScreenRecorderWindowCandidate],
     requireProcessID: Int32? = nil
@@ -64,7 +58,7 @@ enum ScreenRecorderWindowSelector {
       if let requiredPID = requireProcessID {
         return candidate.processID == requiredPID
       }
-      return allowedBundleIdentifiers.contains(candidate.bundleIdentifier ?? "")
+      return bundlePriority(for: candidate.bundleIdentifier) != nil
     }
 
     guard !matchingCandidates.isEmpty else { return nil }
@@ -87,13 +81,40 @@ enum ScreenRecorderWindowSelector {
   }
 
   private static func priority(for candidate: ScreenRecorderWindowCandidate) -> Int {
-    let bundleIdentifier = candidate.bundleIdentifier ?? ""
-    if bundleIdentifier == preferredBundleIdentifiers[0] {
+    bundlePriority(for: candidate.bundleIdentifier) ?? 2
+  }
+
+  private static func bundlePriority(for bundleIdentifier: String?) -> Int? {
+    guard let bundleIdentifier else { return nil }
+    if bundleIdentifier == productionBundleIdentifier {
       return 0
     }
-    if bundleIdentifier == preferredBundleIdentifiers[1] {
+    if bundleIdentifier == productionBundleIdentifier + uiTestingSuffix {
       return 1
     }
-    return preferredBundleIdentifiers.count
+    guard bundleIdentifier.hasPrefix(developmentLanePrefix) else { return nil }
+    var lane = String(bundleIdentifier.dropFirst(developmentLanePrefix.count))
+    let isUITesting = lane.hasSuffix(uiTestingSuffix)
+    if isUITesting {
+      lane.removeLast(uiTestingSuffix.count)
+    }
+    guard isValidLaneSlug(lane) else { return nil }
+    return isUITesting ? 1 : 0
+  }
+
+  private static func isValidLaneSlug(_ lane: String) -> Bool {
+    guard 1...48 ~= lane.count,
+      lane.first?.isASCII == true,
+      lane.first?.isLetter == true || lane.first?.isNumber == true,
+      lane.last?.isASCII == true,
+      lane.last?.isLetter == true || lane.last?.isNumber == true,
+      !lane.contains("--")
+    else {
+      return false
+    }
+    return lane.allSatisfy { character in
+      character.isASCII
+        && (character.isLowercase || character.isNumber || character == "-")
+    }
   }
 }

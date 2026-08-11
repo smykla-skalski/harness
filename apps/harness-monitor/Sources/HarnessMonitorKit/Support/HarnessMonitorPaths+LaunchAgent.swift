@@ -34,15 +34,29 @@ extension HarnessMonitorPaths {
   /// Old plist filenames. Kept solely so the app can attempt to unregister
   /// orphaned SMAppService entries on first launch under the new layout.
   public static var legacyLaunchAgentPlistNames: [String] {
+    legacyLaunchAgentPlistNames(using: .current)
+  }
+
+  static func legacyLaunchAgentPlistNames(
+    using environment: HarnessMonitorEnvironment
+  ) -> [String] {
+    let laneNames = legacyGeneratedLaneLaunchAgentLabels(using: environment).map {
+      "\($0).plist"
+    }
+    guard !usesDevelopmentLaneBundle(using: environment) else {
+      return laneNames
+    }
+
     var names = [
       "Q498EB36N4.io.harnessmonitor.agent.plist",
       "Q498EB36N4.io.harnessmonitor.daemon.plist",
+      "Q498EB36N4.io.harnessmonitor.managed-agent.plist",
+      "Q498EB36N4.io.harnessmonitor.managed-daemon.plist",
       "io.harnessmonitor.daemon.managed.plist",
       "io.harnessmonitor.daemon.plist",
     ]
-    let generatedLaneName = "\(legacyGeneratedLaneLaunchAgentLabel(using: .current)).plist"
-    if !names.contains(generatedLaneName) {
-      names.append(generatedLaneName)
+    for name in laneNames where !names.contains(name) {
+      names.append(name)
     }
     return names
   }
@@ -53,13 +67,26 @@ extension HarnessMonitorPaths {
     "io.harnessmonitor.daemon.plist"
   }
 
-  static func legacyGeneratedLaneLaunchAgentLabel(
+  static func legacyGeneratedLaneLaunchAgentLabels(
     using environment: HarnessMonitorEnvironment
-  ) -> String {
+  ) -> [String] {
+    let baseLabels = [
+      HarnessMonitorRuntimeLane.legacyLaunchAgentBaseLabel,
+      "\(HarnessMonitorAppGroup.identifier).daemon",
+      "\(HarnessMonitorAppGroup.identifier).managed-agent",
+      "\(HarnessMonitorAppGroup.identifier).managed-daemon",
+    ]
     guard let lane = resolvedRuntimeLane(using: environment) else {
-      return HarnessMonitorRuntimeLane.legacyLaunchAgentBaseLabel
+      return baseLabels
     }
-    return "\(HarnessMonitorRuntimeLane.legacyLaunchAgentBaseLabel)-\(lane)"
+    return baseLabels.map { "\($0)-\(lane)" }
+  }
+
+  private static func usesDevelopmentLaneBundle(
+    using environment: HarnessMonitorEnvironment
+  ) -> Bool {
+    embeddedBundleValue(for: "CFBundleIdentifier", using: environment)?
+      .hasPrefix("io.harnessmonitor.app.development.lane-") == true
   }
 
   public static var launchAgentBundleRelativePath: String {

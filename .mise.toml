@@ -619,7 +619,8 @@ run = '''
     printf 'error: Built app not found: %s\n' "$app_path" >&2
     exit 1
   fi
-  defaults write io.harnessmonitor.app HarnessMonitor.DaemonOwnership -string external
+  app_bundle_id="$(harness_monitor_managed_app_bundle_id)"
+  defaults write "$app_bundle_id" HarnessMonitor.DaemonOwnership -string external
   printf 'Launching signed Release app in external-daemon mode: %s\n' "$app_path"
   open -na "$app_path"
 '''
