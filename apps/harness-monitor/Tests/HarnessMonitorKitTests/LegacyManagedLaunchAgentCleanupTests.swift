@@ -112,24 +112,43 @@ struct LegacyManagedLaunchAgentCleanupTests {
     #expect(unregistered.sorted() == legacy.sorted())
   }
 
-  @Test("Not-found legacy services are explicitly unregistered")
-  func notFoundLegacyServicesAreExplicitlyUnregistered() throws {
+  @Test("Not-found legacy services are already absent")
+  func notFoundLegacyServicesAreAlreadyAbsent() throws {
     let suiteName =
       "io.harnessmonitor.kit-tests.legacy-cleanup.\(UUID().uuidString)"
     let defaults = try #require(UserDefaults(suiteName: suiteName))
     defer { defaults.removePersistentDomain(forName: suiteName) }
-    var unregistered: [String] = []
+    var unregisterWasCalled = false
 
-    let completed = LegacyManagedLaunchAgentCleanup.runOnce(defaults: defaults) { name in
-      LegacyLaunchAgentManagerStub(state: .notFound) {
-        unregistered.append(name)
+    let completed = LegacyManagedLaunchAgentCleanup.runOnce(defaults: defaults) { _ in
+      LegacyLaunchAgentManagerStub(state: .notFound, unregisterFails: true) {
+        unregisterWasCalled = true
       }
     }
 
-    let legacy = HarnessMonitorPaths.legacyLaunchAgentPlistNames
-      .filter { $0 != HarnessMonitorPaths.launchAgentPlistName }
     #expect(completed)
-    #expect(unregistered.sorted() == legacy.sorted())
+    #expect(unregisterWasCalled == false)
+  }
+
+  @Test("Not-found current service is already disabled after cleanup failure")
+  func notFoundCurrentServiceIsAlreadyDisabledAfterCleanupFailure() throws {
+    let suiteName =
+      "io.harnessmonitor.kit-tests.legacy-cleanup.\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    var currentUnregisterWasCalled = false
+
+    let completed = LegacyManagedLaunchAgentCleanup.runOnce(defaults: defaults) { name in
+      if name == HarnessMonitorPaths.launchAgentPlistName {
+        return LegacyLaunchAgentManagerStub(state: .notFound, unregisterFails: true) {
+          currentUnregisterWasCalled = true
+        }
+      }
+      return LegacyLaunchAgentManagerStub(state: .enabled, unregisterFails: true)
+    }
+
+    #expect(completed == false)
+    #expect(currentUnregisterWasCalled == false)
   }
 
   @Test("Cleanup excludes the controller lane service")
@@ -138,8 +157,8 @@ struct LegacyManagedLaunchAgentCleanupTests {
       "io.harnessmonitor.kit-tests.legacy-cleanup.\(UUID().uuidString)"
     let defaults = try #require(UserDefaults(suiteName: suiteName))
     defer { defaults.removePersistentDomain(forName: suiteName) }
-    let currentName = "Q498EB36N4.io.harnessmonitor.agent-lane-a.plist"
-    let legacyName = "Q498EB36N4.io.harnessmonitor.agent.plist"
+    let currentName = "Q498EB36N4.io.harnessmonitor.managed-service-lane-a.plist"
+    let legacyName = "Q498EB36N4.io.harnessmonitor.agent-lane-a.plist"
     var inspectedNames: [String] = []
 
     let completed = LegacyManagedLaunchAgentCleanup.runOnce(

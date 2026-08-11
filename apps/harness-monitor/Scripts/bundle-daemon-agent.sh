@@ -149,25 +149,20 @@ unsealable_plugin=""
 if [ "${ENABLE_USER_SCRIPT_SANDBOXING:-}" != "YES" ]; then
   unsealable_plugin="$(first_unsealable_plugin "$app_bundle" || true)"
 fi
-daemon_dir="$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH"
+daemon_dir="$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Helpers"
 launch_agents_dir="$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Library/LaunchAgents"
 daemon_target="$daemon_dir/harness-daemon"
 plist_template_name="Q498EB36N4.io.harnessmonitor.agent.plist"
 launch_agent_label="$(harness_monitor_runtime_launch_agent_label "$repo_root")"
 plist_name="$launch_agent_label.plist"
 plist_target="$launch_agents_dir/$plist_name"
-legacy_agent_plist_target="$launch_agents_dir/$plist_template_name"
-# The bundled plist's `Label` MUST equal the plist filename without its
-# `.plist` extension or `SMAppService.register()` returns
-# `error: 22 (EINVAL)` on macOS 26 and silently leaves
-# `Service status: 3 (.notFound)` — the daemon never registers and
-# `Bootstrapping daemon client for managed daemon mode` then stalls
-# forever. The hyphenated lane suffix keeps each managed runtime isolated
-# while remaining one immediate child of the app group. The older dotted
-# labels were registered from fixed legacy plist filenames on macOS versions
-# that did not enforce the filename match; those fixed plists remain bundled
-# solely so upgrades can unregister them.
+legacy_lane_label="$(harness_monitor_legacy_runtime_launch_agent_label "$repo_root")"
+generated_lane_legacy_plist_target="$launch_agents_dir/$legacy_lane_label.plist"
+# The current plist filename and Label deliberately match. The distinct,
+# deterministic development app bundle ID gives Background Task Management a
+# stable parent per build lane without sharing the production app's record.
 app_group_id="$(harness_monitor_runtime_app_group_id)"
+app_bundle_identifier="${PRODUCT_BUNDLE_IDENTIFIER:-io.harnessmonitor.app}"
 bundle_stamp_path="$(resolve_bundle_stamp_path)"
 
 # Resolve a codesign identity. Xcode populates EXPANDED_CODE_SIGN_IDENTITY
@@ -195,12 +190,15 @@ fi
 
 bundle_stamp_contents="$(
   {
-    printf 'bundle_stamp_schema=2\n'
+    printf 'bundle_stamp_schema=4\n'
+    printf 'bundle_script_sha=%s\n' "$(file_sha256 "$0")"
     printf 'daemon_source=%s\n' "$daemon_source"
     printf 'daemon_source_stat=%s\n' "$(file_stat_signature "$daemon_source")"
     printf 'codesign_identity=%s\n' "${codesign_identity:--}"
     printf 'timestamp_flag=%s\n' "$timestamp_flag"
     printf 'launch_agent_label=%s\n' "$launch_agent_label"
+    printf 'plist_name=%s\n' "$plist_name"
+    printf 'app_bundle_identifier=%s\n' "$app_bundle_identifier"
     printf 'app_group_id=%s\n' "$app_group_id"
     printf 'marketing_version=%s\n' "${MARKETING_VERSION:-}"
     printf 'daemon_data_home=%s\n' "${HARNESS_DAEMON_DATA_HOME:-}"
@@ -227,7 +225,7 @@ bundle_stamp_contents="$(
 if [ -f "$bundle_stamp_path" ] \
   && [ -x "$daemon_target" ] \
   && [ -f "$plist_target" ] \
-  && { [ "$plist_name" = "$plist_template_name" ] || [ -f "$legacy_agent_plist_target" ]; } \
+  && { [ -z "$generated_lane_legacy_plist_target" ] || [ -f "$generated_lane_legacy_plist_target" ]; } \
   && { [ ! -f "$PROJECT_DIR/Resources/LaunchAgents/io.harnessmonitor.daemon.managed.plist" ] \
     || [ -f "$launch_agents_dir/io.harnessmonitor.daemon.managed.plist" ]; } \
   && { [ ! -f "$PROJECT_DIR/Resources/LaunchAgents/io.harnessmonitor.daemon.plist" ] \
@@ -279,6 +277,12 @@ validate_package_version "$package_version" "${MARKETING_VERSION:-}"
 /usr/bin/xattr -dr com.apple.quarantine "$daemon_target_staging" 2>/dev/null || true
 /bin/cp "$PROJECT_DIR/Resources/LaunchAgents/$plist_template_name" "$plist_target_staging"
 /usr/bin/plutil -replace Label -string "$launch_agent_label" "$plist_target_staging"
+/usr/bin/plutil -remove AssociatedBundleIdentifiers "$plist_target_staging"
+/usr/bin/plutil -insert AssociatedBundleIdentifiers -array "$plist_target_staging"
+/usr/bin/plutil -insert AssociatedBundleIdentifiers.0 -string "$app_bundle_identifier" "$plist_target_staging"
+if [ "$app_bundle_identifier" != "io.harnessmonitor.app" ]; then
+  /usr/bin/plutil -insert AssociatedBundleIdentifiers.1 -string "io.harnessmonitor.app" "$plist_target_staging"
+fi
 /usr/bin/plutil -replace EnvironmentVariables.HARNESS_APP_GROUP_ID -string "$app_group_id" "$plist_target_staging"
 if [[ -n "${HARNESS_DAEMON_DATA_HOME:-}" ]]; then
   /usr/bin/plutil -replace EnvironmentVariables.HARNESS_DAEMON_DATA_HOME -string "$HARNESS_DAEMON_DATA_HOME" "$plist_target_staging"
@@ -294,6 +298,12 @@ fi
 # made it into the build environment.
 /usr/bin/plutil -replace EnvironmentVariables.HARNESS_DAEMON_OWNERSHIP -string "managed" "$plist_target_staging"
 /usr/bin/plutil -lint "$plist_target_staging"
+
+if [ -n "$generated_lane_legacy_plist_target" ]; then
+  /bin/cp "$plist_target_staging" "$generated_lane_legacy_plist_target"
+  /usr/bin/plutil -replace Label -string "$legacy_lane_label" "$generated_lane_legacy_plist_target"
+  /usr/bin/plutil -lint "$generated_lane_legacy_plist_target"
+fi
 
 for legacy_plist_name in \
   Q498EB36N4.io.harnessmonitor.agent.plist \

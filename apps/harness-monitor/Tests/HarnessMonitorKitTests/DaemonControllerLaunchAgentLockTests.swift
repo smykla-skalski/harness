@@ -143,7 +143,7 @@ struct DaemonControllerLaunchAgentLockTests {
       #expect(testBSDFileLock(externalFD, LOCK_EX | LOCK_NB) == 0)
 
       let stamp = ManagedLaunchAgentBundleStamp(
-        helperPath: "/Applications/Harness Monitor.app/Contents/Resources/harness-daemon",
+        helperPath: "/Applications/Harness Monitor.app/Contents/Helpers/harness-daemon",
         deviceIdentifier: 1,
         inode: 2,
         fileSize: 3,

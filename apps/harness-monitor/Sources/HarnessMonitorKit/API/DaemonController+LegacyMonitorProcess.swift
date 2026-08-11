@@ -62,7 +62,7 @@ extension DaemonController {
   }
 
   static func legacyMonitorLabelNeedsContainment(_ label: String?) -> Bool {
-    let lanePrefix = "Q498EB36N4.io.harnessmonitor.agent-"
+    let lanePrefix = "\(HarnessMonitorRuntimeLane.launchAgentBaseLabel)-"
     guard let label else { return true }
     return !label.hasPrefix(lanePrefix) || label.count == lanePrefix.count
   }

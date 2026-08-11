@@ -3,18 +3,23 @@ import ProjectDescription
 
 public enum BuildPhases {
   private static let managedDaemonBaseLaunchAgentLabel =
+    "Q498EB36N4.io.harnessmonitor.managed-service"
+  private static let managedDaemonLegacyBaseLaunchAgentLabel =
     "Q498EB36N4.io.harnessmonitor.agent"
   private static let managedDaemonLaunchAgentLabel =
     ProcessInfo.processInfo.environment["TUIST_MANAGED_DAEMON_LAUNCH_AGENT_LABEL"]
     ?? managedDaemonBaseLaunchAgentLabel
+  private static let managedDaemonRuntimeLane =
+    ProcessInfo.processInfo.environment["TUIST_MANAGED_DAEMON_RUNTIME_LANE"] ?? ""
 
   private static var managedDaemonLegacyAgentOutputs: [Path] {
-    guard managedDaemonLaunchAgentLabel != managedDaemonBaseLaunchAgentLabel else {
-      return []
+    var labels = [managedDaemonLegacyBaseLaunchAgentLabel]
+    if managedDaemonRuntimeLane.isEmpty == false {
+      labels.append("\(managedDaemonLegacyBaseLaunchAgentLabel)-\(managedDaemonRuntimeLane)")
     }
-    return [
-      "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/\(managedDaemonBaseLaunchAgentLabel).plist"
-    ]
+    return labels.map {
+      "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/\($0).plist"
+    }
   }
 
   private static func scriptPhaseBody(
@@ -88,10 +93,10 @@ public enum BuildPhases {
         "$(PROJECT_TEMP_DIR)/HarnessMonitor-daemon-staged-ready.id.staging",
       ],
       outputPaths: [
-        "$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/harness-daemon",
-        "$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/harness-daemon.cstemp",
-        "$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/harness-daemon.staging",
-        "$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/harness-daemon.staging.cstemp",
+        "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/harness-daemon",
+        "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/harness-daemon.cstemp",
+        "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/harness-daemon.staging",
+        "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/harness-daemon.staging.cstemp",
         "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/\(managedDaemonLaunchAgentLabel).plist",
         "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/\(managedDaemonLaunchAgentLabel).plist.staging",
       ] + managedDaemonLegacyAgentOutputs + [

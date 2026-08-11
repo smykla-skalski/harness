@@ -10,6 +10,11 @@ struct LegacyManagedDaemonControlTests {
   func managedHelperIdentityAcceptsIsolatedLanes() {
     #expect(
       DaemonController.isTrustedManagedHelperIdentifier(
+        "Q498EB36N4.io.harnessmonitor.managed-service-fix-automation-6245e82a"
+      )
+    )
+    #expect(
+      DaemonController.isTrustedManagedHelperIdentifier(
         "Q498EB36N4.io.harnessmonitor.agent-fix-automation-6245e82a"
       )
     )
@@ -48,7 +53,7 @@ struct LegacyManagedDaemonControlTests {
       processLiveness: { requestedPID in
         #expect(requestedPID == pid)
         return .alive(
-          executablePath: "/Applications/Harness Monitor.app/Contents/Resources/harness-daemon")
+          executablePath: "/Applications/Harness Monitor.app/Contents/Helpers/harness-daemon")
       },
       processSignal: { requestedPID, signal in
         signalRecorder.record(pid: requestedPID, signal: signal)
@@ -89,7 +94,7 @@ struct LegacyManagedDaemonControlTests {
       managedStaleManifestGracePeriod: .milliseconds(100),
       processLiveness: { _ in
         .alive(
-          executablePath: "/Applications/Harness Monitor.app/Contents/Resources/harness-daemon")
+          executablePath: "/Applications/Harness Monitor.app/Contents/Helpers/harness-daemon")
       },
       processSignal: { requestedPID, signal in
         signalRecorder.record(pid: requestedPID, signal: signal)
@@ -131,7 +136,7 @@ struct LegacyManagedDaemonControlTests {
       sessionFactory: { _ in client },
       processLiveness: { _ in
         .alive(
-          executablePath: "/Applications/Harness Monitor.app/Contents/Resources/harness-daemon")
+          executablePath: "/Applications/Harness Monitor.app/Contents/Helpers/harness-daemon")
       },
       processSignal: { requestedPID, signal in
         signalRecorder.record(pid: requestedPID, signal: signal)

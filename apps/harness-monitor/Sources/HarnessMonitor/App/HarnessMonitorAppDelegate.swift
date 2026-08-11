@@ -7,7 +7,7 @@ import HarnessMonitorUIPreviewable
 
 @MainActor
 final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
-  private static let uiTestingBundleIdentifier = "io.harnessmonitor.app.ui-testing"
+  private static let uiTestingBundleIdentifierSuffix = ".ui-testing"
   private static let uiTestsEnvironmentKey = "HARNESS_MONITOR_UI_TESTS"
   private let handledSignals = [SIGTERM, SIGINT, SIGHUP]
   private let hidesDockIconForPerfRuns =
@@ -322,7 +322,7 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
 
   private static func launchEnvironment() -> [String: String] {
     let environment = ProcessInfo.processInfo.environment
-    guard Bundle.main.bundleIdentifier == uiTestingBundleIdentifier else {
+    guard Bundle.main.bundleIdentifier?.hasSuffix(uiTestingBundleIdentifierSuffix) == true else {
       return environment
     }
 
@@ -358,7 +358,9 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
       || environment["XCTestConfigurationFilePath"] != nil
       || environment["XCInjectBundle"] != nil
       || environment["XCInjectBundleInto"] != nil
-      || bundleIdentifier == "io.harnessmonitor.app.ui-testing"
+      || bundleIdentifier?.hasSuffix(
+        HarnessMonitorAppConfiguration.uiTestingBundleIdentifierSuffix
+      ) == true
       || processName == "xctest"
       || loadedBundlePaths.contains { $0.hasSuffix(".xctest") }
   }

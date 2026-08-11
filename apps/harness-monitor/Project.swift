@@ -4,7 +4,16 @@ import ProjectDescriptionHelpers
 
 private let managedDaemonLaunchAgentLabel =
   ProcessInfo.processInfo.environment["TUIST_MANAGED_DAEMON_LAUNCH_AGENT_LABEL"]
-  ?? "Q498EB36N4.io.harnessmonitor.agent"
+  ?? "Q498EB36N4.io.harnessmonitor.managed-service"
+private let monitorAppBundleId =
+  ProcessInfo.processInfo.environment["TUIST_MONITOR_APP_BUNDLE_ID"]
+  ?? "io.harnessmonitor.app"
+private let monitorIntentsExtensionBundleId = "\(monitorAppBundleId).intents-extension"
+private let monitorWidgetsBundleId = "\(monitorAppBundleId).widgets"
+private let monitorPreviewBundleId =
+  ProcessInfo.processInfo.environment["TUIST_MONITOR_PREVIEW_BUNDLE_ID"]
+  ?? "io.harnessmonitor.previews"
+private let monitorUITestHostBundleId = "\(monitorAppBundleId).ui-testing"
 private let managedDaemonDataHome =
   ProcessInfo.processInfo.environment["TUIST_MANAGED_DAEMON_DATA_HOME"] ?? ""
 private let managedDaemonRuntimeLane =
@@ -359,7 +368,7 @@ private let intentsExtensionTarget: Target = .target(
   name: "HarnessMonitorIntentsExtension",
   destinations: macOSDestinations,
   product: .appExtension,
-  bundleId: "io.harnessmonitor.app.intents-extension",
+  bundleId: monitorIntentsExtensionBundleId,
   deploymentTargets: macOSDeploymentTargets,
   infoPlist: .file(path: "Resources/HarnessMonitorIntentsExtension-Info.plist"),
   sources: ["Sources/HarnessMonitorIntentsExtension/**/*.swift"],
@@ -376,7 +385,7 @@ private let intentsExtensionTarget: Target = .target(
       "ENABLE_OUTGOING_NETWORK_CONNECTIONS": "YES",
       "GENERATE_INFOPLIST_FILE": "NO",
       "INFOPLIST_FILE": "Resources/HarnessMonitorIntentsExtension-Info.plist",
-      "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.app.intents-extension",
+      "PRODUCT_BUNDLE_IDENTIFIER": .string(monitorIntentsExtensionBundleId),
       "PRODUCT_MODULE_NAME": "HarnessMonitorIntentsExtension",
       "PRODUCT_NAME": "HarnessMonitorIntentsExtension",
       "SWIFT_ACTIVE_COMPILATION_CONDITIONS": FeatureFlags.compilationConditionSetting(),
@@ -389,7 +398,7 @@ private let widgetsExtensionTarget: Target = .target(
   name: "HarnessMonitorWidgets",
   destinations: macOSDestinations,
   product: .appExtension,
-  bundleId: "io.harnessmonitor.app.widgets",
+  bundleId: monitorWidgetsBundleId,
   deploymentTargets: macOSDeploymentTargets,
   infoPlist: .file(path: "Resources/HarnessMonitorWidgets-Info.plist"),
   sources: ["Sources/HarnessMonitorWidgets/**/*.swift"],
@@ -408,7 +417,7 @@ private let widgetsExtensionTarget: Target = .target(
       "ENABLE_OUTGOING_NETWORK_CONNECTIONS": "YES",
       "GENERATE_INFOPLIST_FILE": "NO",
       "INFOPLIST_FILE": "Resources/HarnessMonitorWidgets-Info.plist",
-      "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.app.widgets",
+      "PRODUCT_BUNDLE_IDENTIFIER": .string(monitorWidgetsBundleId),
       "PRODUCT_MODULE_NAME": "HarnessMonitorWidgets",
       "PRODUCT_NAME": "HarnessMonitorWidgets",
       "SWIFT_ACTIVE_COMPILATION_CONDITIONS": FeatureFlags.compilationConditionSetting(),
@@ -660,7 +669,7 @@ private let previewHostTarget: Target = .target(
   name: "HarnessMonitorPreviewHost",
   destinations: macOSDestinations,
   product: .app,
-  bundleId: "io.harnessmonitor.previews",
+  bundleId: monitorPreviewBundleId,
   deploymentTargets: macOSDeploymentTargets,
   sources: ["Sources/HarnessMonitorPreviewHost/**/*.swift"],
   entitlements: .file(path: "HarnessMonitorPreviewHost.entitlements"),
@@ -673,7 +682,7 @@ private let previewHostTarget: Target = .target(
       "CODE_SIGN_IDENTITY[sdk=macosx*]": "Apple Development",
       "CODE_SIGN_STYLE": "Automatic",
       "CODE_SIGNING_ALLOWED": "YES",
-      "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.previews",
+      "PRODUCT_BUNDLE_IDENTIFIER": .string(monitorPreviewBundleId),
       "PRODUCT_NAME": "HarnessMonitorPreviewHost",
       "GENERATE_INFOPLIST_FILE": "NO",
       "INFOPLIST_FILE": "Resources/HarnessMonitorPreviewHost-Info.plist",
@@ -729,9 +738,8 @@ private let monitorAppDependencies: [TargetDependency] = {
 }()
 
 // Production-app dependencies embed the App Intents extension as a plug-in.
-// HarnessMonitorUITestHost cannot embed it because its bundle id
-// `io.harnessmonitor.app.ui-testing` is not a prefix of
-// `io.harnessmonitor.app.intents-extension`, which would trip the
+// HarnessMonitorUITestHost cannot embed it because its sibling bundle id is
+// not a prefix of the production extension bundle ids, which would trip the
 // ValidateEmbeddedBinary build step.
 private let monitorProductionAppDependencies: [TargetDependency] =
   monitorAppDependencies + [
@@ -754,7 +762,7 @@ private let monitorAppSettings: Settings = .settings(
     "HARNESS_DAEMON_DATA_HOME": .string(managedDaemonDataHome),
     "HARNESS_MONITOR_RUNTIME_LANE": .string(managedDaemonRuntimeLane),
     "HARNESS_CODEX_WS_PORT": .string(managedDaemonCodexWSPort),
-    "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.app",
+    "PRODUCT_BUNDLE_IDENTIFIER": .string(monitorAppBundleId),
     "PRODUCT_MODULE_NAME": "HarnessMonitor",
     "PRODUCT_NAME": "Harness Monitor",
     "REGISTER_APP_GROUPS": "YES",
@@ -766,7 +774,7 @@ private let monitorAppTarget: Target = .target(
   name: "HarnessMonitor",
   destinations: macOSDestinations,
   product: .app,
-  bundleId: "io.harnessmonitor.app",
+  bundleId: monitorAppBundleId,
   deploymentTargets: macOSDeploymentTargets,
   infoPlist: .file(path: "Resources/HarnessMonitor-Info.plist"),
   sources: monitorAppSources,
@@ -791,8 +799,8 @@ private let monitorAppTarget: Target = .target(
 // registration is skipped at runtime via `HARNESS_MONITOR_EXTERNAL_DAEMON=1`, so
 // the bundled managed plist stays inert; we still ship the helper binary in the
 // .app to keep the layout identical to the sandboxed product.
-// Reuse the regular app's bundle ID so the existing automatic-signing
-// provisioning profile covers both variants and user defaults stay shared. The
+// Reuse the regular app's lane-aware bundle ID so managed and external variants
+// share user defaults without colliding with another development lane. The
 // external-daemon app is intentionally unsandboxed, so it resolves app-group
 // files through the home-relative fallback instead of carrying the app-group
 // entitlement that only the sandboxed app targets need. The two products live
@@ -814,7 +822,7 @@ private let externalDaemonAppSettings: Settings = .settings(
     "HARNESS_DAEMON_DATA_HOME": .string(managedDaemonDataHome),
     "HARNESS_MONITOR_RUNTIME_LANE": .string(managedDaemonRuntimeLane),
     "HARNESS_CODEX_WS_PORT": .string(managedDaemonCodexWSPort),
-    "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.app",
+    "PRODUCT_BUNDLE_IDENTIFIER": .string(monitorAppBundleId),
     "PRODUCT_MODULE_NAME": "HarnessMonitor",
     "PRODUCT_NAME": "Harness Monitor (External Daemon)",
     "REGISTER_APP_GROUPS": "NO",
@@ -826,7 +834,7 @@ private let externalDaemonAppTarget: Target = .target(
   name: "HarnessMonitorExternalDaemon",
   destinations: macOSDestinations,
   product: .app,
-  bundleId: "io.harnessmonitor.app",
+  bundleId: monitorAppBundleId,
   deploymentTargets: macOSDeploymentTargets,
   infoPlist: .file(path: "Resources/HarnessMonitor-Info.plist"),
   sources: monitorAppSources,
@@ -861,7 +869,7 @@ private let uiTestHostSettings: Settings = .settings(
     "HARNESS_DAEMON_DATA_HOME": .string(managedDaemonDataHome),
     "HARNESS_MONITOR_RUNTIME_LANE": .string(managedDaemonRuntimeLane),
     "HARNESS_CODEX_WS_PORT": .string(managedDaemonCodexWSPort),
-    "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.app.ui-testing",
+    "PRODUCT_BUNDLE_IDENTIFIER": .string(monitorUITestHostBundleId),
     "PRODUCT_NAME": "Harness Monitor UI Testing",
     "REGISTER_APP_GROUPS": "YES",
     "SWIFT_ACTIVE_COMPILATION_CONDITIONS": FeatureFlags.compilationConditionSetting(),
@@ -872,7 +880,7 @@ private let uiTestHostTarget: Target = .target(
   name: "HarnessMonitorUITestHost",
   destinations: macOSDestinations,
   product: .app,
-  bundleId: "io.harnessmonitor.app.ui-testing",
+  bundleId: monitorUITestHostBundleId,
   deploymentTargets: macOSDeploymentTargets,
   infoPlist: .file(path: "Resources/HarnessMonitor-Info.plist"),
   sources: monitorAppSources,
@@ -1275,7 +1283,9 @@ private let monitorRunEnv: [String: EnvironmentVariable] = [
 
 private let monitorTestEnv: [String: EnvironmentVariable] = [
   "HARNESS_DAEMON_DATA_HOME": .environmentVariable(
-    value: "/tmp/harness-monitor-tests", isEnabled: true)
+    value: "/tmp/harness-monitor-tests", isEnabled: true),
+  "HARNESS_MONITOR_UI_TEST_HOST_BUNDLE_IDENTIFIER": .environmentVariable(
+    value: monitorUITestHostBundleId, isEnabled: true),
 ]
 
 private let externalDaemonRunEnv: [String: EnvironmentVariable] = monitorRunEnv.merging([
@@ -1500,6 +1510,7 @@ private let agentsE2EScheme: Scheme = .scheme(
   ),
   testAction: .targets(
     [.testableTarget(target: .target("HarnessMonitorAgentsE2ETests"))],
+    arguments: Arguments.arguments(environmentVariables: monitorTestEnv),
     configuration: "Debug",
     options: .options(coverage: true)
   )

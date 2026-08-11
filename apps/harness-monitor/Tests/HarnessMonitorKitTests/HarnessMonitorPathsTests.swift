@@ -352,13 +352,18 @@ struct HarnessMonitorPathsTests {
 
   @Test("Launch agent plist path is bundle relative")
   func launchAgentPlistPathIsBundleRelative() {
-    #expect(
-      HarnessMonitorPaths.launchAgentPlistName
-        == "Q498EB36N4.io.harnessmonitor.agent.plist"
+    let environment = HarnessMonitorEnvironment(
+      values: [HarnessMonitorRuntimeLane.environmentKey: "Lane A"],
+      homeDirectory: URL(fileURLWithPath: "/Users/example", isDirectory: true)
     )
     #expect(
-      HarnessMonitorPaths.launchAgentBundleRelativePath
-        == "Contents/Library/LaunchAgents/Q498EB36N4.io.harnessmonitor.agent.plist"
+      HarnessMonitorPaths.launchAgentPlistName(using: environment)
+        == "Q498EB36N4.io.harnessmonitor.managed-service-lane-a.plist"
+    )
+    #expect(
+      HarnessMonitorPaths.launchAgentBundleRelativePath(using: environment)
+        == "Contents/Library/LaunchAgents/"
+        + "Q498EB36N4.io.harnessmonitor.managed-service-lane-a.plist"
     )
   }
 
@@ -374,11 +379,11 @@ struct HarnessMonitorPathsTests {
 
     #expect(
       HarnessMonitorPaths.launchAgentLabel(using: environment)
-        == "Q498EB36N4.io.harnessmonitor.agent-lane-a"
+        == "Q498EB36N4.io.harnessmonitor.managed-service-lane-a"
     )
     #expect(
       HarnessMonitorPaths.launchAgentPlistName(using: environment)
-        == "Q498EB36N4.io.harnessmonitor.agent-lane-a.plist"
+        == "Q498EB36N4.io.harnessmonitor.managed-service-lane-a.plist"
     )
   }
 }

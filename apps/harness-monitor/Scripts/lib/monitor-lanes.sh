@@ -6,7 +6,8 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
 fi
 
 HARNESS_MONITOR_LANE_APP_GROUP_DEFAULT="Q498EB36N4.io.harnessmonitor"
-HARNESS_MONITOR_LANE_LABEL="Q498EB36N4.io.harnessmonitor.agent"
+HARNESS_MONITOR_LANE_LABEL="Q498EB36N4.io.harnessmonitor.managed-service"
+HARNESS_MONITOR_LEGACY_LANE_LABEL="Q498EB36N4.io.harnessmonitor.agent"
 HARNESS_MONITOR_LANE_CODEX_PORT_BASE=4600
 HARNESS_MONITOR_LANE_CODEX_PORT_SPAN=20000
 
@@ -96,6 +97,31 @@ harness_monitor_isolated_bundle_id() {
     printf '%s\n' "$base"
   else
     printf '%s.%s\n' "$base" "$lane"
+  fi
+}
+
+# The installed product keeps its stable production identity, while every
+# named development lane gets its own LaunchServices and Background Task
+# Management parent record. Reusing `io.harnessmonitor.app` across rapidly
+# rebuilt DerivedData products can leave SMAppService unable to resolve the
+# bundled helper on macOS 26.
+harness_monitor_managed_app_bundle_id() {
+  local lane
+  lane="$(harness_monitor_build_lane)" || return 1
+  if [[ "$lane" == "default" ]]; then
+    printf 'io.harnessmonitor.app\n'
+  else
+    printf 'io.harnessmonitor.app.development.lane-%s\n' "$lane"
+  fi
+}
+
+harness_monitor_preview_bundle_id() {
+  local lane
+  lane="$(harness_monitor_build_lane)" || return 1
+  if [[ "$lane" == "default" ]]; then
+    printf 'io.harnessmonitor.previews\n'
+  else
+    printf 'io.harnessmonitor.previews.lane-%s\n' "$lane"
   fi
 }
 
@@ -194,6 +220,13 @@ harness_monitor_runtime_launch_agent_label() {
   fi
   lane="$(harness_monitor_runtime_lane "$checkout_root")" || return 1
   printf '%s-%s\n' "$HARNESS_MONITOR_LANE_LABEL" "$lane"
+}
+
+harness_monitor_legacy_runtime_launch_agent_label() {
+  local checkout_root="$1"
+  local lane
+  lane="$(harness_monitor_runtime_lane "$checkout_root")" || return 1
+  printf '%s-%s\n' "$HARNESS_MONITOR_LEGACY_LANE_LABEL" "$lane"
 }
 
 harness_monitor_runtime_xcodebuildmcp_socket_path() {

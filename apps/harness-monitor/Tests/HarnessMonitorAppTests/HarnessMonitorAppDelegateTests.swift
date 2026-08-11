@@ -41,13 +41,22 @@ final class HarnessMonitorAppDelegateTests: XCTestCase {
         processName: "Harness Monitor UI Testing"
       )
     )
+    XCTAssertTrue(
+      HarnessMonitorAppDelegate.isTestHarnessRun(
+        environment: [:],
+        bundleIdentifier:
+          "io.harnessmonitor.app.development.lane-fix-automation.ui-testing",
+        processName: "Harness Monitor UI Testing"
+      )
+    )
   }
 
   func testDefersInitialMainWindowContentOnlyForUITestHostBundle() {
     XCTAssertTrue(
       HarnessMonitorAppConfiguration.shouldDeferInitialMainWindowContentUntilBootstrap(
         isUITesting: true,
-        bundleIdentifier: "io.harnessmonitor.app.ui-testing"
+        bundleIdentifier:
+          "io.harnessmonitor.app.development.lane-fix-automation.ui-testing"
       )
     )
     XCTAssertFalse(

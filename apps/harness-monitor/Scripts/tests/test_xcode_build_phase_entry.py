@@ -59,13 +59,29 @@ class XcodeBuildPhaseEntryTests(unittest.TestCase):
             '"$(PROJECT_DIR)/Resources/LaunchAgents/io.harnessmonitor.daemon.plist"',
             '"$(PROJECT_DIR)/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist"',
             '"$(PROJECT_DIR)/HarnessMonitorDaemon.entitlements"',
-            '"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/harness-daemon.cstemp"',
+            '"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/harness-daemon.cstemp"',
             'inputPaths: variant.inputPaths + ["$(TARGET_BUILD_DIR)/$(FULL_PRODUCT_NAME)"]',
         )
 
         for required_input in required_inputs:
             with self.subTest(required_input=required_input):
                 self.assertIn(required_input, source)
+
+        required_outputs = (
+            'Library/LaunchAgents/Q498EB36N4.io.harnessmonitor.daemon.plist"',
+            'Library/LaunchAgents/io.harnessmonitor.daemon.managed.plist"',
+            'Library/LaunchAgents/io.harnessmonitor.daemon.plist"',
+        )
+
+        for required_output in required_outputs:
+            with self.subTest(required_output=required_output):
+                self.assertIn(required_output, source)
+
+        self.assertIn('"Q498EB36N4.io.harnessmonitor.managed-service"', source)
+        self.assertIn('"Q498EB36N4.io.harnessmonitor.agent"', source)
+        self.assertIn("managedDaemonLaunchAgentLabel).plist", source)
+        self.assertNotIn("managed-daemon.plist", source)
+        self.assertNotIn("managed-agent.plist", source)
 
         # bundleDaemonAgent opts out because Cargo discovers Rust inputs
         # dynamically; all other sandboxed phases use dependency analysis.

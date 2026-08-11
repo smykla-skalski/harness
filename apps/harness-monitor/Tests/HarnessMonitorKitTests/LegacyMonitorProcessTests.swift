@@ -31,6 +31,15 @@ struct LegacyMonitorProcessTests {
   func laneScopedIdentityCanCoexist() {
     #expect(
       !DaemonController.legacyMonitorLabelNeedsContainment(
+        "Q498EB36N4.io.harnessmonitor.managed-service-lane-a"
+      )
+    )
+  }
+
+  @Test("Shipped agent lane identities require containment")
+  func shippedAgentLaneIdentityRequiresContainment() {
+    #expect(
+      DaemonController.legacyMonitorLabelNeedsContainment(
         "Q498EB36N4.io.harnessmonitor.agent-lane-a"
       )
     )

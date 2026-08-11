@@ -4,7 +4,7 @@ import SwiftUI
 enum HarnessMonitorUITestEnvironment {
   static let environmentKey = "HARNESS_MONITOR_UI_TESTS"
   static let hostBundleIdentifier = "io.harnessmonitor.app.ui-testing"
-  static let isHostBundle = Bundle.main.bundleIdentifier == hostBundleIdentifier
+  static let isHostBundle = Bundle.main.bundleIdentifier?.hasSuffix(".ui-testing") == true
   static let isEnabled =
     ProcessInfo.processInfo.environment[environmentKey] == "1" || isHostBundle
   static let accessibilityMarkersEnabled: Bool = {

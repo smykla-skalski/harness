@@ -18,7 +18,7 @@ struct HarnessMonitorPathsManagedIdentityTests {
       "CFBundleName": "HarnessMonitorPathsTests",
       "CFBundlePackageType": "APPL",
       "HarnessMonitorManagedLaunchAgentLabel":
-        "Q498EB36N4.io.harnessmonitor.agent-lane-a",
+        "Q498EB36N4.io.harnessmonitor.managed-service-lane-a",
       "HarnessMonitorManagedDaemonDataHome": dataHome,
       "HarnessMonitorManagedDaemonRuntimeLane": "lane-a",
       "HarnessMonitorManagedDaemonCodexWSPort": "4812",
@@ -37,7 +37,7 @@ struct HarnessMonitorPathsManagedIdentityTests {
 
     #expect(
       HarnessMonitorPaths.launchAgentLabel(using: environment)
-        == "Q498EB36N4.io.harnessmonitor.agent-lane-a"
+        == "Q498EB36N4.io.harnessmonitor.managed-service-lane-a"
     )
     #expect(HarnessMonitorPaths.runtimeLane(using: environment) == "lane-a")
     #expect(HarnessMonitorPaths.codexBridgePort(using: environment) == 4_812)
@@ -59,7 +59,7 @@ struct HarnessMonitorPathsManagedIdentityTests {
       "CFBundleName": "HarnessMonitorPathsTests",
       "CFBundlePackageType": "APPL",
       "HarnessMonitorManagedLaunchAgentLabel":
-        "Q498EB36N4.io.harnessmonitor.agent-lane-a",
+        "Q498EB36N4.io.harnessmonitor.managed-service-lane-a",
       "HarnessMonitorManagedDaemonDataHome": "/tmp/runtime-lanes/lane-a",
       "HarnessMonitorManagedDaemonRuntimeLane": "lane-a",
       "HarnessMonitorManagedDaemonCodexWSPort": "4812",
@@ -81,7 +81,7 @@ struct HarnessMonitorPathsManagedIdentityTests {
     )
     try Data().write(
       to: launchAgentsURL.appendingPathComponent(
-        "Q498EB36N4.io.harnessmonitor.agent-lane-a.plist"
+        "Q498EB36N4.io.harnessmonitor.managed-service-lane-a.plist"
       )
     )
     let explicitDataHome = "/tmp/runtime-lanes/lane-b"
@@ -97,7 +97,7 @@ struct HarnessMonitorPathsManagedIdentityTests {
     #expect(HarnessMonitorPaths.runtimeLane(using: environment) == "lane-a")
     #expect(
       HarnessMonitorPaths.launchAgentLabel(using: environment)
-        == "Q498EB36N4.io.harnessmonitor.agent-lane-a"
+        == "Q498EB36N4.io.harnessmonitor.managed-service-lane-a"
     )
     #expect(HarnessMonitorPaths.codexBridgePort(using: environment) == 4_812)
     #expect(

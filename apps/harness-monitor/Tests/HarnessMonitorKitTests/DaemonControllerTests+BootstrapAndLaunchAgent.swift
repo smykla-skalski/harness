@@ -384,7 +384,7 @@ extension DaemonControllerTests {
 
     let snapshot = await controller.launchAgentSnapshot()
 
-    #expect(snapshot.label == "Q498EB36N4.io.harnessmonitor.agent-bart-dev")
-    #expect(snapshot.serviceTarget == "Q498EB36N4.io.harnessmonitor.agent-bart-dev")
+    #expect(snapshot.label == "Q498EB36N4.io.harnessmonitor.managed-service-bart-dev")
+    #expect(snapshot.serviceTarget == "Q498EB36N4.io.harnessmonitor.managed-service-bart-dev")
   }
 }
