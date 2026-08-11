@@ -97,8 +97,9 @@ public enum HarnessMonitorRuntimeLane {
   public static let launchAgentLabelEnvKey = "HARNESS_MONITOR_DAEMON_LAUNCH_AGENT_LABEL"
   public static let codexWSPortEnvironmentKey = "HARNESS_CODEX_WS_PORT"
 
-  static let launchAgentName = "agent"
+  static let launchAgentName = "managed-service"
   static let launchAgentBaseLabel = "\(HarnessMonitorAppGroup.identifier).\(launchAgentName)"
+  static let legacyLaunchAgentBaseLabel = "\(HarnessMonitorAppGroup.identifier).agent"
   public static let dataHomeLanesDirectoryName = "runtime-lanes"
   static let codexWSPortBase = 4_600
   static let codexWSPortSpan = 20_000

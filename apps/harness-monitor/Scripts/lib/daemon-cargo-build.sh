@@ -244,6 +244,10 @@ daemon_build_features() {
   printf '%s\n' "harness-daemon/tokio-console"
 }
 
+daemon_bundle_identifier() {
+  printf '%s\n' "${HARNESS_MONITOR_DAEMON_LAUNCH_AGENT_LABEL:-Q498EB36N4.io.harnessmonitor.managed-service}"
+}
+
 daemon_rustflags_contract() {
   printf '%s\n' "config-plus-daemon-info-linker-args"
 }
@@ -313,6 +317,7 @@ daemon_current_input_state() {
     --global-input "$(dirname -- "${BASH_SOURCE[0]}")/daemon-bundle-env.sh" \
     --metadata "profile=$(daemon_build_profile_dir)" \
     --metadata "features=$(daemon_build_features)" \
+    --metadata "bundle_identifier=$(daemon_bundle_identifier)" \
     --metadata "marketing_version=${MARKETING_VERSION:-}" \
     --metadata "toolchain=$pinned_channel" \
     --metadata "rustflags=$(daemon_rustflags_contract)" \
@@ -476,6 +481,8 @@ build_daemon_binary() {
   fi
 
   local daemon_info_plist="$PROJECT_DIR/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist"
+  local daemon_identifier
+  daemon_identifier="$(daemon_bundle_identifier)"
   local cargo_bin
   cargo_bin="$(find_cargo)"
 
@@ -484,11 +491,19 @@ build_daemon_binary() {
   assert_daemon_cargo_toolchain "$cargo_bin" "$pinned_channel" "$repo_root"
 
   local daemon_info_digest
-  daemon_info_digest="$(/usr/bin/shasum -a 256 "$daemon_info_plist" | /usr/bin/awk '{print $1}')"
+  daemon_info_digest="$(
+    {
+      /bin/cat "$daemon_info_plist"
+      printf '\nbundle_identifier=%s\nmarketing_version=%s\n' \
+        "$daemon_identifier" \
+        "${MARKETING_VERSION:-}"
+    } | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}'
+  )"
 
   local daemon_info_link_plist="$target_dir/daemon-info/io.harnessmonitor.daemon.$daemon_info_digest.Info.plist"
   /bin/mkdir -p "$(dirname "$daemon_info_link_plist")"
   /bin/cp "$daemon_info_plist" "$daemon_info_link_plist"
+  /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $daemon_identifier" "$daemon_info_link_plist"
   if [ -n "${MARKETING_VERSION:-}" ]; then
     /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${MARKETING_VERSION}" "$daemon_info_link_plist"
   fi

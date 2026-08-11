@@ -34,9 +34,12 @@ extension DaemonController {
   }
 
   static func isTrustedManagedHelperIdentifier(_ identifier: String) -> Bool {
-    let currentBase = "Q498EB36N4.io.harnessmonitor.agent"
+    let currentBase = HarnessMonitorRuntimeLane.launchAgentBaseLabel
+    let legacyBase = HarnessMonitorRuntimeLane.legacyLaunchAgentBaseLabel
     return identifier == currentBase
       || identifier.hasPrefix("\(currentBase)-")
+      || identifier == legacyBase
+      || identifier.hasPrefix("\(legacyBase)-")
       || [
         "Q498EB36N4.io.harnessmonitor.daemon",
         "io.harnessmonitor.daemon",
@@ -56,7 +59,7 @@ extension DaemonController {
       )
     }
     let executableURL = URL(fileURLWithPath: runningPath).resolvingSymlinksInPath()
-    guard executableURL.path.hasSuffix("/Contents/Resources/harness-daemon") else {
+    guard executableURL.path.hasSuffix("/Contents/Helpers/harness-daemon") else {
       throw DaemonControlError.invalidManifest(
         "managed daemon process does not use the bundled helper path"
       )

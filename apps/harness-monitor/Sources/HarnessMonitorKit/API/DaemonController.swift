@@ -68,8 +68,7 @@ public struct DaemonController: DaemonControlling {
     expectedManagedDaemonVersion: @escaping @Sendable () -> String? = {
       guard
         let bundleIdentifier = Bundle.main.bundleIdentifier,
-        bundleIdentifier == "io.harnessmonitor.app"
-          || bundleIdentifier == "io.harnessmonitor.app.ui-testing"
+        bundleIdentifier.hasPrefix("io.harnessmonitor.app")
       else {
         return nil
       }
@@ -392,7 +391,7 @@ public struct DaemonController: DaemonControlling {
   {
     let helperURL = Bundle.main.bundleURL
       .appendingPathComponent("Contents", isDirectory: true)
-      .appendingPathComponent("Resources", isDirectory: true)
+      .appendingPathComponent("Helpers", isDirectory: true)
       .appendingPathComponent("harness-daemon")
     guard FileManager.default.fileExists(atPath: helperURL.path) else {
       return nil

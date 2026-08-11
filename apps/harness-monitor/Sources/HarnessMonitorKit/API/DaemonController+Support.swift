@@ -7,6 +7,10 @@ public enum DaemonLaunchAgentRegistrationState: Equatable, Sendable {
   case enabled
   case requiresApproval
   case notFound
+
+  var isAbsent: Bool {
+    self == .notRegistered || self == .notFound
+  }
 }
 
 public protocol DaemonLaunchAgentManaging: Sendable {

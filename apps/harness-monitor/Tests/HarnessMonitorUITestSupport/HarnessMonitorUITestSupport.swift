@@ -141,7 +141,9 @@ class HarnessMonitorUITestCase: XCTestCase {
   nonisolated static let artifactsDirectoryKey = "HARNESS_MONITOR_UI_TEST_ARTIFACTS_DIR"
   nonisolated static let recordingControlDirectoryKey =
     "HARNESS_MONITOR_UI_TEST_RECORDING_CONTROL_DIR"
-  nonisolated static let uiTestHostBundleIdentifier = "io.harnessmonitor.app.ui-testing"
+  nonisolated static let uiTestHostBundleIdentifier =
+    ProcessInfo.processInfo.environment["HARNESS_MONITOR_UI_TEST_HOST_BUNDLE_IDENTIFIER"]
+    ?? "io.harnessmonitor.app.ui-testing"
   nonisolated static let uiTimeout: TimeInterval = 10
   nonisolated static let actionTimeout: TimeInterval = 2
   nonisolated static let fastActionTimeout: TimeInterval = 0.4

@@ -168,6 +168,11 @@ class GenerateScriptTests(unittest.TestCase):
                 captured_env,
             )
             self.assertIn("HARNESS_CODEX_WS_PORT=", captured_env)
+            self.assertIn("TUIST_MONITOR_APP_BUNDLE_ID=io.harnessmonitor.app", captured_env)
+            self.assertIn(
+                "TUIST_MONITOR_PREVIEW_BUNDLE_ID=io.harnessmonitor.previews",
+                captured_env,
+            )
 
     def test_runs_post_generate_even_when_tuist_regeneration_is_not_needed(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

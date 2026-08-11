@@ -6,7 +6,7 @@ public enum HarnessMonitorUITestEnvironment {
   public static let perfScenarioEnvironmentKey = "HARNESS_MONITOR_PERF_SCENARIO"
   public static let visualOptionsDisabledSuffix = "-visual-options-disabled"
   public static let hostBundleIdentifier = "io.harnessmonitor.app.ui-testing"
-  public static let isHostBundle = Bundle.main.bundleIdentifier == hostBundleIdentifier
+  public static let isHostBundle = Bundle.main.bundleIdentifier?.hasSuffix(".ui-testing") == true
   public static let isEnabled =
     ProcessInfo.processInfo.environment[environmentKey] == "1" || isHostBundle
   public static let perfScenarioRawValue: String? = {

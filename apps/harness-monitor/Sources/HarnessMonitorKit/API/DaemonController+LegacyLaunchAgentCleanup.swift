@@ -140,7 +140,7 @@ public enum LegacyManagedLaunchAgentCleanup {
     where legacyName != currentName {
       let legacyService = managerFactory(legacyName)
       let state = legacyService.registrationState()
-      if completedNames.contains(legacyName), state == .notRegistered {
+      if completedNames.contains(legacyName), state.isAbsent {
         continue
       }
       completedNames.remove(legacyName)
@@ -151,9 +151,7 @@ public enum LegacyManagedLaunchAgentCleanup {
         status=\(String(describing: state), privacy: .public)
         """
       )
-      let completed =
-        state == .notRegistered
-        || attemptUnregister(legacyService, name: legacyName)
+      let completed = state.isAbsent || attemptUnregister(legacyService, name: legacyName)
       if completed {
         completedNames.insert(legacyName)
       } else {
@@ -192,9 +190,9 @@ public enum LegacyManagedLaunchAgentCleanup {
     name: String
   ) -> Bool {
     switch service.registrationState() {
-    case .notRegistered:
+    case .notRegistered, .notFound:
       return false
-    case .enabled, .requiresApproval, .notFound:
+    case .enabled, .requiresApproval:
       break
     }
     do {
@@ -267,7 +265,7 @@ extension DaemonController {
   }
 
   private func disableCurrentLaunchAgentAfterCleanupFailure() async -> Bool {
-    guard launchAgentManager.registrationState() != .notRegistered else {
+    guard !launchAgentManager.registrationState().isAbsent else {
       return true
     }
     do {

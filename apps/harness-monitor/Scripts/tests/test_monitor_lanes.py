@@ -125,12 +125,11 @@ class MonitorLaneHelperTests(unittest.TestCase):
                 ),
             )
             self.assertEqual(port, expected_port(expected_lane))
-            # The label and generated plist filename share the same lane
-            # suffix. Keeping the suffix in one component satisfies the app
-            # group child-service rule while isolating launchd jobs.
+            # The launchd label carries lane isolation independently from the
+            # stable SMAppService plist filename.
             self.assertEqual(
                 label,
-                f"Q498EB36N4.io.harnessmonitor.agent-{expected_lane}",
+                f"Q498EB36N4.io.harnessmonitor.managed-service-{expected_lane}",
             )
 
     def test_legacy_profile_env_is_rejected(self) -> None:
@@ -223,6 +222,36 @@ class MonitorLaneHelperTests(unittest.TestCase):
                 completed.stdout.strip().startswith("io.harnessmonitor.app.isolated"),
                 completed.stdout,
             )
+
+    def test_managed_app_bundle_id_default_lane_keeps_production_identity(self) -> None:
+        completed = run_helper("harness_monitor_managed_app_bundle_id", base_env())
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(completed.stdout.strip(), "io.harnessmonitor.app")
+
+    def test_managed_app_bundle_id_named_lane_is_development_scoped(self) -> None:
+        env = base_env()
+        env["HARNESS_MONITOR_BUILD_LANE"] = "Agent Session 123"
+
+        completed = run_helper("harness_monitor_managed_app_bundle_id", env)
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(
+            completed.stdout.strip(),
+            "io.harnessmonitor.app.development.lane-agent-session-123",
+        )
+
+    def test_preview_bundle_id_named_lane_is_lane_scoped(self) -> None:
+        env = base_env()
+        env["HARNESS_MONITOR_BUILD_LANE"] = "Agent Session 123"
+
+        completed = run_helper("harness_monitor_preview_bundle_id", env)
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(
+            completed.stdout.strip(),
+            "io.harnessmonitor.previews.lane-agent-session-123",
+        )
 
 
 if __name__ == "__main__":

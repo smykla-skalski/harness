@@ -133,15 +133,8 @@ public enum HarnessMonitorPaths {
   /// External daemons are not launchd-registered (they run from `harness
   /// daemon dev` in a user shell) so there's no symmetric label for them.
   ///
-  /// The label MUST equal the bundled plist filename without its `.plist`
-  /// extension — macOS 26's `SMAppService.register()` returns
-  /// `error: 22 (EINVAL)` and `Service status: 3 (.notFound)` whenever the
-  /// two diverge, which manifests as a managed-daemon bootstrap that loops
-  /// on `Bootstrapping daemon client for managed daemon mode` without ever
-  /// spawning a daemon process. Sandboxed SMAppService launch agents must
-  /// also be immediate children of the app group, so the lane suffix is
-  /// joined with `-`, not another `.`, and the result remains
-  /// `<app-group>.<single-component>`.
+  /// The label and bundled plist filename match. The lane suffix is joined
+  /// with `-` so the service remains an immediate child of the app group.
   public static func launchAgentLabel(
     using environment: HarnessMonitorEnvironment = .current
   ) -> String {
@@ -184,9 +177,9 @@ public enum HarnessMonitorPaths {
     using environment: HarnessMonitorEnvironment = .current
   ) -> String {
     guard let lane = resolvedRuntimeLane(using: environment) else {
-      return HarnessMonitorRuntimeLane.launchAgentBaseLabel
+      return HarnessMonitorRuntimeLane.legacyLaunchAgentBaseLabel
     }
-    return "\(HarnessMonitorRuntimeLane.launchAgentBaseLabel).\(lane)"
+    return "\(HarnessMonitorRuntimeLane.legacyLaunchAgentBaseLabel).\(lane)"
   }
 
   public static func commandEnvironmentVariables(

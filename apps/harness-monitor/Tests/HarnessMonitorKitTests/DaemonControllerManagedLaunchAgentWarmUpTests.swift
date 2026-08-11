@@ -5,11 +5,11 @@ import Testing
 
 private let managedLaunchAgentHelperPathFixture =
   "/Users/example/Library/Developer/Xcode/DerivedData/HarnessMonitor/Build/Products/Debug/"
-  + "Harness Monitor.app/Contents/Resources/harness-daemon"
+  + "Harness Monitor.app/Contents/Helpers/harness-daemon"
 private let managedLaunchAgentPlistPathFixture =
   "/Users/example/Library/Developer/Xcode/DerivedData/HarnessMonitor/Build/Products/Debug/"
   + "Harness Monitor.app/Contents/Library/LaunchAgents/"
-  + "Q498EB36N4.io.harnessmonitor.agent.plist"
+  + "Q498EB36N4.io.harnessmonitor.managed-service-test-lane.plist"
 
 @Suite("Daemon controller managed launch-agent warm-up", .serialized)
 struct DaemonControllerManagedLaunchAgentWarmUpTests {
@@ -27,7 +27,7 @@ struct DaemonControllerManagedLaunchAgentWarmUpTests {
       let staleEndpoint = "http://127.0.0.1:65534"
       try writeManagedLaunchAgentBundleStampFixture(
         ManagedLaunchAgentBundleStampFixture(
-          helperPath: "/Applications/Harness Monitor.app/Contents/Resources/harness-daemon",
+          helperPath: "/Applications/Harness Monitor.app/Contents/Helpers/harness-daemon",
           deviceIdentifier: 41,
           inode: 84,
           fileSize: 16_384,
@@ -99,7 +99,7 @@ struct DaemonControllerManagedLaunchAgentWarmUpTests {
       modificationTimeIntervalSince1970: 1_714_000_000
     )
     let stalePersistedStamp = ManagedLaunchAgentBundleStampFixture(
-      helperPath: "/Applications/Harness Monitor.app/Contents/Resources/harness-daemon",
+      helperPath: "/Applications/Harness Monitor.app/Contents/Helpers/harness-daemon",
       deviceIdentifier: 41,
       inode: 84,
       fileSize: 16_384,
@@ -245,7 +245,7 @@ struct DaemonControllerManagedLaunchAgentWarmUpTests {
       modificationTimeIntervalSince1970: 1_714_000_000
     )
     let staleManifestStamp = DaemonBinaryStampFixture(
-      helperPath: "/Applications/Harness Monitor.app/Contents/Resources/harness-daemon",
+      helperPath: "/Applications/Harness Monitor.app/Contents/Helpers/harness-daemon",
       deviceIdentifier: 41,
       inode: 84,
       fileSize: 16_384,

@@ -5,6 +5,7 @@ import SwiftData
 
 struct HarnessMonitorAppConfiguration {
   static let uiTestingBundleIdentifier = "io.harnessmonitor.app.ui-testing"
+  static let uiTestingBundleIdentifierSuffix = ".ui-testing"
   static let uiTestsEnvironmentKey = "HARNESS_MONITOR_UI_TESTS"
   static let uiTestDefaultDataRootName = "HarnessMonitorUITestHost"
   static let resetBackgroundRecentsOverrideKey = "HARNESS_MONITOR_RESET_BACKGROUND_RECENTS"
@@ -147,7 +148,7 @@ struct HarnessMonitorAppConfiguration {
   ) -> Bool {
     isUITesting
       && !hasPerfScenario
-      && bundleIdentifier == uiTestingBundleIdentifier
+      && isUITestHostBundleIdentifier(bundleIdentifier)
   }
 
   struct UITestOverrides {
@@ -164,7 +165,7 @@ struct HarnessMonitorAppConfiguration {
     base: HarnessMonitorEnvironment = .current
   ) -> HarnessMonitorEnvironment {
     let environment = base
-    let isUITestHost = Bundle.main.bundleIdentifier == uiTestingBundleIdentifier
+    let isUITestHost = isUITestHostBundleIdentifier(Bundle.main.bundleIdentifier)
     let isUITesting = environment.values[uiTestsEnvironmentKey] == "1" || isUITestHost
     guard isUITesting else {
       return environment
@@ -229,6 +230,10 @@ struct HarnessMonitorAppConfiguration {
       .joined()
       .trimmingCharacters(in: CharacterSet(charactersIn: ".-_"))
     return component.isEmpty ? "ui-test-host" : component
+  }
+
+  static func isUITestHostBundleIdentifier(_ bundleIdentifier: String?) -> Bool {
+    bundleIdentifier?.hasSuffix(uiTestingBundleIdentifierSuffix) == true
   }
 
   static func isBlank(_ rawValue: String?) -> Bool {

@@ -48,7 +48,7 @@ def _isolated_subprocess_env() -> dict:
     isolated = dict(os.environ)
     isolated.pop("BASH_ENV", None)
     isolated["HARNESS_MONITOR_DAEMON_LAUNCH_AGENT_LABEL"] = (
-        "Q498EB36N4.io.harnessmonitor.agent"
+        "Q498EB36N4.io.harnessmonitor.managed-service"
     )
     return isolated
 
@@ -111,12 +111,15 @@ def _bundle_stamp_lines(
         else "missing"
     )
     return [
-        "bundle_stamp_schema=2",
+        "bundle_stamp_schema=4",
+        f"bundle_script_sha={hashlib.sha256(SCRIPT_PATH.read_bytes()).hexdigest()}",
         f"daemon_source={daemon_source}",
         f"daemon_source_stat={int(daemon_stat.st_mtime)}:{daemon_stat.st_size}",
         "codesign_identity=fake-identity",
         "timestamp_flag=--timestamp=none",
-        "launch_agent_label=Q498EB36N4.io.harnessmonitor.agent",
+        "launch_agent_label=Q498EB36N4.io.harnessmonitor.managed-service",
+        "plist_name=Q498EB36N4.io.harnessmonitor.managed-service.plist",
+        "app_bundle_identifier=io.harnessmonitor.app",
         "app_group_id=test.group",
         "marketing_version=1.2.3",
         "daemon_data_home=/tmp/test-daemon-home",
@@ -142,21 +145,36 @@ class BundleDaemonAgentScriptTests(unittest.TestCase):
         )
         self.assertIn("if is_test_bundle_target; then", script)
 
-    def test_lane_service_keeps_the_base_plist_for_legacy_cleanup(self) -> None:
+    def test_lane_service_uses_matching_deterministic_plist_and_label(self) -> None:
         script = SCRIPT_PATH.read_text(encoding="utf-8")
 
         self.assertIn(
-            "Q498EB36N4.io.harnessmonitor.agent.plist \\",
+            'plist_name="$launch_agent_label.plist"',
             script,
         )
         self.assertIn(
             '[ "$legacy_plist_name" = "$plist_name" ]',
             script,
         )
-        self.assertIn(
-            '[ -f "$legacy_agent_plist_target" ]',
-            script,
+        self.assertNotIn("managed-daemon.plist", script)
+        self.assertNotIn("managed-agent.plist", script)
+
+    def test_associated_bundle_identifiers_are_rebuilt_without_duplicates(self) -> None:
+        script = SCRIPT_PATH.read_text(encoding="utf-8")
+
+        remove = '/usr/bin/plutil -remove AssociatedBundleIdentifiers'
+        create = '/usr/bin/plutil -insert AssociatedBundleIdentifiers -array'
+        current = (
+            '/usr/bin/plutil -insert AssociatedBundleIdentifiers.0 '
+            '-string "$app_bundle_identifier"'
         )
+        production = (
+            '/usr/bin/plutil -insert AssociatedBundleIdentifiers.1 '
+            '-string "io.harnessmonitor.app"'
+        )
+        self.assertLess(script.index(remove), script.index(create))
+        self.assertLess(script.index(create), script.index(current))
+        self.assertLess(script.index(current), script.index(production))
 
 
 class DaemonInputStateScriptTests(unittest.TestCase):
@@ -220,7 +238,7 @@ class DaemonLaunchAgentPlistTests(unittest.TestCase):
     def test_launch_agent_uses_dedicated_daemon_command(self) -> None:
         payload = plistlib.loads(DAEMON_LAUNCH_AGENT_PLIST_PATH.read_bytes())
 
-        self.assertEqual(payload["BundleProgram"], "Contents/Resources/harness-daemon")
+        self.assertEqual(payload["BundleProgram"], "Contents/Helpers/harness-daemon")
         self.assertEqual(
             payload["ProgramArguments"][:2],
             ["harness-daemon", "serve"],
@@ -352,6 +370,27 @@ class BuildDaemonBinaryTests(unittest.TestCase):
             self.assertIn("--features harness-daemon/tokio-console", captured)
             self.assertIn("-Wl,-no_compact_unwind", captured)
             self.assertIn("__info_plist", captured)
+
+    def test_embeds_runtime_launch_agent_identifier(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            project_dir, target_dir, captured_env_path, fake_cargo = _setup_fake_daemon_layout(
+                Path(tmp_dir)
+            )
+            runtime_identifier = "Q498EB36N4.io.harnessmonitor.managed-service-test-lane"
+
+            run_build_helper(
+                f'export PROJECT_DIR="{project_dir}"; '
+                f'export CARGO_BIN="{fake_cargo}"; '
+                f'export CARGO_TARGET_DIR="{target_dir}"; '
+                f'export CAPTURED_ENV_PATH="{captured_env_path}"; '
+                f'export HARNESS_MONITOR_DAEMON_LAUNCH_AGENT_LABEL="{runtime_identifier}"; '
+                "build_daemon_binary >/dev/null"
+            )
+
+            generated_plists = list((target_dir / "daemon-info").glob("*.Info.plist"))
+            self.assertEqual(len(generated_plists), 1)
+            payload = plistlib.loads(generated_plists[0].read_bytes())
+            self.assertEqual(payload["CFBundleIdentifier"], runtime_identifier)
 
     def test_unsets_xcode_only_swift_debug_environment_before_cargo(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -640,6 +679,10 @@ class DaemonStagedBinaryTests(unittest.TestCase):
                 state["metadata"]["rustflags"],
                 "config-plus-daemon-info-linker-args",
             )
+            self.assertEqual(
+                state["metadata"]["bundle_identifier"],
+                "Q498EB36N4.io.harnessmonitor.managed-service",
+            )
             self.assertEqual(state["metadata"]["toolchain"], "stable")
 
             layout["daemon_source"].write_text("pub fn daemon_changed() {}\n")
@@ -798,6 +841,7 @@ class DaemonStagedBinaryTests(unittest.TestCase):
                 'export MARKETING_VERSION="1.2.4"; ',
                 'export RUSTC_WRAPPER="/tmp/wrapper-b"; ',
                 'export MACOSX_DEPLOYMENT_TARGET="27.0"; ',
+                'export HARNESS_MONITOR_DAEMON_LAUNCH_AGENT_LABEL="Q498EB36N4.io.harnessmonitor.managed-service-other-lane"; ',
             ):
                 with self.subTest(changed_environment=changed_environment):
                     freshness = run_build_helper(
@@ -1064,13 +1108,13 @@ class BundleStampShortcutTests(unittest.TestCase):
         target_build_dir = root / "build"
         derived_dir = root / "derived"
         daemon_source = root / "daemon-source"
-        daemon_target = target_build_dir / "Contents" / "Resources" / "harness-daemon"
+        daemon_target = target_build_dir / "Contents" / "Helpers" / "harness-daemon"
         plist_target = (
             target_build_dir
             / "Contents"
             / "Library"
             / "LaunchAgents"
-            / "Q498EB36N4.io.harnessmonitor.agent.plist"
+            / "Q498EB36N4.io.harnessmonitor.managed-service.plist"
         )
         bundle_stamp_path = derived_dir / "HarnessMonitor-bundle-daemon-agent.stamp"
         legacy_plist_path = (
@@ -1079,6 +1123,13 @@ class BundleStampShortcutTests(unittest.TestCase):
             / "Library"
             / "LaunchAgents"
             / "io.harnessmonitor.daemon.plist"
+        )
+        generated_legacy_plist_path = (
+            target_build_dir
+            / "Contents"
+            / "Library"
+            / "LaunchAgents"
+            / "Q498EB36N4.io.harnessmonitor.agent-test-lane.plist"
         )
 
         (repo_root / ".git").mkdir(parents=True)
@@ -1093,6 +1144,7 @@ class BundleStampShortcutTests(unittest.TestCase):
         daemon_target.chmod(0o755)
         plist_target.write_text("plist\n")
         legacy_plist_path.write_text("legacy plist\n")
+        generated_legacy_plist_path.write_text("generated legacy plist\n")
 
         bundle_stamp_path.write_text(
             "\n".join(_bundle_stamp_lines(daemon_source)) + "\n"
@@ -1110,17 +1162,19 @@ class BundleStampShortcutTests(unittest.TestCase):
             "HARNESS_MONITOR_DAEMON_BINARY": str(daemon_source),
             "HARNESS_MONITOR_RUNTIME_LANE": "test-lane",
             "HARNESS_MONITOR_DAEMON_LAUNCH_AGENT_LABEL": (
-                "Q498EB36N4.io.harnessmonitor.agent"
+                "Q498EB36N4.io.harnessmonitor.managed-service"
             ),
             "HARNESS_DAEMON_DATA_HOME": "/tmp/test-daemon-home",
             "HARNESS_CODEX_WS_PORT": "4242",
             "HARNESS_APP_GROUP_ID": "test.group",
             "EXPANDED_CODE_SIGN_IDENTITY": "fake-identity",
             "MARKETING_VERSION": "1.2.3",
+            "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.app",
             "WRAPPER_NAME": "Harness Monitor.app",
-            "SCRIPT_OUTPUT_FILE_COUNT": "10",
-            "SCRIPT_OUTPUT_FILE_8": str(legacy_plist_path),
-            "SCRIPT_OUTPUT_FILE_9": str(bundle_stamp_path),
+            "SCRIPT_OUTPUT_FILE_COUNT": "12",
+            "SCRIPT_OUTPUT_FILE_7": str(generated_legacy_plist_path),
+            "SCRIPT_OUTPUT_FILE_10": str(legacy_plist_path),
+            "SCRIPT_OUTPUT_FILE_11": str(bundle_stamp_path),
         }
         return env, daemon_source
 
@@ -1137,7 +1191,7 @@ class BundleStampShortcutTests(unittest.TestCase):
             )
 
             self.assertEqual(completed.returncode, 0, msg=completed.stderr)
-            legacy_plist = Path(env["SCRIPT_OUTPUT_FILE_8"])
+            legacy_plist = Path(env["SCRIPT_OUTPUT_FILE_10"])
             self.assertEqual(legacy_plist.read_text(), "legacy plist\n")
 
     def test_a_skeleton_plugin_invalidates_a_sealed_stamp(self) -> None:
@@ -1246,15 +1300,13 @@ class BundleStampShortcutTests(unittest.TestCase):
 
             target_build_dir = root / "build"
             derived_dir = root / "derived"
-            daemon_target = (
-                target_build_dir / "Contents" / "Resources" / "harness-daemon"
-            )
+            daemon_target = target_build_dir / "Contents" / "Helpers" / "harness-daemon"
             plist_target = (
                 target_build_dir
                 / "Contents"
                 / "Library"
                 / "LaunchAgents"
-                / "Q498EB36N4.io.harnessmonitor.agent.plist"
+                / "Q498EB36N4.io.harnessmonitor.managed-service.plist"
             )
             daemon_target.parent.mkdir(parents=True)
             plist_target.parent.mkdir(parents=True)
@@ -1262,6 +1314,10 @@ class BundleStampShortcutTests(unittest.TestCase):
             daemon_target.write_text("bundled\n")
             daemon_target.chmod(0o755)
             plist_target.write_text("plist\n")
+            generated_legacy_plist = plist_target.parent / (
+                "Q498EB36N4.io.harnessmonitor.agent-test-lane.plist"
+            )
+            generated_legacy_plist.write_text("generated legacy plist\n")
             bundle_stamp_path = (
                 derived_dir / "HarnessMonitor-bundle-daemon-agent.stamp"
             )

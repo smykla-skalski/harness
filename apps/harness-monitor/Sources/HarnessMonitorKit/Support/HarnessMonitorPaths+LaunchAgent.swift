@@ -34,18 +34,32 @@ extension HarnessMonitorPaths {
   /// Old plist filenames. Kept solely so the app can attempt to unregister
   /// orphaned SMAppService entries on first launch under the new layout.
   public static var legacyLaunchAgentPlistNames: [String] {
-    [
+    var names = [
       "Q498EB36N4.io.harnessmonitor.agent.plist",
       "Q498EB36N4.io.harnessmonitor.daemon.plist",
       "io.harnessmonitor.daemon.managed.plist",
       "io.harnessmonitor.daemon.plist",
     ]
+    let generatedLaneName = "\(legacyGeneratedLaneLaunchAgentLabel(using: .current)).plist"
+    if !names.contains(generatedLaneName) {
+      names.append(generatedLaneName)
+    }
+    return names
   }
 
   /// Pre-coexistence plist filename. Prefer `legacyLaunchAgentPlistNames` for
   /// cleanup; kept for callers/tests that still need the original singleton.
   public static var legacyLaunchAgentPlistName: String {
     "io.harnessmonitor.daemon.plist"
+  }
+
+  static func legacyGeneratedLaneLaunchAgentLabel(
+    using environment: HarnessMonitorEnvironment
+  ) -> String {
+    guard let lane = resolvedRuntimeLane(using: environment) else {
+      return HarnessMonitorRuntimeLane.legacyLaunchAgentBaseLabel
+    }
+    return "\(HarnessMonitorRuntimeLane.legacyLaunchAgentBaseLabel)-\(lane)"
   }
 
   public static var launchAgentBundleRelativePath: String {
