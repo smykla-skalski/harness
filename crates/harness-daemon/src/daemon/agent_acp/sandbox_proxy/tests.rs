@@ -15,6 +15,8 @@ use crate::daemon::protocol::StreamEvent;
 use crate::session::types::AgentStatus;
 use harness_kernel::errors::CliErrorKind;
 
+mod logging;
+
 #[test]
 fn replay_safe_resync_events_keeps_safe_events_only() {
     let events = vec![

@@ -252,7 +252,8 @@ struct ManagedDaemonQuiescenceFixture {
   func writeManifest(
     at candidate: ManagedDaemonRootCandidate,
     endpoint: String,
-    pid: Int32 = getpid()
+    pid: Int32 = getpid(),
+    binaryStamp: DaemonBinaryStampFixture? = nil
   ) throws {
     try FileManager.default.createDirectory(
       at: candidate.rootURL,
@@ -265,7 +266,8 @@ struct ManagedDaemonQuiescenceFixture {
       pid: Int(pid),
       endpoint: endpoint,
       startedAt: "2026-08-09T20:00:00Z",
-      tokenPath: tokenURL.path
+      tokenPath: tokenURL.path,
+      binaryStamp: binaryStamp
     )
   }
 

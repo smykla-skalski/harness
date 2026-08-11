@@ -7,7 +7,12 @@ fi
 
 HARNESS_MONITOR_LANE_APP_GROUP_DEFAULT="Q498EB36N4.io.harnessmonitor"
 HARNESS_MONITOR_LANE_LABEL="Q498EB36N4.io.harnessmonitor.managed-service"
-HARNESS_MONITOR_LEGACY_LANE_LABEL="Q498EB36N4.io.harnessmonitor.agent"
+HARNESS_MONITOR_LEGACY_LANE_LABELS=(
+  "Q498EB36N4.io.harnessmonitor.agent"
+  "Q498EB36N4.io.harnessmonitor.daemon"
+  "Q498EB36N4.io.harnessmonitor.managed-agent"
+  "Q498EB36N4.io.harnessmonitor.managed-daemon"
+)
 HARNESS_MONITOR_LANE_CODEX_PORT_BASE=4600
 HARNESS_MONITOR_LANE_CODEX_PORT_SPAN=20000
 
@@ -222,11 +227,13 @@ harness_monitor_runtime_launch_agent_label() {
   printf '%s-%s\n' "$HARNESS_MONITOR_LANE_LABEL" "$lane"
 }
 
-harness_monitor_legacy_runtime_launch_agent_label() {
+harness_monitor_legacy_runtime_launch_agent_labels() {
   local checkout_root="$1"
-  local lane
+  local lane base_label
   lane="$(harness_monitor_runtime_lane "$checkout_root")" || return 1
-  printf '%s-%s\n' "$HARNESS_MONITOR_LEGACY_LANE_LABEL" "$lane"
+  for base_label in "${HARNESS_MONITOR_LEGACY_LANE_LABELS[@]}"; do
+    printf '%s-%s\n' "$base_label" "$lane"
+  done
 }
 
 harness_monitor_runtime_xcodebuildmcp_socket_path() {

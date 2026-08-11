@@ -118,6 +118,15 @@ def _bundle_stamp_lines(
         "codesign_identity=fake-identity",
         "timestamp_flag=--timestamp=none",
         "launch_agent_label=Q498EB36N4.io.harnessmonitor.managed-service",
+        (
+            "generated_legacy_labels="
+            "Q498EB36N4.io.harnessmonitor.managed-agent "
+            "Q498EB36N4.io.harnessmonitor.managed-daemon "
+            "Q498EB36N4.io.harnessmonitor.agent-test-lane "
+            "Q498EB36N4.io.harnessmonitor.daemon-test-lane "
+            "Q498EB36N4.io.harnessmonitor.managed-agent-test-lane "
+            "Q498EB36N4.io.harnessmonitor.managed-daemon-test-lane"
+        ),
         "plist_name=Q498EB36N4.io.harnessmonitor.managed-service.plist",
         "app_bundle_identifier=io.harnessmonitor.app",
         "app_group_id=test.group",
@@ -156,8 +165,16 @@ class BundleDaemonAgentScriptTests(unittest.TestCase):
             '[ "$legacy_plist_name" = "$plist_name" ]',
             script,
         )
-        self.assertNotIn("managed-daemon.plist", script)
-        self.assertNotIn("managed-agent.plist", script)
+        self.assertIn(
+            '"Q498EB36N4.io.harnessmonitor.managed-daemon"', script
+        )
+        self.assertIn(
+            '"Q498EB36N4.io.harnessmonitor.managed-agent"', script
+        )
+        self.assertIn(
+            'harness_monitor_legacy_runtime_launch_agent_labels "$repo_root"',
+            script,
+        )
 
     def test_associated_bundle_identifiers_are_rebuilt_without_duplicates(self) -> None:
         script = SCRIPT_PATH.read_text(encoding="utf-8")
@@ -1124,13 +1141,17 @@ class BundleStampShortcutTests(unittest.TestCase):
             / "LaunchAgents"
             / "io.harnessmonitor.daemon.plist"
         )
-        generated_legacy_plist_path = (
-            target_build_dir
-            / "Contents"
-            / "Library"
-            / "LaunchAgents"
-            / "Q498EB36N4.io.harnessmonitor.agent-test-lane.plist"
-        )
+        generated_legacy_plist_paths = [
+            target_build_dir / "Contents" / "Library" / "LaunchAgents" / name
+            for name in (
+                "Q498EB36N4.io.harnessmonitor.managed-agent.plist",
+                "Q498EB36N4.io.harnessmonitor.managed-daemon.plist",
+                "Q498EB36N4.io.harnessmonitor.agent-test-lane.plist",
+                "Q498EB36N4.io.harnessmonitor.daemon-test-lane.plist",
+                "Q498EB36N4.io.harnessmonitor.managed-agent-test-lane.plist",
+                "Q498EB36N4.io.harnessmonitor.managed-daemon-test-lane.plist",
+            )
+        ]
 
         (repo_root / ".git").mkdir(parents=True)
         project_dir.mkdir(parents=True, exist_ok=True)
@@ -1144,7 +1165,8 @@ class BundleStampShortcutTests(unittest.TestCase):
         daemon_target.chmod(0o755)
         plist_target.write_text("plist\n")
         legacy_plist_path.write_text("legacy plist\n")
-        generated_legacy_plist_path.write_text("generated legacy plist\n")
+        for generated_legacy_plist_path in generated_legacy_plist_paths:
+            generated_legacy_plist_path.write_text("generated legacy plist\n")
 
         bundle_stamp_path.write_text(
             "\n".join(_bundle_stamp_lines(daemon_source)) + "\n"
@@ -1172,7 +1194,7 @@ class BundleStampShortcutTests(unittest.TestCase):
             "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.app",
             "WRAPPER_NAME": "Harness Monitor.app",
             "SCRIPT_OUTPUT_FILE_COUNT": "12",
-            "SCRIPT_OUTPUT_FILE_7": str(generated_legacy_plist_path),
+            "SCRIPT_OUTPUT_FILE_7": str(generated_legacy_plist_paths[2]),
             "SCRIPT_OUTPUT_FILE_10": str(legacy_plist_path),
             "SCRIPT_OUTPUT_FILE_11": str(bundle_stamp_path),
         }
@@ -1314,10 +1336,17 @@ class BundleStampShortcutTests(unittest.TestCase):
             daemon_target.write_text("bundled\n")
             daemon_target.chmod(0o755)
             plist_target.write_text("plist\n")
-            generated_legacy_plist = plist_target.parent / (
-                "Q498EB36N4.io.harnessmonitor.agent-test-lane.plist"
-            )
-            generated_legacy_plist.write_text("generated legacy plist\n")
+            for generated_legacy_plist_name in (
+                "Q498EB36N4.io.harnessmonitor.managed-agent.plist",
+                "Q498EB36N4.io.harnessmonitor.managed-daemon.plist",
+                "Q498EB36N4.io.harnessmonitor.agent-test-lane.plist",
+                "Q498EB36N4.io.harnessmonitor.daemon-test-lane.plist",
+                "Q498EB36N4.io.harnessmonitor.managed-agent-test-lane.plist",
+                "Q498EB36N4.io.harnessmonitor.managed-daemon-test-lane.plist",
+            ):
+                (plist_target.parent / generated_legacy_plist_name).write_text(
+                    "generated legacy plist\n"
+                )
             bundle_stamp_path = (
                 derived_dir / "HarnessMonitor-bundle-daemon-agent.stamp"
             )

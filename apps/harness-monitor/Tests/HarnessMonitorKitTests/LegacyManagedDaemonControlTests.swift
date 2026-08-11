@@ -30,6 +30,30 @@ struct LegacyManagedDaemonControlTests {
     )
   }
 
+  @Test("Managed helper path accepts current and pre-migration bundle locations")
+  func managedHelperPathAcceptsCurrentAndLegacyLocations() {
+    #expect(
+      DaemonController.isTrustedManagedHelperExecutablePath(
+        "/Applications/Harness Monitor.app/Contents/Helpers/harness-daemon"
+      )
+    )
+    #expect(
+      DaemonController.isTrustedManagedHelperExecutablePath(
+        "/Applications/Harness Monitor.app/Contents/Resources/harness-daemon"
+      )
+    )
+    #expect(
+      DaemonController.isTrustedManagedHelperExecutablePath(
+        "/tmp/harness-daemon"
+      ) == false
+    )
+    #expect(
+      DaemonController.isTrustedManagedHelperExecutablePath(
+        "/Applications/Harness Monitor.app/Contents/Resources/harness-daemon-copy"
+      ) == false
+    )
+  }
+
   @Test("Controller falls back to a validated process signal")
   func controllerFallsBackToValidatedProcessSignal() async throws {
     let fixture = try ManagedDaemonQuiescenceFixture(name: "signal-fallback")
@@ -38,10 +62,19 @@ struct LegacyManagedDaemonControlTests {
       HarnessMonitorPaths.managedDaemonRootCandidates(using: fixture.environment).first
     )
     let pid: Int32 = 45_612
+    let legacyHelperPath =
+      "/Applications/Harness Monitor.app/Contents/Resources/harness-daemon"
     try fixture.writeManifest(
       at: candidate,
       endpoint: "http://127.0.0.1:65106",
-      pid: pid
+      pid: pid,
+      binaryStamp: DaemonBinaryStampFixture(
+        helperPath: legacyHelperPath,
+        deviceIdentifier: 1,
+        inode: 2,
+        fileSize: 3,
+        modificationTimeIntervalSince1970: 4
+      )
     )
     let client = RecordingHarnessClient()
     client.stopDaemonError = ManagedDaemonQuiescenceTestError.stopFailed
@@ -52,8 +85,7 @@ struct LegacyManagedDaemonControlTests {
       sessionFactory: { _ in client },
       processLiveness: { requestedPID in
         #expect(requestedPID == pid)
-        return .alive(
-          executablePath: "/Applications/Harness Monitor.app/Contents/Helpers/harness-daemon")
+        return .alive(executablePath: legacyHelperPath)
       },
       processSignal: { requestedPID, signal in
         signalRecorder.record(pid: requestedPID, signal: signal)
@@ -94,7 +126,7 @@ struct LegacyManagedDaemonControlTests {
       managedStaleManifestGracePeriod: .milliseconds(100),
       processLiveness: { _ in
         .alive(
-          executablePath: "/Applications/Harness Monitor.app/Contents/Helpers/harness-daemon")
+          executablePath: "/Applications/Harness Monitor.app/Contents/Resources/harness-daemon")
       },
       processSignal: { requestedPID, signal in
         signalRecorder.record(pid: requestedPID, signal: signal)
@@ -136,7 +168,7 @@ struct LegacyManagedDaemonControlTests {
       sessionFactory: { _ in client },
       processLiveness: { _ in
         .alive(
-          executablePath: "/Applications/Harness Monitor.app/Contents/Helpers/harness-daemon")
+          executablePath: "/Applications/Harness Monitor.app/Contents/Resources/harness-daemon")
       },
       processSignal: { requestedPID, signal in
         signalRecorder.record(pid: requestedPID, signal: signal)

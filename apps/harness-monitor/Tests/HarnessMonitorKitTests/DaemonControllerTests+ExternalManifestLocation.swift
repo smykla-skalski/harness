@@ -312,9 +312,10 @@ func writeExternalManifestFixture(
   pid: Int,
   endpoint: String,
   startedAt: String,
-  tokenPath: String
+  tokenPath: String,
+  binaryStamp: DaemonBinaryStampFixture? = nil
 ) throws {
-  let payload: [String: Any] = [
+  var payload: [String: Any] = [
     "version": "19.4.1",
     "pid": pid,
     "endpoint": endpoint,
@@ -328,6 +329,16 @@ func writeExternalManifestFixture(
     ],
     "revision": 0,
   ]
+  if let binaryStamp {
+    payload["binary_stamp"] = [
+      "helper_path": binaryStamp.helperPath,
+      "device_identifier": binaryStamp.deviceIdentifier,
+      "inode": binaryStamp.inode,
+      "file_size": binaryStamp.fileSize,
+      "modification_time_interval_since_1970":
+        binaryStamp.modificationTimeIntervalSince1970,
+    ]
+  }
   let data = try JSONSerialization.data(
     withJSONObject: payload, options: [.prettyPrinted, .sortedKeys])
   try data.write(to: manifestURL, options: .atomic)

@@ -156,8 +156,25 @@ plist_template_name="Q498EB36N4.io.harnessmonitor.agent.plist"
 launch_agent_label="$(harness_monitor_runtime_launch_agent_label "$repo_root")"
 plist_name="$launch_agent_label.plist"
 plist_target="$launch_agents_dir/$plist_name"
-legacy_lane_label="$(harness_monitor_legacy_runtime_launch_agent_label "$repo_root")"
-generated_lane_legacy_plist_target="$launch_agents_dir/$legacy_lane_label.plist"
+generated_legacy_labels=(
+  "Q498EB36N4.io.harnessmonitor.managed-agent"
+  "Q498EB36N4.io.harnessmonitor.managed-daemon"
+)
+while IFS= read -r legacy_label; do
+  generated_legacy_labels+=("$legacy_label")
+done < <(harness_monitor_legacy_runtime_launch_agent_labels "$repo_root")
+generated_legacy_plist_targets=()
+for legacy_label in "${generated_legacy_labels[@]}"; do
+  if [ "$legacy_label" != "$launch_agent_label" ]; then
+    generated_legacy_plist_targets+=("$launch_agents_dir/$legacy_label.plist")
+  fi
+done
+generated_legacy_plists_exist() {
+  local legacy_target
+  for legacy_target in "${generated_legacy_plist_targets[@]}"; do
+    [ -f "$legacy_target" ] || return 1
+  done
+}
 # The current plist filename and Label deliberately match. The distinct,
 # deterministic development app bundle ID gives Background Task Management a
 # stable parent per build lane without sharing the production app's record.
@@ -197,6 +214,7 @@ bundle_stamp_contents="$(
     printf 'codesign_identity=%s\n' "${codesign_identity:--}"
     printf 'timestamp_flag=%s\n' "$timestamp_flag"
     printf 'launch_agent_label=%s\n' "$launch_agent_label"
+    printf 'generated_legacy_labels=%s\n' "${generated_legacy_labels[*]}"
     printf 'plist_name=%s\n' "$plist_name"
     printf 'app_bundle_identifier=%s\n' "$app_bundle_identifier"
     printf 'app_group_id=%s\n' "$app_group_id"
@@ -225,7 +243,7 @@ bundle_stamp_contents="$(
 if [ -f "$bundle_stamp_path" ] \
   && [ -x "$daemon_target" ] \
   && [ -f "$plist_target" ] \
-  && { [ -z "$generated_lane_legacy_plist_target" ] || [ -f "$generated_lane_legacy_plist_target" ]; } \
+  && generated_legacy_plists_exist \
   && { [ ! -f "$PROJECT_DIR/Resources/LaunchAgents/io.harnessmonitor.daemon.managed.plist" ] \
     || [ -f "$launch_agents_dir/io.harnessmonitor.daemon.managed.plist" ]; } \
   && { [ ! -f "$PROJECT_DIR/Resources/LaunchAgents/io.harnessmonitor.daemon.plist" ] \
@@ -299,11 +317,12 @@ fi
 /usr/bin/plutil -replace EnvironmentVariables.HARNESS_DAEMON_OWNERSHIP -string "managed" "$plist_target_staging"
 /usr/bin/plutil -lint "$plist_target_staging"
 
-if [ -n "$generated_lane_legacy_plist_target" ]; then
-  /bin/cp "$plist_target_staging" "$generated_lane_legacy_plist_target"
-  /usr/bin/plutil -replace Label -string "$legacy_lane_label" "$generated_lane_legacy_plist_target"
-  /usr/bin/plutil -lint "$generated_lane_legacy_plist_target"
-fi
+for legacy_target in "${generated_legacy_plist_targets[@]}"; do
+  legacy_label="$(basename "$legacy_target" .plist)"
+  /bin/cp "$plist_target_staging" "$legacy_target"
+  /usr/bin/plutil -replace Label -string "$legacy_label" "$legacy_target"
+  /usr/bin/plutil -lint "$legacy_target"
+done
 
 for legacy_plist_name in \
   Q498EB36N4.io.harnessmonitor.agent.plist \
