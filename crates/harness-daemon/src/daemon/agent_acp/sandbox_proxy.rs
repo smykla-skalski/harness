@@ -21,11 +21,13 @@ use super::manager::{
 };
 use super::permission_bridge::{AcpPermissionBatch, AcpPermissionDecision};
 mod incidents;
+mod logging;
 use incidents::{
     AcpPoolKeyMismatchIncidentPayload, bridge_resync_incident_payload, dedupe_incident_replays,
     emit_bridge_resync_incident, emit_pool_key_mismatch_incidents, incident_key,
     replay_safe_resync_events,
 };
+use logging::log_empty_inspect_with_error;
 
 const SANDBOX_ACP_EVENT_POLL_INTERVAL: Duration = Duration::from_millis(250);
 const SANDBOX_ACP_EVENT_ERROR_BACKOFF: Duration = Duration::from_secs(1);
@@ -359,20 +361,6 @@ impl AcpAgentManagerHandle {
             let _ = self.sender().send(event);
         }
         false
-    }
-}
-
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
-)]
-fn log_empty_inspect_with_error(error: &CliError, message: &str) -> AcpAgentInspectResponse {
-    tracing::warn!(%error, "{message}");
-    AcpAgentInspectResponse {
-        agents: Vec::new(),
-        daemon_perceived_now: Some(utc_now()),
-        available: false,
-        issue_message: Some(message.to_string()),
     }
 }
 
