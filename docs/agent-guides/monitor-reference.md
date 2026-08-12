@@ -95,7 +95,7 @@ Do not reintroduce LaunchAction env patching in `Scripts/post-generate.sh` witho
 
 ## UI test interaction contract
 
-Targeted `HarnessMonitorUITests` runs must use the isolated `Harness Monitor UI Testing` host (`io.harnessmonitor.app.ui-testing`).
+Targeted `HarnessMonitorUITests` runs must use the isolated `Harness Monitor UI Testing` host (`io.harnessmonitor.app.ui-testing`). The identity stays fixed across build lanes so macOS app-group approval and the development provisioning profile are reused instead of recreated per lane; runtime state remains isolated by the explicit temporary daemon data home.
 
 If a control is visually correct but a UI test cannot find or tap it, fix the test query or interaction path before changing product layout, copy, or semantics. Do not introduce UI changes only to satisfy a flaky lookup unless the product has a real visual or accessibility bug.
 

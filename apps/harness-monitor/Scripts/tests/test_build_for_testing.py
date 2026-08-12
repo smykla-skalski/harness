@@ -69,6 +69,7 @@ class BuildForTestingScriptTests(unittest.TestCase):
 
         self.assertIn('source "$ROOT/Scripts/lib/test-code-signing.sh"', script)
         self.assertIn("harness_monitor_test_code_signing_allowed", script)
+        self.assertIn("-allowProvisioningUpdates", script)
 
     def wait_for_path(self, path: Path, *, timeout: float = 5.0) -> None:
         deadline = time.monotonic() + timeout

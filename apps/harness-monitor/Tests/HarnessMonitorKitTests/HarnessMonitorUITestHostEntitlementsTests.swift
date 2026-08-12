@@ -3,22 +3,66 @@ import Testing
 
 @Suite("UI test host entitlements")
 struct HarnessMonitorUITestHostEntitlementsTests {
-  @Test("UI test host requests the monitor app-group access it needs")
-  func uiTestHostRequestsMonitorAppGroupAccess() throws {
-    let entitlementsURL = monitorAppRoot()
+  @Test("UI test host uses one signed identity for app-group access")
+  func uiTestHostUsesStableSignedAppGroupIdentity() throws {
+    let root = monitorAppRoot()
+    let entitlementsURL =
+      root
       .appendingPathComponent("HarnessMonitorUITestHost.entitlements", isDirectory: false)
     let entitlements = try loadDictionaryPlist(at: entitlementsURL)
+    let projectSource = try String(
+      contentsOf: root.appendingPathComponent("Project.swift", isDirectory: false),
+      encoding: .utf8
+    )
+    let settingsStart = try #require(projectSource.range(of: "private let uiTestHostSettings"))
+    let targetStart = try #require(projectSource.range(of: "private let uiTestHostTarget"))
+    let settingsSource = projectSource[settingsStart.lowerBound..<targetStart.lowerBound]
 
     #expect(entitlements["com.apple.security.app-sandbox"] as? Bool == true)
     #expect(
       entitlements["com.apple.security.application-groups"] as? [String]
         == ["Q498EB36N4.io.harnessmonitor"]
     )
+    #expect(
+      projectSource.contains(
+        "private let monitorUITestHostBundleId = \"io.harnessmonitor.app.ui-testing\""
+      )
+    )
+    #expect(
+      projectSource.contains(
+        "private let uiTestsBundleId = \"\\(monitorUITestHostBundleId).ui-tests\""
+      )
+    )
+    #expect(
+      settingsSource.contains(
+        "\"CODE_SIGN_IDENTITY[sdk=macosx*]\": \"Apple Development\""
+      )
+    )
+    #expect(settingsSource.contains("\"CODE_SIGN_STYLE\": \"Automatic\""))
+    #expect(settingsSource.contains("\"REGISTER_APP_GROUPS\": \"YES\""))
   }
 }
 
 @Suite("App bundle metadata")
 struct HarnessMonitorAppBundleMetadataTests {
+  @Test("Hosted app tests use the app development team")
+  func hostedAppTestsUseAppleDevelopmentSigning() throws {
+    let projectSource = try String(
+      contentsOf: monitorAppRoot().appendingPathComponent("Project.swift", isDirectory: false),
+      encoding: .utf8
+    )
+    let targetStart = try #require(projectSource.range(of: "private let appTestsTarget"))
+    let schemeStart = try #require(projectSource.range(of: "private let appTestsScheme"))
+    let targetSource = projectSource[targetStart.lowerBound..<schemeStart.lowerBound]
+
+    #expect(
+      targetSource.contains(
+        "\"CODE_SIGN_IDENTITY[sdk=macosx*]\": \"Apple Development\""
+      )
+    )
+    #expect(targetSource.contains("\"CODE_SIGN_STYLE\": \"Automatic\""))
+  }
+
   @Test("Harness Monitor defaults to a menu-bar-only application presence")
   func harnessMonitorDefaultsToAccessoryActivation() throws {
     let infoPlistURL = monitorAppRoot()
