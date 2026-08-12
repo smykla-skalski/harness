@@ -35,6 +35,8 @@ class TestSwiftScriptTests(unittest.TestCase):
         override_runner: bool = False,
         test_scheme: str | None = None,
         precreated_xctestruns: list[str] | None = None,
+        precreated_contract: bool = True,
+        contract_signing: str | None = None,
     ) -> tuple[subprocess.CompletedProcess[str], list[list[str]]]:
         with tempfile.TemporaryDirectory() as tmp_dir:
             temp_root = Path(tmp_dir)
@@ -50,6 +52,41 @@ class TestSwiftScriptTests(unittest.TestCase):
             build_products_path.mkdir(parents=True, exist_ok=True)
             for filename in precreated_xctestruns or []:
                 (build_products_path / filename).write_text("xctestrun", encoding="utf-8")
+            if precreated_xctestruns and precreated_contract:
+                scheme = test_scheme or "HarnessMonitor"
+                signing = contract_signing
+                if signing is None:
+                    app_host_schemes = {
+                        "HarnessMonitor",
+                        "HarnessMonitorAppTests",
+                        "HarnessMonitorUITestHost",
+                    }
+                    requests_ui_tests = bool(
+                        only_testing
+                        and (
+                            "HarnessMonitorUITests" in only_testing
+                            or "HarnessMonitorAgentsE2ETests" in only_testing
+                        )
+                    )
+                    signing = (
+                        "YES"
+                        if scheme in app_host_schemes or requests_ui_tests
+                        else "NO"
+                    )
+                safe_scheme = "".join(
+                    character
+                    if character.isalnum() or character in "_.-"
+                    else "_"
+                    for character in scheme
+                )
+                contract_path = (
+                    build_products_path
+                    / f".harness-monitor-build-for-testing-{safe_scheme}.contract"
+                )
+                contract_path.write_text(
+                    f"scheme={scheme}\ncode-signing-allowed={signing}\n",
+                    encoding="utf-8",
+                )
 
             write_executable(
                 build_for_testing_script,
@@ -450,6 +487,7 @@ exec "{fake_bin / "xcodebuild"}" "$@"
         self.assertIn("test-without-building", calls[1])
         self.assertIn("-skip-testing:HarnessMonitorUITests", calls[1])
         self.assertIn("-skip-testing:HarnessMonitorAgentsE2ETests", calls[1])
+        self.assertIn("CODE_SIGNING_ALLOWED=YES", calls[1])
 
     def test_uses_overridden_test_scheme_for_test_without_building(self) -> None:
         completed, calls = self.run_script(
@@ -464,6 +502,7 @@ exec "{fake_bin / "xcodebuild"}" "$@"
             calls[1][calls[1].index("-scheme") + 1],
             "HarnessMonitorPolicyCanvasTests",
         )
+        self.assertIn("CODE_SIGNING_ALLOWED=NO", calls[1])
 
     def test_overridden_scheme_does_not_reuse_unrelated_xctestrun(self) -> None:
         completed, calls = self.run_script(
@@ -503,6 +542,24 @@ exec "{fake_bin / "xcodebuild"}" "$@"
         self.assertEqual(len(calls), 1)
         self.assertNotEqual(calls[0], ["build-for-testing"])
         self.assertIn("reuse-build-for-testing: skipping build", completed.stderr)
+
+    def test_default_scheme_rebuilds_matching_xctestrun_without_contract(self) -> None:
+        completed, calls = self.run_script(
+            precreated_xctestruns=["HarnessMonitor_macosx26.5-arm64.xctestrun"],
+            precreated_contract=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(calls[0], ["build-for-testing"])
+
+    def test_default_scheme_rebuilds_unsigned_matching_xctestrun(self) -> None:
+        completed, calls = self.run_script(
+            precreated_xctestruns=["HarnessMonitor_macosx26.5-arm64.xctestrun"],
+            contract_signing="NO",
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(calls[0], ["build-for-testing"])
 
     def test_overridden_scheme_reuses_matching_xctestrun(self) -> None:
         completed, calls = self.run_script(

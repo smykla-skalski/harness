@@ -12,6 +12,8 @@ source "$ROOT/Scripts/lib/xcodebuild-destination.sh"
 source "$ROOT/Scripts/lib/xcodebuild-support.sh"
 # shellcheck source=apps/harness-monitor/Scripts/lib/monitor-lanes.sh
 source "$ROOT/Scripts/lib/monitor-lanes.sh"
+# shellcheck source=apps/harness-monitor/Scripts/lib/test-code-signing.sh
+source "$ROOT/Scripts/lib/test-code-signing.sh"
 STALE_CHECK_SCRIPT="$CHECKOUT_ROOT/scripts/check-no-stale-state.sh"
 DESTINATION="$(harness_monitor_xcodebuild_destination)"
 DERIVED_DATA_PATH="$(harness_monitor_build_derived_data_path "$COMMON_REPO_ROOT")"
@@ -42,22 +44,6 @@ run_stale_preflight() {
   fi
 
   "$STALE_CHECK_SCRIPT"
-}
-
-resolve_code_signing_allowed() {
-  if [[ -n "${HARNESS_MONITOR_CODE_SIGNING_ALLOWED:-}" ]]; then
-    printf '%s\n' "$HARNESS_MONITOR_CODE_SIGNING_ALLOWED"
-    return 0
-  fi
-
-  case "${XCODE_ONLY_TESTING:-}" in
-    *HarnessMonitorUITests*|*HarnessMonitorAgentsE2ETests*)
-      printf 'YES\n'
-      ;;
-    *)
-      printf 'NO\n'
-      ;;
-  esac
 }
 
 # Unit and app-test builds exercise Swift code and do not need the embedded
@@ -102,7 +88,9 @@ else
 fi
 
 "$GENERATE_PROJECT_SCRIPT"
-CODE_SIGNING_ALLOWED_SETTING="$(resolve_code_signing_allowed)"
+CODE_SIGNING_ALLOWED_SETTING="$(
+  harness_monitor_test_code_signing_allowed "$TEST_SCHEME" "${XCODE_ONLY_TESTING:-}"
+)"
 
 exec env \
   HARNESS_SKIP_STALE_CHECK=1 \

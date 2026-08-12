@@ -51,11 +51,13 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
   }
 
   func applicationWillFinishLaunching(_ notification: Notification) {
-    if hidesDockIconForPerfRuns {
-      NSApplication.shared.setActivationPolicy(.accessory)
-      return
-    }
-    NSApplication.shared.setActivationPolicy(.regular)
+    _ = notification
+    HarnessMonitorApplicationPresenceController.shared.configure(
+      mode: Self.applicationPresenceMode(
+        hidesDockIconForPerfRuns: hidesDockIconForPerfRuns,
+        isTestHarnessRun: isTestHarnessRun
+      )
+    )
   }
 
   func applicationDidFinishLaunching(_ notification: Notification) {
@@ -153,6 +155,16 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
     hasVisibleWindows: Bool
   ) -> Bool {
     !hasVisibleWindows
+  }
+
+  static func applicationPresenceMode(
+    hidesDockIconForPerfRuns: Bool,
+    isTestHarnessRun: Bool
+  ) -> HarnessMonitorApplicationPresenceController.Mode {
+    if hidesDockIconForPerfRuns {
+      return .alwaysAccessory
+    }
+    return isTestHarnessRun ? .alwaysRegular : .dynamic
   }
 
   func applicationDidResignActive(_ notification: Notification) {

@@ -12,6 +12,8 @@ source "$ROOT/Scripts/lib/xcodebuild-destination.sh"
 source "$ROOT/Scripts/lib/xcodebuild-support.sh"
 # shellcheck source=apps/harness-monitor/Scripts/lib/monitor-lanes.sh
 source "$ROOT/Scripts/lib/monitor-lanes.sh"
+# shellcheck source=apps/harness-monitor/Scripts/lib/test-code-signing.sh
+source "$ROOT/Scripts/lib/test-code-signing.sh"
 # shellcheck source=apps/harness-monitor/Scripts/lib/build-for-testing-reuse.sh
 source "$ROOT/Scripts/lib/build-for-testing-reuse.sh"
 STALE_CHECK_SCRIPT="$CHECKOUT_ROOT/scripts/check-no-stale-state.sh"
@@ -92,22 +94,6 @@ run_stale_preflight() {
   else
     "$STALE_CHECK_SCRIPT"
   fi
-}
-
-resolve_code_signing_allowed() {
-  if [[ -n "${HARNESS_MONITOR_CODE_SIGNING_ALLOWED:-}" ]]; then
-    printf '%s\n' "$HARNESS_MONITOR_CODE_SIGNING_ALLOWED"
-    return 0
-  fi
-
-  case "$XCODE_ONLY_TESTING" in
-    *HarnessMonitorUITests*|*HarnessMonitorAgentsE2ETests*)
-      printf 'YES\n'
-      ;;
-    *)
-      printf 'NO\n'
-      ;;
-  esac
 }
 
 run_test_action() {
@@ -248,6 +234,9 @@ run_build_for_testing() {
   set -e
   filter_monitor_test_console_output <"$build_log_path"
   /bin/rm -f "$build_log_path"
+  if (( status == 0 )); then
+    record_build_for_testing_contract
+  fi
   return "$status"
 }
 
@@ -439,7 +428,9 @@ if [ ! -x "${BUILD_FOR_TESTING_SCRIPT}" ]; then
   exit 1
 fi
 
-CODE_SIGNING_ALLOWED_SETTING="$(resolve_code_signing_allowed)"
+CODE_SIGNING_ALLOWED_SETTING="$(
+  harness_monitor_test_code_signing_allowed "$TEST_SCHEME" "$XCODE_ONLY_TESTING"
+)"
 run_stale_preflight
 
 trap 'cleanup_script_descendants $?' EXIT

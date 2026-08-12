@@ -45,6 +45,8 @@
 	<string>public.app-category.developer-tools</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
+	<key>LSUIElement</key>
+	<true/>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Harness Monitor records voice only when you press a voice input control so it can transcribe your instruction.</string>
 	<key>NSLocalNetworkUsageDescription</key>

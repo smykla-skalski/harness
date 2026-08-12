@@ -71,6 +71,37 @@ ui_test_runners_are_valid() {
   return 0
 }
 
+build_for_testing_contract_path() {
+  local product_dir="$DERIVED_DATA_PATH/Build/Products"
+  local scheme="${TEST_SCHEME:-${HARNESS_MONITOR_TEST_SCHEME:-HarnessMonitor}}"
+  local safe_scheme
+  safe_scheme="$(printf '%s' "$scheme" | /usr/bin/tr -c '[:alnum:]_.-' '_')"
+  printf '%s/.harness-monitor-build-for-testing-%s.contract\n' "$product_dir" "$safe_scheme"
+}
+
+build_for_testing_contract() {
+  printf 'scheme=%s\ncode-signing-allowed=%s\n' \
+    "${TEST_SCHEME:-${HARNESS_MONITOR_TEST_SCHEME:-HarnessMonitor}}" \
+    "${CODE_SIGNING_ALLOWED_SETTING:-}"
+}
+
+build_for_testing_contract_is_current() {
+  local contract_path
+  contract_path="$(build_for_testing_contract_path)"
+  [[ -f "$contract_path" ]] || return 1
+  [[ "$(<"$contract_path")" == "$(build_for_testing_contract)" ]]
+}
+
+record_build_for_testing_contract() {
+  local contract_path product_dir temporary_path
+  contract_path="$(build_for_testing_contract_path)"
+  product_dir="$(dirname "$contract_path")"
+  temporary_path="${contract_path}.tmp.$$"
+  mkdir -p "$product_dir"
+  build_for_testing_contract >"$temporary_path"
+  mv "$temporary_path" "$contract_path"
+}
+
 # Skip the build-for-testing step when the existing .xctestrun is newer than
 # every Swift source, project descriptor, and SPM lockfile that could affect
 # the test bundle. Defaults ON because chained focused reruns rarely change
@@ -94,6 +125,10 @@ should_reuse_existing_build_for_testing() {
   fi
 
   if ! ui_test_runners_are_valid; then
+    return 1
+  fi
+
+  if ! build_for_testing_contract_is_current; then
     return 1
   fi
 
