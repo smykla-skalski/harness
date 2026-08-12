@@ -177,6 +177,8 @@ struct HarnessMonitorOpenAnythingExecutorBinder: ViewModifier {
   }
 
   private func executeRoutingStep(_ step: OpenAnythingRoutingStep, openWindow: OpenWindowAction) {
+    prepareHarnessIfNeeded(for: step)
+    defer { activateHarnessIfNeeded(for: step) }
     guard !executePresentationStep(step, openWindow: openWindow) else { return }
     guard !executeCommandStep(step) else { return }
     switch step {
@@ -199,7 +201,6 @@ struct HarnessMonitorOpenAnythingExecutorBinder: ViewModifier {
       .revealInFinder:
       break
     }
-    activateHarnessIfNeeded(for: step)
   }
 
   private func executeCommandStep(_ step: OpenAnythingRoutingStep) -> Bool {
@@ -230,11 +231,9 @@ struct HarnessMonitorOpenAnythingExecutorBinder: ViewModifier {
     switch step {
     case .presentNewSessionSheet:
       openDashboardPresentationHostIfNeeded(openWindow: openWindow)
-      activateHarnessIfNeeded(for: step)
       store.presentedSheet = .newSession
     case .presentNewTaskSheet:
       openDashboardPresentationHostIfNeeded(openWindow: openWindow)
-      activateHarnessIfNeeded(for: step)
       store.requestCreateTaskSheet()
     case .attachExternalSession:
       store.requestAttachExternalSession()
@@ -244,6 +243,11 @@ struct HarnessMonitorOpenAnythingExecutorBinder: ViewModifier {
       return false
     }
     return true
+  }
+
+  private func prepareHarnessIfNeeded(for step: OpenAnythingRoutingStep) {
+    guard openAnythingRoutingStepRequiresApplicationActivation(step) else { return }
+    HarnessMonitorApplicationPresenceController.shared.prepareToPresentApplicationWindow()
   }
 
   private func activateHarnessIfNeeded(for step: OpenAnythingRoutingStep) {

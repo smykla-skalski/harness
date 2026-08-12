@@ -54,6 +54,7 @@ class TestAgentsE2EScriptTests(unittest.TestCase):
             re.search(r"CODE_SIGNING_ALLOWED=NO\s*\\\s*\n\s*test-without-building", script),
             "test-without-building must not disable code signing for macOS UI tests",
         )
+        self.assertIn("-allowProvisioningUpdates", script)
 
     def test_expensive_e2e_lane_disables_xcodebuild_retries(self) -> None:
         script = SCRIPT_PATH.read_text(encoding="utf-8")

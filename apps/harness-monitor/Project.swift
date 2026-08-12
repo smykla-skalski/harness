@@ -13,7 +13,7 @@ private let monitorWidgetsBundleId = "\(monitorAppBundleId).widgets"
 private let monitorPreviewBundleId =
   ProcessInfo.processInfo.environment["TUIST_MONITOR_PREVIEW_BUNDLE_ID"]
   ?? "io.harnessmonitor.previews"
-private let monitorUITestHostBundleId = "\(monitorAppBundleId).ui-testing"
+private let monitorUITestHostBundleId = "io.harnessmonitor.app.ui-testing"
 private let managedDaemonDataHome =
   ProcessInfo.processInfo.environment["TUIST_MANAGED_DAEMON_DATA_HOME"] ?? ""
 private let managedDaemonRuntimeLane =
@@ -40,7 +40,7 @@ private let generatedAppEntitlements: SettingValue =
   "$(PROJECT_TEMP_DIR)/GeneratedAppEntitlements/$(TARGET_NAME).codesign.entitlements"
 private let isolatedAppEntitlementsPath: Path = "HarnessMonitorIsolated.entitlements"
 private let isolatedAppBundleId: String = IsolatedAppIdentity.bundleId
-private let uiTestsBundleId = "\(isolatedAppBundleId).ui-tests"
+private let uiTestsBundleId = "\(monitorUITestHostBundleId).ui-tests"
 
 private func staticFrameworkSettings(
   bundleId: String,
@@ -972,6 +972,7 @@ private let appTestsTarget: Target = .target(
   dependencies: [.target(name: "HarnessMonitor"), .target(name: "HarnessMonitorPolicyCanvas")],
   settings: .settings(base: [
     "BUNDLE_LOADER": "$(TEST_HOST)",
+    "CODE_SIGN_IDENTITY[sdk=macosx*]": "Apple Development",
     "CODE_SIGN_STYLE": "Automatic",
     "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.app-tests",
     "SWIFT_ACTIVE_COMPILATION_CONDITIONS": FeatureFlags.compilationConditionSetting(),
