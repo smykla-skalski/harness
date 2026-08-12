@@ -12,6 +12,8 @@
 use std::fs;
 use std::io::Write as _;
 use std::os::unix::fs::PermissionsExt;
+use std::path::Path;
+use std::sync::Mutex;
 
 use uuid::Uuid;
 
@@ -23,6 +25,8 @@ use super::{
     DaemonAuditEvent, DaemonDiagnostics, auth_token_path, daemon_root, ensure_daemon_dirs,
     events_path, manifest_path,
 };
+
+static EVENT_APPEND_LOCK: Mutex<()> = Mutex::new(());
 
 /// Generate and persist a local bearer token with 0600 permissions.
 ///
@@ -69,17 +73,21 @@ pub fn append_event(level: &str, message: &str) -> Result<(), CliError> {
 pub fn append_event_entry(event: &DaemonAuditEvent) -> Result<(), CliError> {
     ensure_daemon_dirs()?;
     let path = events_path();
-    let line = serde_json::to_string(&event).map_err(|error| {
+    let mut record = serde_json::to_vec(&event).map_err(|error| {
         CliError::from(CliErrorKind::workflow_serialize(format!(
             "serialize daemon audit event: {error}"
         )))
     })?;
+    record.push(b'\n');
+    let _guard = EVENT_APPEND_LOCK
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let mut file = fs_err::OpenOptions::new()
         .create(true)
         .append(true)
         .open(path)
         .map_err(|error| CliErrorKind::workflow_io(format!("open daemon events: {error}")))?;
-    writeln!(file, "{line}")
+    file.write_all(&record)
         .map_err(|error| CliErrorKind::workflow_io(format!("append daemon event: {error}")).into())
 }
 
@@ -115,24 +123,33 @@ pub fn read_recent_events(limit: usize) -> Result<Vec<DaemonAuditEvent>, CliErro
         )))
     })?;
     let mut events = Vec::new();
-    for line in content.lines().rev() {
+    'lines: for line in content.lines().rev() {
         let trimmed = line.trim();
         if trimmed.is_empty() {
             continue;
         }
-        let event = serde_json::from_str(trimmed).map_err(|error| {
-            CliError::from(CliErrorKind::workflow_parse(format!(
-                "parse daemon event {}: {error}",
-                path.display()
-            )))
-        })?;
-        events.push(event);
-        if events.len() == limit {
-            break;
+        let line_events = parse_event_line(trimmed, &path)?;
+        for event in line_events.into_iter().rev() {
+            events.push(event);
+            if events.len() == limit {
+                break 'lines;
+            }
         }
     }
     events.reverse();
     Ok(events)
+}
+
+fn parse_event_line(line: &str, path: &Path) -> Result<Vec<DaemonAuditEvent>, CliError> {
+    serde_json::Deserializer::from_str(line)
+        .into_iter::<DaemonAuditEvent>()
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| {
+            CliError::from(CliErrorKind::workflow_parse(format!(
+                "parse daemon event {}: {error}",
+                path.display()
+            )))
+        })
 }
 
 /// Build a derived diagnostics snapshot for the local daemon workspace.
