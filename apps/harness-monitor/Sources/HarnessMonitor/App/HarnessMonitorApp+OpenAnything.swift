@@ -249,11 +249,7 @@ struct HarnessMonitorOpenAnythingExecutorBinder: ViewModifier {
   private func activateHarnessIfNeeded(for step: OpenAnythingRoutingStep) {
     guard openAnythingRoutingStepRequiresApplicationActivation(step) else { return }
     guard !NSApplication.shared.isActive else { return }
-    if #available(macOS 14.0, *) {
-      NSApplication.shared.activate()
-    } else {
-      NSApplication.shared.activate(ignoringOtherApps: true)
-    }
+    NSApplication.shared.activate()
   }
 
   private func openDashboardPresentationHostIfNeeded(openWindow: OpenWindowAction) {

@@ -132,7 +132,7 @@ struct HarnessMonitorMenuBarExtraContent: View {
 
     Button("Open Policy Workspace") {
       openPolicyWorkspace()
-      NSApplication.shared.activate(ignoringOtherApps: true)
+      NSApplication.shared.activate()
     }
   }
 
@@ -185,7 +185,7 @@ struct HarnessMonitorMenuBarExtraContent: View {
     } else {
       openWindow(id: id)
     }
-    NSApplication.shared.activate(ignoringOtherApps: true)
+    NSApplication.shared.activate()
   }
 
   private func toggleSupervisor() {

@@ -19,6 +19,15 @@ struct HarnessMonitorUITestHostEntitlementsTests {
 
 @Suite("App bundle metadata")
 struct HarnessMonitorAppBundleMetadataTests {
+  @Test("Harness Monitor defaults to a menu-bar-only application presence")
+  func harnessMonitorDefaultsToAccessoryActivation() throws {
+    let infoPlistURL = monitorAppRoot()
+      .appendingPathComponent("Resources/HarnessMonitor-Info.plist", isDirectory: false)
+    let infoPlist = try loadDictionaryPlist(at: infoPlistURL)
+
+    #expect(infoPlist["LSUIElement"] as? Bool == true)
+  }
+
   @Test("Harness Monitor exports custom drag payload UTTypes")
   func harnessMonitorExportsCustomDragPayloadUTTypes() throws {
     let infoPlistURL = monitorAppRoot()

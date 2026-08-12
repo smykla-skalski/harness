@@ -163,6 +163,7 @@ extension HarnessMonitorApp {
         navigationRequest: settingsNavigationRequestBinding
       )
       .harnessTrackMCPWindow(tracksElements: false)
+      .modifier(HarnessMonitorApplicationWindowLifecycleModifier())
       .environment(appStore)
       .environment(\.supervisorAuditTimelineDispatcher, appAuditTimelineDispatcher)
       .dashboardDebuggingOCRPasteCommand()

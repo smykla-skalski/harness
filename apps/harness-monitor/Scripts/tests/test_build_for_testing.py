@@ -64,6 +64,12 @@ class BuildForTestingScriptTests(unittest.TestCase):
         )
         self.assertIn('-scheme "$TEST_SCHEME"', script)
 
+    def test_app_host_schemes_keep_code_signing_enabled(self) -> None:
+        script = SCRIPT_PATH.read_text(encoding="utf-8")
+
+        self.assertIn('source "$ROOT/Scripts/lib/test-code-signing.sh"', script)
+        self.assertIn("harness_monitor_test_code_signing_allowed", script)
+
     def wait_for_path(self, path: Path, *, timeout: float = 5.0) -> None:
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
