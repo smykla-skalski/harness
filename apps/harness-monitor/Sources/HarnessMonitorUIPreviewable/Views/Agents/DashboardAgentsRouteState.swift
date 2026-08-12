@@ -56,11 +56,15 @@ struct DashboardAgentBrowserViewState: Equatable, Sendable {
 @Observable
 final class DashboardAgentsRouteState {
   private(set) var viewState: DashboardAgentBrowserViewState
+  @ObservationIgnored private(set) var lastCachedSnapshotAt: Date?
+  @ObservationIgnored private(set) var lastCompletedRefreshAt: Date?
   private var generation: UInt64 = 0
   private var isLoadInFlight: Bool
 
   init(viewState: DashboardAgentBrowserViewState = DashboardAgentBrowserViewState()) {
     self.viewState = viewState
+    lastCachedSnapshotAt = viewState.cachedAt
+    lastCompletedRefreshAt = viewState.refreshedAt
     isLoadInFlight = viewState.isLoading
   }
 
@@ -84,12 +88,16 @@ final class DashboardAgentsRouteState {
     generation expectedGeneration: UInt64
   ) {
     guard generation == expectedGeneration else { return }
-    viewState.cachedAt = snapshot.cachedAt
+    lastCachedSnapshotAt = snapshot.cachedAt
     guard !snapshot.agents.isEmpty, viewState.source == nil || viewState.source == .cache else {
       return
     }
-    viewState.agents = snapshot.agents
-    viewState.source = .cache
+    var next = viewState
+    next.agents = snapshot.agents
+    next.source = .cache
+    guard next != viewState else { return }
+    next.cachedAt = snapshot.cachedAt
+    viewState = next
   }
 
   func finishLoad(
@@ -98,12 +106,16 @@ final class DashboardAgentsRouteState {
   ) {
     guard generation == expectedGeneration else { return }
     isLoadInFlight = false
-    viewState.agents = result.agents
-    viewState.source = result.source
-    viewState.issue = result.issue
-    viewState.refreshedAt = result.refreshedAt
-    viewState.isLoading = false
-    viewState.hasAttemptedLoad = true
+    lastCompletedRefreshAt = result.refreshedAt
+    var next = viewState
+    next.agents = result.agents
+    next.source = result.source
+    next.issue = result.issue
+    next.isLoading = false
+    next.hasAttemptedLoad = true
+    guard next != viewState else { return }
+    next.refreshedAt = result.refreshedAt
+    viewState = next
   }
 }
 

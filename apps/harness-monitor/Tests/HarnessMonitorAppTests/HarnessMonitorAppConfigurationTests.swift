@@ -78,10 +78,11 @@ final class HarnessMonitorAppConfigurationTests: XCTestCase {
       .appendingPathComponent("harness-monitor-mobile-relay-no-icloud-\(UUID().uuidString)")
     let environment = HarnessMonitorEnvironment(values: [:], homeDirectory: home)
     let store = HarnessMonitorStore(daemonController: PreviewDaemonController(mode: .empty))
+    let clientProvider = HarnessMonitorMobileRelayClientProvider(store: store)
 
     let runtime = HarnessMonitorApp.makeMobileRelayRuntime(
       environment: environment,
-      store: store,
+      clientProvider: clientProvider,
       runsLiveSideEffects: true,
       hasCloudKitEntitlement: { false }
     )

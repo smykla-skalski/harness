@@ -3,7 +3,7 @@ import SwiftUI
 
 extension SessionWindowView {
   var sessionStatusSummaryModel: SessionStatusSummaryModel {
-    let metrics = store.connectionMetrics
+    let metrics = store.connectionStatusMetrics
     let sourceTitle: String =
       if snapshot == nil {
         "Loading"

@@ -39,9 +39,10 @@ public enum HarnessMonitorPerfTaskBoardLaneScrollBus {
   public static let isActiveAtLaunch: Bool = isActive()
 
   public static func requestScroll(
-    laneRaw: String,
+    lane: TaskBoardInboxLane,
     edge: String
   ) {
+    let laneRaw = lane.rawValue
     HarnessMonitorPerfTrace.recordScenarioEvent(
       component: auditComponent,
       event: "scroll.request.\(edge)",

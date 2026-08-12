@@ -3,7 +3,15 @@ struct LegacyContainmentFence: Sendable {
 }
 
 extension HarnessMonitorStore {
+  private var requiresLegacyManagedLaunchAgentContainment: Bool {
+    daemonOwnership == .managed || usesRemoteDaemon
+  }
+
   func requireLegacyManagedLaunchAgentCleanup() async -> Bool {
+    guard requiresLegacyManagedLaunchAgentContainment else {
+      skipLegacyManagedLaunchAgentContainment()
+      return true
+    }
     startLegacyManagedLaunchAgentContainment(failureActive: false)
     do {
       try await daemonController.requireLegacyManagedLaunchAgentCleanup()
@@ -20,6 +28,10 @@ extension HarnessMonitorStore {
   }
 
   func requireLegacyManagedLaunchAgentCleanupOrThrow() async throws {
+    guard requiresLegacyManagedLaunchAgentContainment else {
+      skipLegacyManagedLaunchAgentContainment()
+      return
+    }
     startLegacyManagedLaunchAgentContainment(failureActive: false)
     do {
       try await daemonController.requireLegacyManagedLaunchAgentCleanup()
@@ -124,6 +136,14 @@ extension HarnessMonitorStore {
     connection.legacyContainmentReconnectTask?.cancel()
   }
 
+  func skipLegacyManagedLaunchAgentContainment() {
+    legacyManagedLaunchAgentContainment.cancel()
+    connection.legacyContainmentGeneration &+= 1
+    connection.legacyContainmentHealthy = true
+    connection.legacyContainmentReconnectTask?.cancel()
+    connection.legacyContainmentReconnectTask = nil
+  }
+
   func recordControllerLegacyCleanupFailureIfNeeded(_ error: any Error) async {
     guard
       let daemonError = error as? DaemonControlError,
@@ -206,7 +226,7 @@ extension HarnessMonitorStore {
   }
 
   func isCurrentLegacyContainmentFence(_ fence: LegacyContainmentFence) -> Bool {
-    shouldAbandonConnectionAttempt == false
+    return shouldAbandonConnectionAttempt == false
       && connection.legacyContainmentHealthy
       && connection.legacyContainmentGeneration == fence.generation
   }

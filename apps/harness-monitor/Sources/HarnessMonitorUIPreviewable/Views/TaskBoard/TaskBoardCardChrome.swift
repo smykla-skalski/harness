@@ -130,32 +130,34 @@ extension View {
     )
   }
 
-  /// Each card reports its own frame straight into the lane's hover model.
-  /// Deliberately not a shared preference reduced across the `LazyVStack` - that
-  /// aggregate faulted as "bound preference ... tried to update multiple times
-  /// per frame" while lazy children measured in. Frame recording stays
-  /// unconditional so the model is current the instant the pointer arrives, but
-  /// re-resolving the hovered card is gated: every visible card's frame changes
-  /// each scroll frame, yet only the card now under the pointer, or the one
-  /// sliding off it, can change the hit. `isHovered` is that second case.
+  /// Each card reports its frame directly instead of reducing one shared
+  /// preference. Geometry publication pauses while the list scrolls; the lane
+  /// clears old frames at scroll start and visible rows publish current frames
+  /// when scrolling settles.
   func taskBoardCardFrame(
     id: TaskBoardLaneCardHoverID,
     in coordinateSpace: String,
     tracking: TaskBoardLaneHoverTracking,
-    isHovered: Bool,
+    behavior: TaskBoardCardFrameBehavior,
     onChange: @escaping () -> Void
   ) -> some View {
-    onGeometryChange(for: CGRect.self) { proxy in
-      proxy.frame(in: .named(coordinateSpace))
+    onGeometryChange(for: CGRect?.self) { proxy in
+      behavior.isGeometryRecordingEnabled ? proxy.frame(in: .named(coordinateSpace)) : nil
     } action: { frame in
+      guard let frame else { return }
       TaskBoardCardDragDiagnostics.recordGeometryUpdate()
       tracking.setFrame(frame, for: id)
       guard let location = tracking.location else { return }
-      if isHovered || frame.contains(location) { onChange() }
+      if behavior.isHovered || frame.contains(location) { onChange() }
     }
     .onDisappear {
       tracking.removeFrame(for: id)
-      if isHovered { onChange() }
+      if behavior.isHovered { onChange() }
     }
   }
+}
+
+struct TaskBoardCardFrameBehavior: Sendable {
+  let isHovered: Bool
+  let isGeometryRecordingEnabled: Bool
 }

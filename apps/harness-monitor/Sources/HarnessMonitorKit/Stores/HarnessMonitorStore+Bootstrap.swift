@@ -26,11 +26,12 @@ extension HarnessMonitorStore {
       return
     }
     ensureLocalManifestURL()
-    guard await requireLegacyManagedLaunchAgentCleanup() else { return }
     switch daemonOwnership {
     case .external:
+      skipLegacyManagedLaunchAgentContainment()
       await bootstrapExternalDaemon()
     case .managed:
+      guard await requireLegacyManagedLaunchAgentCleanup() else { return }
       await bootstrapManagedDaemon()
     }
   }
@@ -48,22 +49,18 @@ extension HarnessMonitorStore {
   /// count crosses the trigger threshold.
   private func scheduleReviewFilesVacuumIfNeeded() {
     guard let modelContext else { return }
-    let cache = ReviewFilesCache(context: modelContext)
-    let rowCount = cache.countCachedFiles()
-    guard rowCount > Self.reviewFilesVacuumTrigger else { return }
     let container = modelContext.container
-    let cutoff = Date.now.addingTimeInterval(-Self.reviewFilesVacuumMaxAge)
     Task.detached(priority: .background) {
-      Self.runReviewFilesVacuum(container: container, cutoff: cutoff)
+      Self.runReviewFilesVacuumIfNeeded(container: container)
     }
   }
 
-  nonisolated private static func runReviewFilesVacuum(
-    container: ModelContainer,
-    cutoff: Date
-  ) {
+  nonisolated private static func runReviewFilesVacuumIfNeeded(container: ModelContainer) {
     let context = ModelContext(container)
     let cache = ReviewFilesCache(context: context)
+    let rowCount = cache.countCachedFiles()
+    guard rowCount > reviewFilesVacuumTrigger else { return }
+    let cutoff = Date.now.addingTimeInterval(-reviewFilesVacuumMaxAge)
     let pruned = cache.pruneStale(cutoff: cutoff)
     HarnessMonitorLogger.store.info(
       """
@@ -74,8 +71,8 @@ extension HarnessMonitorStore {
     )
   }
 
-  static var reviewFilesVacuumTrigger: Int { 100_000 }
-  static var reviewFilesVacuumMaxAge: TimeInterval { 14 * 24 * 60 * 60 }
+  nonisolated static var reviewFilesVacuumTrigger: Int { 100_000 }
+  nonisolated static var reviewFilesVacuumMaxAge: TimeInterval { 14 * 24 * 60 * 60 }
 
   static func makeBookmarkStore() -> BookmarkStore? {
     #if DEBUG

@@ -101,7 +101,7 @@ struct SessionSidebarMultiSelectTests {
       decisions: [],
       decisionIDs: [],
       statusModel: SessionStatusSummaryModel(
-        metrics: store.connectionMetrics,
+        metrics: store.connectionStatusMetrics,
         sourceTitle: "Test",
         sourceSystemImage: "circle",
         sourceTint: .tertiary,

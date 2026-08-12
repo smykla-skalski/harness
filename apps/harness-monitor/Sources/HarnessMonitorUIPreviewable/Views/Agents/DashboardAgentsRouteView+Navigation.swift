@@ -2,6 +2,7 @@ import HarnessMonitorKit
 
 extension DashboardAgentsRouteView {
   func applyPendingHistoryRestoreIfNeeded() {
+    guard isRouteVisible else { return }
     guard let request = history.pendingDashboardAgentsRestoreRequest else { return }
     if case .createTerminal(let sessionID) = request.target {
       switch DashboardTerminalCreationNavigationResolution.resolve(
@@ -99,6 +100,11 @@ extension DashboardAgentsRouteView {
     pendingDecisionNavigationReadinessValue = readiness
     return readiness
   }
+}
+
+struct DashboardAgentsNavigationTaskID: Equatable {
+  let requestID: Int?
+  let isRouteVisible: Bool
 }
 
 struct DashboardDecisionNavigationReadiness: Equatable {

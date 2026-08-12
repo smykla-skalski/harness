@@ -26,12 +26,12 @@ struct DashboardTerminalAgentDetailView: View {
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardAgentDetail)
-    .task(id: membershipLoadIdentity) {
-      signalState.prepare(agentID: agent.managedAgentID)
+    .task(id: automaticMembershipLoadTaskID) {
       guard loadsAutomatically else { return }
+      signalState.prepare(agentID: agent.managedAgentID)
       await requestMembershipLoad()
     }
-    .task(id: agent.identity.id) {
+    .task(id: automaticPollingTaskID) {
       guard loadsAutomatically else { return }
       while !Task.isCancelled {
         do {
@@ -102,6 +102,20 @@ struct DashboardTerminalAgentDetailView: View {
 
   private var membershipLoadIdentity: String {
     "\(automaticLoadIdentity):\(membershipRefreshID)"
+  }
+
+  private var automaticMembershipLoadTaskID: DashboardAgentDetailAutomaticLoadTaskID {
+    DashboardAgentDetailAutomaticLoadTaskID(
+      identity: membershipLoadIdentity,
+      isActive: loadsAutomatically
+    )
+  }
+
+  private var automaticPollingTaskID: DashboardAgentDetailAutomaticLoadTaskID {
+    DashboardAgentDetailAutomaticLoadTaskID(
+      identity: agent.identity.id,
+      isActive: loadsAutomatically
+    )
   }
 
   private func requestMembershipRefresh() {

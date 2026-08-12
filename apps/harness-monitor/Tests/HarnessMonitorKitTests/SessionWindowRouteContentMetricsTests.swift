@@ -216,8 +216,8 @@ struct SessionWindowRouteContentMetricsTests {
   @Test("Task board controls stay explicit after chrome cleanup")
   func taskBoardControlsStayExplicitAfterChromeCleanup() throws {
     let overviewSource = try taskBoardOverviewSource()
-    let orchestratorSource = try taskBoardSourceFile(
-      named: "TaskBoardOrchestratorSummaryView.swift"
+    let orchestratorControlsSource = try taskBoardSourceFile(
+      named: "TaskBoardOrchestratorControls.swift"
     )
     let managementActionsSource = try taskBoardSourceFile(
       named: "TaskBoardItemLiveActionButtons.swift"
@@ -229,7 +229,7 @@ struct SessionWindowRouteContentMetricsTests {
         ".harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)"
       )
     )
-    #expect(orchestratorSource.contains(".harnessActionButtonStyle(variant: .prominent"))
+    #expect(orchestratorControlsSource.contains(".harnessActionButtonStyle(variant: .prominent"))
     #expect(
       managementActionsSource.contains(
         "Label(\"Sync Live\", systemImage: \"arrow.clockwise\")"
@@ -288,6 +288,20 @@ struct SessionWindowRouteContentMetricsTests {
     let supportSource = try taskBoardSourceFile(named: "TaskBoardOverviewSupport.swift")
 
     #expect(operationsSource.contains("TaskBoardOperationsPanelLayout("))
+    #expect(
+      operationsSource.contains(
+        "layoutMode: TaskBoardOperationsPanelLayoutMode = .responsive"
+      )
+    )
+    #expect(operationsSource.contains("mode: layoutMode"))
+    #expect(layoutSource.contains("enum TaskBoardOperationsPanelLayoutMode"))
+    #expect(layoutSource.contains("case vertical"))
+    #expect(layoutSource.contains("switch mode"))
+    #expect(
+      layoutSource.contains(
+        "VStack(alignment: .leading, spacing: metrics.columnSpacing)"
+      )
+    )
     #expect(layoutSource.contains("TaskBoardOperationsResponsiveLayout("))
     #expect(layoutSource.contains("private struct TaskBoardOperationsResponsiveLayout: Layout"))
     #expect(layoutSource.contains("maxColumnWidth: metrics.operationsCardMaxWidth"))

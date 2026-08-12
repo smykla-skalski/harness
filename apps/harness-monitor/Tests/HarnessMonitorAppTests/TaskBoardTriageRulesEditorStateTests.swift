@@ -43,7 +43,12 @@ struct TaskBoardTriageRulesEditorStateTests {
         recordedAt: "2026-07-24T00:00:00Z")
     ]
 
-    state.applyLoad(draft: draft, activeRevision: 2, revisions: revisions, audit: audit)
+    state.applyLoad(
+      TaskBoardTriageRulesEditorLoadProjection(
+        draft: draft,
+        revisions: revisions,
+        audit: audit
+      ))
 
     #expect(state.draftRevision == 3)
     #expect(state.decodedCandidate() == Self.ruleSet)
@@ -59,12 +64,54 @@ struct TaskBoardTriageRulesEditorStateTests {
     state.draftText = "unsaved edits"
     state.draftRevision = 1
 
-    state.applyLoad(draft: nil, activeRevision: nil, revisions: [], audit: [])
+    state.applyLoad(
+      TaskBoardTriageRulesEditorLoadProjection(draft: nil, revisions: [], audit: []))
 
     #expect(state.draftRevision == nil)
     #expect(state.draftText == "unsaved edits")
     #expect(state.activeRevision == nil)
     #expect(state.hasLoaded)
+  }
+
+  @Test("Load projection bounds render history and formats the draft off MainActor")
+  func loadProjectionBoundsRenderHistory() async {
+    let draft = TriageRuleSetDraft(
+      rules: Self.ruleSet, revision: 15, actor: "operator-1",
+      updatedAt: "2026-07-24T00:00:00Z"
+    )
+    let revisions = (1...15).reversed().map { revision in
+      TriageRuleSetRevisionSummary(
+        revision: Int64(revision),
+        schemaVersion: 1,
+        ruleCount: 1,
+        status: revision == 15 ? .active : .superseded,
+        actor: "operator-1",
+        activatedAt: "2026-07-24T00:00:00Z"
+      )
+    }
+    let audit = (1...15).reversed().map { revision in
+      TriageRuleSetAuditEntry(
+        auditId: "audit-\(revision)",
+        kind: .activated,
+        revision: Int64(revision),
+        actor: "operator-1",
+        recordedAt: "2026-07-24T00:00:00Z"
+      )
+    }
+
+    let projection = await Task.detached {
+      TaskBoardTriageRulesEditorLoadProjection(
+        draft: draft,
+        revisions: revisions,
+        audit: audit
+      )
+    }.value
+
+    #expect(projection.draftRevision == 15)
+    #expect(projection.draftText == TaskBoardTriageRulesEditorState.encodedText(Self.ruleSet))
+    #expect(projection.activeRevision == 15)
+    #expect(projection.revisions.map(\.revision) == Array((6...15).reversed()).map(Int64.init))
+    #expect(projection.audit.map(\.auditId) == (6...15).reversed().map { "audit-\($0)" })
   }
 
   private static var ruleSet: TriageRuleSetV1 {

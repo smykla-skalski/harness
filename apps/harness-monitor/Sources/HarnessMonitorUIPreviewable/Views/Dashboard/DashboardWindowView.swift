@@ -117,7 +117,7 @@ public struct DashboardWindowView: View {
   func dashboardStatusSummaryModel(
     route: DashboardWindowRoute
   ) -> SessionStatusSummaryModel {
-    let metrics = store.connectionMetrics
+    let metrics = store.connectionStatusMetrics
     return SessionStatusSummaryModel(
       metrics: metrics,
       sourceTitle: "Dashboard",

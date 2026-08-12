@@ -70,9 +70,14 @@ extension HarnessMonitorStore {
     }
     public var isDiagnosticsRefreshInFlight = false
     public var activeTransport: TransportKind = .webSocket
+    public private(set) var connectionStatusMetrics: ConnectionStatusMetrics = .initial
     public var connectionMetrics: ConnectionMetrics = .initial {
       didSet {
         guard oldValue != connectionMetrics else { return }
+        let nextStatusMetrics = ConnectionStatusMetrics(connectionMetrics)
+        if connectionStatusMetrics != nextStatusMetrics {
+          connectionStatusMetrics = nextStatusMetrics
+        }
         onChanged?(.metrics)
       }
     }

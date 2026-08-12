@@ -542,6 +542,42 @@ struct AccessibilityRegistryTests {
   }
 
   @MainActor
+  @Test("window element sync suspends while traversing unidentified nodes")
+  func windowElementSyncSuspendsWhileTraversingUnidentifiedNodes() async {
+    let registry = AccessibilityRegistry()
+    var suspensionCount = 0
+    let controller = WindowElementRegistrySyncController(
+      registry: registry,
+      minimumReplacementInterval: .zero,
+      traversalBatchSize: 2,
+      suspendTraversal: {
+        suspensionCount += 1
+        await Task.yield()
+      }
+    )
+    let window = NSWindow(
+      contentRect: NSRect(x: 120, y: 180, width: 420, height: 320),
+      styleMask: [.titled, .closable],
+      backing: .buffered,
+      defer: false
+    )
+    let root = NSView(frame: NSRect(x: 0, y: 0, width: 420, height: 320))
+    for index in 0..<8 {
+      let view = NSView(frame: NSRect(x: index * 20, y: 20, width: 16, height: 16))
+      root.addSubview(view)
+    }
+    window.contentView = root
+    window.layoutIfNeeded()
+    root.layoutSubtreeIfNeeded()
+
+    let generation = controller.beginTracking(windowID: window.windowNumber)
+    controller.sync(window: window, generation: generation)
+    await controller.waitForIdle()
+
+    #expect(suspensionCount >= 4)
+  }
+
+  @MainActor
   @Test("window element sync harvests accessibility-only children")
   func windowElementSyncHarvestsAccessibilityOnlyChildren() async {
     let registry = AccessibilityRegistry()

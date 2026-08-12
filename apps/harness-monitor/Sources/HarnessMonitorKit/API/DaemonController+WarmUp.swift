@@ -100,14 +100,21 @@ extension DaemonController {
         state.lastError = error
         return .progressedLoop
       }
-      state.managedStaleManifestTracker.reset()
       state.managedVersionMismatchTracker.reset()
       state.lastLoggedManifestSignature = nil
+      state.lastError = error
+      if let outcome = managedUnavailableManifestOutcome(
+        after: error,
+        state: &state
+      ) {
+        emitWarmUpRetryTraceIfChanged(error: error, state: &state)
+        return outcome
+      }
+      state.managedStaleManifestTracker.reset()
       if case .invalidManifest = error, ownership == .external {
         state.immediateError = error
         return .stopLoop
       }
-      state.lastError = error
       emitWarmUpRetryTraceIfChanged(error: error, state: &state)
     } catch {
       state.managedStaleManifestTracker.reset()

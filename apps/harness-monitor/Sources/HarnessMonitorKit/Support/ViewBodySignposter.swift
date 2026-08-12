@@ -2,6 +2,39 @@ import OSLog
 import SwiftUI
 
 public enum ViewBodySignposter {
+  private enum UpdateLoggingSelection: Sendable {
+    case disabled
+    case all
+    case views(Set<String>)
+
+    func includes(_ viewName: String) -> Bool {
+      switch self {
+      case .disabled:
+        false
+      case .all:
+        true
+      case .views(let selectedViews):
+        selectedViews.contains(viewName)
+      }
+    }
+  }
+
+  private struct LaunchConfiguration: Sendable {
+    let automaticProfilingEnabled: Bool
+    let updateLoggingSelection: UpdateLoggingSelection
+    let allowsDynamicTestOverrides: Bool
+
+    init(environment: [String: String]) {
+      automaticProfilingEnabled = ViewBodySignposter.isAutomaticProfilingEnabled(
+        environment: environment
+      )
+      updateLoggingSelection = ViewBodySignposter.updateLoggingSelection(
+        environment: environment
+      )
+      allowsDynamicTestOverrides = environment["XCTestConfigurationFilePath"] != nil
+    }
+  }
+
   #if HARNESS_FEATURE_OTEL
     private static let bridge = HarnessMonitorSignpostBridge(
       subsystem: "io.harnessmonitor",
@@ -16,9 +49,22 @@ public enum ViewBodySignposter {
   private static let profileEnvKey = "HARNESS_MONITOR_PROFILE_VIEW_BODIES"
   private static let perfScenarioEnvKey = "HARNESS_MONITOR_PERF_SCENARIO"
   private static let updateLoggingEnvKey = "HARNESS_MONITOR_LOG_VIEW_UPDATES"
+  private static let launchConfiguration = LaunchConfiguration(
+    environment: ProcessInfo.processInfo.environment
+  )
 
   private static var automaticProfilingEnabled: Bool {
-    let environment = ProcessInfo.processInfo.environment
+    #if DEBUG
+      if launchConfiguration.allowsDynamicTestOverrides {
+        return isAutomaticProfilingEnabled(
+          environment: ProcessInfo.processInfo.environment
+        )
+      }
+    #endif
+    return launchConfiguration.automaticProfilingEnabled
+  }
+
+  static func isAutomaticProfilingEnabled(environment: [String: String]) -> Bool {
     if environment[profileEnvKey] == "1" {
       return true
     }
@@ -34,24 +80,42 @@ public enum ViewBodySignposter {
 
   static func shouldLogChanges(
     for viewName: String,
-    environment: [String: String] = ProcessInfo.processInfo.environment
+    environment: [String: String]
   ) -> Bool {
+    updateLoggingSelection(environment: environment).includes(viewName)
+  }
+
+  private static func updateLoggingSelection(
+    environment: [String: String]
+  ) -> UpdateLoggingSelection {
     guard
       let rawValue = environment[updateLoggingEnvKey]?
         .trimmingCharacters(in: .whitespacesAndNewlines),
       !rawValue.isEmpty
     else {
-      return false
+      return .disabled
     }
     if rawValue == "1" || rawValue.caseInsensitiveCompare("all") == .orderedSame {
-      return true
+      return .all
     }
 
     let selectedViews =
       rawValue
       .split(separator: ",")
       .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-    return selectedViews.contains(viewName)
+    return .views(Set(selectedViews))
+  }
+
+  private static func shouldLogLaunchChanges(for viewName: String) -> Bool {
+    #if DEBUG
+      if launchConfiguration.allowsDynamicTestOverrides {
+        return shouldLogChanges(
+          for: viewName,
+          environment: ProcessInfo.processInfo.environment
+        )
+      }
+    #endif
+    return launchConfiguration.updateLoggingSelection.includes(viewName)
   }
 
   @MainActor
@@ -59,7 +123,7 @@ public enum ViewBodySignposter {
     _ viewType: V.Type,
     viewName: String
   ) {
-    guard shouldLogChanges(for: viewName) else {
+    guard shouldLogLaunchChanges(for: viewName) else {
       return
     }
     if #available(macOS 14.2, *) {

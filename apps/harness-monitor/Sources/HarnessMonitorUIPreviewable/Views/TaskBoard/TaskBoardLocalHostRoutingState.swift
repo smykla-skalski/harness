@@ -32,10 +32,19 @@ final class TaskBoardLocalHostRoutingState {
     projectTypes = nil
     isLoading = false
   }
+
+  func suspend() {
+    generation &+= 1
+    isLoading = false
+  }
 }
 
 extension TaskBoardOverviewView {
   func updateLocalHostRouting() {
+    guard isRouteVisible else {
+      localHostRoutingStateValue.suspend()
+      return
+    }
     guard
       let store,
       store.contentUI.dashboard.connectionState == .online

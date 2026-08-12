@@ -1,22 +1,38 @@
 import SwiftUI
 
+enum TaskBoardOperationsPanelLayoutMode {
+  case responsive
+  case vertical
+}
+
 struct TaskBoardOperationsPanelLayout<SyncCard: View, DispatchCard: View, InventoryCard: View>:
   View
 {
+  let mode: TaskBoardOperationsPanelLayoutMode
   let metrics: TaskBoardOverviewMetrics
   let syncCard: SyncCard
   let dispatchCard: DispatchCard
   let inventoryCard: InventoryCard
 
-  var body: some View {
-    TaskBoardOperationsResponsiveLayout(
-      minColumnWidth: metrics.operationsCardMinWidth,
-      maxColumnWidth: metrics.operationsCardMaxWidth,
-      spacing: metrics.columnSpacing
-    ) {
-      syncCard
-      dispatchCard
-      inventoryCard
+  @ViewBuilder var body: some View {
+    switch mode {
+    case .responsive:
+      TaskBoardOperationsResponsiveLayout(
+        minColumnWidth: metrics.operationsCardMinWidth,
+        maxColumnWidth: metrics.operationsCardMaxWidth,
+        spacing: metrics.columnSpacing
+      ) {
+        syncCard
+        dispatchCard
+        inventoryCard
+      }
+    case .vertical:
+      VStack(alignment: .leading, spacing: metrics.columnSpacing) {
+        syncCard
+        dispatchCard
+        inventoryCard
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
     }
   }
 }

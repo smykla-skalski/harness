@@ -113,11 +113,7 @@ public enum DashboardDecisionAttributor {
     }
 
     var itemsByAgent: [DashboardAgentIdentity: [DashboardDecisionItem]] = [:]
-    typealias WorkspaceBucket = (
-      workspace: DashboardAgentWorkspace,
-      items: [DashboardDecisionItem]
-    )
-    var bucketItems: [DashboardAgentWorkspaceIdentity: WorkspaceBucket] = [:]
+    var bucketItems: [DashboardAgentWorkspaceIdentity: DashboardDecisionWorkspaceAccumulator] = [:]
     var unattributed: [DashboardDecisionItem] = []
     for item in items {
       switch item.target {
@@ -128,9 +124,10 @@ public enum DashboardDecisionAttributor {
           unattributed.append(item)
           continue
         }
-        var existing = bucketItems[workspaceID]?.items ?? []
-        existing.append(item)
-        bucketItems[workspaceID] = (workspace, existing)
+        bucketItems[
+          workspaceID,
+          default: DashboardDecisionWorkspaceAccumulator(workspace: workspace)
+        ].append(item, workspace: workspace)
       case .unattributed:
         unattributed.append(item)
       }
@@ -245,4 +242,17 @@ public enum DashboardDecisionAttributor {
 private struct SessionAgentKey: Hashable {
   let sessionID: String
   let sessionAgentID: String
+}
+
+private struct DashboardDecisionWorkspaceAccumulator {
+  var workspace: DashboardAgentWorkspace
+  var items: [DashboardDecisionItem] = []
+
+  mutating func append(
+    _ item: DashboardDecisionItem,
+    workspace: DashboardAgentWorkspace
+  ) {
+    self.workspace = workspace
+    items.append(item)
+  }
 }

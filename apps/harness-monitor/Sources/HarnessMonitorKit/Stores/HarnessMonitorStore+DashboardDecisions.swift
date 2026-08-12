@@ -10,11 +10,29 @@ extension HarnessMonitorStore {
     agents: [DashboardAgentSummary]
   ) -> DashboardDecisionResolution {
     let openDecisionIDs = Set(supervisorOpenDecisions.map(\.id))
-    dashboardDecisionActionsCache = dashboardDecisionActionsCache.filter {
-      openDecisionIDs.contains($0.key)
+    let staleActionIDs = dashboardDecisionCache.actions.keys.filter {
+      !openDecisionIDs.contains($0)
+    }
+    for decisionID in staleActionIDs {
+      dashboardDecisionCache.actions.removeValue(forKey: decisionID)
     }
     let inputs = supervisorOpenDecisions.map(dashboardDecisionAttributionInput(for:))
-    return DashboardDecisionAttributor.resolve(inputs: inputs, agents: agents)
+    let agentInputs = agents.map(DashboardDecisionAgentAttributionKey.init)
+    if let cached = dashboardDecisionCache.resolution,
+      cached.refreshTick == supervisorDecisionRefreshTick,
+      cached.decisionInputs == inputs,
+      cached.agentInputs == agentInputs
+    {
+      return cached.resolution
+    }
+    let resolution = DashboardDecisionAttributor.resolve(inputs: inputs, agents: agents)
+    dashboardDecisionCache.resolution = DashboardDecisionResolutionCacheEntry(
+      refreshTick: supervisorDecisionRefreshTick,
+      decisionInputs: inputs,
+      agentInputs: agentInputs,
+      resolution: resolution
+    )
+    return resolution
   }
 
   /// Resolves a supervisor or manual decision through the shared action handler, which runs the
@@ -62,7 +80,7 @@ extension HarnessMonitorStore {
   }
 
   private func dashboardDecisionSuggestedActions(for decision: Decision) -> [SuggestedAction] {
-    if let cached = dashboardDecisionActionsCache[decision.id],
+    if let cached = dashboardDecisionCache.actions[decision.id],
       cached.ruleID == decision.ruleID,
       cached.suggestedActionsJSON == decision.suggestedActionsJSON
     {
@@ -71,7 +89,7 @@ extension HarnessMonitorStore {
     let actions = DecisionDetailViewModel.prepareContent(
       input: .init(decision: decision)
     ).suggestedActions
-    dashboardDecisionActionsCache[decision.id] = DashboardDecisionActionsCacheEntry(
+    dashboardDecisionCache.actions[decision.id] = DashboardDecisionActionsCacheEntry(
       ruleID: decision.ruleID,
       suggestedActionsJSON: decision.suggestedActionsJSON,
       actions: actions
@@ -113,4 +131,30 @@ struct DashboardDecisionActionsCacheEntry {
   let ruleID: String
   let suggestedActionsJSON: String
   let actions: [SuggestedAction]
+}
+
+struct DashboardDecisionCache {
+  var actions: [String: DashboardDecisionActionsCacheEntry] = [:]
+  var resolution: DashboardDecisionResolutionCacheEntry?
+}
+
+struct DashboardDecisionResolutionCacheEntry {
+  let refreshTick: Int
+  let decisionInputs: [DashboardDecisionAttributionInput]
+  let agentInputs: [DashboardDecisionAgentAttributionKey]
+  let resolution: DashboardDecisionResolution
+}
+
+struct DashboardDecisionAgentAttributionKey: Equatable {
+  let identity: DashboardAgentIdentity
+  let workspace: DashboardAgentWorkspace
+  let sessionID: String
+  let sessionAgentID: String?
+
+  init(agent: DashboardAgentSummary) {
+    identity = agent.identity
+    workspace = agent.workspace
+    sessionID = agent.sessionID
+    sessionAgentID = agent.sessionAgentID
+  }
 }

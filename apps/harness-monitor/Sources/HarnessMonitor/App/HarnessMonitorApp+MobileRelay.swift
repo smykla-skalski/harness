@@ -34,11 +34,11 @@ final class HarnessMonitorMobileRelayClientProvider: @unchecked Sendable {
 }
 
 extension HarnessMonitorApp {
-  static func makeMobileRelayRuntime(
+  nonisolated static func makeMobileRelayRuntime(
     environment: HarnessMonitorEnvironment,
-    store: HarnessMonitorStore,
+    clientProvider: HarnessMonitorMobileRelayClientProvider,
     runsLiveSideEffects: Bool,
-    hasCloudKitEntitlement: @MainActor () -> Bool = Self.hasMobileRelayCloudKitEntitlement
+    hasCloudKitEntitlement: @Sendable () -> Bool = Self.hasMobileRelayCloudKitEntitlement
   ) -> MobileMacRelayRuntime? {
     guard runsLiveSideEffects else {
       return nil
@@ -53,7 +53,6 @@ extension HarnessMonitorApp {
       return nil
     }
 
-    let clientProvider = HarnessMonitorMobileRelayClientProvider(store: store)
     do {
       let storageRoot = MobileRelayStorageResolver.prepareStorageRoot(environment: environment)
       return try MobileMacRelayRuntime(
@@ -75,7 +74,7 @@ extension HarnessMonitorApp {
     }
   }
 
-  static func hasMobileRelayCloudKitEntitlement() -> Bool {
+  nonisolated static func hasMobileRelayCloudKitEntitlement() -> Bool {
     var code: SecCode?
     guard SecCodeCopySelf(SecCSFlags(), &code) == errSecSuccess, let code else {
       return false
@@ -100,7 +99,7 @@ extension HarnessMonitorApp {
     return containers.contains("iCloud.io.harnessmonitor")
   }
 
-  private static func mobileRelayStationName() -> String {
+  nonisolated private static func mobileRelayStationName() -> String {
     let localizedName = Host.current().localizedName?
       .trimmingCharacters(in: .whitespacesAndNewlines)
     if let localizedName, !localizedName.isEmpty {
@@ -113,17 +112,29 @@ extension HarnessMonitorApp {
 }
 
 enum MobileRelayStorageResolver {
+  typealias LegacyStorageRootsProvider = (HarnessMonitorEnvironment, FileManager) -> [URL]
+
   private static let stationIdentityFileName = "station-identity.json"
   private static let trustedDevicesFileName = "trusted-mobile-devices.json"
 
   static func prepareStorageRoot(
     environment: HarnessMonitorEnvironment,
-    fileManager: FileManager = .default
+    fileManager: FileManager = .default,
+    legacyStorageRootsProvider: LegacyStorageRootsProvider = { environment, fileManager in
+      Self.legacyStorageRoots(
+        environment: environment,
+        fileManager: fileManager
+      )
+    }
   ) -> URL {
     let stableRoot = storageRoot(environment: environment)
+    let stableCandidate = MobileRelayStorageCandidate(root: stableRoot, fileManager: fileManager)
+    guard !stableCandidate.hasUsablePairingState else {
+      return stableRoot
+    }
     migrateTrustedLaneStateIfNeeded(
       to: stableRoot,
-      from: legacyStorageRoots(environment: environment, fileManager: fileManager),
+      from: legacyStorageRootsProvider(environment, fileManager),
       fileManager: fileManager
     )
     return stableRoot
@@ -181,10 +192,6 @@ enum MobileRelayStorageResolver {
     from legacyRoots: [URL],
     fileManager: FileManager
   ) {
-    let stableCandidate = MobileRelayStorageCandidate(root: stableRoot, fileManager: fileManager)
-    guard !stableCandidate.hasUsablePairingState else {
-      return
-    }
     guard
       let candidate =
         legacyRoots

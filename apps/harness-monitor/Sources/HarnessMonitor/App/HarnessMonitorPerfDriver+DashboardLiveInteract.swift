@@ -7,7 +7,7 @@ import SwiftUI
 extension HarnessMonitorPerfDriver {
   /// Drives the dashboard window against the real external daemon and exercises
   /// the surface beyond a pure scroll: three bottom-top round trips on the
-  /// outer dashboard, three more on the Needs-You task column, a route flip
+  /// outer dashboard, three more on the Human Required task column, a route flip
   /// (task-board -> policy-canvas -> task-board), then two more outer-scroll
   /// round trips on the rebuilt surface. Multiple passes capture steady-state
   /// scroll perf instead of the one-shot bootstrap-warmup snapshot a single
@@ -70,13 +70,13 @@ extension HarnessMonitorPerfDriver {
       await settle(.milliseconds(500))
     }
 
-    // Pass 2: Needs You task column, 3 bottom-top round trips. The inner
+    // Pass 2: Human Required task column, 3 bottom-top round trips. The inner
     // ScrollView is the surface users actually drag while triaging decisions,
     // and it stutters independently of the outer dashboard scroll.
     for trip in 1...3 {
-      postLaneScrollRequest(lane: "needs_you", edge: "bottom", trip: trip)
+      postLaneScrollRequest(lane: .humanRequired, edge: "bottom", trip: trip)
       await settle(.milliseconds(600))
-      postLaneScrollRequest(lane: "needs_you", edge: "top", trip: trip)
+      postLaneScrollRequest(lane: .humanRequired, edge: "top", trip: trip)
       await settle(.milliseconds(500))
     }
 
@@ -142,13 +142,17 @@ extension HarnessMonitorPerfDriver {
     HarnessMonitorPerfDashboardRouteBus.requestRoute(raw: raw)
   }
 
-  private static func postLaneScrollRequest(lane: String, edge: String, trip: Int = 1) {
+  private static func postLaneScrollRequest(
+    lane: TaskBoardInboxLane,
+    edge: String,
+    trip: Int = 1
+  ) {
     HarnessMonitorPerfTrace.recordScenarioEvent(
       component: "perf.dashboard-live-interact",
       event: "lane.scroll.post.\(edge)",
-      details: ["lane": lane, "trip": String(trip)]
+      details: ["lane": lane.rawValue, "trip": String(trip)]
     )
-    HarnessMonitorPerfTaskBoardLaneScrollBus.requestScroll(laneRaw: lane, edge: edge)
+    HarnessMonitorPerfTaskBoardLaneScrollBus.requestScroll(lane: lane, edge: edge)
   }
 
   private static func waitForLiveInteractDashboardReady(

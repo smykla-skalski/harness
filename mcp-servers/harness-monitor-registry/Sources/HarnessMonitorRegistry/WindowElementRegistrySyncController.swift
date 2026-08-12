@@ -21,6 +21,8 @@ final class WindowElementRegistrySyncController {
   private let registry: AccessibilityRegistry
   private let payloadWorker = WindowElementRegistryPayloadWorker()
   private let minimumReplacementInterval: Duration
+  private let traversalBatchSize: Int
+  private let suspendTraversal: @MainActor () async -> Void
   private let onReplacementApplied: @MainActor () -> Void
   private let clock = ContinuousClock()
   private var trackedWindowID: Int?
@@ -35,10 +37,16 @@ final class WindowElementRegistrySyncController {
   init(
     registry: AccessibilityRegistry,
     minimumReplacementInterval: Duration = .milliseconds(120),
+    traversalBatchSize: Int = 8,
+    suspendTraversal: @escaping @MainActor () async -> Void = {
+      try? await Task.sleep(for: .milliseconds(1))
+    },
     onReplacementApplied: @escaping @MainActor () -> Void = {}
   ) {
     self.registry = registry
     self.minimumReplacementInterval = minimumReplacementInterval
+    self.traversalBatchSize = max(1, traversalBatchSize)
+    self.suspendTraversal = suspendTraversal
     self.onReplacementApplied = onReplacementApplied
   }
 
@@ -149,7 +157,9 @@ final class WindowElementRegistrySyncController {
 
       let payload = await WindowAccessibilityElementSnapshotter.payload(
         in: window,
-        payloadWorker: payloadWorker
+        payloadWorker: payloadWorker,
+        traversalBatchSize: traversalBatchSize,
+        suspendTraversal: suspendTraversal
       )
       if hasExplicitElements == false {
         guard payload.signature != lastAppliedPayloadSignature else {
@@ -243,7 +253,6 @@ enum WindowAccessibilityChildNodeCollector {
 @MainActor
 private enum WindowAccessibilityElementSnapshotter {
   private static let maximumVisitedNodes = 700
-  private static let traversalBatchSize = 40
 
   private struct SnapshotNodeMetadata {
     let identifier: String?
@@ -256,7 +265,9 @@ private enum WindowAccessibilityElementSnapshotter {
 
   static func payload(
     in window: NSWindow,
-    payloadWorker: WindowElementRegistryPayloadWorker
+    payloadWorker: WindowElementRegistryPayloadWorker,
+    traversalBatchSize: Int,
+    suspendTraversal: @MainActor () async -> Void
   ) async -> WindowElementRegistryPayload {
     var queue: [any NSAccessibilityProtocol] = [window]
     var index = 0
@@ -266,6 +277,12 @@ private enum WindowAccessibilityElementSnapshotter {
     while index < queue.count, visited.count < maximumVisitedNodes {
       if Task.isCancelled {
         return .empty
+      }
+      if index > 0, index.isMultiple(of: traversalBatchSize) {
+        await suspendTraversal()
+        if Task.isCancelled {
+          return .empty
+        }
       }
       let node = queue[index]
       index += 1
@@ -290,10 +307,6 @@ private enum WindowAccessibilityElementSnapshotter {
         continue
       }
       harvested.append(element)
-
-      if index.isMultiple(of: traversalBatchSize) {
-        await Task.yield()
-      }
     }
 
     return await payloadWorker.replacementPayload(from: harvested)

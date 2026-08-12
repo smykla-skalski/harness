@@ -144,7 +144,7 @@ public enum TaskBoardAutomationControlsPreviewRenderer {
 
     NSApplication.shared.setActivationPolicy(.regular)
     window.makeKeyAndOrderFront(nil)
-    NSApplication.shared.activate(ignoringOtherApps: true)
+    NSApplication.shared.activate()
     window.orderFrontRegardless()
     window.makeMain()
     window.makeKey()
@@ -152,14 +152,14 @@ public enum TaskBoardAutomationControlsPreviewRenderer {
     view.layoutSubtreeIfNeeded()
     RunLoop.main.run(until: Date().addingTimeInterval(0.5))
     window.makeFirstResponder(nil)
-    RunLoop.main.run(until: Date().addingTimeInterval(0.05))
-    guard NSApplication.shared.isActive else {
-      FileHandle.standardError.write(Data("focused preview app is inactive\n".utf8))
-      window.close()
-      return false
+    let focusDeadline = Date().addingTimeInterval(3)
+    while !NSApplication.shared.isActive || !window.isKeyWindow, Date() < focusDeadline {
+      NSApplication.shared.activate()
+      window.makeKeyAndOrderFront(nil)
+      RunLoop.main.run(until: Date().addingTimeInterval(0.05))
     }
-    guard window.isKeyWindow else {
-      FileHandle.standardError.write(Data("focused preview window is not key\n".utf8))
+    guard NSApplication.shared.isActive, window.isKeyWindow else {
+      FileHandle.standardError.write(Data("focused inspector preview window is not focused\n".utf8))
       window.close()
       return false
     }

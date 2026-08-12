@@ -56,6 +56,7 @@ struct DashboardRouteContent: View, Equatable {
       .opacity(isTaskBoardVisible ? 1 : 0)
       .allowsHitTesting(isTaskBoardVisible)
       .accessibilityHidden(!isTaskBoardVisible)
+      .modifier(DashboardRetainedRouteMCPTracking(isVisible: isTaskBoardVisible))
       .modifier(DashboardRetainedRouteGeometryIsolation())
 
       DashboardRetainedAuxiliaryRoute(isVisible: isAgentsVisible) {
@@ -72,7 +73,8 @@ struct DashboardRouteContent: View, Equatable {
         DashboardAuditRouteView(
           store: store,
           dashboardUI: dashboardUI,
-          history: history
+          history: history,
+          isRouteVisible: isAuditVisible
         )
       }
       .modifier(DashboardRetainedRouteGeometryIsolation())
@@ -93,7 +95,8 @@ struct DashboardRouteContent: View, Equatable {
       DashboardRetainedAuxiliaryRoute(isVisible: isDiagnosticsVisible) {
         DashboardDiagnosticsRouteView(
           store: store,
-          selectedRoute: route
+          selectedRoute: route,
+          isRouteVisible: isDiagnosticsVisible
         )
       }
       .modifier(DashboardRetainedRouteGeometryIsolation())
@@ -151,10 +154,21 @@ private struct DashboardRetainedAuxiliaryRoute<Content: View>: View {
         .opacity(isVisible ? 1 : 0)
         .allowsHitTesting(isVisible)
         .accessibilityHidden(!isVisible)
+        .modifier(DashboardRetainedRouteMCPTracking(isVisible: isVisible))
         .onAppear {
           hasBeenMounted = true
         }
     }
+  }
+}
+
+private struct DashboardRetainedRouteMCPTracking: ViewModifier {
+  @Environment(\.harnessMCPElementTrackingEnabled)
+  private var parentTrackingEnabled
+  let isVisible: Bool
+
+  func body(content: Content) -> some View {
+    content.harnessMCPElementTrackingEnabled(parentTrackingEnabled && isVisible)
   }
 }
 
@@ -217,6 +231,13 @@ struct DashboardTaskBoardRouteView: View {
     visibleTaskBoardSessions.map(\.sessionId)
   }
 
+  private var taskBoardInboxRefreshTaskID: DashboardTaskBoardInboxRefreshTaskID {
+    DashboardTaskBoardInboxRefreshTaskID(
+      isRouteVisible: isRouteVisible,
+      sessionIDs: taskBoardInboxSessionIDs
+    )
+  }
+
   private var operationsInspectorFocus: TaskBoardOperationsInspectorFocus? {
     guard isRouteVisible else { return nil }
     return TaskBoardOperationsInspectorFocus(
@@ -234,7 +255,8 @@ struct DashboardTaskBoardRouteView: View {
         guard perfScrollHookEnabled else { return }
         HarnessMonitorPerfDashboardScrollBus.recordTrigger(edge: "view.appear")
       }
-      .task(id: taskBoardInboxSessionIDs) {
+      .task(id: taskBoardInboxRefreshTaskID) {
+        guard isRouteVisible else { return }
         await refreshVisibleTaskBoardInboxSnapshot()
       }
       .onChange(of: isRouteVisible, initial: true) {
@@ -248,7 +270,7 @@ struct DashboardTaskBoardRouteView: View {
           for: HarnessMonitorPerfDashboardScrollBus.scrollToBottom
         )
       ) { _ in
-        guard perfScrollHookEnabled else { return }
+        guard perfScrollHookEnabled, isRouteVisible else { return }
         HarnessMonitorPerfDashboardScrollBus.recordTrigger(edge: "bottom")
         withAnimation(.easeOut(duration: 0.6)) {
           perfScrollPosition = ScrollPosition(edge: .bottom)
@@ -259,7 +281,7 @@ struct DashboardTaskBoardRouteView: View {
           for: HarnessMonitorPerfDashboardScrollBus.scrollToTop
         )
       ) { _ in
-        guard perfScrollHookEnabled else { return }
+        guard perfScrollHookEnabled, isRouteVisible else { return }
         HarnessMonitorPerfDashboardScrollBus.recordTrigger(edge: "top")
         withAnimation(.easeOut(duration: 0.6)) {
           perfScrollPosition = ScrollPosition(edge: .top)
@@ -362,4 +384,9 @@ struct DashboardTaskBoardRouteView: View {
       }
     )
   }
+}
+
+private struct DashboardTaskBoardInboxRefreshTaskID: Equatable {
+  let isRouteVisible: Bool
+  let sessionIDs: [String]
 }

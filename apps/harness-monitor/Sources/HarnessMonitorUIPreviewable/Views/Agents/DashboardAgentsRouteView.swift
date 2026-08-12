@@ -19,6 +19,7 @@ struct DashboardAgentsRouteView: View {
   @State private var pendingNavigationRefreshRequestID: Int?
   @State private var pendingDecisionNavigationReadiness: DashboardDecisionNavigationReadiness?
   @State private var terminalCreateSessionID: String?
+  @State private var retainedDecisionResolution = DashboardDecisionResolution.empty
 
   init(
     store: HarnessMonitorStore,
@@ -69,6 +70,15 @@ struct DashboardAgentsRouteView: View {
     nonmutating set { pendingDecisionNavigationReadiness = newValue }
   }
 
+  private var automaticDetailRefreshes: Bool {
+    refreshesAutomatically && isRouteVisible
+  }
+
+  private var presentedDecisionResolution: DashboardDecisionResolution {
+    guard isRouteVisible else { return retainedDecisionResolution }
+    return store.dashboardDecisionResolution(agents: state.viewState.agents)
+  }
+
   @ViewBuilder
   private func detailPane(_ resolution: DashboardDecisionResolution) -> some View {
     switch currentSelection {
@@ -104,9 +114,9 @@ struct DashboardAgentsRouteView: View {
       store: store,
       agent: agent,
       decisions: decisions,
-      loadsTerminalDetailAutomatically: refreshesAutomatically,
-      loadsAcpDetailAutomatically: refreshesAutomatically,
-      loadsCodexDetailAutomatically: refreshesAutomatically,
+      loadsTerminalDetailAutomatically: automaticDetailRefreshes,
+      loadsAcpDetailAutomatically: automaticDetailRefreshes,
+      loadsCodexDetailAutomatically: automaticDetailRefreshes,
       initialTerminalDetail: initialTerminalDetail,
       initialAcpDetail: initialAcpDetail,
       initialCodexDetail: initialCodexDetail,
@@ -137,7 +147,7 @@ struct DashboardAgentsRouteView: View {
   }
 
   var body: some View {
-    let resolution = store.dashboardDecisionResolution(agents: state.viewState.agents)
+    let resolution = presentedDecisionResolution
     VStack(spacing: 0) {
       DashboardAgentsRouteHeader(
         countText: agentCountText(resolution),
@@ -185,19 +195,26 @@ struct DashboardAgentsRouteView: View {
     .scaledFont(.body)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardAgentsRoot)
+    .onChange(of: resolution, initial: true) { _, newResolution in
+      guard isRouteVisible, retainedDecisionResolution != newResolution else { return }
+      retainedDecisionResolution = newResolution
+    }
     .onChange(of: state.viewState.agents, initial: true) {
+      guard isRouteVisible else { return }
       reconcileSelection()
       applyPendingHistoryRestoreIfNeeded()
     }
     .onChange(of: state.viewState.isLoading) { _, isLoading in
-      if !isLoading {
+      if isRouteVisible, !isLoading {
         applyPendingHistoryRestoreIfNeeded()
       }
     }
     .onChange(of: sessions.map(\.sessionId)) {
+      guard isRouteVisible else { return }
       applyPendingHistoryRestoreIfNeeded()
     }
     .onChange(of: store.lastRefreshTimings?.recordedAt) {
+      guard isRouteVisible else { return }
       applyPendingHistoryRestoreIfNeeded()
     }
     .task(id: refreshContext) {
@@ -215,10 +232,16 @@ struct DashboardAgentsRouteView: View {
         requestRefresh(force: false, presentation: .background)
       }
     }
-    .task(id: history.pendingDashboardAgentsRestoreRequest?.requestID) {
+    .task(
+      id: DashboardAgentsNavigationTaskID(
+        requestID: history.pendingDashboardAgentsRestoreRequest?.requestID,
+        isRouteVisible: isRouteVisible
+      )
+    ) {
       applyPendingHistoryRestoreIfNeeded()
     }
     .onChange(of: store.supervisorDecisionRefreshTick) {
+      guard isRouteVisible else { return }
       applyPendingHistoryRestoreIfNeeded()
     }
     .sheet(isPresented: $isPresentingTerminalCreate) {

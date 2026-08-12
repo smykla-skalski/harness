@@ -2,7 +2,7 @@ import HarnessMonitorKit
 import SwiftUI
 
 struct SessionStatusSummaryModel: Equatable {
-  let metrics: ConnectionMetrics
+  let metrics: ConnectionStatusMetrics
   let sourceTitle: String
   let sourceSystemImage: String
   let sourceTint: SessionStatusSourceTint
@@ -41,7 +41,9 @@ struct SessionStatusSummaryModel: Equatable {
   }
 }
 
-func harnessSidebarStatusSourceTint(for metrics: ConnectionMetrics) -> SessionStatusSourceTint {
+func harnessSidebarStatusSourceTint(
+  for metrics: ConnectionStatusMetrics
+) -> SessionStatusSourceTint {
   if metrics.usesMutedConnectionChrome {
     return .disabledConnection
   }
@@ -75,7 +77,7 @@ func harnessSidebarConnectionTitle(for store: HarnessMonitorStore) -> String {
 
 @MainActor
 func harnessSidebarConnectionSummaryText(for store: HarnessMonitorStore) -> String {
-  let metrics = store.connectionMetrics
+  let metrics = store.connectionStatusMetrics
   if metrics.connectedSince != nil {
     if let latency = metrics.transportLatencyMs {
       return "Connection: \(metrics.transportKind.title), transport latency \(latency) milliseconds"
@@ -187,7 +189,7 @@ struct SessionSidebarFooter: View {
 }
 
 private struct SessionStatusSummary: View {
-  let metrics: ConnectionMetrics
+  let metrics: ConnectionStatusMetrics
   let source: SessionStatusSourcePresentation
   let statusStripState: SessionStatusStripState
   let usesFlexibleSpacer: Bool
@@ -233,7 +235,7 @@ private struct SessionStatusStrip: View {
 }
 
 private struct SessionStatusTransportChrome: View {
-  let metrics: ConnectionMetrics
+  let metrics: ConnectionStatusMetrics
 
   private static let badgeFont = Font.system(.caption2, design: .rounded, weight: .semibold)
     .monospacedDigit()

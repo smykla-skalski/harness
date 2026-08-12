@@ -55,7 +55,7 @@ extension HarnessMonitorStore {
     case .persistedDataAvailability:
       scheduleUISync([.contentToolbar, .contentChrome])
     case .metrics:
-      scheduleUISync([.sidebar])
+      break
     case .remoteDaemon:
       scheduleUISync([.contentChrome, .contentToolbar, .contentDashboard])
     }
