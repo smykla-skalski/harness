@@ -55,6 +55,25 @@ final class HarnessMonitorAppLifecyclePolicyTests: XCTestCase {
   }
 
   @MainActor
+  func testDynamicPresencePromotesBeforeSwiftUICreatesAClosedWindow() {
+    var appliedPolicies: [NSApplication.ActivationPolicy] = []
+    let controller = HarnessMonitorApplicationPresenceController(
+      setActivationPolicy: { policy in
+        appliedPolicies.append(policy)
+        return true
+      }
+    )
+    let dashboard = NSObject()
+
+    controller.configure(mode: .dynamic)
+    controller.prepareToPresentApplicationWindow()
+    controller.applicationWindowDidOpen(ObjectIdentifier(dashboard))
+    controller.applicationWindowWillClose(ObjectIdentifier(dashboard))
+
+    XCTAssertEqual(appliedPolicies, [.accessory, .regular, .accessory])
+  }
+
+  @MainActor
   func testPerformanceModeNeverPromotesTheDock() {
     var appliedPolicies: [NSApplication.ActivationPolicy] = []
     let controller = HarnessMonitorApplicationPresenceController(
@@ -66,6 +85,7 @@ final class HarnessMonitorAppLifecyclePolicyTests: XCTestCase {
     let dashboard = NSObject()
 
     controller.configure(mode: .alwaysAccessory)
+    controller.prepareToPresentApplicationWindow()
     controller.applicationWindowDidOpen(ObjectIdentifier(dashboard))
 
     XCTAssertEqual(appliedPolicies, [.accessory])

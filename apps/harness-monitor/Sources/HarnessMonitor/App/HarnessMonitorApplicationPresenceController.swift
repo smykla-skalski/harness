@@ -53,6 +53,11 @@ final class HarnessMonitorApplicationPresenceController {
     applyDesiredActivationPolicy()
   }
 
+  func prepareToPresentApplicationWindow() {
+    guard mode != .alwaysAccessory else { return }
+    applyActivationPolicy(.regular)
+  }
+
   func applicationWindowWillClose(_ windowID: ObjectIdentifier) {
     guard applicationWindowIDs.remove(windowID) != nil else { return }
     applyDesiredActivationPolicy()

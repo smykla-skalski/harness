@@ -113,6 +113,12 @@ struct AppOpenAnythingSourceContractTests {
     #expect(!presenterSource.contains("activate("))
     #expect(!presenterSource.contains("makeKeyAndOrderFront"))
     #expect(hostSource.contains("activateHarnessIfNeeded(for: step)"))
+    #expect(hostSource.contains("prepareHarnessIfNeeded(for: step)"))
+    #expect(
+      hostSource.contains(
+        "HarnessMonitorApplicationPresenceController.shared.prepareToPresentApplicationWindow()"
+      )
+    )
     #expect(hostSource.contains("struct HarnessMonitorOpenAnythingExecutorBinder: ViewModifier"))
     // No other view tree mounts the palette directly.
     #expect(!sessionSource.contains("OpenAnythingPaletteView("))
