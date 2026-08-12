@@ -36,6 +36,16 @@ DAEMON_LAUNCH_AGENT_PLIST_PATH = (
     / "LaunchAgents"
     / "Q498EB36N4.io.harnessmonitor.agent.plist"
 )
+LEGACY_DAEMON_LAUNCH_AGENT_PLIST_PATHS = (
+    Path(__file__).resolve().parents[2]
+    / "Resources"
+    / "LaunchAgents"
+    / "Q498EB36N4.io.harnessmonitor.daemon.plist",
+    Path(__file__).resolve().parents[2]
+    / "Resources"
+    / "LaunchAgents"
+    / "io.harnessmonitor.daemon.managed.plist",
+)
 
 
 def _isolated_subprocess_env() -> dict:
@@ -261,6 +271,20 @@ class DaemonLaunchAgentPlistTests(unittest.TestCase):
             ["harness-daemon", "serve"],
         )
         self.assertNotIn("daemon", payload["ProgramArguments"])
+
+    def test_launch_agents_do_not_force_tokio_console(self) -> None:
+        launch_agents = (
+            DAEMON_LAUNCH_AGENT_PLIST_PATH,
+            *LEGACY_DAEMON_LAUNCH_AGENT_PLIST_PATHS,
+        )
+
+        for launch_agent in launch_agents:
+            with self.subTest(launch_agent=launch_agent.name):
+                payload = plistlib.loads(launch_agent.read_bytes())
+                self.assertNotIn(
+                    "HARNESS_TOKIO_CONSOLE",
+                    payload["EnvironmentVariables"],
+                )
 
 
 class ResolveCargoTargetDirTests(unittest.TestCase):
