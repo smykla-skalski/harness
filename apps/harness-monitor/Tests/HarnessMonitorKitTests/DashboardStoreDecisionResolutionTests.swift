@@ -174,6 +174,65 @@ struct DashboardStoreDecisionResolutionTests {
     )
   }
 
+  @Test("Resolution cache includes session agent attribution")
+  func resolutionCacheIncludesSessionAgentAttribution() async {
+    let store = await makeBootstrappedStore()
+    let session = PreviewFixtures.summary
+    _ = store.sessionIndex.applySessionSummary(session)
+    store.supervisorOpenDecisions = [
+      Decision(
+        id: "stuck-agent:session-cache",
+        severity: .critical,
+        ruleID: "stuck-agent",
+        sessionID: session.sessionId,
+        agentID: "worker-1",
+        taskID: nil,
+        summary: "Agent has stalled",
+        contextJSON: "{}",
+        suggestedActionsJSON: "[]"
+      )
+    ]
+    let workspace = HarnessMonitorStore.dashboardAgentWorkspace(session)
+    let identity = DashboardAgentIdentity(
+      workspace: workspace.identity,
+      runtimeKind: .terminal,
+      managedAgentID: "terminal-1"
+    )
+    let matchingAgent = DashboardAgentSummary(
+      identity: identity,
+      workspace: workspace,
+      sessionID: session.sessionId,
+      sessionAgentID: "worker-1",
+      displayName: "Worker",
+      lifecycle: .active,
+      summary: nil,
+      projectDirectory: workspace.checkoutRoot,
+      createdAt: "2026-08-02T07:00:00Z",
+      updatedAt: "2026-08-02T08:00:00Z",
+      source: .live
+    )
+    let movedAgent = DashboardAgentSummary(
+      identity: identity,
+      workspace: workspace,
+      sessionID: "different-session",
+      sessionAgentID: "worker-1",
+      displayName: "Worker",
+      lifecycle: .active,
+      summary: nil,
+      projectDirectory: workspace.checkoutRoot,
+      createdAt: "2026-08-02T07:00:00Z",
+      updatedAt: "2026-08-02T08:00:00Z",
+      source: .live
+    )
+
+    let attributed = store.dashboardDecisionResolution(agents: [matchingAgent])
+    let moved = store.dashboardDecisionResolution(agents: [movedAgent])
+
+    #expect(attributed.itemsByAgent[identity]?.count == 1)
+    #expect(moved.itemsByAgent.isEmpty)
+    #expect(moved.workspaceBuckets.first?.items.first?.id == "stuck-agent:session-cache")
+  }
+
   private func makeBatch(sessionID: String) -> AcpPermissionBatch {
     AcpPermissionBatch(
       batchId: "batch-1",

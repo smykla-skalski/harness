@@ -2,6 +2,36 @@ import Foundation
 import HarnessMonitorKit
 import Observation
 
+struct TaskBoardTriageRulesEditorLoadProjection: Equatable, Sendable {
+  static let historyLimit: UInt32 = 10
+
+  let draftText: String?
+  let draftRevision: Int64?
+  let activeRevision: Int64?
+  let revisions: [TriageRuleSetRevisionSummary]
+  let audit: [TriageRuleSetAuditEntry]
+
+  init(
+    draft: TriageRuleSetDraft?,
+    revisions: [TriageRuleSetRevisionSummary],
+    audit: [TriageRuleSetAuditEntry]
+  ) {
+    draftText = draft.flatMap { Self.encodedText($0.rules) }
+    draftRevision = draft?.revision
+    activeRevision = revisions.first(where: { $0.status == .active })?.revision
+    let limit = Int(Self.historyLimit)
+    self.revisions = Array(revisions.prefix(limit))
+    self.audit = Array(audit.prefix(limit))
+  }
+
+  static func encodedText(_ rules: TriageRuleSetV1) -> String? {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+    guard let data = try? encoder.encode(rules) else { return nil }
+    return String(data: data, encoding: .utf8)
+  }
+}
+
 @MainActor
 @Observable
 final class TaskBoardTriageRulesEditorState {
@@ -16,12 +46,6 @@ final class TaskBoardTriageRulesEditorState {
   var statusMessage: String?
   var hasLoaded = false
 
-  static let jsonEncoder: JSONEncoder = {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-    return encoder
-  }()
-
   static let jsonDecoder = JSONDecoder()
 
   func decodedCandidate() -> TriageRuleSetV1? {
@@ -29,26 +53,20 @@ final class TaskBoardTriageRulesEditorState {
     return try? Self.jsonDecoder.decode(TriageRuleSetV1.self, from: data)
   }
 
-  func applyLoad(
-    draft: TriageRuleSetDraft?,
-    activeRevision: Int64?,
-    revisions: [TriageRuleSetRevisionSummary],
-    audit: [TriageRuleSetAuditEntry]
-  ) {
-    if let draft {
-      draftRevision = draft.revision
-      draftText = Self.encodedText(draft.rules) ?? draftText
+  func applyLoad(_ projection: TaskBoardTriageRulesEditorLoadProjection) {
+    if let draftRevision = projection.draftRevision {
+      self.draftRevision = draftRevision
+      draftText = projection.draftText ?? draftText
     } else {
       draftRevision = nil
     }
-    self.activeRevision = activeRevision
-    self.revisions = revisions
-    self.audit = audit
+    activeRevision = projection.activeRevision
+    revisions = projection.revisions
+    audit = projection.audit
     hasLoaded = true
   }
 
-  static func encodedText(_ rules: TriageRuleSetV1) -> String? {
-    guard let data = try? jsonEncoder.encode(rules) else { return nil }
-    return String(data: data, encoding: .utf8)
+  nonisolated static func encodedText(_ rules: TriageRuleSetV1) -> String? {
+    TaskBoardTriageRulesEditorLoadProjection.encodedText(rules)
   }
 }

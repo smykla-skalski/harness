@@ -6,6 +6,34 @@ import HarnessMonitorKit
 import HarnessMonitorUIPreviewable
 
 extension HarnessMonitorAppConfigurationTests {
+  func testMobileRelayStorageSkipsLegacyEnumerationWhenStableStateIsUsable() throws {
+    let fileManager = FileManager.default
+    let home = fileManager.temporaryDirectory
+      .appendingPathComponent("harness-monitor-mobile-relay-stable-\(UUID().uuidString)")
+    defer { try? fileManager.removeItem(at: home) }
+    let environment = HarnessMonitorEnvironment(values: [:], homeDirectory: home)
+    let stableRoot = MobileRelayStorageResolver.storageRoot(environment: environment)
+    try writeMobileRelayState(
+      stationID: "station-stable",
+      trustedDeviceIDs: ["device-phone"],
+      to: stableRoot,
+      fileManager: fileManager
+    )
+    var didEnumerateLegacyStorage = false
+
+    let preparedRoot = MobileRelayStorageResolver.prepareStorageRoot(
+      environment: environment,
+      fileManager: fileManager,
+      legacyStorageRootsProvider: { _, _ in
+        didEnumerateLegacyStorage = true
+        return []
+      }
+    )
+
+    XCTAssertEqual(preparedRoot, stableRoot)
+    XCTAssertFalse(didEnumerateLegacyStorage)
+  }
+
   func testMobileRelayStorageMigratesTrustedLaneStateWhenStableRootHasNoDevices() throws {
     let fileManager = FileManager.default
     let home = fileManager.temporaryDirectory

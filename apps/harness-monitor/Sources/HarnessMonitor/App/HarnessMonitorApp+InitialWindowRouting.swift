@@ -1,3 +1,4 @@
+import AppKit
 import HarnessMonitorKit
 import HarnessMonitorUIPreviewable
 import SwiftUI
@@ -40,8 +41,15 @@ extension HarnessMonitorApp {
   @MainActor
   func routeInitialWindows() async {
     let router = HarnessMonitorInitialWindowRouter(
+      prepareToPresentApplicationWindow: {
+        HarnessMonitorApplicationPresenceController.shared.prepareToPresentApplicationWindow()
+      },
       openDashboardWindow: {
         openWindow.openHarnessDashboardWindow()
+      },
+      activateApplication: {
+        guard !NSApplication.shared.isActive else { return }
+        NSApplication.shared.activate()
       }
     )
     router.route()

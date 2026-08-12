@@ -48,6 +48,7 @@ public struct SessionWindowView: View {
   @State private var startupSearchParticipationEnabledStorage =
     HarnessMonitorUITestEnvironment.isEnabled
   @State private var handledHistoryRestoreRequestIDStorage = 0
+  @State private var navigationStateStorage = WindowNavigationState()
 
   @MainActor
   public init(
@@ -254,15 +255,10 @@ public struct SessionWindowView: View {
   }
 
   var windowNavigationState: WindowNavigationState {
-    let navigationState = WindowNavigationState(
+    navigationStateStorage.updating(
       canGoBack: history.canGoBack,
       canGoForward: history.canGoForward
     )
-    navigationState.setHandlers(
-      back: { history.navigateBack() },
-      forward: { history.navigateForward() }
-    )
-    return navigationState
   }
 
   var renderedRoute: SessionWindowRoute {
@@ -297,6 +293,10 @@ public struct SessionWindowView: View {
       history.installSessionStateIfNeeded(
         sessionID: token.sessionID,
         selection: stateCache.selection
+      )
+      navigationStateStorage.setHandlers(
+        back: { history.navigateBack() },
+        forward: { history.navigateForward() }
       )
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

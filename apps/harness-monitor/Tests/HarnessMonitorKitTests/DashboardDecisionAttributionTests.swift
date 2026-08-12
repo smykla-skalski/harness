@@ -127,6 +127,43 @@ struct DashboardDecisionAttributionTests {
     #expect(resolution.workspaceBuckets.first?.workspace.identity == ws.identity)
   }
 
+  @Test("Workspace bucket keeps the latest metadata for a shared identity")
+  func workspaceBucketKeepsLatestMetadata() {
+    let firstWorkspace = workspace(projectID: "harness", checkoutID: "main")
+    let latestWorkspace = DashboardAgentWorkspace(
+      identity: firstWorkspace.identity,
+      projectName: "Harness Monitor",
+      checkoutName: "Current checkout",
+      checkoutRoot: "/tmp/harness/current"
+    )
+    let first = AttributionInputFixture(
+      id: "daemon-disconnect:old",
+      ruleID: "daemon-disconnect",
+      severity: .warn,
+      sessionID: "s-old",
+      sessionAgentID: nil,
+      managedAgentID: nil,
+      workspace: firstWorkspace
+    ).input
+    let latest = AttributionInputFixture(
+      id: "daemon-disconnect:new",
+      ruleID: "daemon-disconnect",
+      severity: .critical,
+      sessionID: "s-new",
+      sessionAgentID: nil,
+      managedAgentID: nil,
+      workspace: latestWorkspace
+    ).input
+
+    let resolution = DashboardDecisionAttributor.resolve(
+      inputs: [first, latest],
+      agents: []
+    )
+
+    #expect(resolution.workspaceBuckets.first?.workspace == latestWorkspace)
+    #expect(resolution.workspaceBuckets.first?.items.count == 2)
+  }
+
   @Test("Decision with no resolvable workspace is unattributed")
   func unattributed() {
     let decision = AttributionInputFixture(

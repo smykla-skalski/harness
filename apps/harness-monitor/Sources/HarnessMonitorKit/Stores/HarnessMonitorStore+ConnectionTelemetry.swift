@@ -114,6 +114,10 @@ extension HarnessMonitorStore {
     set { connection.connectionMetrics = newValue }
   }
 
+  public var connectionStatusMetrics: ConnectionStatusMetrics {
+    connection.connectionStatusMetrics
+  }
+
   public var connectionEvents: [ConnectionEvent] {
     get { connection.connectionEvents }
     set { connection.connectionEvents = newValue }

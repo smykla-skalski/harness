@@ -1,5 +1,6 @@
 import XCTest
 
+import HarnessMonitorKit
 @testable import HarnessMonitorUIPreviewable
 
 final class HarnessMonitorPerfDashboardScrollBusTests: XCTestCase {
@@ -39,5 +40,25 @@ final class HarnessMonitorPerfDashboardScrollBusTests: XCTestCase {
       HarnessMonitorPerfDashboardScrollBus.scrollToTop.rawValue,
       "io.harnessmonitor.perf.dashboardScroll.top"
     )
+  }
+
+  func testTaskBoardLaneScrollRequestEmitsTypedLaneRawValue() {
+    let notification = expectation(
+      forNotification: HarnessMonitorPerfTaskBoardLaneScrollBus.scrollToBottom,
+      object: nil
+    ) { notification in
+      XCTAssertEqual(
+        notification.userInfo?[HarnessMonitorPerfTaskBoardLaneScrollBus.laneRawKey] as? String,
+        "human_required"
+      )
+      return true
+    }
+
+    HarnessMonitorPerfTaskBoardLaneScrollBus.requestScroll(
+      lane: .humanRequired,
+      edge: "bottom"
+    )
+
+    wait(for: [notification], timeout: 1)
   }
 }

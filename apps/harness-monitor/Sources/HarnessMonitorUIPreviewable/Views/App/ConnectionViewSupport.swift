@@ -29,3 +29,19 @@ extension ConnectionMetrics {
     return requestQuality.themeColor
   }
 }
+
+extension ConnectionStatusMetrics {
+  var usesMutedConnectionChrome: Bool {
+    transportLatencyMs == nil && requestLatencyMs == nil
+  }
+
+  var latencyTint: Color {
+    if usesMutedConnectionChrome {
+      return HarnessMonitorTheme.disabledConnectionChrome
+    }
+    if transportLatencyMs != nil {
+      return transportQuality.themeColor
+    }
+    return requestQuality.themeColor
+  }
+}

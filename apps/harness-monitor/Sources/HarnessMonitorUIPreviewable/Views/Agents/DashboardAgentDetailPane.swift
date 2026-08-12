@@ -1,6 +1,11 @@
 import HarnessMonitorKit
 import SwiftUI
 
+struct DashboardAgentDetailAutomaticLoadTaskID: Equatable {
+  let identity: String
+  let isActive: Bool
+}
+
 struct DashboardAgentDetailPane: View {
   let store: HarnessMonitorStore
   let agent: DashboardAgentSummary?

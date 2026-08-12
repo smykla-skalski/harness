@@ -85,6 +85,30 @@ struct KeyWindowObserverTests {
     #expect(observer.snapshot.prefersUserNotificationDelivery)
   }
 
+  @Test("unchanged refresh does not invalidate observation")
+  func unchangedRefreshDoesNotInvalidateObservation() async {
+    let application = FakeKeyWindowApplication(
+      keyWindowIdentifier: "main",
+      keyWindowParentIdentifier: nil,
+      isActive: true,
+      isHidden: false,
+      windowStates: [
+        KeyWindowState(identifier: "main", isVisible: true, isMiniaturized: false)
+      ]
+    )
+    let observer = KeyWindowObserver(
+      application: application,
+      notificationCenter: NotificationCenter()
+    )
+
+    let invalidations = await invalidationCount(
+      { observer.snapshot },
+      after: { observer.refresh() }
+    )
+
+    #expect(invalidations == 0)
+  }
+
   @Test("observer keeps the parent window active while a sheet is key")
   func observerFallsBackToSheetParentIdentifier() async {
     let notificationCenter = NotificationCenter()

@@ -197,13 +197,30 @@ public struct TaskBoardOverviewView: View {
   }
 
   public var body: some View {
+    Group {
+      if isRouteVisible {
+        activeContent
+      } else {
+        Color.clear
+      }
+    }
+    .onChange(of: isRouteVisible, initial: true) { _, isVisible in
+      if !isVisible {
+        localHostRoutingState.suspend()
+      }
+    }
+  }
+
+  private var activeContent: some View {
     let presentationInput = synchronizedPresentationInput
     let dashboardNavigationTaskID = DashboardTaskBoardNavigationTaskID(
       requestID: navigationHistory?.pendingDashboardTaskBoardRestoreRequest?.requestID,
       isRouteVisible: isRouteVisible,
       presentationInput: presentationInput
     )
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
+    let localHostRoutingIsActive =
+      isRouteVisible && store?.contentUI.dashboard.connectionState == .online
+    return VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing) {
       boardChrome
       taskBoardDetailRow { boardSection }
         .frame(maxHeight: fillsAvailableHeight ? .infinity : nil)
@@ -261,7 +278,7 @@ public struct TaskBoardOverviewView: View {
     .task {
       await relativeTimeClock.run()
     }
-    .task(id: store?.contentUI.dashboard.connectionState == .online) {
+    .task(id: localHostRoutingIsActive) {
       updateLocalHostRouting()
     }
     .task(id: presentationInput) {

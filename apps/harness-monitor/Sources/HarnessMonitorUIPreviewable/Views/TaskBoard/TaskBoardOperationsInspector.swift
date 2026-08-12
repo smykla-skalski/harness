@@ -155,7 +155,8 @@ private struct TaskBoardOperationsInspectorContent: View {
         TaskBoardOperationsPanel(
           store: store,
           taskBoardItems: taskBoardItems,
-          isActive: isActive
+          isActive: isActive,
+          layoutMode: .vertical
         )
       }
       .padding(HarnessMonitorTheme.spacingLG)

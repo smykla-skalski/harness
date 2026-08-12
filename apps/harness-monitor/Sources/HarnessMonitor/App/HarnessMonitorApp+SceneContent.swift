@@ -157,7 +157,7 @@ extension HarnessMonitorApp {
         windowCommandRouting: appWindowCommandRouting,
         windowNavigationHistory: appWindowNavigationHistory,
         mcpWindowCommandRegistrar: appMCPWindowCommandRegistrar,
-        mobileRelayRuntime: mobileRelayRuntime,
+        mobileRelayStartupController: appMobileRelayStartupController,
         themeMode: themeModeBinding,
         selectedSection: settingsSelectedSectionBinding,
         navigationRequest: settingsNavigationRequestBinding

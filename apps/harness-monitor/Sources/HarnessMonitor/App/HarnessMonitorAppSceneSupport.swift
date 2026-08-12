@@ -309,7 +309,7 @@ struct HarnessMonitorSettingsRootView: View {
   let windowCommandRouting: WindowCommandRoutingState
   let windowNavigationHistory: GlobalWindowNavigationHistory
   let mcpWindowCommandRegistrar: HarnessMonitorMCPWindowCommandRegistrar
-  let mobileRelayRuntime: MobileMacRelayRuntime?
+  let mobileRelayStartupController: HarnessMonitorMobileRelayStartupController
   @Binding var themeMode: HarnessMonitorThemeMode
   @Binding var selectedSection: SettingsSection
   @Binding var navigationRequest: SettingsNavigationRequest?
@@ -328,7 +328,7 @@ struct HarnessMonitorSettingsRootView: View {
     windowCommandRouting: WindowCommandRoutingState,
     windowNavigationHistory: GlobalWindowNavigationHistory,
     mcpWindowCommandRegistrar: HarnessMonitorMCPWindowCommandRegistrar,
-    mobileRelayRuntime: MobileMacRelayRuntime?,
+    mobileRelayStartupController: HarnessMonitorMobileRelayStartupController,
     themeMode: Binding<HarnessMonitorThemeMode>,
     selectedSection: Binding<SettingsSection>,
     navigationRequest: Binding<SettingsNavigationRequest?>
@@ -339,7 +339,7 @@ struct HarnessMonitorSettingsRootView: View {
     self.windowCommandRouting = windowCommandRouting
     self.windowNavigationHistory = windowNavigationHistory
     self.mcpWindowCommandRegistrar = mcpWindowCommandRegistrar
-    self.mobileRelayRuntime = mobileRelayRuntime
+    self.mobileRelayStartupController = mobileRelayStartupController
     _themeMode = themeMode
     _selectedSection = selectedSection
     _navigationRequest = navigationRequest
@@ -354,7 +354,7 @@ struct HarnessMonitorSettingsRootView: View {
   }
 
   var mobilePairingContent: (@MainActor @Sendable () -> MobileRelayPairingSettingsPanel)? {
-    guard let mobileRelayRuntime else {
+    guard let mobileRelayRuntime = mobileRelayStartupController.runtime else {
       return nil
     }
     return { @MainActor @Sendable in

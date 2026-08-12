@@ -59,16 +59,23 @@ struct DashboardPolicyCanvasRouteView: View {
 
   private var isCanvasMutationDisabled: Bool { dashboardUI.isBusy || store.isDaemonActionInFlight }
 
-  private var refreshTaskID: DashboardPolicyCanvasRefreshTaskID {
-    DashboardPolicyCanvasRefreshTaskID(
+  private var refreshTaskID: DashboardPolicyCanvasRefreshTaskID? {
+    guard isRouteVisible else { return nil }
+    return DashboardPolicyCanvasRefreshTaskID(
       isRouteVisible: isRouteVisible,
       connectionState: dashboardUI.connectionState,
       needsInitialRefresh: workspace == nil
     )
   }
 
-  private var canvasIDs: [String] {
-    workspace?.canvases.map(\.canvasId) ?? []
+  private var observedActiveCanvasID: String? {
+    guard isRouteVisible else { return nil }
+    return dashboardUI.policyCanvasWorkspace?.activeCanvasId
+  }
+
+  private var observedCanvasIDs: [String]? {
+    guard isRouteVisible else { return nil }
+    return workspace?.canvases.map(\.canvasId) ?? []
   }
 
   private var switchConfirmationPresented: Binding<Bool> {
@@ -98,24 +105,26 @@ struct DashboardPolicyCanvasRouteView: View {
     let routeContent = SessionContentDetailSplitView(
       detail: { detailPane },
       footer: {
-        DashboardPolicyCanvasFooterBar(
-          workspace: workspace,
-          fallbackDocument: dashboardUI.policyPipeline,
-          selectedCanvasId: selectedCanvasId,
-          policyCanvasViewModel: policyCanvasViewModel,
-          isCanvasMutationDisabled: isCanvasMutationDisabled,
-          editingCanvasId: editingCanvasId,
-          isAutomationPolicySheetPresented: $isAutomationPolicySheetPresented,
-          createCanvas: requestCreateCanvas,
-          selectCanvas: { selectedCanvasId = $0.canvasId },
-          duplicateCanvasFromTab: requestDuplicateCanvas,
-          renameCanvasFromTab: requestRenameCanvas,
-          submitRenameCanvasFromTab: submitRenameCanvasFromTab,
-          cancelRenameCanvasFromTab: cancelRenameCanvasFromTab,
-          deleteCanvasFromTab: requestDeleteCanvas,
-          onExport: requestExportCanvas,
-          onImport: requestImportCanvas
-        )
+        if isRouteVisible {
+          DashboardPolicyCanvasFooterBar(
+            workspace: workspace,
+            fallbackDocument: dashboardUI.policyPipeline,
+            selectedCanvasId: selectedCanvasId,
+            policyCanvasViewModel: policyCanvasViewModel,
+            isCanvasMutationDisabled: isCanvasMutationDisabled,
+            editingCanvasId: editingCanvasId,
+            isAutomationPolicySheetPresented: $isAutomationPolicySheetPresented,
+            createCanvas: requestCreateCanvas,
+            selectCanvas: { selectedCanvasId = $0.canvasId },
+            duplicateCanvasFromTab: requestDuplicateCanvas,
+            renameCanvasFromTab: requestRenameCanvas,
+            submitRenameCanvasFromTab: submitRenameCanvasFromTab,
+            cancelRenameCanvasFromTab: cancelRenameCanvasFromTab,
+            deleteCanvasFromTab: requestDeleteCanvas,
+            onExport: requestExportCanvas,
+            onImport: requestImportCanvas
+          )
+        }
       }
     )
     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -128,14 +137,17 @@ struct DashboardPolicyCanvasRouteView: View {
       }
       syncCanvasSelectionToActiveCanvas()
     }
-    .onChange(of: dashboardUI.policyCanvasWorkspace?.activeCanvasId) { _, _ in
+    .onChange(of: observedActiveCanvasID) { _, _ in
+      guard isRouteVisible else { return }
       clearCanvasSelectionPreview()
       syncCanvasSelectionToActiveCanvas()
     }
     .onChange(of: selectedCanvasId) { _, newValue in
+      guard isRouteVisible else { return }
       handleCanvasSelectionChange(newValue)
     }
-    .onChange(of: canvasIDs) { _, ids in
+    .onChange(of: observedCanvasIDs) { _, ids in
+      guard let ids else { return }
       if let editingCanvasId, !ids.contains(editingCanvasId) {
         self.editingCanvasId = nil
       }
@@ -196,12 +208,13 @@ struct DashboardPolicyCanvasRouteView: View {
   }
 
   @ViewBuilder private var detailPane: some View {
-    if detailUsesLiveCanvas {
+    if !isRouteVisible || detailUsesLiveCanvas {
       PolicyCanvasView(
         viewModel: policyCanvasViewModel,
         runtime: store,
         dashboardSnapshotOverride: selectedCanvasPreview?.snapshot,
-        sceneFocusEnabled: isRouteVisible
+        sceneFocusEnabled: isRouteVisible,
+        isActive: isRouteVisible
       )
       .frame(maxWidth: .infinity, maxHeight: .infinity)
     } else {

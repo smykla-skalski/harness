@@ -24,8 +24,8 @@ struct HarnessMonitorApp: App {
   let acpAttentionState: AcpPermissionAttentionState
   let pendingDecisionsDockBadgeController: PendingDecisionsDockBadgeController
   let perfScenario: HarnessMonitorPerfScenario?
-  let mobileRelayRuntime: MobileMacRelayRuntime?
   @State private var store: HarnessMonitorStore
+  @State private var mobileRelayStartupController: HarnessMonitorMobileRelayStartupController
   @State private var menuBarStatusController: HarnessMonitorMenuBarStatusController
   @State private var windowCommandRouting: WindowCommandRoutingState
   @State private var windowNavigationHistory: GlobalWindowNavigationHistory
@@ -121,7 +121,7 @@ struct HarnessMonitorApp: App {
     pendingDecisionsDockBadgeController = PendingDecisionsDockBadgeController()
     perfScenario = configuration.perfScenario
     let store = configuration.store
-    mobileRelayRuntime = Self.makeMobileRelayRuntime(
+    let mobileRelayStartupController = HarnessMonitorMobileRelayStartupController(
       environment: configuration.environment,
       store: store,
       runsLiveSideEffects: runsLiveSideEffects
@@ -134,6 +134,7 @@ struct HarnessMonitorApp: App {
       menuBarStatusController: menuBarStatusController
     )
     _store = State(initialValue: store)
+    _mobileRelayStartupController = State(initialValue: mobileRelayStartupController)
     _menuBarStatusController = State(initialValue: menuBarStatusController)
     _windowCommandRouting = State(initialValue: WindowCommandRoutingState())
     GlobalWindowNavigationHistoryRegistry.current = windowNavigationHistory
@@ -162,7 +163,7 @@ struct HarnessMonitorApp: App {
     )
     delegate.bind(store: store)
     delegate.bind(globalHotKeyController: globalHotKeyController)
-    mobileRelayRuntime?.start()
+    mobileRelayStartupController.start()
   }
 
   static func registerLaunchDefaults() {
@@ -219,6 +220,10 @@ struct HarnessMonitorApp: App {
 
   var appStore: HarnessMonitorStore {
     store
+  }
+
+  var appMobileRelayStartupController: HarnessMonitorMobileRelayStartupController {
+    mobileRelayStartupController
   }
 
   var appDelegate: HarnessMonitorAppDelegate {

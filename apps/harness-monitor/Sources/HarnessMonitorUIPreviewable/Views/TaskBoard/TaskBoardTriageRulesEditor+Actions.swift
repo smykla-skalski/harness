@@ -15,20 +15,20 @@ struct TaskBoardTriageRulesEditorActions {
   func load() {
     guard !state.isBusy else { return }
     state.isBusy = true
+    let historyLimit = TaskBoardTriageRulesEditorLoadProjection.historyLimit
     HarnessMonitorAsyncWorkQueue.shared.submit(
       .init(title: "Loading triage rules") {
         async let draftResponse = store.taskBoardTriageRulesDraft()
-        async let revisionsResponse = store.taskBoardTriageRulesRevisions()
-        async let auditResponse = store.taskBoardTriageRulesAudit()
+        async let revisionsResponse = store.taskBoardTriageRulesRevisions(limit: historyLimit)
+        async let auditResponse = store.taskBoardTriageRulesAudit(limit: historyLimit)
         let (draft, revisions, audit) = await (draftResponse, revisionsResponse, auditResponse)
-        let activeRevision = revisions?.revisions.first(where: { $0.status == .active })?.revision
+        let projection = TaskBoardTriageRulesEditorLoadProjection(
+          draft: draft?.draft,
+          revisions: revisions?.revisions ?? [],
+          audit: audit?.audit ?? []
+        )
         await MainActor.run {
-          state.applyLoad(
-            draft: draft?.draft,
-            activeRevision: activeRevision,
-            revisions: revisions?.revisions ?? [],
-            audit: audit?.audit ?? []
-          )
+          state.applyLoad(projection)
           state.isBusy = false
         }
       }

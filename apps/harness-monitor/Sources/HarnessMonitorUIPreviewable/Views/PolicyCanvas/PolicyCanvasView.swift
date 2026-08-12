@@ -68,6 +68,7 @@ public struct PolicyCanvasView: View {
   let suppressesSceneStorage: Bool
   let allowsRemoteActions: Bool
   let sceneFocusEnabled: Bool
+  let isActive: Bool
   let automationStore: PolicyCanvasAutomationStore
 
   var viewModel: PolicyCanvasViewModel {
@@ -152,6 +153,7 @@ public struct PolicyCanvasView: View {
     suppressesSceneStorage = false
     allowsRemoteActions = true
     sceneFocusEnabled = true
+    isActive = true
     automationStore = .shared
   }
 
@@ -163,6 +165,7 @@ public struct PolicyCanvasView: View {
     suppressesSceneStorage: Bool = false,
     allowsRemoteActions: Bool = true,
     sceneFocusEnabled: Bool = true,
+    isActive: Bool = true,
     automationStore: PolicyCanvasAutomationStore = .shared
   ) {
     let snapshot = dashboardSnapshotOverride ?? runtime.policyCanvasSnapshot
@@ -181,6 +184,7 @@ public struct PolicyCanvasView: View {
     self.suppressesSceneStorage = suppressesSceneStorage
     self.allowsRemoteActions = allowsRemoteActions
     self.sceneFocusEnabled = sceneFocusEnabled
+    self.isActive = isActive
     self.automationStore = automationStore
   }
 
@@ -196,6 +200,7 @@ public struct PolicyCanvasView: View {
     suppressesSceneStorage = false
     allowsRemoteActions = true
     sceneFocusEnabled = true
+    isActive = true
     self.automationStore = automationStore
   }
 
@@ -207,6 +212,7 @@ public struct PolicyCanvasView: View {
     suppressesSceneStorage: Bool = false,
     allowsRemoteActions: Bool = true,
     sceneFocusEnabled: Bool = true,
+    isActive: Bool = true,
     automationStore: PolicyCanvasAutomationStore = .shared
   ) {
     _viewModelState = State(initialValue: viewModel)
@@ -216,11 +222,20 @@ public struct PolicyCanvasView: View {
     self.suppressesSceneStorage = suppressesSceneStorage
     self.allowsRemoteActions = allowsRemoteActions
     self.sceneFocusEnabled = sceneFocusEnabled
+    self.isActive = isActive
     self.automationStore = automationStore
   }
 
   public var body: some View {
     let _ = HarnessMonitorPerfTrace.countBodyEval("PolicyCanvasView")
+    if isActive {
+      activeContent
+    } else {
+      Color.clear
+    }
+  }
+
+  private var activeContent: some View {
     // Split from the long modifier chain below so the body type-checks in
     // reasonable time: the go-live sheet's multi-closure builder plus the
     // deletion dialog tip the single-expression chain over the solver budget.

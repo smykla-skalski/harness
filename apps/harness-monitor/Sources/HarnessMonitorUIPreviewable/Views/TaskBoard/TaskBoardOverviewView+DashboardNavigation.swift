@@ -89,7 +89,7 @@ enum DashboardTaskBoardResolvedNavigationTarget: Equatable {
 struct DashboardTaskBoardNavigationTaskID: Equatable {
   let requestID: Int?
   let isRouteVisible: Bool
-  let presentationInput: TaskBoardOverviewPresentationInput
+  let presentationInput: TaskBoardOverviewPresentationInput?
 }
 
 enum DashboardTaskBoardNavigationCommitGuard {

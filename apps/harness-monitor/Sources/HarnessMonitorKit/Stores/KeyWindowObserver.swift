@@ -114,16 +114,19 @@ public final class KeyWindowObserver {
   }
 
   public func refresh() {
-    guard let application else {
-      snapshot = KeyWindowSnapshot(
-        keyWindowIdentifier: nil,
-        isAppActive: false,
-        appIsHidden: false,
-        hasVisibleNonMiniaturizedWindows: false
-      )
-      return
-    }
-    snapshot = Self.snapshot(for: application)
+    let nextSnapshot =
+      if let application {
+        Self.snapshot(for: application)
+      } else {
+        KeyWindowSnapshot(
+          keyWindowIdentifier: nil,
+          isAppActive: false,
+          appIsHidden: false,
+          hasVisibleNonMiniaturizedWindows: false
+        )
+      }
+    guard snapshot != nextSnapshot else { return }
+    snapshot = nextSnapshot
   }
 
   public func isKey(windowID: String) -> Bool {

@@ -11,6 +11,7 @@ struct DashboardAuditRouteView: View {
   let store: HarnessMonitorStore
   let dashboardUI: HarnessMonitorStore.ContentDashboardSlice
   let history: GlobalWindowNavigationHistory?
+  let isRouteVisible: Bool
   @Environment(\.harnessDateTimeConfiguration)
   private var dateTimeConfiguration
   @AppStorage(DashboardAuditContentDetailWidthRestoration.storageKey)
@@ -23,6 +24,18 @@ struct DashboardAuditRouteView: View {
   @State private var navigationScrollTarget: DashboardAuditTimelineScrollTarget?
   @State private var copyDispatcher = DashboardAuditCopyDispatcher()
   @FocusState private var focusedFilterField: DashboardAuditFilterField?
+
+  init(
+    store: HarnessMonitorStore,
+    dashboardUI: HarnessMonitorStore.ContentDashboardSlice,
+    history: GlobalWindowNavigationHistory?,
+    isRouteVisible: Bool = true
+  ) {
+    self.store = store
+    self.dashboardUI = dashboardUI
+    self.history = history
+    self.isRouteVisible = isRouteVisible
+  }
 
   private var events: [HarnessMonitorAuditEvent] {
     guard let routedTimelineEvent else { return dashboardUI.auditEvents }
@@ -54,6 +67,14 @@ struct DashboardAuditRouteView: View {
   }
 
   var body: some View {
+    if isRouteVisible {
+      activeContent
+    } else {
+      Color.clear
+    }
+  }
+
+  private var activeContent: some View {
     ViewBodySignposter.trace(Self.self, "DashboardAuditRouteView") {
       VStack(spacing: 0) {
         DashboardAuditSummaryStrip(

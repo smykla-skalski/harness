@@ -4,14 +4,20 @@ import HarnessMonitorUIPreviewable
 @MainActor
 struct HarnessMonitorInitialWindowRouter {
   let userDefaults: UserDefaults
+  let prepareToPresentApplicationWindow: () -> Void
   let openDashboardWindow: () -> Void
+  let activateApplication: () -> Void
 
   init(
     userDefaults: UserDefaults = .standard,
-    openDashboardWindow: @escaping () -> Void
+    prepareToPresentApplicationWindow: @escaping () -> Void,
+    openDashboardWindow: @escaping () -> Void,
+    activateApplication: @escaping () -> Void
   ) {
     self.userDefaults = userDefaults
+    self.prepareToPresentApplicationWindow = prepareToPresentApplicationWindow
     self.openDashboardWindow = openDashboardWindow
+    self.activateApplication = activateApplication
   }
 
   func route() {
@@ -25,7 +31,9 @@ struct HarnessMonitorInitialWindowRouter {
     case .none:
       return
     case .dashboard:
+      prepareToPresentApplicationWindow()
       openDashboardWindow()
+      activateApplication()
     }
   }
 }

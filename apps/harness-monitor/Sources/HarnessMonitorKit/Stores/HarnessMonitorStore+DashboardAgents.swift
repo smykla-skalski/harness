@@ -11,7 +11,22 @@ extension HarnessMonitorStore {
     let details = await cacheService.loadSessionDetails(
       sessionIDs: uniqueSessions.map(\.sessionId)
     )
-    let summariesByID = Dictionary(uniqueKeysWithValues: uniqueSessions.map { ($0.sessionId, $0) })
+    let cachedAt = lastPersistedSnapshotAt
+    return await Task.detached(priority: .userInitiated) {
+      Self.projectCachedDashboardAgents(
+        sessions: uniqueSessions,
+        details: details,
+        cachedAt: cachedAt
+      )
+    }.value
+  }
+
+  nonisolated private static func projectCachedDashboardAgents(
+    sessions: [SessionSummary],
+    details: [String: SessionCacheService.CachedSessionSnapshot],
+    cachedAt: Date?
+  ) -> DashboardAgentCacheSnapshot {
+    let summariesByID = Dictionary(uniqueKeysWithValues: sessions.map { ($0.sessionId, $0) })
     let agents = details.values.flatMap { cached -> [DashboardAgentSummary] in
       let session = summariesByID[cached.detail.session.sessionId] ?? cached.detail.session
       return cached.detail.agents.compactMap { registration in
@@ -20,7 +35,7 @@ extension HarnessMonitorStore {
     }
     return DashboardAgentCacheSnapshot(
       agents: DashboardAgentSummary.deduplicated(agents),
-      cachedAt: lastPersistedSnapshotAt
+      cachedAt: cachedAt
     )
   }
 
@@ -60,14 +75,23 @@ extension HarnessMonitorStore {
         refreshedAt: .now
       )
     }
+    let loads = await Self.loadDashboardAgentSessions(
+      uniqueSessions,
+      using: client
+    )
+    return await Task.detached(priority: .userInitiated) {
+      Self.projectDashboardAgentRefresh(loads: loads, cachedAgents: cachedAgents)
+    }.value
+  }
+
+  nonisolated private static func projectDashboardAgentRefresh(
+    loads: [DashboardAgentSessionLoad],
+    cachedAgents: [DashboardAgentSummary]
+  ) -> DashboardAgentRefreshResult {
     let cachedByIdentity = Dictionary(
       uniqueKeysWithValues: DashboardAgentSummary.deduplicated(cachedAgents).map {
         ($0.identity, $0)
       }
-    )
-    let loads = await Self.loadDashboardAgentSessions(
-      uniqueSessions,
-      using: client
     )
     var liveAgents: [DashboardAgentSummary] = []
     var successfulSessionIDs: Set<String> = []

@@ -12,15 +12,18 @@ struct TaskBoardOperationsPanel: View {
   let store: HarnessMonitorStore
   let taskBoardItems: [TaskBoardItem]
   let isActive: Bool
+  let layoutMode: TaskBoardOperationsPanelLayoutMode
 
   init(
     store: HarnessMonitorStore,
     taskBoardItems: [TaskBoardItem],
-    isActive: Bool = true
+    isActive: Bool = true,
+    layoutMode: TaskBoardOperationsPanelLayoutMode = .responsive
   ) {
     self.store = store
     self.taskBoardItems = taskBoardItems
     self.isActive = isActive
+    self.layoutMode = layoutMode
   }
 
   @Environment(\.fontScale)
@@ -48,6 +51,7 @@ struct TaskBoardOperationsPanel: View {
   var body: some View {
     TaskBoardSection(title: "Operations") {
       TaskBoardOperationsPanelLayout(
+        mode: layoutMode,
         metrics: metrics,
         syncCard: TaskBoardOperationsSyncCard(
           store: store,

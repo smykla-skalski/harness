@@ -24,6 +24,10 @@ final class TaskBoardLaneHoverTracking {
     frames.removeValue(forKey: id)
   }
 
+  func removeAllFrames() {
+    frames.removeAll(keepingCapacity: true)
+  }
+
   /// Cards never overlap in a lane, so at most one rect contains any point.
   func cardID(at point: CGPoint) -> TaskBoardLaneCardHoverID? {
     frames.first { $0.value.contains(point) }?.key

@@ -68,6 +68,11 @@ func expectVisibleResizableInspectorSource(_ source: String) {
   #expect(source.contains("static let defaultValue: CGFloat = 480"))
   #expect(source.contains("@AppStorage(TaskBoardOperationsInspectorWidth.storageKey)"))
   #expect(source.contains("ScrollView(.vertical)"))
+  #expect(
+    source.contains(
+      "VStack(alignment: .leading, spacing: HarnessMonitorTheme.sectionSpacing)"
+    )
+  )
   #expect(!source.contains("topContentInset"))
   #expect(source.contains(".harnessInspectorGlass(isActive: true)"))
   #expect(clippedIndex != nil)
@@ -82,6 +87,7 @@ func expectVisibleResizableInspectorSource(_ source: String) {
   #expect(source.contains("TaskBoardOperationsPanel("))
   #expect(source.contains("taskBoardItems: taskBoardItems"))
   #expect(source.contains("isActive: true"))
+  #expect(source.contains("layoutMode: .vertical"))
   #expect(source.contains("@GestureState private var resizeTranslation"))
   #expect(source.contains("DragGesture(minimumDistance: 0)"))
   #expect(source.contains(".updating($resizeTranslation)"))

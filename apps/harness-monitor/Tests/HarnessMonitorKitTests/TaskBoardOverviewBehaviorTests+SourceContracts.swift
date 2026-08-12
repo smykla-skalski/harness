@@ -30,6 +30,7 @@ extension TaskBoardOverviewBehaviorTests {
     let cardChrome = try taskBoardSourceFile(named: "TaskBoardCardChrome.swift")
     let hoverTracking = try taskBoardSourceFile(named: "TaskBoardLaneHoverTracking.swift")
     let laneColumn = try taskBoardSourceFile(named: "TaskBoardLaneUnifiedColumn.swift")
+    let laneRows = try taskBoardSourceFile(named: "TaskBoardLaneUnifiedColumn+Rows.swift")
 
     // The old aggregation reduced one PreferenceKey across every card in the
     // lane; it updated several times per frame as children measured in, which
@@ -42,8 +43,16 @@ extension TaskBoardOverviewBehaviorTests {
     #expect(!hoverTracking.contains("TaskBoardLaneCardFramePreferenceKey"))
     #expect(!cardChrome.contains("TaskBoardLaneCardFrame("))
     #expect(!laneColumn.contains("TaskBoardLaneCardFramePreferenceKey"))
-    #expect(cardChrome.contains("onGeometryChange(for: CGRect.self)"))
+    #expect(cardChrome.contains("onGeometryChange(for: CGRect?.self)"))
     #expect(cardChrome.contains("tracking.setFrame(frame, for: id)"))
+    #expect(cardChrome.contains("behavior.isGeometryRecordingEnabled ?"))
+    #expect(laneColumn.contains(".onScrollPhaseChange"))
+    #expect(laneColumn.contains("var isCardGeometryRecordingEnabled: Bool { !isScrolling }"))
+    #expect(laneColumn.contains(".onDisappear {"))
+    #expect(laneColumn.contains("resetScrollTracking()"))
+    #expect(laneColumn.contains("isScrolling = false"))
+    #expect(laneColumn.contains("hoverTrackingValue.removeAllFrames()"))
+    #expect(laneRows.contains("guard isCardGeometryRecordingEnabled else"))
   }
 
   @Test("Expanded lane List owns custom insertion and card spacing")

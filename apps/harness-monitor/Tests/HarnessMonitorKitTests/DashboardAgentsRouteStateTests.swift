@@ -1,5 +1,7 @@
 import Foundation
+import Observation
 import Testing
+import os
 
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorUIPreviewable
@@ -192,6 +194,52 @@ struct DashboardAgentsRouteStateTests {
 
     #expect(state.viewState.agents.map(\.displayName) == ["Newest"])
     #expect(state.viewState.source == .live)
+  }
+
+  @Test("Background diagnostics do not republish unchanged rendered state")
+  func backgroundDiagnosticsDoNotRepublishRenderedState() throws {
+    let initialTimestamp = Date(timeIntervalSince1970: 1_000)
+    let latestCacheTimestamp = Date(timeIntervalSince1970: 2_000)
+    let latestRefreshTimestamp = Date(timeIntervalSince1970: 3_000)
+    let agent = fixtureAgent(source: .cache)
+    let state = DashboardAgentsRouteState(
+      viewState: DashboardAgentBrowserViewState(
+        agents: [agent],
+        hasAttemptedLoad: true,
+        source: .cache,
+        cachedAt: initialTimestamp,
+        refreshedAt: initialTimestamp
+      )
+    )
+    let generation = try #require(
+      state.beginLoad(force: false, presentation: .background)
+    )
+    let didInvalidate = OSAllocatedUnfairLock(initialState: false)
+    withObservationTracking {
+      _ = state.viewState
+    } onChange: {
+      didInvalidate.withLock { $0 = true }
+    }
+
+    state.adoptCache(
+      DashboardAgentCacheSnapshot(agents: [agent], cachedAt: latestCacheTimestamp),
+      generation: generation
+    )
+    state.finishLoad(
+      DashboardAgentRefreshResult(
+        agents: [agent],
+        source: .cache,
+        issue: nil,
+        refreshedAt: latestRefreshTimestamp
+      ),
+      generation: generation
+    )
+
+    #expect(!didInvalidate.withLock { $0 })
+    #expect(state.lastCachedSnapshotAt == latestCacheTimestamp)
+    #expect(state.lastCompletedRefreshAt == latestRefreshTimestamp)
+    #expect(state.viewState.cachedAt == initialTimestamp)
+    #expect(state.viewState.refreshedAt == initialTimestamp)
   }
 }
 

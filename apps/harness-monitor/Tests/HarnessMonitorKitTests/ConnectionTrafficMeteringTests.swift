@@ -6,37 +6,58 @@ import Testing
 @MainActor
 @Suite("Connection traffic metering")
 struct ConnectionTrafficMeteringTests {
-  @Test("A streamed event costs one sidebar sync")
-  func streamedEventCostsOneSidebarSync() async {
+  @Test("Stream traffic leaves persistent connection chrome unchanged")
+  func streamTrafficLeavesPersistentConnectionChromeUnchanged() async {
     let store = await makeBootstrappedStore()
     let eventCount = 50
+    let originalStatusMetrics = store.connectionStatusMetrics
+    let originalMessageCount = store.connectionMetrics.messagesReceived
+    var sidebarSyncCountAfterTraffic = -1
 
     store.debugResetUISyncCounts()
-    for index in 0..<eventCount {
-      store.recordStreamEvent(
-        countedInTraffic: true,
-        recordedAt: Date(timeIntervalSinceReferenceDate: 1_000_000 + Double(index) / 100)
-      )
-    }
+    let invalidations = await invalidationCount(
+      { store.connectionStatusMetrics },
+      after: {
+        for index in 0..<eventCount {
+          store.recordStreamEvent(
+            countedInTraffic: true,
+            recordedAt: Date(
+              timeIntervalSinceReferenceDate: 1_000_000 + Double(index) / 100
+            )
+          )
+        }
+        sidebarSyncCountAfterTraffic = store.debugUISyncCount(for: .sidebar)
+      }
+    )
 
-    #expect(store.debugUISyncCount(for: .sidebar) == eventCount)
+    #expect(store.connectionMetrics.messagesReceived == originalMessageCount + eventCount)
+    #expect(store.connectionStatusMetrics == originalStatusMetrics)
+    #expect(invalidations == 0)
+    #expect(sidebarSyncCountAfterTraffic == 0)
   }
 
-  @Test("A successful request costs one sidebar sync")
-  func successfulRequestCostsOneSidebarSync() async {
+  @Test("Request latency updates connection chrome without a sidebar slice sync")
+  func requestLatencyUpdatesConnectionChromeWithoutSidebarSliceSync() async {
     let store = await makeBootstrappedStore()
-    let requestCount = 25
+    let recordedAt = Date(timeIntervalSinceReferenceDate: 2_000_000)
+    let connectedSince = store.connectionStatusMetrics.connectedSince
 
     store.debugResetUISyncCounts()
-    for index in 0..<requestCount {
-      store.recordRequestSuccess(
-        latencyMs: 20 + index,
-        latencySource: .request,
-        recordedAt: Date(timeIntervalSinceReferenceDate: 2_000_000 + Double(index) / 100)
-      )
-    }
+    let invalidations = await invalidationCount(
+      { store.connectionStatusMetrics },
+      after: {
+        store.recordRequestSuccess(
+          latencyMs: 73,
+          latencySource: .request,
+          recordedAt: recordedAt
+        )
+      }
+    )
 
-    #expect(store.debugUISyncCount(for: .sidebar) == requestCount)
+    #expect(store.connectionStatusMetrics.requestLatencyMs == 73)
+    #expect(store.connectionStatusMetrics.connectedSince == connectedSince)
+    #expect(invalidations == 1)
+    #expect(store.debugUISyncCount(for: .sidebar) == 0)
   }
 }
 

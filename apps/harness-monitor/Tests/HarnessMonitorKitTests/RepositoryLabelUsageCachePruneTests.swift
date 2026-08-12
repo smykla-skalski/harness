@@ -30,7 +30,22 @@ struct RepositoryLabelUsageCachePruneTests {
         "await worker.pruneStale()"
       )
     )
-    #expect(source.contains("nonisolated private static func runReviewFilesVacuum("))
+    #expect(
+      source.contains(
+        "nonisolated private static func runReviewFilesVacuumIfNeeded(container: ModelContainer)"
+      )
+    )
+
+    let schedulerStart = try #require(
+      source.range(of: "private func scheduleReviewFilesVacuumIfNeeded()")
+    )
+    let workerStart = try #require(
+      source.range(of: "nonisolated private static func runReviewFilesVacuumIfNeeded")
+    )
+    let schedulerSource = source[schedulerStart.lowerBound..<workerStart.lowerBound]
+    let workerSource = source[workerStart.lowerBound...]
+    #expect(!schedulerSource.contains("countCachedFiles()"))
+    #expect(workerSource.contains("countCachedFiles()"))
   }
 
   @Test("pruneStale caps rows per repository at the lowest-rank tail")

@@ -178,6 +178,46 @@ public struct ConnectionMetrics: Equatable, Sendable {
   }()
 }
 
+/// Connection fields used by persistent window chrome. Traffic counters and
+/// diagnostics change per event, so observing them here would invalidate the UI.
+public struct ConnectionStatusMetrics: Equatable, Sendable {
+  public let transportKind: TransportKind
+  public let transportLatencyMs: Int?
+  public let requestLatencyMs: Int?
+  public let connectedSince: Date?
+
+  public init(
+    transportKind: TransportKind,
+    transportLatencyMs: Int?,
+    requestLatencyMs: Int?,
+    connectedSince: Date?
+  ) {
+    self.transportKind = transportKind
+    self.transportLatencyMs = transportLatencyMs
+    self.requestLatencyMs = requestLatencyMs
+    self.connectedSince = connectedSince
+  }
+
+  public init(_ metrics: ConnectionMetrics) {
+    self.init(
+      transportKind: metrics.transportKind,
+      transportLatencyMs: metrics.transportLatencyMs,
+      requestLatencyMs: metrics.requestLatencyMs,
+      connectedSince: metrics.connectedSince
+    )
+  }
+
+  public var transportQuality: ConnectionQuality {
+    ConnectionQuality(latencyMs: transportLatencyMs)
+  }
+
+  public var requestQuality: ConnectionQuality {
+    ConnectionQuality(latencyMs: requestLatencyMs)
+  }
+
+  public static let initial = Self(ConnectionMetrics.initial)
+}
+
 public struct HarnessMonitorRefreshTimings: Equatable, Sendable {
   public let recordedAt: Date
   public let diagnosticsLatencyMs: Int

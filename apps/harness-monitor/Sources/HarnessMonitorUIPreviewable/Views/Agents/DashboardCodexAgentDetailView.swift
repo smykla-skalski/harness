@@ -47,10 +47,17 @@ struct DashboardCodexAgentDetailView: View {
       .frame(maxWidth: .infinity, alignment: .topLeading)
     }
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardAgentDetail)
-    .task(id: "\(agent.identity.id):\(agent.updatedAt)") {
+    .task(id: automaticLoadTaskID) {
       guard loadsAutomatically else { return }
       requestLoad()
     }
+  }
+
+  private var automaticLoadTaskID: DashboardAgentDetailAutomaticLoadTaskID {
+    DashboardAgentDetailAutomaticLoadTaskID(
+      identity: "\(agent.identity.id):\(agent.updatedAt)",
+      isActive: loadsAutomatically
+    )
   }
 
   private var navigationDecisionIDs: Set<String> {

@@ -5,13 +5,32 @@ import SwiftUI
 struct DashboardDiagnosticsRouteView: View {
   let store: HarnessMonitorStore
   let selectedRoute: DashboardWindowRoute
+  let isRouteVisible: Bool
   @State private var databaseStatistics: DatabaseStatistics?
   @State private var isDatabaseStatisticsLoading = false
   @Environment(\.harnessDateTimeConfiguration)
   private var dateTimeConfiguration
 
+  init(
+    store: HarnessMonitorStore,
+    selectedRoute: DashboardWindowRoute,
+    isRouteVisible: Bool = true
+  ) {
+    self.store = store
+    self.selectedRoute = selectedRoute
+    self.isRouteVisible = isRouteVisible
+  }
+
   var body: some View {
-    return ViewBodySignposter.trace(Self.self, "DashboardDiagnosticsRouteView") {
+    if isRouteVisible {
+      activeContent
+    } else {
+      Color.clear
+    }
+  }
+
+  private var activeContent: some View {
+    ViewBodySignposter.trace(Self.self, "DashboardDiagnosticsRouteView") {
       HarnessMonitorColumnScrollView(
         horizontalPadding: 24,
         verticalPadding: 24,

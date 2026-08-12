@@ -47,6 +47,7 @@ struct TaskBoardLaneUnifiedColumn: View {
   private var isLaneEnabled
   @State private var hoverTracking = TaskBoardLaneHoverTracking()
   @State private var hoveredCardID: TaskBoardLaneCardHoverID?
+  @State private var isScrolling = false
   private let perfScrollHookEnabled = HarnessMonitorPerfTaskBoardLaneScrollBus.isActiveAtLaunch
 
   var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
@@ -58,6 +59,7 @@ struct TaskBoardLaneUnifiedColumn: View {
     get { hoveredCardID }
     nonmutating set { hoveredCardID = newValue }
   }
+  var isCardGeometryRecordingEnabled: Bool { !isScrolling }
   var cardHoverCoordinateSpace: String {
     "task-board-lane-card-hover-\(lane.rawValue)"
   }
@@ -284,6 +286,30 @@ struct TaskBoardLaneUnifiedColumn: View {
         guard !dragRuntime.isActive else { return }
         updateHoveredCard(phase: phase)
       }
+      .onScrollPhaseChange { _, phase in
+        updateScrollPhase(phase)
+      }
+      .onDisappear {
+        resetScrollTracking()
+      }
+  }
+
+  private func updateScrollPhase(_ phase: ScrollPhase) {
+    let nextIsScrolling = phase.isScrolling
+    guard isScrolling != nextIsScrolling else { return }
+    isScrolling = nextIsScrolling
+    if nextIsScrolling {
+      hoverTrackingValue.removeAllFrames()
+      if hoveredCardIDValue != nil {
+        hoveredCardIDValue = nil
+      }
+    }
+  }
+
+  private func resetScrollTracking() {
+    isScrolling = false
+    hoverTrackingValue.removeAllFrames()
+    hoveredCardIDValue = nil
   }
 
   private func handleLaneDropSession(_ session: DropSession) {

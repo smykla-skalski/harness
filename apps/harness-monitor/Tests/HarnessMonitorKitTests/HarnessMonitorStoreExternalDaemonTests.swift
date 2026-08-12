@@ -6,11 +6,12 @@ import Testing
 @MainActor
 @Suite("Harness Monitor store external daemon")
 struct HarnessMonitorStoreExternalDaemonTests {
-  @Test("External bootstrap skips launch agent gate and connects via warm-up")
+  @Test("External bootstrap skips managed containment and connects via warm-up")
   func externalBootstrapSkipsLaunchAgentAndConnects() async {
     let daemon = RecordingDaemonController(
       launchAgentInstalled: false,
-      registrationState: .notRegistered
+      registrationState: .notRegistered,
+      legacyCleanupError: DaemonControlError.commandFailed("managed-only containment ran")
     )
     let store = HarnessMonitorStore(
       daemonController: daemon,
@@ -21,6 +22,7 @@ struct HarnessMonitorStoreExternalDaemonTests {
 
     #expect(store.connectionState == .online)
     #expect(store.currentFailureFeedbackMessage == nil)
+    #expect(await daemon.recordedLegacyCleanupCallCount() == 0)
   }
 
   @Test("External bootstrap reports short external offline error")
@@ -60,8 +62,8 @@ struct HarnessMonitorStoreExternalDaemonTests {
     #expect(message.contains("approval"))
   }
 
-  @Test("External bootstrap falls through to warm-up error when warm-up fails")
-  func externalBootstrapFallsBackToWarmUpErrorMessage() async {
+  @Test("External bootstrap surfaces a localized warm-up error")
+  func externalBootstrapSurfacesLocalizedWarmUpError() async {
     struct SentinelError: Error, LocalizedError {
       var errorDescription: String? { "sentinel warm-up failure" }
     }
@@ -77,8 +79,7 @@ struct HarnessMonitorStoreExternalDaemonTests {
       Issue.record("Expected offline connection state, got \(store.connectionState)")
       return
     }
-    // Non-DaemonControlError falls back to the generic recovery guidance message.
-    #expect(message.contains("Background helper unavailable"))
+    #expect(message == "sentinel warm-up failure")
   }
 
   @Test("Ownership init reads HARNESS_MONITOR_EXTERNAL_DAEMON")

@@ -32,11 +32,31 @@ final class HarnessMonitorInitialWindowPlanTests: XCTestCase {
     var openCount = 0
     let router = HarnessMonitorInitialWindowRouter(
       userDefaults: userDefaults,
-      openDashboardWindow: { openCount += 1 }
+      prepareToPresentApplicationWindow: {},
+      openDashboardWindow: { openCount += 1 },
+      activateApplication: {}
     )
 
     router.route()
 
     XCTAssertEqual(openCount, 1)
+  }
+
+  func testRouterPreparesAndActivatesDashboardInPresentationOrder() {
+    let suiteName = "io.harnessmonitor.tests.InitialWindowRouter.\(UUID().uuidString)"
+    let userDefaults = UserDefaults(suiteName: suiteName)!
+    defer { userDefaults.removePersistentDomain(forName: suiteName) }
+    userDefaults.set(true, forKey: DashboardWindowLifecycleTracker.openAtQuitKey)
+    var events: [String] = []
+    let router = HarnessMonitorInitialWindowRouter(
+      userDefaults: userDefaults,
+      prepareToPresentApplicationWindow: { events.append("prepare") },
+      openDashboardWindow: { events.append("open") },
+      activateApplication: { events.append("activate") }
+    )
+
+    router.route()
+
+    XCTAssertEqual(events, ["prepare", "open", "activate"])
   }
 }

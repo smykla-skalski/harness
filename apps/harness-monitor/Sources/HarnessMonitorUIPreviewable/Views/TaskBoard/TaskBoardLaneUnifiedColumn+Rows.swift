@@ -67,7 +67,10 @@ extension TaskBoardLaneUnifiedColumn {
       id: hoverID,
       in: cardHoverCoordinateSpace,
       tracking: hoverTrackingValue,
-      isHovered: hoveredCardIDValue == hoverID,
+      behavior: TaskBoardCardFrameBehavior(
+        isHovered: hoveredCardIDValue == hoverID,
+        isGeometryRecordingEnabled: isCardGeometryRecordingEnabled
+      ),
       onChange: resolveHoveredCard
     )
     .background {
@@ -97,7 +100,10 @@ extension TaskBoardLaneUnifiedColumn {
       id: hoverID,
       in: cardHoverCoordinateSpace,
       tracking: hoverTrackingValue,
-      isHovered: hoveredCardIDValue == hoverID,
+      behavior: TaskBoardCardFrameBehavior(
+        isHovered: hoveredCardIDValue == hoverID,
+        isGeometryRecordingEnabled: isCardGeometryRecordingEnabled
+      ),
       onChange: resolveHoveredCard
     )
     .background {
@@ -117,7 +123,10 @@ extension TaskBoardLaneUnifiedColumn {
       id: hoverID,
       in: cardHoverCoordinateSpace,
       tracking: hoverTrackingValue,
-      isHovered: hoveredCardIDValue == hoverID,
+      behavior: TaskBoardCardFrameBehavior(
+        isHovered: hoveredCardIDValue == hoverID,
+        isGeometryRecordingEnabled: isCardGeometryRecordingEnabled
+      ),
       onChange: resolveHoveredCard
     )
   }
@@ -141,6 +150,10 @@ extension TaskBoardLaneUnifiedColumn {
     switch phase {
     case .active(let location):
       hoverTrackingValue.location = location
+      guard isCardGeometryRecordingEnabled else {
+        updateHoveredCard(id: nil)
+        return
+      }
       resolveHoveredCard()
     case .ended:
       hoverTrackingValue.location = nil
