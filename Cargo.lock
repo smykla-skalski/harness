@@ -3578,7 +3578,7 @@ dependencies = [
  "libc",
  "nix 0.31.3",
  "notify",
- "noyalib 0.0.16",
+ "noyalib 0.0.53",
  "opentelemetry",
  "opentelemetry_sdk",
  "pathdiff",
@@ -5935,14 +5935,16 @@ dependencies = [
 
 [[package]]
 name = "noyalib"
-version = "0.0.16"
+version = "0.0.53"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c11d7b3d5d0b3d22eecbf678f9830b25444e90e773510ac3092d406082164d69"
+checksum = "962838abbd8dd2cd3844d2208dc502458bba6985f8bf1dc21761b30260fcbd7f"
 dependencies = [
+ "hashbrown 0.17.1",
  "indexmap 2.14.0",
+ "libm",
  "memchr",
  "rustc-hash",
- "serde",
+ "serde_core",
  "smallvec",
 ]
 
