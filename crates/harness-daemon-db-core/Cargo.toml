@@ -23,12 +23,12 @@ harness-telemetry = { path = "../harness-telemetry", version = "57.0.0" }
 hex = "0.4.3"
 rusqlite = { version = "0.39", features = ["bundled"] }
 sqlx = { version = "0.9.0-alpha.1", default-features = false, features = ["sqlite", "sqlite-bundled", "runtime-tokio", "tls-rustls-ring", "migrate", "macros", "chrono", "uuid", "json"] }
-tokio = { version = "=1.53.1", features = ["sync"] }
+tokio = { version = "=1.53.3", features = ["sync"] }
 tracing = "0.1.44"
 
 [dev-dependencies]
 tempfile = "=3.27.0"
-tokio = { version = "=1.53.1", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "=1.53.3", features = ["macros", "rt-multi-thread"] }
 
 # Matches the root crate's lint set rather than the lighter one the facade
 # crates carry: this code was extracted from harness-daemon's own `db`
