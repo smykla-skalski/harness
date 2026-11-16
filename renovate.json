@@ -69,7 +69,9 @@
     }
   ],
   "vulnerabilityAlerts": {"automerge": false},
-  "dependencyDashboardLabels": ["automation/renovate"],
+  "dependencyDashboard": {
+    "labels": ["automation/renovate"]
+  },
   "schedule": ["* 4 * * 6"],
   "timezone": "Europe/Warsaw"
 }
