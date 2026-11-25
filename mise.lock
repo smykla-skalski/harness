@@ -195,6 +195,7 @@ url_api = "https://api.github.com/repos/koalaman/shellcheck/releases/assets/2790
 [[tools.tuist]]
 version = "4.203.4"
 backend = "aqua:tuist/tuist"
+unsupported_platforms = ["windows-x64"]
 
 [tools.tuist."platforms.linux-arm64"]
 checksum = "sha256:5835e2290ef93b3e5f20ae45cbe54698e7768056aa10286eaecdd9affc31f9e2"
@@ -229,9 +230,20 @@ url_api = "https://api.github.com/repos/tuist/tuist/releases/assets/504546155"
 [[tools.xcbeautify]]
 version = "3.2.1"
 backend = "aqua:cpisciotta/xcbeautify"
+unsupported_platforms = [
+    "linux-arm64",
+    "linux-arm64-musl",
+    "windows-x64",
+]
 
 [tools.xcbeautify."platforms.linux-x64"]
 checksum = "sha256:5302e480b01910fcda9071fcc5a64f0a7fce904965834a1e9ed065bc9638bfe9"
+url = "https://github.com/cpisciotta/xcbeautify/releases/download/3.2.1/xcbeautify-3.2.1-x86_64-unknown-linux-gnu.tar.xz"
+url_api = "https://api.github.com/repos/cpisciotta/xcbeautify/releases/assets/388373840"
+
+[tools.xcbeautify."platforms.linux-x64-musl"]
+checksum = "sha256:5302e480b01910fcda9071fcc5a64f0a7fce904965834a1e9ed065bc9638bfe9"
+checksum_source = "mise-versions"
 url = "https://github.com/cpisciotta/xcbeautify/releases/download/3.2.1/xcbeautify-3.2.1-x86_64-unknown-linux-gnu.tar.xz"
 url_api = "https://api.github.com/repos/cpisciotta/xcbeautify/releases/assets/388373840"
 
